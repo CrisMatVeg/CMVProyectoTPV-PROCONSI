@@ -297,11 +297,15 @@ body {
 }
 
 /* disabled / baja product */
-.product-card.inactive {
-  opacity: 0.45;
-}
 .product-card.inactive .product-emoji {
+  opacity: 0.45;
   filter: grayscale(1);
+}
+.product-card.inactive .product-name,
+.product-card.inactive .product-sku,
+.product-card.inactive .product-price,
+.product-card.inactive .baja-pill {
+  opacity: 0.45;
 }
 .baja-pill {
   position: absolute;
@@ -525,7 +529,7 @@ body {
 }
 .payment-methods {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: 1fr 1fr;
   gap: 8px;
 }
 .pay-btn {
@@ -751,84 +755,145 @@ body {
 
 /* LANDING & AUTH CLASSES */
 .container-full {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    flex: 1;
-    background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  background: var(--bg);
 }
 
 .hero-box {
-    background: var(--surface);
-    padding: 64px 40px;
-    border-radius: 24px;
-    border: 1.5px solid var(--border);
-    box-shadow: var(--shadow-lg);
-    max-width: 500px;
-    text-align: center;
+  background: var(--surface);
+  padding: 64px 40px;
+  border-radius: 24px;
+  border: 1.5px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  max-width: 500px;
+  text-align: center;
 }
 
 .hero-icon {
-    font-size: 48px;
-    margin-bottom: 24px;
+  font-size: 48px;
+  margin-bottom: 24px;
 }
 
 .hero-title {
-    font-family: "DM Sans", sans-serif;
-    font-size: 28px;
-    font-weight: 700;
-    color: var(--text);
-    margin-bottom: 12px;
+  font-family: "DM Sans", sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 12px;
 }
 
 .hero-text {
-    color: var(--text-muted);
-    font-size: 15px;
-    line-height: 1.6;
-    margin-bottom: 32px;
+  color: var(--text-muted);
+  font-size: 15px;
+  line-height: 1.6;
+  margin-bottom: 32px;
 }
 
 .auth-card {
-    width: 100%;
-    max-width: 400px;
+  width: 100%;
+  max-width: 400px;
 }
 
 .form-group {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    margin-bottom: 16px;
-    text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+  text-align: left;
 }
 
 .full-width {
-    width: 100%;
+  width: 100%;
 }
 
-.mb-24 { margin-bottom: 24px; }
-.hidden { display: none; }
+.mb-24 {
+  margin-bottom: 24px;
+}
+.hidden {
+  display: none;
+}
 
 /* Ajuste para que los inputs de envío luzcan como los botones del TPV */
 input[type="submit"].charge-btn {
-    appearance: none;
-    -webkit-appearance: none;
-    width: 100%;
-    border: none;
-    cursor: pointer;
-    text-align: center;
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  border: none;
+  cursor: pointer;
+  text-align: center;
 }
 
 input[type="submit"].btn-clear {
-    appearance: none;
-    background: none;
-    border: none;
-    cursor: pointer;
-    text-decoration: underline;
-    font-family: "DM Mono", sans-serif;
-    color: var(--text-muted);
+  appearance: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+  font-family: "DM Mono", sans-serif;
+  color: var(--text-muted);
 }
 
 .form-container {
+  width: 100%;
+}
+
+/* ── ESTILOS DE IMPRESIÓN ─────────────────────────────────────────────────── */
+@media print {
+  /* Ocultar todo lo que no sea el contenido imprimible */
+  body * {
+    visibility: hidden;
+  }
+
+  /* Si estamos imprimiendo el cierre de caja (página dedicada) */
+  .main.container-full,
+  .main.container-full * {
+    visibility: visible;
+  }
+  .main.container-full {
+    position: absolute;
+    left: 0;
+    top: 0;
     width: 100%;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  /* Ocultar botones en el cierre de caja */
+  form[action="index.php"],
+  button {
+    display: none !important;
+  }
+
+  /* Si estamos imprimiendo un ticket (modal sobre el TPV) */
+  #ticketContenido,
+  #ticketContenido * {
+    visibility: visible;
+  }
+  #ticketContenido {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    transform: translateX(-50%);
+    width: 80mm; /* Formato estándar de ticket térmico */
+    padding: 10mm;
+    border: none !important;
+    box-shadow: none !important;
+    background: white;
+    color: black;
+  }
+
+  /* Forzar colores de fondo y bordes en impresión (para las barras y pills) */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Ajustes de página */
+  @page {
+    margin: 0;
+    size: auto;
+  }
 }

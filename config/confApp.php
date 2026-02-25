@@ -2,10 +2,15 @@
 require_once './core/231018libreriaValidacion.php';
 require_once './model/Usuario.php';
 require_once './model/UsuarioPDO.php';
+require_once './model/Producto.php';
+require_once './model/ProductoPDO.php';
+require_once './model/Venta.php';
+require_once './model/VentaPDO.php';
 $controller = [
     "inicioPublico" => "controller/cInicioPublico.php",
     "Login" => "controller/cLogin.php",
     "inicioPrivado" => "controller/cInicioPrivado.php",
+    "cierreCaja" => "controller/cCierreCaja.php",
     // "Detalle" => "controller/cDetalle.php",
     // "MiCuenta" => "controller/cMiCuenta.php",
     // "BorrarCuenta" => "controller/cBorrarCuenta.php",
@@ -30,6 +35,7 @@ $controller = [
 $view = [
     "inicioPublico" => "view/vInicioPublico.php",
     "inicioPrivado" => "view/vInicioPrivado.php",
+    "cierreCaja" => "view/vCierreCaja.php",
     "layout" => "view/layout.php",
     "Login" => "view/vLogin.php",
     // "Detalle" => "view/vDetalle.php",

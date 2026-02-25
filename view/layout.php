@@ -7,6 +7,11 @@
     <title>TPV · ElectroBazar</title>
     <link rel="stylesheet" href="./webroot/css/estilos.css" />
     <link rel="stylesheet" href="./webroot/css/fonts.css" />
+    <script>
+        const IS_ADMIN_BACKEND = <?php echo json_encode(isset($avInicioPrivado['esAdmin']) && $avInicioPrivado['esAdmin']); ?>;
+        const DB_PRODUCTS = <?php echo json_encode($avInicioPrivado['productos'] ?? []); ?>;
+        const CAJERO_NOMBRE = <?php echo json_encode($avInicioPrivado['nombre_completo'] ?? ''); ?>;
+    </script>
 </head>
 
 <body>

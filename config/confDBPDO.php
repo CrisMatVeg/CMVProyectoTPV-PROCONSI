@@ -8,4 +8,4 @@ define("HOST", "localhost");
 define("DBNAME", "dbelectrobazar-tpv");
 define("USERNAME", "root");
 define("PASSWORD", "");
-define("DSN", "mysql:host=" . HOST . "; dbname=" . DBNAME);
+define("DSN", "mysql:host=" . HOST . ";dbname=" . DBNAME . ";charset=utf8mb4");

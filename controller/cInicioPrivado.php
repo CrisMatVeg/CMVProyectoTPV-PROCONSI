@@ -22,17 +22,36 @@ if (isset($_REQUEST['atras'])) {
     exit;
 }
 
+if (isset($_REQUEST['irCierreCaja'])) {
+    $_SESSION['paginaEnCurso'] = 'cierreCaja';
+    header('Location: index.php');
+    exit;
+}
+
+// Carga de productos desde la base de datos
+$oProductos = ProductoPDO::listarProductos();
+$aProductos = [];
+foreach ($oProductos as $oProducto) {
+    $aProductos[] = [
+        "id" => $oProducto->getId(),
+        "name" => $oProducto->getNombre(),
+        "codigo" => $oProducto->getCodigo(),
+        "price" => (float)$oProducto->getPrecio(),
+        "icono" => $oProducto->getIcono(),
+        "cat" => $oProducto->getCategoria(),
+        "inactive" => !$oProducto->getActivo()
+    ];
+}
+
 // Preparación de los datos del usuario para la vista
 $avInicioPrivado = [
     "nombre_completo" => $_SESSION['usuarioActualTPV']->getNombreCompleto(),
     "username" => $_SESSION['usuarioActualTPV']->getUsername(),
     "password" => $_SESSION['usuarioActualTPV']->getPassword(),
     "rol" => $_SESSION['usuarioActualTPV']->getRol(),
-    "esAdmin" => $esAdmin
+    "esAdmin" => $esAdmin,
+    "productos" => $aProductos
 ];
 $_SESSION['arrayDatosusuarioActualTPV'] = $avInicioPrivado;
-// Pasamos el estado de admin a una variable global de JS
-echo "<script>const IS_ADMIN_BACKEND = " . ($esAdmin ? 'true' : 'false') . ";</script>";
-
 // Carga la vista layout principal
 require_once $view["layout"];

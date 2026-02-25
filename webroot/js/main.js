@@ -1,203 +1,4 @@
-const PRODUCTS = [
-  // AUDIO
-  {
-    id: 1,
-    name: "Auriculares BT Pro X",
-    sku: "AUD-001",
-    price: 89.99,
-    emoji: "🎧",
-    cat: "audio",
-  },
-  {
-    id: 2,
-    name: "Altavoz JBL Portable",
-    sku: "AUD-002",
-    price: 59.99,
-    emoji: "🔊",
-    cat: "audio",
-  },
-  {
-    id: 3,
-    name: "Auriculares In-Ear TWS",
-    sku: "AUD-003",
-    price: 39.99,
-    emoji: "🎵",
-    cat: "audio",
-  },
-  {
-    id: 4,
-    name: "Barra Sonido 2.1",
-    sku: "AUD-004",
-    price: 129.99,
-    emoji: "📻",
-    cat: "audio",
-  },
-  // MÓVIL
-  {
-    id: 5,
-    name: "Funda iPhone 15 Pro",
-    sku: "MOV-001",
-    price: 14.99,
-    emoji: "📱",
-    cat: "movil",
-  },
-  {
-    id: 6,
-    name: "Protector Pantalla",
-    sku: "MOV-002",
-    price: 9.99,
-    emoji: "🛡️",
-    cat: "movil",
-  },
-  {
-    id: 7,
-    name: "Soporte Coche Mag",
-    sku: "MOV-003",
-    price: 19.99,
-    emoji: "🚗",
-    cat: "movil",
-  },
-  {
-    id: 8,
-    name: "Power Bank 20000mAh",
-    sku: "MOV-004",
-    price: 34.99,
-    emoji: "🔋",
-    cat: "movil",
-  },
-  // GAMING
-  {
-    id: 9,
-    name: "Mando PS5 DualSense",
-    sku: "GAM-001",
-    price: 74.99,
-    emoji: "🎮",
-    cat: "gaming",
-  },
-  {
-    id: 10,
-    name: "Headset Gaming RGB",
-    sku: "GAM-002",
-    price: 49.99,
-    emoji: "🎯",
-    cat: "gaming",
-  },
-  {
-    id: 11,
-    name: "Mousepad XL",
-    sku: "GAM-003",
-    price: 14.99,
-    emoji: "🖱️",
-    cat: "gaming",
-  },
-  {
-    id: 12,
-    name: "Tarjeta PSN 50€",
-    sku: "GAM-004",
-    price: 50.0,
-    emoji: "💳",
-    cat: "gaming",
-  },
-  // INFORMÁTICA
-  {
-    id: 13,
-    name: "Teclado Mecánico",
-    sku: "INF-001",
-    price: 79.99,
-    emoji: "⌨️",
-    cat: "informatica",
-  },
-  {
-    id: 14,
-    name: "Ratón Inalámbrico",
-    sku: "INF-002",
-    price: 44.99,
-    emoji: "🖱️",
-    cat: "informatica",
-  },
-  {
-    id: 15,
-    name: "Hub USB-C 7 en 1",
-    sku: "INF-003",
-    price: 34.99,
-    emoji: "🔌",
-    cat: "informatica",
-  },
-  {
-    id: 16,
-    name: "SSD Externo 1TB",
-    sku: "INF-004",
-    price: 89.99,
-    emoji: "💾",
-    cat: "informatica",
-  },
-  // CABLES Y CARGADORES
-  {
-    id: 17,
-    name: "Cable USB-C a USB-C 2m",
-    sku: "CAB-001",
-    price: 12.99,
-    emoji: "🔗",
-    cat: "cables",
-  },
-  {
-    id: 18,
-    name: "Cargador GaN 65W",
-    sku: "CAB-002",
-    price: 29.99,
-    emoji: "⚡",
-    cat: "cables",
-  },
-  {
-    id: 19,
-    name: "Cable Lightning 1m",
-    sku: "CAB-003",
-    price: 9.99,
-    emoji: "🍎",
-    cat: "cables",
-  },
-  {
-    id: 20,
-    name: "Cargador Inalámbrico",
-    sku: "CAB-004",
-    price: 24.99,
-    emoji: "🌀",
-    cat: "cables",
-  },
-  // FOTO Y VIDEO
-  {
-    id: 21,
-    name: "Trípode Flexible 45cm",
-    sku: "FOT-001",
-    price: 17.99,
-    emoji: "📷",
-    cat: "foto",
-  },
-  {
-    id: 22,
-    name: 'Ring Light LED 10"',
-    sku: "FOT-002",
-    price: 39.99,
-    emoji: "💡",
-    cat: "foto",
-  },
-  {
-    id: 23,
-    name: "Tarjeta SD 128GB V30",
-    sku: "FOT-003",
-    price: 22.99,
-    emoji: "💿",
-    cat: "foto",
-  },
-  {
-    id: 24,
-    name: "Micrófono Condensador",
-    sku: "FOT-004",
-    price: 54.99,
-    emoji: "🎙️",
-    cat: "foto",
-  },
-];
+const PRODUCTS = typeof DB_PRODUCTS !== "undefined" ? DB_PRODUCTS : [];
 
 // ── Estado global ──────────────────────────────────────────────────────────────
 let cart = {};
@@ -206,7 +7,8 @@ let discountPct = 0;
 let ticketNum = 1001;
 let activeCat = "all";
 let searchTerm = "";
-let isAdmin = typeof IS_ADMIN_BACKEND !== 'undefined' ? IS_ADMIN_BACKEND : false;
+let isAdmin =
+  typeof IS_ADMIN_BACKEND !== "undefined" ? IS_ADMIN_BACKEND : false;
 
 // ── Formato monetario ──────────────────────────────────────────────────────────
 function fmt(n) {
@@ -215,16 +17,26 @@ function fmt(n) {
 
 // ── Catálogo ───────────────────────────────────────────────────────────────────
 function renderProducts() {
-    const grid = document.getElementById("productsGrid");
-    // ... resto de tu lógica de filtrado ...
+  const grid = document.getElementById("productsGrid");
+  if (!grid) return;
 
-    grid.innerHTML = filtered.map(p => `
+  let filtered = PRODUCTS.filter((p) => {
+    const matchesCat = activeCat === "all" || p.cat === activeCat;
+    const matchesSearch =
+      p.name.toLowerCase().includes(searchTerm) ||
+      p.codigo.toLowerCase().includes(searchTerm);
+    return matchesCat && matchesSearch;
+  });
+
+  grid.innerHTML = filtered
+    .map(
+      (p) => `
         <div class="product-card${p.inactive ? " inactive" : ""}" id="card-${p.id}" onclick="handleCardClick(event, ${p.id}, this)">
             ${p.inactive ? '<div class="baja-pill">Baja</div>' : ""}
-            <span class="product-emoji">${p.emoji}</span>
+            <span class="product-emoji">${p.icono}</span>
             <div>
                 <div class="product-name">${p.name}</div>
-                <div class="product-sku">${p.sku}</div>
+                <div class="product-sku">${p.codigo}</div>
             </div>
             <div class="product-price" style="margin-top:auto">${fmt(p.price)}</div>
             
@@ -234,10 +46,12 @@ function renderProducts() {
                 <button class="admin-action baja" onclick="toggleBaja(event,${p.id})">${p.inactive ? "Alta" : "Baja"}</button>
             </div>
         </div>
-    `).join("");
+    `,
+    )
+    .join("");
 
-    // Aplicamos la clase que muestra/oculta las opciones según el rol
-    grid.classList.toggle("is-admin", isAdmin);
+  // Aplicamos la clase que muestra/oculta las opciones según el rol
+  grid.classList.toggle("is-admin", isAdmin);
 }
 
 function handleCardClick(e, id, el) {
@@ -299,7 +113,7 @@ function renderCart() {
     .map(
       (item) => `
     <div class="order-item">
-      <span class="order-item-emoji">${item.emoji}</span>
+      <span class="order-item-emoji">${item.icono}</span>
       <div class="order-item-info">
         <div class="order-item-name">${item.name}</div>
         <div class="order-item-price">${fmt(item.price)} × ${item.qty}</div>
@@ -363,17 +177,191 @@ function applyDiscount() {
   }
 }
 
+// Estado del tipo de cliente seleccionado
+let tipoClienteActual = "particular";
+
+// Paso 1: Abrir el modal de tipo de cliente
 function processPayment() {
-  const total = document.getElementById("totalAmt").textContent;
-  document.getElementById("modalAmount").textContent = total;
-  document.getElementById("modalSub").textContent =
-    `Pago con ${selectedPayment} · Ticket #${ticketNum++}`;
-  document.getElementById("modalOverlay").classList.add("visible");
+  // Resetear selección
+  tipoClienteActual = "particular";
+  document.getElementById("empresaDatos").style.display = "none";
+  document.getElementById("empresaNombre").value = "";
+  document.getElementById("empresaNif").value = "";
+  const btnP = document.getElementById("btnParticular");
+  const btnE = document.getElementById("btnEmpresa");
+  btnP.style.borderColor = "var(--accent)";
+  btnP.style.background = "var(--blue-light)";
+  btnE.style.borderColor = "var(--border)";
+  btnE.style.background = "var(--surface2)";
+  document.getElementById("clienteModal").classList.add("visible");
 }
 
-function closeModal() {
-  document.getElementById("modalOverlay").classList.remove("visible");
+// Paso 2: Seleccionar tipo de cliente (particular o empresa)
+function seleccionarTipoCliente(tipo) {
+  tipoClienteActual = tipo;
+  const btnP = document.getElementById("btnParticular");
+  const btnE = document.getElementById("btnEmpresa");
+  if (tipo === "particular") {
+    btnP.style.borderColor = "var(--accent)";
+    btnP.style.background = "var(--blue-light)";
+    btnE.style.borderColor = "var(--border)";
+    btnE.style.background = "var(--surface2)";
+    document.getElementById("empresaDatos").style.display = "none";
+  } else {
+    btnE.style.borderColor = "var(--accent)";
+    btnE.style.background = "var(--blue-light)";
+    btnP.style.borderColor = "var(--border)";
+    btnP.style.background = "var(--surface2)";
+    document.getElementById("empresaDatos").style.display = "flex";
+  }
+}
+
+// Paso 3: Confirmar cliente y enviar la venta a la BD via API
+async function confirmarCliente() {
+  const btn = document.getElementById("confirmarClienteBtn");
+  btn.disabled = true;
+  btn.textContent = "Guardando…";
+
+  const items = Object.values(cart);
+  const subtotal = items.reduce((a, b) => a + b.price * b.qty, 0);
+
+  const payload = {
+    tipoCliente: tipoClienteActual,
+    nombreCliente:
+      tipoClienteActual === "empresa"
+        ? document.getElementById("empresaNombre").value
+        : null,
+    nifCliente:
+      tipoClienteActual === "empresa"
+        ? document.getElementById("empresaNif").value
+        : null,
+    metodoPago: selectedPayment,
+    subtotal: subtotal,
+    descuentoPct: discountPct,
+    lineas: items.map((it) => ({
+      id: it.id,
+      name: it.name,
+      codigo: it.codigo,
+      price: it.price,
+      qty: it.qty,
+    })),
+  };
+
+  try {
+    const resp = await fetch("./api/guardarVenta.php", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await resp.json();
+
+    if (!resp.ok || !data.ok) {
+      throw new Error(data.error || "Error al guardar la venta");
+    }
+
+    // Ocultar modal de cliente y mostrar ticket
+    document.getElementById("clienteModal").classList.remove("visible");
+    mostrarTicket(data.venta);
+  } catch (err) {
+    showToast("❌ " + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Cobrar";
+  }
+}
+
+// Paso 4: Rellenar y mostrar el documento de venta
+function mostrarTicket(v) {
+  const fmt2 = (n) => parseFloat(n).toFixed(2).replace(".", ",") + " €";
+  const date = new Date(v.creado_en.replace(" ", "T"));
+  const fechaStr =
+    date.toLocaleDateString("es-ES") +
+    " " +
+    date.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+
+  // Tipo de documento
+  document.getElementById("tkTipoDoc").textContent =
+    v.tipo_cliente === "empresa" ? "FACTURA" : "TICKET DE VENTA";
+
+  // Meta
+  document.getElementById("tkNumero").textContent =
+    "#" + String(v.numero_ticket).padStart(4, "0");
+  document.getElementById("tkFecha").textContent = fechaStr;
+  document.getElementById("tkMetodo").textContent =
+    v.metodo_pago.charAt(0).toUpperCase() + v.metodo_pago.slice(1);
+
+  // Cajero
+  const tkCajero = document.getElementById("tkCajero");
+  if (typeof CAJERO_NOMBRE !== "undefined") {
+    tkCajero.textContent = CAJERO_NOMBRE;
+  } else {
+    tkCajero.textContent = "—";
+  }
+
+  // Datos de empresa
+  const showEmp = v.tipo_cliente === "empresa";
+  ["tkLabelCliente", "tkNombreCliente", "tkLabelNif", "tkNifCliente"].forEach(
+    (id) => {
+      document.getElementById(id).style.display = showEmp ? "" : "none";
+    },
+  );
+  if (showEmp) {
+    document.getElementById("tkNombreCliente").textContent =
+      v.nombre_cliente || "—";
+    document.getElementById("tkNifCliente").textContent = v.nif_cliente || "—";
+  }
+
+  // Líneas de producto
+  const lineasEl = document.getElementById("tkLineas");
+  lineasEl.innerHTML = v.lineas
+    .map(
+      (l) => `
+    <div style="display:flex; justify-content:space-between; padding: 4px 0; border-bottom: 1px solid var(--surface2);">
+      <div>
+        <span style="font-weight:600;">${l.nombre_producto}</span>
+        <span style="color:var(--text-muted); font-size:11px; margin-left:6px;">${l.codigo_producto}</span><br>
+        <span style="color:var(--text-muted); font-size:11px;">${l.cantidad} × ${fmt2(l.precio_unitario)}</span>
+      </div>
+      <span style="font-family:'DM Mono',monospace; font-weight:600; align-self:center;">${fmt2(l.total_linea)}</span>
+    </div>
+  `,
+    )
+    .join("");
+
+  // Totales
+  document.getElementById("tkSubtotal").textContent = fmt2(v.subtotal);
+  document.getElementById("tkBase").textContent = fmt2(v.base_imponible);
+  document.getElementById("tkIva").textContent = fmt2(v.iva_amt);
+  document.getElementById("tkTotal").textContent = fmt2(v.total);
+
+  const descRow = document.getElementById("tkDescRow");
+  if (parseFloat(v.descuento_pct) > 0) {
+    descRow.style.display = "flex";
+    document.getElementById("tkDescLabel").textContent =
+      `Descuento (${v.descuento_pct}%)`;
+    document.getElementById("tkDescAmt").textContent =
+      "−" + fmt2(v.descuento_amt);
+  } else {
+    descRow.style.display = "none";
+  }
+
+  document.getElementById("ticketModal").classList.add("visible");
+}
+
+// Imprimir solo el área del ticket
+function imprimirTicket() {
+  window.print();
+}
+
+// Nueva venta: cerrar ticket y resetear carrito
+function nuevaVenta() {
+  document.getElementById("ticketModal").classList.remove("visible");
   clearCart();
+}
+
+// Función legacy por si queda alguna referencia
+function closeModal() {
+  nuevaVenta();
 }
 
 // ── Modo administrador ─────────────────────────────────────────────────────────
@@ -385,28 +373,105 @@ function requireAdmin() {
   return true;
 }
 
+// Abrir modal de nuevo producto
+function abrirModalNuevoProducto() {
+  if (!requireAdmin()) return;
+  document.getElementById("addName").value = "";
+  document.getElementById("addSku").value = "";
+  document.getElementById("addPrice").value = "";
+  document.getElementById("addEmoji").value = "📦";
+  document.getElementById("addCat").value = "audio";
+  document.getElementById("addModal").classList.add("visible");
+}
+
+// Guardar nuevo producto en BD
+async function guardarNuevoProducto() {
+  const name = document.getElementById("addName").value.trim();
+  const codigo = document.getElementById("addSku").value.trim();
+  const price = parseFloat(document.getElementById("addPrice").value);
+  const icono = document.getElementById("addEmoji").value.trim();
+  const cat = document.getElementById("addCat").value;
+
+  if (!name || !codigo || isNaN(price)) {
+    showToast("❌ Por favor, rellena todos los campos");
+    return;
+  }
+
+  try {
+    const resp = await fetch("./api/gestionProducto.php", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        accion: "añadir",
+        nombre: name,
+        codigo,
+        precio: price,
+        icono,
+        categoria: cat,
+      }),
+    });
+    const data = await resp.json();
+
+    if (!data.ok) throw new Error(data.error);
+
+    PRODUCTS.push(data.producto);
+    document.getElementById("addModal").classList.remove("visible");
+    renderProducts();
+    showToast("✅ Producto añadido correctamente");
+  } catch (err) {
+    showToast("❌ " + err.message);
+  }
+}
+
 function editProduct(e, id) {
   e.stopPropagation();
   if (!requireAdmin()) return;
   const p = PRODUCTS.find((x) => x.id === id);
   document.getElementById("editId").value = p.id;
   document.getElementById("editName").value = p.name;
-  document.getElementById("editSku").value = p.sku;
+  document.getElementById("editSku").value = p.codigo;
   document.getElementById("editPrice").value = p.price;
-  document.getElementById("editEmoji").value = p.emoji;
+  document.getElementById("editEmoji").value = p.icono;
   document.getElementById("editModal").classList.add("visible");
 }
 
-function saveEdit() {
+async function saveEdit() {
   const id = parseInt(document.getElementById("editId").value);
-  const p = PRODUCTS.find((x) => x.id === id);
-  p.name = document.getElementById("editName").value.trim() || p.name;
-  p.sku = document.getElementById("editSku").value.trim() || p.sku;
-  p.price = parseFloat(document.getElementById("editPrice").value) || p.price;
-  p.emoji = document.getElementById("editEmoji").value.trim() || p.emoji;
-  document.getElementById("editModal").classList.remove("visible");
-  renderProducts();
-  showToast("✅ Producto actualizado");
+  const name = document.getElementById("editName").value.trim();
+  const codigo = document.getElementById("editSku").value.trim();
+  const price = parseFloat(document.getElementById("editPrice").value);
+  const icono = document.getElementById("editEmoji").value.trim();
+
+  try {
+    const resp = await fetch("./api/gestionProducto.php", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        accion: "editar",
+        id,
+        nombre: name,
+        codigo,
+        precio: price,
+        icono,
+        categoria: PRODUCTS.find((x) => x.id === id).cat,
+      }),
+    });
+    const data = await resp.json();
+
+    if (!data.ok) throw new Error(data.error);
+
+    const p = PRODUCTS.find((x) => x.id === id);
+    p.name = name || p.name;
+    p.codigo = codigo || p.codigo;
+    p.price = price || p.price;
+    p.icono = icono || p.icono;
+
+    document.getElementById("editModal").classList.remove("visible");
+    renderProducts();
+    showToast("✅ Producto actualizado en BD");
+  } catch (err) {
+    showToast("❌ " + err.message);
+  }
 }
 
 function deleteProduct(e, id) {
@@ -414,33 +479,63 @@ function deleteProduct(e, id) {
   if (!requireAdmin()) return;
   const p = PRODUCTS.find((x) => x.id === id);
   document.getElementById("delName").textContent = p.name;
-  document.getElementById("delConfirmBtn").onclick = () => {
-    PRODUCTS.splice(
-      PRODUCTS.findIndex((x) => x.id === id),
-      1,
-    );
-    if (cart[id]) {
-      delete cart[id];
-      renderCart();
+  document.getElementById("delConfirmBtn").onclick = async () => {
+    try {
+      const resp = await fetch("./api/gestionProducto.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accion: "eliminar", id }),
+      });
+      const data = await resp.json();
+
+      if (!data.ok) throw new Error(data.error);
+
+      PRODUCTS.splice(
+        PRODUCTS.findIndex((x) => x.id === id),
+        1,
+      );
+      if (cart[id]) {
+        delete cart[id];
+        renderCart();
+      }
+      document.getElementById("deleteModal").classList.remove("visible");
+      renderProducts();
+      showToast("🗑️ Producto eliminado de la BD");
+    } catch (err) {
+      showToast("❌ " + err.message);
     }
-    document.getElementById("deleteModal").classList.remove("visible");
-    renderProducts();
-    showToast("🗑️ Producto eliminado");
   };
   document.getElementById("deleteModal").classList.add("visible");
 }
 
-function toggleBaja(e, id) {
+async function toggleBaja(e, id) {
   e.stopPropagation();
   if (!requireAdmin()) return;
-  const p = PRODUCTS.find((x) => x.id === id);
-  p.inactive = !p.inactive;
-  if (p.inactive && cart[id]) {
-    delete cart[id];
-    renderCart();
+
+  try {
+    const resp = await fetch("./api/gestionProducto.php", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ accion: "baja", id }),
+    });
+    const data = await resp.json();
+
+    if (!data.ok) throw new Error(data.error);
+
+    const p = PRODUCTS.find((x) => x.id === id);
+    p.inactive = !data.activo; // El API devuelve 'activo', nosotros usamos 'inactive'
+
+    if (p.inactive && cart[id]) {
+      delete cart[id];
+      renderCart();
+    }
+    renderProducts();
+    showToast(
+      p.inactive ? "⏸️ Producto dado de baja" : "▶️ Producto reactivado",
+    );
+  } catch (err) {
+    showToast("❌ " + err.message);
   }
-  renderProducts();
-  showToast(p.inactive ? "⏸️ Producto dado de baja" : "▶️ Producto reactivado");
 }
 
 // ── Toast ──────────────────────────────────────────────────────────────────────
