@@ -1,0 +1,16 @@
+@font-face {
+  font-family: "DM Mono";
+  src:
+    url("../fonts/DM_Mono/DMMono-Regular.ttf") format("woff2"),
+    url("../fonts/DM_Mono/DMMono-Regular.ttf") format("woff");
+  font-weight: normal;
+  font-style: normal;
+}
+@font-face {
+  font-family: "DM Sans";
+  src:
+    url("../fonts/DM_Mono/DMMono-MediumItalic.ttf") format("woff2"),
+    url("../fonts/DM_Mono/DMMono-MediumItalic.ttf") format("woff");
+  font-weight: normal;
+  font-style: normal;
+}
