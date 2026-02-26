@@ -75,6 +75,7 @@
             <button class="cat-tab" data-cat="informatica">Informática</button>
             <button class="cat-tab" data-cat="cables">Cables y Cargadores</button>
             <button class="cat-tab" data-cat="foto">Foto y Video</button>
+            <button class="cat-tab" data-cat="baja" style="color: var(--red); border-color: var(--red-light); background: var(--red-light);">📉 De Baja</button>
         </div>
 
         <div class="products-grid" id="productsGrid"></div>
@@ -404,6 +405,18 @@
                 <input id="empresaNif" class="edit-field" placeholder="B12345678" style="width: 100%; margin-top: 4px;" />
             </label>
         </div>
+        <!-- Gestión de Efectivo (Solo si metodo_pago es efectivo) -->
+        <div id="efectivoGestion" style="display: none; flex-direction: column; gap: 8px; padding: 12px; background: var(--surface2); border-radius: 8px; border: 1px solid var(--border);">
+            <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">Pago en efectivo</div>
+            <label style="font-size: 13px; font-weight: 500;">
+                Importe recibido
+                <input id="efectivoRecibido" type="number" step="0.01" class="edit-field" placeholder="0.00" style="width: 100%; margin-top: 4px; font-family: 'DM Mono', monospace; font-size: 16px;" oninput="calcularCambio()" />
+            </label>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+                <span style="font-size: 13px; color: var(--text-muted);">Cambio a devolver:</span>
+                <span id="efectivoCambio" style="font-family: 'DM Mono', monospace; font-weight: 700; font-size: 16px; color: var(--accent);">0,00 €</span>
+            </div>
+        </div>
         <div style="display: flex; gap: 8px;">
             <button onclick="document.getElementById('clienteModal').classList.remove('visible')"
                 style="flex: 1; padding: 12px; border-radius: 8px; border: 1.5px solid var(--border);
@@ -462,6 +475,15 @@
             </div>
             <div style="display: flex; justify-content: space-between; font-size: 16px; font-weight: 700; margin-top: 6px; padding-top: 8px; border-top: 1.5px solid var(--border);">
                 <span>TOTAL</span><span id="tkTotal" style="font-family: 'DM Mono', monospace;">—</span>
+            </div>
+            <!-- Detalles de efectivo en ticket -->
+            <div id="tkEfectivoRow" style="display: none; flex-direction: column; gap: 2px; margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border); font-size: 12px; color: var(--text-muted);">
+                <div style="display: flex; justify-content: space-between;">
+                    <span>Entregado</span><span id="tkEntregado">—</span>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                    <span>Cambio</span><span id="tkCambio">—</span>
+                </div>
             </div>
         </div>
 

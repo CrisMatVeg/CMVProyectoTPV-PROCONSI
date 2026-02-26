@@ -21,7 +21,10 @@ function renderProducts() {
   if (!grid) return;
 
   let filtered = PRODUCTS.filter((p) => {
-    const matchesCat = activeCat === "all" || p.cat === activeCat;
+    const matchesCat =
+      activeCat === "all" ||
+      (activeCat === "baja" ? p.inactive : p.cat === activeCat);
+
     const matchesSearch =
       p.name.toLowerCase().includes(searchTerm) ||
       p.codigo.toLowerCase().includes(searchTerm);
@@ -187,6 +190,18 @@ function processPayment() {
   document.getElementById("empresaDatos").style.display = "none";
   document.getElementById("empresaNombre").value = "";
   document.getElementById("empresaNif").value = "";
+
+  // Resetear gestión de efectivo
+  document.getElementById("efectivoRecibido").value = "";
+  document.getElementById("efectivoCambio").textContent = "0,00 €";
+  const efectivoGestion = document.getElementById("efectivoGestion");
+  if (selectedPayment === "efectivo") {
+    efectivoGestion.style.display = "flex";
+    setTimeout(() => document.getElementById("efectivoRecibido").focus(), 100);
+  } else {
+    efectivoGestion.style.display = "none";
+  }
+
   const btnP = document.getElementById("btnParticular");
   const btnE = document.getElementById("btnEmpresa");
   btnP.style.borderColor = "var(--accent)";
@@ -213,6 +228,35 @@ function seleccionarTipoCliente(tipo) {
     btnP.style.borderColor = "var(--border)";
     btnP.style.background = "var(--surface2)";
     document.getElementById("empresaDatos").style.display = "flex";
+  }
+}
+
+// Cálculo de cambio en tiempo real
+function calcularCambio() {
+  const recibido =
+    parseFloat(document.getElementById("efectivoRecibido").value) || 0;
+  const items = Object.values(cart);
+  const subtotal = items.reduce((a, b) => a + b.price * b.qty, 0);
+  const discountAmt = (subtotal * discountPct) / 100;
+  const base = subtotal - discountAmt;
+  const total = base * 1.21;
+
+  const cambio = recibido - total;
+  const cambioEl = document.getElementById("efectivoCambio");
+  const confirmarBtn = document.getElementById("confirmarClienteBtn");
+
+  if (recibido > 0) {
+    cambioEl.textContent = fmt(Math.max(0, cambio));
+    if (cambio < -0.01) {
+      cambioEl.style.color = "var(--red)";
+      confirmarBtn.disabled = true;
+    } else {
+      cambioEl.style.color = "var(--accent)";
+      confirmarBtn.disabled = false;
+    }
+  } else {
+    cambioEl.textContent = "0,00 €";
+    confirmarBtn.disabled = true;
   }
 }
 
@@ -245,6 +289,11 @@ async function confirmarCliente() {
       price: it.price,
       qty: it.qty,
     })),
+    // Añadimos datos de efectivo para el ticket (no se guardan en BD por ahora)
+    efectivo: {
+      recibido:
+        parseFloat(document.getElementById("efectivoRecibido").value) || 0,
+    },
   };
 
   try {
@@ -261,6 +310,10 @@ async function confirmarCliente() {
 
     // Ocultar modal de cliente y mostrar ticket
     document.getElementById("clienteModal").classList.remove("visible");
+
+    // Inyectamos el importe recibido en el objeto de venta para el ticket
+    data.venta.efectivo_recibido = payload.efectivo.recibido;
+
     mostrarTicket(data.venta);
   } catch (err) {
     showToast("❌ " + err.message);
@@ -333,6 +386,20 @@ function mostrarTicket(v) {
   document.getElementById("tkBase").textContent = fmt2(v.base_imponible);
   document.getElementById("tkIva").textContent = fmt2(v.iva_amt);
   document.getElementById("tkTotal").textContent = fmt2(v.total);
+
+  // Gestión de efectivo en ticket
+  const tkEfectivoRow = document.getElementById("tkEfectivoRow");
+  if (v.metodo_pago === "efectivo" && v.efectivo_recibido > 0) {
+    tkEfectivoRow.style.display = "flex";
+    document.getElementById("tkEntregado").textContent = fmt2(
+      v.efectivo_recibido,
+    );
+    document.getElementById("tkCambio").textContent = fmt2(
+      v.efectivo_recibido - v.total,
+    );
+  } else {
+    tkEfectivoRow.style.display = "none";
+  }
 
   const descRow = document.getElementById("tkDescRow");
   if (parseFloat(v.descuento_pct) > 0) {

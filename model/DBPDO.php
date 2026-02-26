@@ -10,6 +10,7 @@
  */
 
 require_once __DIR__ . '/../config/confDBPDO.php';
+require_once 'AppError.php';
 
 class DBPDO {
 
