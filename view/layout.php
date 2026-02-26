@@ -6,7 +6,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>TPV · ElectroBazar</title>
     <link rel="stylesheet" href="./webroot/css/estilos.css" />
+    <link rel="stylesheet" href="./webroot/css/components.css" />
     <link rel="stylesheet" href="./webroot/css/fonts.css" />
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <script>
         const IS_ADMIN_BACKEND = <?php echo json_encode(isset($avInicioPrivado['esAdmin']) && $avInicioPrivado['esAdmin']); ?>;
         const DB_PRODUCTS = <?php echo json_encode($avInicioPrivado['productos'] ?? []); ?>;
@@ -25,7 +28,6 @@
             Caja #1 &nbsp;·&nbsp; <span id="clock">--:--</span> &nbsp;·&nbsp;
             <span id="datestr">--</span>
         </div>
-        
 
     <?php
     require_once $view[$_SESSION['paginaEnCurso']];

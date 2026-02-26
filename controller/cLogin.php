@@ -68,8 +68,8 @@ if (isset($_REQUEST['acceder'])) {
             // Guardar usuario en sesión para la app
             $_SESSION['usuarioActualTPV'] = $usuario;
 
-            // Redirigir a la app
-            $_SESSION['paginaEnCurso'] = 'inicioPrivado';
+            // Redirigir al Dashboard
+            $_SESSION['paginaEnCurso'] = 'Dashboard';
             header('Location: index.php');
             exit;
         } else {

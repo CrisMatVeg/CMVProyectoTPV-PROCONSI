@@ -93,6 +93,12 @@ class VentaPDO {
                 ':qty'    => $qty,
                 ':total'  => $totalLinea
             ]);
+
+            // Descontar stock si el producto existe
+            if (isset($linea['id'])) {
+                require_once 'ProductoPDO.php';
+                ProductoPDO::reducirStock((int)$linea['id'], $qty);
+            }
         }
 
         return $numTicket;
@@ -124,5 +130,30 @@ class VentaPDO {
         $venta['lineas'] = $qL->fetchAll(PDO::FETCH_ASSOC);
 
         return $venta;
+    }
+
+    /**
+     * Busca ventas con filtros de fecha y cajero.
+     * @param string $desde Fecha inicio (YYYY-MM-DD)
+     * @param string $hasta Fecha fin (YYYY-MM-DD)
+     * @param int|null $idCajero
+     * @return array
+     */
+    public static function buscarVentas(string $desde, string $hasta, ?int $idCajero = null): array {
+        $sql = "SELECT v.*, u.nombre_completo as nombre_cajero 
+                FROM ventas v
+                LEFT JOIN usuarios u ON v.id_cajero = u.id
+                WHERE DATE(v.creado_en) BETWEEN :desde AND :hasta";
+        
+        $params = [':desde' => $desde, ':hasta' => $hasta];
+        
+        if ($idCajero) {
+            $sql .= " AND v.id_cajero = :cajero";
+            $params[':cajero'] = $idCajero;
+        }
+        
+        $sql .= " ORDER BY v.creado_en DESC";
+        $q = DBPDO::ejecutarConsulta($sql, $params);
+        return $q->fetchAll(PDO::FETCH_ASSOC);
     }
 }

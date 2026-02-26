@@ -1,21 +1,21 @@
 </header>
-<div class="main container-full" style="padding: 24px; max-width: 900px; margin: 0 auto;">
+<div class="main-full p-24 w-900 m-0-auto">
 
     <!-- TÍTULO -->
-    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px;">
+    <div class="section-header">
         <div>
-            <h1 style="font-size: 22px; font-weight: 700; margin: 0;">Cierre de Caja</h1>
-            <div style="color: var(--text-muted); font-size: 13px; margin-top: 4px;">
+            <h1 class="section-title">Cierre de Caja</h1>
+            <div class="text-muted fs-13 mt-4">
                 Resumen del día · <?php echo $avCierreCaja['fecha']; ?> · <?php echo $avCierreCaja['nombre_completo']; ?>
             </div>
         </div>
-        <div style="display: flex; gap: 8px;">
-            <button onclick="window.print()" style="padding: 9px 18px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--surface); font-size: 13px; cursor: pointer;">
-                🖨️ Imprimir
+        <div class="d-flex gap-8">
+            <button onclick="window.print()" class="btn-icon w-auto h-auto gap-8 fs-13 p-9-18">
+                <i class="fa-solid fa-print"></i> Imprimir
             </button>
-            <form method="post" action="index.php" style="margin: 0;">
+            <form method="post" action="index.php" class="m-0">
                 <input type="hidden" name="paginaAnterior" value="cierreCaja">
-                <button type="submit" name="irInicio" style="padding: 9px 18px; border-radius: 8px; border: none; background: var(--accent); color: #fff; font-size: 13px; font-weight: 600; cursor: pointer;">
+                <button type="submit" name="irInicio" class="btn-save p-9-18 fs-13">
                     ← Volver al TPV
                 </button>
             </form>
@@ -23,97 +23,108 @@
     </div>
 
     <!-- RESUMEN EN CARDS -->
-    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 28px;">
-        <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px;">
-            <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em;">Ventas realizadas</div>
-            <div style="font-size: 28px; font-weight: 700; font-family: 'DM Mono', monospace; margin-top: 6px;">
+    <div class="grid-4 gap-14 mb-28">
+        <div class="dashboard-card p-18">
+            <div class="summary-label">Ventas</div>
+            <div class="fs-28 font-bold font-mono mt-6">
                 <?php echo $avCierreCaja['resumen']['totalVentas']; ?>
             </div>
         </div>
-        <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px;">
-            <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em;">Efectivo</div>
-            <div style="font-size: 22px; font-weight: 700; font-family: 'DM Mono', monospace; margin-top: 6px; color: var(--green);">
+        <div class="dashboard-card p-18">
+            <div class="summary-label">Efectivo</div>
+            <div class="fs-22 font-bold font-mono mt-6 text-green">
                 <?php echo number_format($avCierreCaja['resumen']['totalEfectivo'], 2, ',', '.'); ?> €
             </div>
         </div>
-        <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px;">
-            <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em;">Tarjeta</div>
-            <div style="font-size: 22px; font-weight: 700; font-family: 'DM Mono', monospace; margin-top: 6px; color: var(--accent2);">
+        <div class="dashboard-card p-18">
+            <div class="summary-label">Tarjeta</div>
+            <div class="fs-22 font-bold font-mono mt-6 text-blue">
                 <?php echo number_format($avCierreCaja['resumen']['totalTarjeta'], 2, ',', '.'); ?> €
             </div>
         </div>
-        <div style="background: var(--accent); border-radius: 12px; padding: 18px;">
-            <div style="font-size: 11px; color: rgba(255,255,255,0.7); text-transform: uppercase; letter-spacing: 0.06em;">Total recaudado</div>
-            <div style="font-size: 22px; font-weight: 700; font-family: 'DM Mono', monospace; margin-top: 6px; color: #fff;">
+        <div class="dashboard-card p-18 bg-accent border-accent">
+            <div class="summary-label text-white-70">Total recaudado</div>
+            <div class="fs-22 font-bold font-mono mt-6 text-white">
                 <?php echo number_format($avCierreCaja['resumen']['totalBruto'], 2, ',', '.'); ?> €
             </div>
         </div>
     </div>
 
     <!-- IVA DESGLOSADO -->
-    <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-bottom: 28px; display: flex; gap: 32px;">
+    <div class="table-container p-18 mb-28 d-flex gap-32 br-12">
         <div>
-            <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em;">Total base imponible</div>
-            <div style="font-size: 18px; font-weight: 600; font-family: 'DM Mono', monospace; margin-top: 4px;">
+            <div class="summary-label">Total base imponible</div>
+            <div class="fs-18 font-bold font-mono mt-4">
                 <?php echo number_format($avCierreCaja['resumen']['totalBruto'] - $avCierreCaja['resumen']['totalIVA'], 2, ',', '.'); ?> €
             </div>
         </div>
         <div>
-            <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em;">IVA recaudado (21%)</div>
-            <div style="font-size: 18px; font-weight: 600; font-family: 'DM Mono', monospace; color: var(--gold); margin-top: 4px;">
+            <div class="summary-label">IVA recaudado (21%)</div>
+            <div class="fs-18 font-bold font-mono text-accent mt-4">
                 <?php echo number_format($avCierreCaja['resumen']['totalIVA'], 2, ',', '.'); ?> €
             </div>
         </div>
     </div>
 
-    <!-- LISTADO DE TICKETS -->
-    <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden;">
-        <div style="padding: 14px 20px; border-bottom: 1px solid var(--border); font-weight: 600; font-size: 13px;">
+    <div class="table-container">
+        <div class="p-14-20 border-bottom font-bold fs-13">
             Tickets del día
         </div>
         <?php if (empty($avCierreCaja['ventas'])): ?>
-            <div style="padding: 32px; text-align: center; color: var(--text-muted); font-size: 14px;">
+            <div class="empty-state p-32">
                 No hay ventas registradas hoy.
             </div>
         <?php else: ?>
-            <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+            <table class="data-table">
                 <thead>
-                    <tr style="background: var(--surface2); color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;">
-                        <th style="padding: 10px 20px; text-align: left;">Ticket</th>
-                        <th style="padding: 10px; text-align: left;">Hora</th>
-                        <th style="padding: 10px; text-align: left;">Cliente</th>
-                        <th style="padding: 10px; text-align: left;">Pago</th>
-                        <th style="padding: 10px; text-align: right;">Base imp.</th>
-                        <th style="padding: 10px 20px; text-align: right;">IVA</th>
-                        <th style="padding: 10px 20px; text-align: right; font-weight: 700;">Total</th>
+                    <tr>
+                        <th class="pl-20">Ticket</th>
+                        <th>Hora</th>
+                        <th>Cliente</th>
+                        <th>Pago</th>
+                        <th class="text-right">Base imp.</th>
+                        <th class="text-right">IVA</th>
+                        <th class="text-right pr-20">Total</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php foreach ($avCierreCaja['ventas'] as $i => $v): ?>
-                    <tr style="border-top: 1px solid var(--border); <?php echo $i % 2 === 0 ? '' : 'background: var(--surface2);'; ?>">
-                        <td style="padding: 10px 20px; font-family: 'DM Mono', monospace; font-weight: 600;">
+                    <tr>
+                        <td class="pl-20 ticket-num">
                             #<?php echo str_pad($v['numero_ticket'], 4, '0', STR_PAD_LEFT); ?>
                         </td>
-                        <td style="padding: 10px; color: var(--text-muted);">
+                        <td class="font-mono text-muted">
                             <?php echo date('H:i', strtotime($v['creado_en'])); ?>
                         </td>
-                        <td style="padding: 10px;">
+                        <td>
                             <?php if ($v['tipo_cliente'] === 'empresa'): ?>
-                                <span style="font-size: 11px; background: var(--blue-light); color: var(--accent); padding: 2px 6px; border-radius: 4px; font-weight: 600;">🏢 <?php echo htmlspecialchars($v['nombre_cliente'] ?? 'Empresa'); ?></span>
+                                <span class="status-pill status-active p-4-8 fs-11 gap-5">
+                                    <i class="fa-solid fa-building"></i> <?php echo htmlspecialchars($v['nombre_cliente'] ?? 'Empresa'); ?>
+                                </span>
                             <?php else: ?>
-                                <span style="font-size: 11px; color: var(--text-muted);">👤 Particular</span>
+                                <span class="fs-11 text-muted d-inline-flex ai-center gap-5">
+                                    <i class="fa-solid fa-user"></i> Particular
+                                </span>
                             <?php endif; ?>
                         </td>
-                        <td style="padding: 10px;">
-                            <?php echo $v['metodo_pago'] === 'efectivo' ? '💵 Efectivo' : '💳 Tarjeta'; ?>
+                        <td>
+                            <?php if ($v['metodo_pago'] === 'efectivo'): ?>
+                                <span class="status-pill status-active p-4-8 fs-11 gap-5 bg-green-light text-green">
+                                    <i class="fa-solid fa-money-bill-1-wave"></i> Efectivo
+                                </span>
+                            <?php else: ?>
+                                <span class="status-pill status-active p-4-8 fs-11 gap-5 bg-blue-light text-blue-light">
+                                    <i class="fa-solid fa-credit-card"></i> Tarjeta
+                                </span>
+                            <?php endif; ?>
                         </td>
-                        <td style="padding: 10px; text-align: right; font-family: 'DM Mono', monospace;">
+                        <td class="text-right font-mono">
                             <?php echo number_format($v['base_imponible'], 2, ',', '.'); ?> €
                         </td>
-                        <td style="padding: 10px 20px; text-align: right; font-family: 'DM Mono', monospace; color: var(--gold);">
+                        <td class="text-right font-mono text-accent">
                             <?php echo number_format($v['iva_amt'], 2, ',', '.'); ?> €
                         </td>
-                        <td style="padding: 10px 20px; text-align: right; font-family: 'DM Mono', monospace; font-weight: 700;">
+                        <td class="text-right font-mono font-bold pr-20">
                             <?php echo number_format($v['total'], 2, ',', '.'); ?> €
                         </td>
                     </tr>
@@ -122,5 +133,7 @@
             </table>
         <?php endif; ?>
     </div>
+
+</div>
 
 </div>

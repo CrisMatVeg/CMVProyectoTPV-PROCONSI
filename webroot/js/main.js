@@ -9,6 +9,7 @@ let activeCat = "all";
 let searchTerm = "";
 let isAdmin =
   typeof IS_ADMIN_BACKEND !== "undefined" ? IS_ADMIN_BACKEND : false;
+let currentTicketNum = null;
 
 // ── Formato monetario ──────────────────────────────────────────────────────────
 function fmt(n) {
@@ -34,19 +35,21 @@ function renderProducts() {
   grid.innerHTML = filtered
     .map(
       (p) => `
-        <div class="product-card${p.inactive ? " inactive" : ""}" id="card-${p.id}" onclick="handleCardClick(event, ${p.id}, this)">
+        <div class="product-card${p.inactive ? " inactive" : ""}${p.stock <= 0 ? " out-of-stock" : ""}" id="card-${p.id}" onclick="handleCardClick(event, ${p.id}, this)">
             ${p.inactive ? '<div class="baja-pill">Baja</div>' : ""}
+            ${p.stock <= 0 ? '<div class="stock-pill" style="background:var(--red); color:white; position:absolute; top:10px; right:10px; padding:2px 8px; border-radius:10px; font-size:10px; font-weight:700;">AGOTADO</div>' : ""}
             <span class="product-emoji">${p.icono}</span>
             <div>
                 <div class="product-name">${p.name}</div>
                 <div class="product-sku">${p.codigo}</div>
+                <div class="product-stock" style="font-size:11px; color:${p.stock <= 5 ? "var(--red)" : "var(--text-muted)"}; font-weight:600;">Stock: ${p.stock}</div>
             </div>
             <div class="product-price" style="margin-top:auto">${fmt(p.price)}</div>
             
             <div class="product-admin-bar">
-                <button class="admin-action edit" onclick="editProduct(event,${p.id})">Editar</button>
-                <button class="admin-action delete" onclick="deleteProduct(event,${p.id})">Borrar</button>
-                <button class="admin-action baja" onclick="toggleBaja(event,${p.id})">${p.inactive ? "Alta" : "Baja"}</button>
+                <button class="admin-action edit" onclick="editProduct(event,${p.id})"><i class="fa-solid fa-pen-to-square"></i> Editar</button>
+                <button class="admin-action delete" onclick="deleteProduct(event,${p.id})"><i class="fa-solid fa-trash"></i> Borrar</button>
+                <button class="admin-action baja" onclick="toggleBaja(event,${p.id})"><i class="fa-solid ${p.inactive ? "fa-arrow-up" : "fa-arrow-down"}"></i> ${p.inactive ? "Alta" : "Baja"}</button>
             </div>
         </div>
     `,
@@ -61,24 +64,47 @@ function handleCardClick(e, id, el) {
   if (e.target.closest(".product-admin-bar")) return;
   const p = PRODUCTS.find((x) => x.id === id);
   if (p && p.inactive) return;
+  if (p && p.stock <= 0) {
+    showToast('<i class="fa-solid fa-circle-xmark"></i> Producto agotado');
+    return;
+  }
   addToCart(id, el);
 }
 
 // ── Carrito ────────────────────────────────────────────────────────────────────
 function addToCart(id, el) {
-  el.classList.add("adding");
-  setTimeout(() => el.classList.remove("adding"), 300);
+  const p = PRODUCTS.find((x) => x.id === id);
+  if (!p) return;
+
   if (cart[id]) {
+    if (cart[id].qty >= p.stock) {
+      showToast(
+        '<i class="fa-solid fa-circle-exclamation"></i> No hay más stock disponible',
+      );
+      return;
+    }
     cart[id].qty++;
   } else {
-    const p = PRODUCTS.find((x) => x.id === id);
+    if (p.stock <= 0) return;
     cart[id] = { ...p, qty: 1 };
   }
+
+  el.classList.add("adding");
+  setTimeout(() => el.classList.remove("adding"), 300);
   renderCart();
 }
 
 function changeQty(id, delta) {
   if (!cart[id]) return;
+  const p = PRODUCTS.find((x) => x.id === id);
+
+  if (delta > 0 && cart[id].qty >= p.stock) {
+    showToast(
+      '<i class="fa-solid fa-circle-exclamation"></i> Límite de stock alcanzado',
+    );
+    return;
+  }
+
   cart[id].qty += delta;
   if (cart[id].qty <= 0) delete cart[id];
   renderCart();
@@ -105,7 +131,7 @@ function renderCart() {
   if (!items.length) {
     container.innerHTML = `
       <div class="empty-cart">
-        <div class="empty-cart-icon">🛒</div>
+        <div class="empty-cart-icon"><i class="fa-solid fa-cart-shopping"></i></div>
         <div>Añade productos<br>al pedido</div>
       </div>`;
     updateTotals(0);
@@ -122,9 +148,9 @@ function renderCart() {
         <div class="order-item-price">${fmt(item.price)} × ${item.qty}</div>
       </div>
       <div class="qty-ctrl">
-        <button class="qty-btn" onclick="changeQty(${item.id}, -1)">−</button>
+        <button class="qty-btn" onclick="changeQty(${item.id}, -1)"><i class="fa-solid fa-minus"></i></button>
         <span class="qty-val">${item.qty}</span>
-        <button class="qty-btn" onclick="changeQty(${item.id}, +1)">+</button>
+        <button class="qty-btn" onclick="changeQty(${item.id}, +1)"><i class="fa-solid fa-plus"></i></button>
       </div>
       <div class="order-item-total">${fmt(item.price * item.qty)}</div>
     </div>
@@ -174,9 +200,13 @@ function applyDiscount() {
       0,
     );
     updateTotals(subtotal);
-    showToast(`✅ Descuento del ${discountPct}% aplicado`);
+    showToast(
+      `<i class="fa-solid fa-circle-check"></i> Descuento del ${discountPct}% aplicado`,
+    );
   } else {
-    showToast("❌ Código no válido. Prueba: DESC10, OFERTA20, VIP15");
+    showToast(
+      '<i class="fa-solid fa-circle-xmark"></i> Código no válido. Prueba: DESC10, OFERTA20, VIP15',
+    );
   }
 }
 
@@ -193,7 +223,10 @@ function processPayment() {
 
   // Resetear gestión de efectivo
   document.getElementById("efectivoRecibido").value = "";
-  document.getElementById("efectivoCambio").textContent = "0,00 €";
+  const cambioEl = document.getElementById("efectivoCambio");
+  cambioEl.textContent = "0,00 €";
+  cambioEl.classList.remove("text-red");
+  cambioEl.classList.add("text-accent");
   const efectivoGestion = document.getElementById("efectivoGestion");
   if (selectedPayment === "efectivo") {
     efectivoGestion.style.display = "flex";
@@ -204,10 +237,8 @@ function processPayment() {
 
   const btnP = document.getElementById("btnParticular");
   const btnE = document.getElementById("btnEmpresa");
-  btnP.style.borderColor = "var(--accent)";
-  btnP.style.background = "var(--blue-light)";
-  btnE.style.borderColor = "var(--border)";
-  btnE.style.background = "var(--surface2)";
+  btnP.classList.add("selected-type");
+  btnE.classList.remove("selected-type");
   document.getElementById("clienteModal").classList.add("visible");
 }
 
@@ -216,18 +247,17 @@ function seleccionarTipoCliente(tipo) {
   tipoClienteActual = tipo;
   const btnP = document.getElementById("btnParticular");
   const btnE = document.getElementById("btnEmpresa");
+
+  btnP.classList.remove("selected-type");
+  btnE.classList.remove("selected-type");
+
   if (tipo === "particular") {
-    btnP.style.borderColor = "var(--accent)";
-    btnP.style.background = "var(--blue-light)";
-    btnE.style.borderColor = "var(--border)";
-    btnE.style.background = "var(--surface2)";
+    btnP.classList.add("selected-type");
     document.getElementById("empresaDatos").style.display = "none";
   } else {
-    btnE.style.borderColor = "var(--accent)";
-    btnE.style.background = "var(--blue-light)";
-    btnP.style.borderColor = "var(--border)";
-    btnP.style.background = "var(--surface2)";
+    btnE.classList.add("selected-type");
     document.getElementById("empresaDatos").style.display = "flex";
+    setTimeout(() => document.getElementById("empresaNombre").focus(), 100);
   }
 }
 
@@ -248,10 +278,12 @@ function calcularCambio() {
   if (recibido > 0) {
     cambioEl.textContent = fmt(Math.max(0, cambio));
     if (cambio < -0.01) {
-      cambioEl.style.color = "var(--red)";
+      cambioEl.classList.remove("text-accent");
+      cambioEl.classList.add("text-red");
       confirmarBtn.disabled = true;
     } else {
-      cambioEl.style.color = "var(--accent)";
+      cambioEl.classList.remove("text-red");
+      cambioEl.classList.add("text-accent");
       confirmarBtn.disabled = false;
     }
   } else {
@@ -316,7 +348,7 @@ async function confirmarCliente() {
 
     mostrarTicket(data.venta);
   } catch (err) {
-    showToast("❌ " + err.message);
+    showToast("<i class='fa-solid fa-circle-xmark'></i> " + err.message);
   } finally {
     btn.disabled = false;
     btn.textContent = "Cobrar";
@@ -325,6 +357,11 @@ async function confirmarCliente() {
 
 // Paso 4: Rellenar y mostrar el documento de venta
 function mostrarTicket(v) {
+  currentTicketNum = v.numero_ticket;
+  // Resetear campo email
+  const emailInput = document.getElementById("tkEmailInput");
+  if (emailInput) emailInput.value = "";
+
   const fmt2 = (n) => parseFloat(n).toFixed(2).replace(".", ",") + " €";
   const date = new Date(v.creado_en.replace(" ", "T"));
   const fechaStr =
@@ -420,6 +457,52 @@ function imprimirTicket() {
   window.print();
 }
 
+// Enviar ticket por email
+async function enviarTicketEmail() {
+  const email = document.getElementById("tkEmailInput").value.trim();
+  const btn = document.getElementById("btnSendEmail");
+
+  if (!email || !email.includes("@")) {
+    showToast("<i class='fa-solid fa-circle-xmark'></i> Email inválido");
+    return;
+  }
+
+  if (!currentTicketNum) {
+    showToast("<i class='fa-solid fa-circle-xmark'></i> No hay ticket cargado");
+    return;
+  }
+
+  const originalContent = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enviando...';
+
+  try {
+    const resp = await fetch("./api/enviarVentaEmail.php", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        numTicket: currentTicketNum,
+        email: email,
+      }),
+    });
+    const data = await resp.json();
+
+    if (data.ok) {
+      showToast(
+        "<i class='fa-solid fa-circle-check'></i> Ticket enviado con éxito",
+      );
+      document.getElementById("tkEmailInput").value = "";
+    } else {
+      throw new Error(data.error);
+    }
+  } catch (err) {
+    showToast("<i class='fa-solid fa-circle-xmark'></i> " + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalContent;
+  }
+}
+
 // Nueva venta: cerrar ticket y resetear carrito
 function nuevaVenta() {
   document.getElementById("ticketModal").classList.remove("visible");
@@ -434,7 +517,9 @@ function closeModal() {
 // ── Modo administrador ─────────────────────────────────────────────────────────
 function requireAdmin() {
   if (!isAdmin) {
-    showToast("⚠️ Acceso restringido a administradores");
+    showToast(
+      "<i class='fa-solid fa-triangle-exclamation'></i> Acceso restringido a administradores",
+    );
     return false;
   }
   return true;
@@ -460,7 +545,9 @@ async function guardarNuevoProducto() {
   const cat = document.getElementById("addCat").value;
 
   if (!name || !codigo || isNaN(price)) {
-    showToast("❌ Por favor, rellena todos los campos");
+    showToast(
+      "<i class='fa-solid fa-circle-xmark'></i> Por favor, rellena todos los campos",
+    );
     return;
   }
 
@@ -484,9 +571,11 @@ async function guardarNuevoProducto() {
     PRODUCTS.push(data.producto);
     document.getElementById("addModal").classList.remove("visible");
     renderProducts();
-    showToast("✅ Producto añadido correctamente");
+    showToast(
+      "<i class='fa-solid fa-circle-check'></i> Producto añadido correctamente",
+    );
   } catch (err) {
-    showToast("❌ " + err.message);
+    showToast("<i class='fa-solid fa-circle-xmark'></i> " + err.message);
   }
 }
 
@@ -537,7 +626,7 @@ async function saveEdit() {
     renderProducts();
     showToast("✅ Producto actualizado en BD");
   } catch (err) {
-    showToast("❌ " + err.message);
+    showToast("<i class='fa-solid fa-circle-xmark'></i> " + err.message);
   }
 }
 
@@ -567,9 +656,11 @@ function deleteProduct(e, id) {
       }
       document.getElementById("deleteModal").classList.remove("visible");
       renderProducts();
-      showToast("🗑️ Producto eliminado de la BD");
+      showToast(
+        "<i class='fa-solid fa-trash-can'></i> Producto eliminado de la BD",
+      );
     } catch (err) {
-      showToast("❌ " + err.message);
+      showToast("<i class='fa-solid fa-circle-xmark'></i> " + err.message);
     }
   };
   document.getElementById("deleteModal").classList.add("visible");
@@ -598,7 +689,9 @@ async function toggleBaja(e, id) {
     }
     renderProducts();
     showToast(
-      p.inactive ? "⏸️ Producto dado de baja" : "▶️ Producto reactivado",
+      p.inactive
+        ? "<i class='fa-solid fa-pause'></i> Producto dado de baja"
+        : "<i class='fa-solid fa-play'></i> Producto reactivado",
     );
   } catch (err) {
     showToast("❌ " + err.message);
@@ -608,7 +701,7 @@ async function toggleBaja(e, id) {
 // ── Toast ──────────────────────────────────────────────────────────────────────
 function showToast(msg) {
   const t = document.getElementById("toast");
-  t.textContent = msg;
+  t.innerHTML = msg; // Usamos innerHTML para soportar iconos
   t.classList.add("show");
   setTimeout(() => t.classList.remove("show"), 2500);
 }

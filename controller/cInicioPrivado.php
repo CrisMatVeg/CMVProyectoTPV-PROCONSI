@@ -28,6 +28,12 @@ if (isset($_REQUEST['irCierreCaja'])) {
     exit;
 }
 
+if (isset($_REQUEST['volver'])) {
+    $_SESSION['paginaEnCurso'] = 'Dashboard';
+    header('Location: index.php');
+    exit;
+}
+
 // Carga de productos desde la base de datos
 $oProductos = ProductoPDO::listarProductos();
 $aProductos = [];
@@ -39,6 +45,7 @@ foreach ($oProductos as $oProducto) {
         "price" => (float)$oProducto->getPrecio(),
         "icono" => $oProducto->getIcono(),
         "cat" => $oProducto->getCategoria(),
+        "stock" => (int)$oProducto->getStock(),
         "inactive" => !$oProducto->getActivo()
     ];
 }

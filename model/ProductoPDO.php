@@ -27,7 +27,8 @@ class ProductoPDO {
                 $registro['precio'],
                 $registro['icono'],
                 $registro['categoria'],
-                $registro['activo']
+                $registro['activo'],
+                $registro['stock']
             );
         }
         return $productos;
@@ -39,14 +40,15 @@ class ProductoPDO {
      * @return array El nuevo producto como array asociativo (con id asignado)
      */
     public static function añadirProducto(array $datos): array {
-        $sql = "INSERT INTO productos (nombre, codigo, precio, icono, categoria, activo)
-                VALUES (:nombre, :codigo, :precio, :icono, :categoria, 1)";
+        $sql = "INSERT INTO productos (nombre, codigo, precio, icono, categoria, activo, stock)
+                VALUES (:nombre, :codigo, :precio, :icono, :categoria, 1, :stock)";
         DBPDO::ejecutarConsulta($sql, [
             ':nombre'    => mb_substr(trim($datos['nombre']), 0, 100),
             ':codigo'    => mb_substr(trim($datos['codigo']), 0, 50),
             ':precio'    => round((float)$datos['precio'], 2),
             ':icono'     => mb_substr(trim($datos['icono']), 0, 10),
             ':categoria' => mb_substr(trim($datos['categoria']), 0, 50),
+            ':stock'     => (int)($datos['stock'] ?? 0),
         ]);
 
         // Obtener el registro recién insertado
@@ -64,7 +66,7 @@ class ProductoPDO {
     public static function editarProducto(int $id, array $datos): void {
         $sql = "UPDATE productos
                 SET nombre = :nombre, codigo = :codigo, precio = :precio,
-                    icono = :icono, categoria = :categoria
+                    icono = :icono, categoria = :categoria, stock = :stock
                 WHERE id = :id";
         DBPDO::ejecutarConsulta($sql, [
             ':nombre'    => mb_substr(trim($datos['nombre']), 0, 100),
@@ -72,6 +74,7 @@ class ProductoPDO {
             ':precio'    => round((float)$datos['precio'], 2),
             ':icono'     => mb_substr(trim($datos['icono']), 0, 10),
             ':categoria' => mb_substr(trim($datos['categoria']), 0, 50),
+            ':stock'     => (int)($datos['stock'] ?? 0),
             ':id'        => $id,
         ]);
     }
@@ -104,5 +107,18 @@ class ProductoPDO {
             [':activo' => $nuevoEstado, ':id' => $id]
         );
         return (bool)$nuevoEstado;
+    }
+
+    /**
+     * Reduce el stock de un producto tras una venta.
+     * @param int $id
+     * @param int $cantidad
+     */
+    public static function reducirStock(int $id, int $cantidad): void {
+        $sql = "UPDATE productos SET stock = stock - :cantidad WHERE id = :id";
+        DBPDO::ejecutarConsulta($sql, [
+            ':cantidad' => $cantidad,
+            ':id'       => $id
+        ]);
     }
 }

@@ -13,8 +13,9 @@ class Producto {
     private $icono;
     private $categoria;
     private $activo;
+    private $stock;
 
-    public function __construct($id, $nombre, $codigo, $precio, $icono, $categoria, $activo) {
+    public function __construct($id, $nombre, $codigo, $precio, $icono, $categoria, $activo, $stock = 0) {
         $this->id = $id;
         $this->nombre = $nombre;
         $this->codigo = $codigo;
@@ -22,6 +23,7 @@ class Producto {
         $this->icono = $icono;
         $this->categoria = $categoria;
         $this->activo = $activo;
+        $this->stock = $stock;
     }
 
     // Getters
@@ -32,4 +34,5 @@ class Producto {
     public function getIcono() { return $this->icono; }
     public function getCategoria() { return $this->categoria; }
     public function getActivo() { return $this->activo; }
+    public function getStock() { return $this->stock; }
 }

@@ -55,6 +55,7 @@ try {
                     'price'    => (float)$nuevo['precio'],
                     'icono'    => $nuevo['icono'],
                     'cat'      => $nuevo['categoria'],
+                    'stock'    => (int)$nuevo['stock'],
                     'inactive' => false,
                 ]
             ]);

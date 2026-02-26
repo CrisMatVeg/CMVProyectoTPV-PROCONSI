@@ -1,7 +1,9 @@
 </header>
 <div class="main container-full">
     <div class="hero-box">
-        <div class="hero-icon">🏬</div>
+        <div class="hero-icon">
+            <i class="fa-solid fa-shop"></i>
+        </div>
         <h1 class="hero-title">ElectroBazar TPV</h1>
         <p class="hero-text">
             Bienvenido al sistema de gestión de punto de venta. 
@@ -12,7 +14,7 @@
             <input type="submit" name="login" value="Acceder al terminal" class="charge-btn">
         </form>
         
-        <div class="topbar-info mt-30" style="justify-content: center;">
+        <div class="topbar-info mt-30 jc-center">
             Versión del Sistema 2.0.26
         </div>
     </div>

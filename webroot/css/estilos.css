@@ -100,6 +100,13 @@ body {
   overflow: hidden;
 }
 
+.main-full {
+  display: block;
+  flex: 1;
+  overflow-y: auto;
+  background: var(--bg);
+}
+
 /* LEFT: CATALOG */
 .catalog-panel {
   display: flex;
@@ -118,6 +125,7 @@ body {
   flex: 1;
   position: relative;
 }
+.search-input-wrap i,
 .search-input-wrap svg {
   position: absolute;
   left: 12px;
@@ -275,10 +283,13 @@ body {
   color: var(--text-muted);
   line-height: 1;
 }
+.admin-action i,
 .admin-action svg {
   width: 13px;
   height: 13px;
-  stroke: currentColor;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .admin-action.edit:hover {
   border-color: var(--blue);
@@ -548,9 +559,13 @@ body {
   transition: all 0.15s;
   font-family: "DM Mono", sans-serif;
 }
+.pay-btn i,
 .pay-btn svg {
   width: 20px;
   height: 20px;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
 }
 .pay-btn:hover {
   border-color: var(--accent);
@@ -561,7 +576,9 @@ body {
   background: var(--accent);
   color: var(--accent-fg);
 }
+.pay-btn.selected i,
 .pay-btn.selected svg {
+  color: var(--accent-fg);
   stroke: var(--accent-fg);
 }
 
