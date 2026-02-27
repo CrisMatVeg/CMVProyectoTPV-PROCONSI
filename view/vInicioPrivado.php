@@ -1,41 +1,6 @@
-<div class="topbar-user">
-    <div class="avatar">
-        <?php 
-            // Sacamos las iniciales del nombre
-            $nombres = explode(" ", $avInicioPrivado["nombre_completo"]);
-            echo strtoupper(substr($nombres[0], 0, 1) . (isset($nombres[1]) ? substr($nombres[1], 0, 1) : ""));
-        ?>
-    </div>
-    <span class="fs-13">
-        <?php echo $avInicioPrivado["nombre_completo"]; ?> 
-        <small>(<?php echo $avInicioPrivado["rol"]; ?>)</small>
-    </span>
-
-    <form method="post" action="index.php" class="ml-12">
-        <input type="hidden" name="paginaAnterior" value="TPV">
-        <button type="submit" name="volver" class="cat-tab p-5-12 fs-11 d-flex ai-center gap-6">
-            <i class="fa-solid fa-house"></i> Dashboard
-        </button>
-    </form>
-    
-    <?php if ($avInicioPrivado['esAdmin']): ?>
-    <form method="post" action="index.php" class="ml-8">
-        <input type="hidden" name="paginaAnterior" value="cierreCaja">
-        <button type="submit" name="irCierreCaja" class="cat-tab p-5-12 fs-11 d-flex ai-center gap-6">
-            <i class="fa-solid fa-vault"></i> Cierre de caja
-        </button>
-    </form>
-    <?php endif; ?>
-
-    <form method="post" action="index.php" class="ml-6">
-        <input type="hidden" name="paginaAnterior" value="Login">
-        <button type="submit" name="atras" class="cat-tab p-5-12 fs-11 text-red border-red bg-red-light d-flex ai-center gap-6">
-            <i class="fa-solid fa-right-from-bracket"></i>
-            Salir
-        </button>
-    </form>
-</div>
 </header>
+</header>
+
 
 <div class="main">
     <!-- CATALOG PANEL -->
@@ -65,7 +30,7 @@
             <button class="cat-tab" data-cat="informatica">Informática</button>
             <button class="cat-tab" data-cat="cables">Cables y Cargadores</button>
             <button class="cat-tab" data-cat="foto">Foto y Video</button>
-            <button class="cat-tab" data-cat="baja" class="text-red border-red-light bg-red-light d-inline-flex ai-center gap-6">
+            <button class="cat-tab d-inline-flex ai-center gap-6 text-red border-red-light bg-red-light" data-cat="baja">
                 <i class="fa-solid fa-arrow-trend-down"></i> De Baja
             </button>
         </div>
@@ -142,6 +107,7 @@
                     Aplicar
                 </button>
             </div>
+            <span id="err-discount" class="form-error"></span>
 
             <button
                 class="charge-btn"
@@ -163,15 +129,25 @@
         </div>
         <input type="hidden" id="editId" />
         <div class="form-grid">
-            <div class="d-flex gap-10 ai-flex-end">
-                <div class="form-group">
-                    <label class="form-label">Emoji</label>
-                    <input id="editEmoji" class="form-input text-center w-80 fs-18" />
+            <div class="form-group">
+                <label class="form-label">Imagen / Icono</label>
+                <div class="d-flex ai-center gap-12">
+                    <div id="editImgPreview" class="prod-img-preview" style="width: 80px; height: 80px; flex-shrink: 0;">
+                        <i class="fa-solid fa-image"></i>
+                    </div>
+                    <div class="flex-1">
+                        <input type="file" id="editFile" accept="image/*" class="d-none" onchange="previewImageTPV(this, 'edit')">
+                        <button type="button" onclick="document.getElementById('editFile').click()" class="btn-icon w-auto h-auto p-12-20 fs-13 gap-8 full-width">
+                            <i class="fa-solid fa-upload"></i> Cambiar Imagen
+                        </button>
+                        <input type="hidden" id="editEmoji" />
+                    </div>
                 </div>
-                <div class="form-group flex-1">
-                    <label class="form-label">Nombre</label>
-                    <input id="editName" class="form-input" />
-                </div>
+            </div>
+            <div class="form-group flex-1">
+                <label class="form-label">Nombre</label>
+                <input id="editName" class="form-input" />
+                <span class="form-error" id="err-editNombre"></span>
             </div>
             <div class="form-group-wrap grid-2">
                 <div class="form-group">
@@ -180,7 +156,8 @@
                 </div>
                 <div class="form-group">
                     <label class="form-label">Precio (€)</label>
-                    <input id="editPrice" class="form-input font-mono text-right" type="number" step="0.01" />
+                    <input id="editPrice" class="form-input font-mono text-right" type="text" />
+                    <span class="form-error" id="err-editPrecio"></span>
                 </div>
             </div>
         </div>
@@ -199,12 +176,24 @@
         </div>
         <div class="form-grid">
             <div class="form-group">
-                <label class="form-label">Emoji / Icono</label>
-                <input id="addEmoji" class="form-input text-center fs-18" placeholder="📦" />
+                <label class="form-label">Imagen / Icono</label>
+                <div class="d-flex ai-center gap-12">
+                    <div id="addImgPreview" class="prod-img-preview" style="width: 80px; height: 80px; flex-shrink: 0;">
+                        <i class="fa-solid fa-image"></i>
+                    </div>
+                    <div class="flex-1">
+                        <input type="file" id="addFile" accept="image/*" class="d-none" onchange="previewImageTPV(this, 'add')">
+                        <button type="button" onclick="document.getElementById('addFile').click()" class="btn-icon w-auto h-auto p-12-20 fs-13 gap-8 full-width">
+                            <i class="fa-solid fa-upload"></i> Subir Imagen
+                        </button>
+                        <input type="hidden" id="addEmoji" />
+                    </div>
+                </div>
             </div>
             <div class="form-group">
                 <label class="form-label">Nombre</label>
                 <input id="addName" class="form-input" placeholder="Nombre completo" />
+                <span class="form-error" id="err-addNombre"></span>
             </div>
             <div class="form-group-wrap grid-2">
                 <div class="form-group">
@@ -213,7 +202,8 @@
                 </div>
                 <div class="form-group">
                     <label class="form-label">Precio (€)</label>
-                    <input id="addPrice" class="form-input font-mono text-right" type="number" step="0.01" placeholder="0.00" />
+                    <input id="addPrice" class="form-input font-mono text-right" type="text" placeholder="0.00" />
+                    <span class="form-error" id="err-addPrecio"></span>
                 </div>
             </div>
             <div class="form-group">
@@ -252,34 +242,60 @@
     </div>
 </div>
 
-<!-- TOAST -->
-<div id="toast"></div>
 
 <!-- MODAL 1: TIPO DE CLIENTE (aparece al pulsar Cobrar) -->
 <div class="modal-overlay" id="clienteModal">
     <div class="modal modal-content gap-18 ai-stretch w-360">
         <div class="modal-title text-center fs-18">¿Tipo de cliente?</div>
-        <div class="grid-2 gap-12 mb-12">
+        <div class="grid-3 gap-12 mb-12">
             <button id="btnParticular" onclick="seleccionarTipoCliente('particular')"
-                class="p-20-10 br-12 border-2 bg-surface2 cursor-pointer fs-14 d-flex flex-column ai-center gap-12 active-scale">
+                class="p-16-8 br-12 border-2 bg-surface2 cursor-pointer fs-13 d-flex flex-column ai-center gap-12 active-scale h-auto">
                 <i class="fa-solid fa-user fs-28"></i>
-                Particular
+                <span class="font-bold">Particular</span>
+            </button>
+            <button id="btnSocio" onclick="seleccionarTipoCliente('socio')"
+                class="p-16-8 br-12 border-2 bg-surface2 cursor-pointer fs-13 d-flex flex-column ai-center gap-12 active-scale h-auto">
+                <i class="fa-solid fa-id-card fs-28 text-accent"></i>
+                <span class="font-bold">Socio</span>
             </button>
             <button id="btnEmpresa" onclick="seleccionarTipoCliente('empresa')"
-                class="p-20-10 br-12 border-2 bg-surface2 cursor-pointer fs-14 d-flex flex-column ai-center gap-12 active-scale">
+                class="p-16-8 br-12 border-2 bg-surface2 cursor-pointer fs-13 d-flex flex-column ai-center gap-12 active-scale h-auto">
                 <i class="fa-solid fa-building fs-28"></i>
-                Empresa
+                <span class="font-bold">Empresa</span>
             </button>
+        </div>
+        
+        <!-- Buscador de Socio -->
+        <div id="socioBusqueda" class="d-none flex-column gap-8 p-12 bg-surface2 br-8 border-2 mb-8">
+            <div class="d-flex gap-8">
+                <input id="socioSearch" class="form-input fs-13 flex-1" placeholder="DNI o Nombre del socio..." />
+                <button onclick="buscarSocio()" class="btn-save w-auto p-4-12"><i class="fa-solid fa-search"></i></button>
+            </div>
+            <div id="socioInfo" class="fs-12 mt-4 text-accent font-bold"></div>
+            <button id="btnAddSocio" onclick="mostrarRegistroSocio()" class="cat-tab p-4-8 fs-11 d-none">+ Registrar nuevo socio</button>
+        </div>
+
+        <!-- Registro de Socio -->
+        <div id="socioRegistro" class="d-none flex-column gap-8 p-12 bg-surface2 br-8 border-2 mb-8">
+            <div class="form-label fs-12 font-bold">Nuevo Socio</div>
+            <input id="newSocioNombre" class="form-input fs-12" placeholder="Nombre completo" />
+            <input id="newSocioNif" class="form-input fs-12 font-mono" placeholder="DNI / NIE" />
+            <div class="d-flex gap-8">
+               <button onclick="cancelarRegistroSocio()" class="btn-cancel fs-11 p-4">Cancelar</button>
+               <button onclick="guardarNuevoSocio()" class="btn-save fs-11 p-4">Guardar y Usar</button>
+            </div>
         </div>
         <!-- Datos de empresa -->
         <div id="empresaDatos" class="d-none flex-column gap-8">
             <div class="form-group">
                 <label class="form-label">Razón social</label>
                 <input id="empresaNombre" class="form-input" placeholder="Nombre de la empresa" />
+                <span class="form-error" id="err-empresaNombre"></span>
             </div>
             <div class="form-group">
                 <label class="form-label">CIF / NIF</label>
                 <input id="empresaNif" class="form-input font-mono" placeholder="B12345678" />
+                <span class="form-error" id="err-empresaNif"></span>
             </div>
         </div>
         <!-- Gestión de Efectivo -->
@@ -287,7 +303,7 @@
             <div class="form-label">Pago en efectivo</div>
             <div class="form-group">
                 <label class="fs-13 font-bold">Importe recibido</label>
-                <input id="efectivoRecibido" type="number" step="0.01" class="form-input font-mono fs-16 text-right" oninput="calcularCambio()" />
+                <input id="efectivoRecibido" type="text" class="form-input font-mono fs-16 text-right" oninput="calcularCambio()" />
             </div>
             <div class="d-flex jc-space-between ai-center mt-4">
                 <span class="label fs-13">Cambio:</span>
@@ -295,73 +311,10 @@
             </div>
         </div>
         <div class="modal-footer">
-            <button onclick="document.getElementById('clienteModal').classList.remove('visible')" class="btn-cancel">Cancelar</button>
+            <button onclick="cerrarModalCliente()" class="btn-cancel">Cancelar</button>
             <button id="confirmarClienteBtn" onclick="confirmarCliente()" class="btn-save">Cobrar</button>
         </div>
     </div>
 </div>
 
-<!-- MODAL 2: TICKET / FACTURA -->
-<div class="modal-overlay" id="ticketModal">
-    <div class="modal ticket-wrapper" id="ticketContenido">
-        <div class="ticket-brand-header">
-            <div class="title"><i class="fa-solid fa-bolt-lightning"></i> ElectroBazar</div>
-            <div class="info">C/ Tecnología 24, 28001 Madrid · NIF: B87654321</div>
-        </div>
 
-        <div class="ticket-meta">
-            <span id="tkTipoDoc" class="doc-type">TICKET DE VENTA</span>
-            <span class="label">Nº Ticket</span> <span id="tkNumero" class="value">#—</span>
-            <span class="label">Fecha</span> <span id="tkFecha">—</span>
-            <span class="label">Cajero</span> <span id="tkCajero">—</span>
-            <span class="label">Pago</span> <span id="tkMetodo">—</span>
-            <!-- Empresa -->
-            <span id="tkLabelCliente" class="label d-none">Cliente</span>
-            <span id="tkNombreCliente" class="d-none"></span>
-            <span id="tkLabelNif" class="label d-none">CIF/NIF</span>
-            <span id="tkNifCliente" class="d-none font-mono"></span>
-        </div>
-
-        <div id="tkLineas" class="ticket-items"></div>
-
-        <div class="ticket-totals">
-            <div class="ticket-total-row label text-muted">
-                <span>Subtotal</span><span id="tkSubtotal">—</span>
-            </div>
-            <div id="tkDescRow" class="ticket-total-row d-none text-green">
-                <span id="tkDescLabel">Descuento</span><span id="tkDescAmt">—</span>
-            </div>
-            <div class="ticket-total-row label text-muted">
-                <span>Base imponible</span><span id="tkBase">—</span>
-            </div>
-            <div class="ticket-total-row label text-muted">
-                <span>IVA (21%)</span><span id="tkIva">—</span>
-            </div>
-            <div class="ticket-total-row ticket-total-main">
-                <span>TOTAL</span><span id="tkTotal" class="font-mono">—</span>
-            </div>
-            <!-- Efectivo -->
-            <div id="tkEfectivoRow" class="d-none flex-column gap-4 mt-8 pt-8 border-top text-muted fs-12">
-                <div class="ticket-total-row"><span>Entregado</span><span id="tkEntregado">—</span></div>
-                <div class="ticket-total-row"><span>Cambio</span><span id="tkCambio">—</span></div>
-            </div>
-        </div>
-
-        <div class="ticket-email-section">
-            <label class="form-label fs-11">Enviar por email</label>
-            <div class="d-flex gap-8">
-                <input type="email" id="tkEmailInput" placeholder="cliente@ejemplo.com" class="form-input font-mono fs-13">
-                <button onclick="enviarTicketEmail()" id="btnSendEmail" class="btn-filter h-40 p-0-20 bg-blue">
-                    <i class="fa-solid fa-paper-plane"></i>
-                </button>
-            </div>
-        </div>
-
-        <div class="modal-footer p-0-24-20">
-            <button onclick="imprimirTicket()" class="btn-cancel d-flex ai-center jc-center gap-8">
-                <i class="fa-solid fa-print"></i> Ticket
-            </button>
-            <button onclick="nuevaVenta()" class="btn-save">Nueva venta</button>
-        </div>
-    </div>
-</div>

@@ -6,6 +6,15 @@
   margin-right: auto;
 }
 
+/* extend max-width for pages that require more horizontal space */
+/* use viewport-percentage so containers occupy most of the screen on large displays */
+.container-wider {
+  width: 100%;
+  max-width: 90vw;
+  margin-left: auto;
+  margin-right: auto;
+}
+
 .mt-24 {
   margin-top: 24px;
 }
@@ -23,24 +32,43 @@
 /* DASHBOARD */
 .dashboard-wrapper {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  min-height: 85vh;
-  background: var(--surface2);
+  padding: 40px 24px;
+  min-height: 100vh;
+  background: var(--bg);
 }
 
 .dashboard-card {
-  width: 600px;
+  width: 100%;
+  max-width: 1200px;
   padding: 40px;
   display: flex;
   flex-direction: column;
   gap: 30px;
   background: var(--surface);
   border: 1px solid var(--border);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-  border-radius: 16px;
+  box-shadow: var(--shadow-lg);
+  border-radius: 20px;
   position: relative;
   z-index: 10;
+}
+
+.stat-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.05);
 }
 
 /* MODAL OVERLAY ADJUSTMENTS */
@@ -303,6 +331,57 @@
   background: var(--surface2);
 }
 
+/* PRODUCT IMAGES */
+.prod-img-fixed {
+  width: 60px;
+  height: 60px;
+  object-fit: contain;
+  padding: 2px;
+  background: var(--surface2);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.prod-img-preview {
+  width: 100%;
+  height: 110px;
+  background: var(--surface2);
+  border: 2px dashed var(--border);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 32px;
+}
+
+.prod-img-tpv {
+  width: 100%;
+  height: 110px;
+  padding: 4px;
+  object-fit: contain;
+  border-radius: 12px;
+  display: block;
+  background-color: var(--surface2);
+}
+
+.product-icon {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 110px;
+}
+
+.order-item-img {
+  width: 38px;
+  height: 38px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
 /* FILTERS PANEL */
 .filters-panel {
   background: var(--surface);
@@ -310,6 +389,11 @@
   border-radius: 12px;
   padding: 20px;
   margin-bottom: 25px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
 }
 
 .filters-form {
@@ -317,6 +401,36 @@
   flex-wrap: wrap;
   gap: 20px;
   align-items: flex-end;
+}
+
+.search-bar-wrap {
+  position: relative;
+  min-width: 300px;
+}
+
+.search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+}
+
+.search-input {
+  width: 100%;
+  padding: 10px 12px 10px 38px;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface2);
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.search-input:focus {
+  border-color: var(--accent);
+  background: var(--surface);
 }
 
 .filter-group {
@@ -345,6 +459,24 @@
 .filter-input:focus {
   border-color: var(--accent);
   background: var(--surface);
+}
+
+.btn-add {
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: none;
+  background: var(--accent);
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  font-family: inherit;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.2s;
 }
 
 .btn-filter {
@@ -577,6 +709,61 @@
 .p-24 {
   padding: 24px !important;
 }
+.p-16-8 {
+  padding: 16px 8px !important;
+}
+
+/* --- TOAST --- */
+.toast-container {
+  position: fixed;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  z-index: 10000;
+  pointer-events: none;
+}
+
+.toast {
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(12px);
+  color: white;
+  padding: 12px 24px;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  animation: toastIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  pointer-events: auto;
+}
+
+.toast i {
+  font-size: 16px;
+}
+
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes toastOut {
+  to {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+  }
+}
 .p-20 {
   padding: 20px !important;
 }
@@ -790,6 +977,10 @@
 .grid-2 {
   display: grid !important;
   grid-template-columns: 1fr 1fr !important;
+}
+.grid-3 {
+  display: grid !important;
+  grid-template-columns: repeat(3, 1fr) !important;
 }
 .grid-4 {
   display: grid !important;
@@ -1169,4 +1360,159 @@
   padding: 0 24px 16px;
   border-bottom: 1.5px solid var(--border);
   margin-bottom: 16px;
+}
+
+/* IMPRESIÓN */
+@media print {
+  @page {
+    margin: 12mm;
+    size: auto;
+  }
+
+  /* ── Reset global: solo blanco y negro para ahorrar tinta ── */
+  * {
+    background: white !important;
+    color: #000 !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+    border-color: #aaa !important;
+  }
+
+  body {
+    background: white !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    height: auto !important;
+  }
+
+  /* ── TPV: imprimir solo el modal de ticket ── */
+  body[data-page="inicioPrivado"] > *:not(#ticketModal) {
+    display: none !important;
+  }
+
+  body[data-page="inicioPrivado"] #ticketModal {
+    position: absolute !important;
+    inset: 0 !important;
+    display: flex !important;
+    align-items: flex-start !important;
+    justify-content: center !important;
+    padding: 0 !important;
+    visibility: visible !important;
+    backdrop-filter: none !important;
+    opacity: 1 !important;
+  }
+
+  body[data-page="inicioPrivado"] .ticket-wrapper {
+    width: 80mm !important;
+    max-width: 100% !important;
+    border: none !important;
+    margin: 0 !important;
+  }
+
+  body[data-page="inicioPrivado"] .ticket-brand-header {
+    background: white !important;
+    border-bottom: 2px solid #000 !important;
+    padding: 8px 0 10px 0 !important;
+  }
+
+  body[data-page="inicioPrivado"] .ticket-items {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  body[data-page="inicioPrivado"] .ticket-email-section,
+  body[data-page="inicioPrivado"] .modal-footer,
+  body[data-page="inicioPrivado"] input,
+  body[data-page="inicioPrivado"] button {
+    display: none !important;
+  }
+
+  /* ── Cierre de Caja ── */
+  body[data-page="cierreCaja"] .topbar,
+  body[data-page="cierreCaja"] #ticketModal,
+  body[data-page="cierreCaja"] .modal-overlay,
+  body[data-page="cierreCaja"] .d-flex.gap-8 button,
+  body[data-page="cierreCaja"] form {
+    display: none !important;
+  }
+
+  body[data-page="cierreCaja"] .main-full {
+    display: block !important;
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+
+  body[data-page="cierreCaja"] .section-header {
+    border: none !important;
+    padding: 0 0 10px 0 !important;
+    margin-bottom: 14px !important;
+    border-bottom: 2px solid #000 !important;
+    border-radius: 0 !important;
+  }
+
+  body[data-page="cierreCaja"] .stat-card {
+    border: 1px solid #aaa !important;
+  }
+
+  body[data-page="cierreCaja"] .table-container {
+    border: 1px solid #aaa !important;
+  }
+
+  body[data-page="cierreCaja"] .data-table thead tr {
+    background: white !important;
+    border-bottom: 2px solid #000 !important;
+  }
+
+  body[data-page="cierreCaja"] .data-table th,
+  body[data-page="cierreCaja"] .data-table td {
+    font-size: 11px !important;
+    padding: 6px 10px !important;
+    border-color: #ccc !important;
+  }
+
+  /* Ocultar columna de acciones al imprimir */
+  body[data-page="cierreCaja"] .data-table th:last-child,
+  body[data-page="cierreCaja"] .data-table td:last-child {
+    display: none !important;
+  }
+
+  /* ── Historial ── */
+  body[data-page="Historial"] .topbar,
+  body[data-page="Historial"] #ticketModal,
+  body[data-page="Historial"] .modal-overlay,
+  body[data-page="Historial"] button,
+  body[data-page="Historial"] form {
+    display: none !important;
+  }
+
+  body[data-page="Historial"] .main-full {
+    display: block !important;
+    overflow: visible !important;
+  }
+}
+/* ESTILOS PARA DIFERENCIAR FACTURAS Y TICKETS */
+.ticket-wrapper {
+  border: 2px solid var(--border);
+  background: var(--surface);
+}
+
+/* Factura: sin borde izquierdo prominente, solo estilos sutiles */
+.ticket-wrapper.es-factura {
+  background: var(--surface);
+  border: 2px solid var(--border);
+}
+
+.ticket-cliente-section {
+  background: var(--surface2);
+  padding: 16px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  border-left: 4px solid var(--accent);
+}
+.form-error {
+  color: var(--red);
+  font-size: 11px;
+  font-weight: 600;
+  margin-top: 4px;
 }

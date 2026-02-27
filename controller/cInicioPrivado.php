@@ -11,13 +11,8 @@ if ($_SESSION['usuarioActualTPV']->getRol() == "admin") {
     $esAdmin = false;
 }
 
-if (isset($_REQUEST['atras'])) {
-    session_unset();
+if (isset($_REQUEST['salir'])) {
     session_destroy();
-    session_start();
-    /* UsuarioPDO::guardarToken($codUsuario, null); */
-    $_SESSION['paginaAnterior'] = $_REQUEST['paginaAnterior'];
-    $_SESSION['paginaEnCurso'] = $_SESSION['paginaAnterior'];
     header('Location: index.php');
     exit;
 }
@@ -28,32 +23,44 @@ if (isset($_REQUEST['irCierreCaja'])) {
     exit;
 }
 
-if (isset($_REQUEST['volver'])) {
+if (isset($_REQUEST['irDashboard']) || isset($_REQUEST['volver'])) {
     $_SESSION['paginaEnCurso'] = 'Dashboard';
     header('Location: index.php');
     exit;
 }
 
-// Carga de productos desde la base de datos
-$oProductos = ProductoPDO::listarProductos();
+if (isset($_REQUEST['irMiPerfil'])) {
+    $_SESSION['paginaEnCurso'] = 'MiPerfil';
+    header('Location: index.php');
+    exit;
+}
+
+// Carga de productos desde la base de datos (incluyendo inactivos para el filtro "De baja")
+$oProductos = ProductoPDO::listarProductos(false);
 $aProductos = [];
 foreach ($oProductos as $oProducto) {
+    // Procesamiento del icono (binario a base64 para la vista)
+    $icono = $oProducto->getIcono();
+    if ($icono && strlen($icono) > 10) { // Si es más largo que un emoji, asumimos imagen
+        $icono = 'data:image/png;base64,' . base64_encode($icono);
+    }
+
     $aProductos[] = [
         "id" => $oProducto->getId(),
         "name" => $oProducto->getNombre(),
-        "codigo" => $oProducto->getCodigo(),
-        "price" => (float)$oProducto->getPrecio(),
-        "icono" => $oProducto->getIcono(),
+        "codigo" => $oProducto->getReferencia(),
+        "price" => (float)$oProducto->getPrecioVenta(),
+        "icono" => $icono,
         "cat" => $oProducto->getCategoria(),
-        "stock" => (int)$oProducto->getStock(),
+        "stock" => (int)$oProducto->getStockActual(),
         "inactive" => !$oProducto->getActivo()
     ];
 }
 
 // Preparación de los datos del usuario para la vista
 $avInicioPrivado = [
-    "nombre_completo" => $_SESSION['usuarioActualTPV']->getNombreCompleto(),
-    "username" => $_SESSION['usuarioActualTPV']->getUsername(),
+    "nombre_completo" => $_SESSION['usuarioActualTPV']->getNombre(),
+    "username" => $_SESSION['usuarioActualTPV']->getLogin(),
     "password" => $_SESSION['usuarioActualTPV']->getPassword(),
     "rol" => $_SESSION['usuarioActualTPV']->getRol(),
     "esAdmin" => $esAdmin,

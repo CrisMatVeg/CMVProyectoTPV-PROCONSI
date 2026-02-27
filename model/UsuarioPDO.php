@@ -12,18 +12,18 @@ class UsuarioPDO {
 
     /**
      * Valida el acceso de un usuario.
-     * @param string $username Nombre de usuario
+     * @param string $login Nombre de usuario (login)
      * @param string $password Contraseña en texto plano
      * @return Usuario|null Devuelve el objeto Usuario si es válido, null en caso contrario.
      */
-    public static function validarUsuario($username, $password=null) {
+    public static function validarUsuario($login, $password=null) {
         if($password!=null){
             // Usamos SHA2 de MySQL para compatibilidad con el script de creación
-            $sql = "SELECT * FROM usuarios WHERE username = :usuario AND password = SHA2(:password,256)";
-            $consulta = DBPDO::ejecutarConsulta($sql, [':usuario' => $username, ':password' => $password]);
+            $sql = "SELECT * FROM usuarios WHERE login = :login AND password = SHA2(:password,256)";
+            $consulta = DBPDO::ejecutarConsulta($sql, [':login' => $login, ':password' => $password]);
         }else{
-            $sql = "SELECT * FROM usuarios WHERE username = :usuario";
-            $consulta = DBPDO::ejecutarConsulta($sql, [':usuario' => $username]);
+            $sql = "SELECT * FROM usuarios WHERE login = :login";
+            $consulta = DBPDO::ejecutarConsulta($sql, [':login' => $login]);
         }
         
         $objetoResultado = $consulta->fetch(PDO::FETCH_ASSOC);
@@ -34,8 +34,8 @@ class UsuarioPDO {
 
         return new Usuario(
             $objetoResultado['id'],
-            $objetoResultado['nombre_completo'],
-            $objetoResultado['username'],
+            $objetoResultado['nombre'],
+            $objetoResultado['login'],
             $objetoResultado['password'],
             $objetoResultado['rol'],
             $objetoResultado['activo']
@@ -47,14 +47,14 @@ class UsuarioPDO {
      * @return array
      */
     public static function listarUsuarios(): array {
-        $sql = "SELECT * FROM usuarios ORDER BY activo DESC, nombre_completo ASC";
+        $sql = "SELECT * FROM usuarios ORDER BY activo DESC, nombre ASC";
         $q = DBPDO::ejecutarConsulta($sql);
         $usuarios = [];
         while ($row = $q->fetch(PDO::FETCH_ASSOC)) {
             $usuarios[] = new Usuario(
                 $row['id'],
-                $row['nombre_completo'],
-                $row['username'],
+                $row['nombre'],
+                $row['login'],
                 $row['password'],
                 $row['rol'],
                 $row['activo']
@@ -66,12 +66,12 @@ class UsuarioPDO {
     /**
      * Añade un nuevo usuario.
      */
-    public static function añadirUsuario($nombre, $username, $password, $rol) {
-        $sql = "INSERT INTO usuarios (nombre_completo, username, password, rol) 
-                VALUES (:nombre, :user, SHA2(:pass,256), :rol)";
+    public static function añadirUsuario($nombre, $login, $password, $rol) {
+        $sql = "INSERT INTO usuarios (nombre, login, password, rol) 
+                VALUES (:nombre, :login, SHA2(:pass,256), :rol)";
         $params = [
             ':nombre' => $nombre,
-            ':user'   => $username,
+            ':login'   => $login,
             ':pass'   => $password,
             ':rol'    => $rol
         ];

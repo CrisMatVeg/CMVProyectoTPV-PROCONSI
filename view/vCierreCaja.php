@@ -1,5 +1,12 @@
 </header>
-<div class="main-full p-24 w-900 m-0-auto">
+<div class="main-full container container-wider p-24 mt-24">
+
+    <?php if ($avCierreCaja['mensajeExito']): ?>
+        <div class="bg-green-light text-green p-16 br-12 mb-24 d-flex ai-center gap-12 fs-14 font-bold">
+            <i class="fa-solid fa-circle-check fs-20"></i>
+            <?php echo $avCierreCaja['mensajeExito']; ?>
+        </div>
+    <?php endif; ?>
 
     <!-- TÍTULO -->
     <div class="section-header">
@@ -24,25 +31,25 @@
 
     <!-- RESUMEN EN CARDS -->
     <div class="grid-4 gap-14 mb-28">
-        <div class="dashboard-card p-18">
+        <div class="stat-card">
             <div class="summary-label">Ventas</div>
             <div class="fs-28 font-bold font-mono mt-6">
                 <?php echo $avCierreCaja['resumen']['totalVentas']; ?>
             </div>
         </div>
-        <div class="dashboard-card p-18">
+        <div class="stat-card">
             <div class="summary-label">Efectivo</div>
             <div class="fs-22 font-bold font-mono mt-6 text-green">
                 <?php echo number_format($avCierreCaja['resumen']['totalEfectivo'], 2, ',', '.'); ?> €
             </div>
         </div>
-        <div class="dashboard-card p-18">
+        <div class="stat-card">
             <div class="summary-label">Tarjeta</div>
             <div class="fs-22 font-bold font-mono mt-6 text-blue">
                 <?php echo number_format($avCierreCaja['resumen']['totalTarjeta'], 2, ',', '.'); ?> €
             </div>
         </div>
-        <div class="dashboard-card p-18 bg-accent border-accent">
+        <div class="stat-card bg-accent border-accent">
             <div class="summary-label text-white-70">Total recaudado</div>
             <div class="fs-22 font-bold font-mono mt-6 text-white">
                 <?php echo number_format($avCierreCaja['resumen']['totalBruto'], 2, ',', '.'); ?> €
@@ -66,6 +73,51 @@
         </div>
     </div>
 
+    <!-- ARQUEO DE CAJA (Z) -->
+    <div class="table-container p-24 mb-28 border-2" style="border-color: var(--accent);">
+        <h3 class="mb-16 d-flex ai-center gap-10">
+            <i class="fa-solid fa-vault text-accent"></i> 
+            Arqueo de Caja y Cierre Fiscal (Z)
+        </h3>
+        <form method="post" id="formCierre">
+            <div class="grid-3 gap-24">
+                <div class="form-group">
+                    <label class="form-label fs-13">Efectivo esperado</label>
+                    <div class="fs-20 font-mono font-bold"><?php echo number_format($avCierreCaja['resumen']['totalEfectivo'], 2, ',', '.'); ?> €</div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label fs-13">Efectivo real en caja</label>
+                    <input type="number" step="0.01" name="realEfectivo" id="realEfectivo" class="form-input fs-18 font-mono" placeholder="0.00" oninput="calcularDiferencia()" required>
+                    <input type="hidden" name="totalTarjeta" value="<?php echo $avCierreCaja['resumen']['totalTarjeta']; ?>">
+                </div>
+                <div class="form-group">
+                    <label class="form-label fs-13">Diferencia / Descuadre</label>
+                    <div id="diffCaja" class="fs-20 font-mono font-bold">0,00 €</div>
+                </div>
+            </div>
+            <div class="mt-20 d-flex jc-between ai-center">
+                <p class="fs-12 text-muted max-w-500">
+                    Al confirmar, se registrará el cierre en el historial fiscal y se asignará un número de Reporte Z. Las ventas actuales quedarán marcadas como cerradas.
+                </p>
+                <button type="submit" name="doCierre" class="btn-save w-auto p-12-24 bg-accent">
+                    Confirmar Cierre y Generar Z
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+    function calcularDiferencia() {
+        const esperado = <?php echo $avCierreCaja['resumen']['totalEfectivo']; ?>;
+        const real = parseFloat(document.getElementById('realEfectivo').value) || 0;
+        const diff = real - esperado;
+        const el = document.getElementById('diffCaja');
+        el.innerText = (diff >= 0 ? '+' : '') + diff.toFixed(2).replace('.', ',') + ' €';
+        el.className = 'fs-20 font-mono font-bold ' + (diff === 0 ? 'text-green' : 'text-red');
+    }
+    </script>
+
+
     <div class="table-container">
         <div class="p-14-20 border-bottom font-bold fs-13">
             Tickets del día
@@ -85,6 +137,7 @@
                         <th class="text-right">Base imp.</th>
                         <th class="text-right">IVA</th>
                         <th class="text-right pr-20">Total</th>
+                        <th>Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -94,7 +147,7 @@
                             #<?php echo str_pad($v['numero_ticket'], 4, '0', STR_PAD_LEFT); ?>
                         </td>
                         <td class="font-mono text-muted">
-                            <?php echo date('H:i', strtotime($v['creado_en'])); ?>
+                            <?php echo date('H:i', strtotime($v['fecha'])); ?>
                         </td>
                         <td>
                             <?php if ($v['tipo_cliente'] === 'empresa'): ?>
@@ -127,13 +180,15 @@
                         <td class="text-right font-mono font-bold pr-20">
                             <?php echo number_format($v['total'], 2, ',', '.'); ?> €
                         </td>
+                        <td class="text-center">
+                            <button title="Ver ticket/factura" class="btn-icon" onclick="verTicket(<?php echo $v['numero_ticket']; ?>)">
+                                <i class="fa-solid fa-receipt"></i>
+                            </button>
+                        </td>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
             </table>
-        <?php endif; ?>
-    </div>
-
-</div>
+        <?php endif; ?>    </div>
 
 </div>

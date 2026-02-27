@@ -43,6 +43,26 @@ if (isset($_REQUEST['irMiPerfil'])) {
     exit;
 }
 
+// Datos de analítica para el admin
+$avDashboard = [
+    'kpis' => null,
+    'metodos' => [],
+    'productos_count' => 0
+];
+
+if ($_SESSION['usuarioActualTPV']->getRol() === 'admin') {
+    require_once 'model/VentaPDO.php';
+    require_once 'model/ProductoPDO.php';
+    
+    $desde = date('Y-m-d', strtotime('-7 days'));
+    $hasta = date('Y-m-d');
+    
+    $avDashboard['kpis'] = VentaPDO::obtenerKPIs($desde, $hasta);
+    $avDashboard['metodos'] = VentaPDO::obtenerVentasPorMetodo($desde, $hasta);
+    $avDashboard['cajeros'] = VentaPDO::obtenerVentasPorCajero($desde, $hasta);
+    $avDashboard['productos_count'] = count(ProductoPDO::listarProductos(false));
+}
+
 // Cargamos la vista de dashboard
 require_once $view['layout'];
 ?>

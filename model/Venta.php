@@ -8,6 +8,9 @@
 class Venta {
     private $id;
     private $numeroTicket;
+    private $fecha;
+    private $idUsuario;
+    private $idCliente;
     private $tipoCliente;
     private $nombreCliente;
     private $nifCliente;
@@ -19,16 +22,19 @@ class Venta {
     private $ivaPct;
     private $ivaAmt;
     private $total;
-    private $idCajero;
+    private $numZ;
     private $creadoEn;
-    private $lineas; // array de lineas_venta
+    private $lineas; // array de asociativo o objetos lineas_venta
 
-    public function __construct($id, $numeroTicket, $tipoCliente, $nombreCliente,
+    public function __construct($id, $numeroTicket, $fecha, $idUsuario, $idCliente, $tipoCliente, $nombreCliente,
                                 $nifCliente, $metodoPago, $subtotal, $descuentoPct,
                                 $descuentoAmt, $baseImponible, $ivaPct, $ivaAmt,
-                                $total, $idCajero, $creadoEn, $lineas = []) {
+                                $total, $numZ, $creadoEn, $lineas = []) {
         $this->id = $id;
         $this->numeroTicket = $numeroTicket;
+        $this->fecha = $fecha;
+        $this->idUsuario = $idUsuario;
+        $this->idCliente = $idCliente;
         $this->tipoCliente = $tipoCliente;
         $this->nombreCliente = $nombreCliente;
         $this->nifCliente = $nifCliente;
@@ -40,7 +46,7 @@ class Venta {
         $this->ivaPct = $ivaPct;
         $this->ivaAmt = $ivaAmt;
         $this->total = $total;
-        $this->idCajero = $idCajero;
+        $this->numZ = $numZ;
         $this->creadoEn = $creadoEn;
         $this->lineas = $lineas;
     }
@@ -48,6 +54,9 @@ class Venta {
     // Getters
     public function getId()            { return $this->id; }
     public function getNumeroTicket()  { return $this->numeroTicket; }
+    public function getFecha()         { return $this->fecha; }
+    public function getIdUsuario()     { return $this->idUsuario; }
+    public function getIdCliente()     { return $this->idCliente; }
     public function getTipoCliente()   { return $this->tipoCliente; }
     public function getNombreCliente() { return $this->nombreCliente; }
     public function getNifCliente()    { return $this->nifCliente; }
@@ -59,7 +68,7 @@ class Venta {
     public function getIvaPct()        { return $this->ivaPct; }
     public function getIvaAmt()        { return $this->ivaAmt; }
     public function getTotal()         { return $this->total; }
-    public function getIdCajero()      { return $this->idCajero; }
+    public function getNumZ()          { return $this->numZ; }
     public function getCreadoEn()      { return $this->creadoEn; }
     public function getLineas()        { return $this->lineas; }
 }

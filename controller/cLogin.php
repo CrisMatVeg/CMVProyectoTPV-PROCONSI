@@ -57,12 +57,11 @@ if (isset($_REQUEST['acceder'])) {
 
     if ($entradaOK) {
 
-        $username = $_REQUEST['username'] == null ? '' : $_REQUEST['username'];
+        $login = $_REQUEST['username'] == null ? '' : $_REQUEST['username'];
         $password = $_REQUEST['password'] == null ? '' : $_REQUEST['password'];
 
         // Llamar al modelo
-        $usuarioPDO = new UsuarioPDO();
-        $usuario = $usuarioPDO->validarUsuario($username, $password);
+        $usuario = UsuarioPDO::validarUsuario($login, $password);
 
         if ($usuario) {
             // Guardar usuario en sesión para la app

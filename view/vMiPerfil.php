@@ -25,10 +25,13 @@
             </div>
         <?php endif; ?>
 
-        <form method="post" class="form-grid gap-20 d-flex flex-column">
+        <form method="post" class="form-grid gap-20 d-flex flex-column" novalidate>
             <div class="form-group">
                 <label class="form-label">Nombre Completo</label>
-                <input type="text" name="nombre_completo" class="form-input" value="<?php echo htmlspecialchars($avMiPerfil['usuario']->getNombreCompleto()); ?>">
+                <input type="text" name="nombre_completo" class="form-input" value="<?php echo htmlspecialchars($_REQUEST['nombre_completo'] ?? $avMiPerfil['usuario']->getNombreCompleto()); ?>">
+                <?php if (isset($avMiPerfil['aErrores']['nombre_completo']) && $avMiPerfil['aErrores']['nombre_completo'] != null) { ?>
+                    <span class="form-error"><?php echo $avMiPerfil['aErrores']['nombre_completo']; ?></span>
+                <?php } ?>
             </div>
 
             <div class="form-group">
@@ -45,15 +48,21 @@
                 <div class="form-group">
                     <label class="form-label">Nueva Contraseña</label>
                     <input type="password" name="pass1" class="form-input" placeholder="••••••••">
+                    <?php if (isset($avMiPerfil['aErrores']['pass1']) && $avMiPerfil['aErrores']['pass1'] != null) { ?>
+                        <span class="form-error"><?php echo $avMiPerfil['aErrores']['pass1']; ?></span>
+                    <?php } ?>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Repetir Contraseña</label>
                     <input type="password" name="pass2" class="form-input" placeholder="••••••••">
+                    <?php if (isset($avMiPerfil['aErrores']['pass2']) && $avMiPerfil['aErrores']['pass2'] != null) { ?>
+                        <span class="form-error"><?php echo $avMiPerfil['aErrores']['pass2']; ?></span>
+                    <?php } ?>
                 </div>
             </div>
 
             <div class="modal-footer p-0 mt-10">
-                <button type="submit" name="irDashboard" class="btn-cancel flex-1">
+                <button type="submit" name="volver" class="btn-cancel flex-1">
                     Cancelar
                 </button>
                 <button type="submit" name="guardarCambios" class="btn-save flex-2">

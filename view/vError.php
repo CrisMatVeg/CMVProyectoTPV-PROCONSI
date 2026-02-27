@@ -1,3 +1,4 @@
+</header>
 <div class="main-full container-full d-flex ai-center jc-center min-h-80vh">
     <div class="modal modal-content w-500 p-40 text-center border-2 border-red-light">
         <div class="fs-56 mb-24 text-red">

@@ -15,6 +15,7 @@ try {
     require_once __DIR__ . '/../model/Usuario.php';
     require_once __DIR__ . '/../model/Producto.php';
     require_once __DIR__ . '/../model/ProductoPDO.php';
+    require_once __DIR__ . '/../core/231018libreriaValidacion.php';
 
     session_start();
 
@@ -42,6 +43,30 @@ try {
     $datos = json_decode(file_get_contents('php://input'), true);
     $accion = $datos['accion'] ?? '';
 
+    if ($accion === 'añadir' || $accion === 'editar') {
+        $aErrores = [
+            'icono' => validacionFormularios::comprobarNoVacio($datos['icono'] ?? ''),
+            'referencia' => validacionFormularios::comprobarAlfaNumerico($datos['referencia'] ?? '', 50, 3, 1),
+            'nombre' => validacionFormularios::comprobarAlfaNumerico($datos['nombre'] ?? '', 100, 3, 1),
+            'precio_coste' => validacionFormularios::comprobarFloat($datos['precio_coste'] ?? '', 1000000, 0, 1),
+            'precio_venta' => validacionFormularios::comprobarFloat($datos['precio_venta'] ?? '', 1000000, 0, 1),
+            'iva' => validacionFormularios::comprobarFloat($datos['iva'] ?? '', 100, 0, 1),
+            'stock_actual' => validacionFormularios::comprobarEntero($datos['stock_actual'] ?? '', 1000000, 0, 1),
+            'stock_minimo' => validacionFormularios::comprobarEntero($datos['stock_minimo'] ?? '', 1000000, 0, 1),
+            'meses_garantia' => validacionFormularios::comprobarEntero($datos['meses_garantia'] ?? '', 120, 0, 1)
+        ];
+
+        $entradaOK = true;
+        foreach ($aErrores as $e) {
+            if ($e != null) $entradaOK = false;
+        }
+
+        if (!$entradaOK) {
+            echo json_encode(['ok' => false, 'aErrores' => $aErrores]);
+            exit;
+        }
+    }
+
     switch ($accion) {
 
         case 'añadir':
@@ -51,11 +76,11 @@ try {
                 'producto' => [
                     'id'       => (int)$nuevo['id'],
                     'name'     => $nuevo['nombre'],
-                    'codigo'   => $nuevo['codigo'],
-                    'price'    => (float)$nuevo['precio'],
+                    'codigo'   => $nuevo['referencia'],
+                    'price'    => (float)$nuevo['precio_venta'],
                     'icono'    => $nuevo['icono'],
                     'cat'      => $nuevo['categoria'],
-                    'stock'    => (int)$nuevo['stock'],
+                    'stock'    => (int)$nuevo['stock_actual'],
                     'inactive' => false,
                 ]
             ]);

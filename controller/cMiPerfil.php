@@ -13,20 +13,34 @@ if (!isset($_SESSION['usuarioActualTPV'])) {
 
 $error = null;
 $success = null;
+$aErrores = [
+    'nombre_completo' => null,
+    'pass1' => null,
+    'pass2' => null
+];
+
+$entradaOK = true;
 
 // Procesar cambio de perfil
 if (isset($_REQUEST['guardarCambios'])) {
-    $nombre = trim($_REQUEST['nombre_completo']);
-    $pass1 = $_REQUEST['pass1'];
-    $pass2 = $_REQUEST['pass2'];
+    
+    $aErrores['nombre_completo'] = validacionFormularios::comprobarAlfabetico($_REQUEST['nombre_completo'], 100, 3, 1);
+    
+    if (!empty($_REQUEST['pass1'])) {
+        $aErrores['pass1'] = validacionFormularios::validarPassword($_REQUEST['pass1'], 20, 4, 1, 1);
+        if ($_REQUEST['pass1'] !== $_REQUEST['pass2']) {
+            $aErrores['pass2'] = "Las contraseñas no coinciden.";
+        }
+    }
 
-    if (empty($nombre)) {
-        $error = "El nombre no puede estar vacío.";
-    } elseif (!empty($pass1) && $pass1 !== $pass2) {
-        $error = "Las contraseñas no coinciden.";
-    } else {
-        // En un sistema real, actualizaríamos la BD aquí.
-        // Implementaremos UsuarioPDO::editarPerfil para esto.
+    foreach ($aErrores as $e) {
+        if ($e != null) $entradaOK = false;
+    }
+
+    if ($entradaOK) {
+        $nombre = $_REQUEST['nombre_completo'];
+        $pass1 = $_REQUEST['pass1'];
+
         try {
             // Actualizar en BD
             $id = $_SESSION['usuarioActualTPV']->getId();
@@ -48,17 +62,43 @@ if (isset($_REQUEST['guardarCambios'])) {
     }
 }
 
-// Volver al Dashboard
-if (isset($_REQUEST['irDashboard'])) {
+// Navegación Global
+if (isset($_REQUEST['salir'])) {
+    session_destroy();
+    header('Location: index.php');
+    exit;
+}
+
+if (isset($_REQUEST['irTPV'])) {
+    $_SESSION['paginaEnCurso'] = 'inicioPrivado';
+    header('Location: index.php');
+    exit;
+}
+
+if (isset($_REQUEST['irCierreCaja'])) {
+    $_SESSION['paginaEnCurso'] = 'cierreCaja';
+    header('Location: index.php');
+    exit;
+}
+
+if (isset($_REQUEST['irMiPerfil'])) {
+    $_SESSION['paginaEnCurso'] = 'MiPerfil';
+    header('Location: index.php');
+    exit;
+}
+
+if (isset($_REQUEST['volver']) || isset($_REQUEST['irDashboard'])) {
     $_SESSION['paginaEnCurso'] = 'Dashboard';
     header('Location: index.php');
     exit;
 }
 
+
 $avMiPerfil = [
     'usuario' => $_SESSION['usuarioActualTPV'],
     'error'   => $error,
-    'success' => $success
+    'success' => $success,
+    'aErrores' => $aErrores
 ];
 
 require_once $view['layout'];

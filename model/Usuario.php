@@ -7,16 +7,16 @@
  */
 class Usuario {
     private $id;
-    private $nombreCompleto;
-    private $username;
+    private $nombre;
+    private $login;
     private $password;
     private $rol;
     private $activo;
 
-    public function __construct($id, $nombreCompleto, $username, $password, $rol, $activo) {
+    public function __construct($id, $nombre, $login, $password, $rol, $activo) {
         $this->id = $id;
-        $this->nombreCompleto = $nombreCompleto;
-        $this->username = $username;
+        $this->nombre = $nombre;
+        $this->login = $login;
         $this->password = $password;
         $this->rol = $rol;
         $this->activo = $activo;
@@ -24,13 +24,15 @@ class Usuario {
 
     // Getters
     public function getId() { return $this->id; }
-    public function getNombreCompleto() { return $this->nombreCompleto; }
-    public function getUsername() { return $this->username; }
+    public function getNombre() { return $this->nombre; }
+    public function getNombreCompleto() { return $this->nombre; } // Alias para compatibilidad
+    public function getLogin() { return $this->login; }
+    public function getUsername() { return $this->login; } // Alias para compatibilidad
     public function getPassword() { return $this->password; }
     public function getRol() { return $this->rol; }
     public function getActivo() { return $this->activo; }
 
     // Setters (opcional, para edición)
-    public function setNombreCompleto($nombre) { $this->nombreCompleto = $nombre; }
+    public function setNombre($nombre) { $this->nombre = $nombre; }
     public function setRol($rol) { $this->rol = $rol; }
 }

@@ -21,12 +21,25 @@ try {
         exit;
     }
 
+    require_once __DIR__ . '/../core/231018libreriaValidacion.php';
+
     $input = json_decode(file_get_contents('php://input'), true);
     $numTicket = $input['numTicket'] ?? null;
-    $email     = filter_var($input['email'] ?? '', FILTER_VALIDATE_EMAIL);
+    $emailRaw  = $input['email'] ?? '';
 
-    if (!$numTicket || !$email) {
-        throw new Exception('Datos insuficientes o email inválido');
+    $aErrores = [
+        'email' => validacionFormularios::validarEmail($emailRaw, 1)
+    ];
+
+    if ($aErrores['email'] != null) {
+        echo json_encode(['ok' => false, 'aErrores' => $aErrores]);
+        exit;
+    }
+
+    $email = $emailRaw;
+
+    if (!$numTicket) {
+        throw new Exception('Número de ticket faltante');
     }
 
     // Obtener los datos de la venta
@@ -38,7 +51,7 @@ try {
 $esFactura = $v['tipo_cliente'] === 'empresa';
 $tipoDoc = $esFactura ? 'Factura' : 'Ticket de Venta';
 $numeroStr = '#' . str_pad($v['numero_ticket'], 4, '0', STR_PAD_LEFT);
-$fechaStr = date("d/m/Y H:i", strtotime($v['creado_en']));
+$fechaStr = date("d/m/Y H:i", strtotime($v['fecha']));
 
 // Generar el cuerpo del mensaje HTML (Diseño profesional similar al ticket)
 $html = "

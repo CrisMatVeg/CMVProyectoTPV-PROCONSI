@@ -11,24 +11,31 @@ require_once 'Producto.php';
 class ProductoPDO {
 
     /**
-     * Obtiene todos los productos activos de la base de datos.
+     * Obtiene los productos de la base de datos.
+     * @param bool $soloActivos Si es true, solo devuelve productos con activo=1. Default true.
      * @return Producto[]
      */
-    public static function listarProductos(): array {
-        $sql = "SELECT * FROM productos WHERE activo = 1";
+    public static function listarProductos(bool $soloActivos = true): array {
+        $sql = "SELECT * FROM productos" . ($soloActivos ? " WHERE activo = 1" : "");
         $consulta = DBPDO::ejecutarConsulta($sql);
 
         $productos = [];
         while ($registro = $consulta->fetch(PDO::FETCH_ASSOC)) {
             $productos[] = new Producto(
                 $registro['id'],
+                $registro['referencia'],
                 $registro['nombre'],
-                $registro['codigo'],
-                $registro['precio'],
+                $registro['descripcion'],
+                $registro['precio_coste'],
+                $registro['precio_venta'],
+                $registro['iva'],
+                $registro['stock_actual'],
+                $registro['stock_minimo'],
+                $registro['meses_garantia'],
                 $registro['icono'],
                 $registro['categoria'],
-                $registro['activo'],
-                $registro['stock']
+                $registro['variantes'],
+                $registro['activo']
             );
         }
         return $productos;
@@ -36,89 +43,93 @@ class ProductoPDO {
 
     /**
      * Añade un nuevo producto a la base de datos.
-     * @param array $datos Campos: nombre, codigo, precio, icono, categoria
-     * @return array El nuevo producto como array asociativo (con id asignado)
+     * @param array $datos
+     * @return array El nuevo producto como array asociativo
      */
     public static function añadirProducto(array $datos): array {
-        $sql = "INSERT INTO productos (nombre, codigo, precio, icono, categoria, activo, stock)
-                VALUES (:nombre, :codigo, :precio, :icono, :categoria, 1, :stock)";
+        $iconoDato = $datos['icono'] ?? '';
+        if (strpos($iconoDato, 'data:image') === 0) {
+            $parts = explode(',', $iconoDato);
+            $iconoDato = base64_decode($parts[1]);
+        }
+
+        $sql = "INSERT INTO productos (referencia, nombre, descripcion, precio_coste, precio_venta, iva, stock_actual, stock_minimo, meses_garantia, icono, categoria, variantes, activo)
+                VALUES (:referencia, :nombre, :descripcion, :precio_coste, :precio_venta, :iva, :stock_actual, :stock_minimo, :meses_garantia, :icono, :categoria, :variantes, 1)";
+        
         DBPDO::ejecutarConsulta($sql, [
-            ':nombre'    => mb_substr(trim($datos['nombre']), 0, 100),
-            ':codigo'    => mb_substr(trim($datos['codigo']), 0, 50),
-            ':precio'    => round((float)$datos['precio'], 2),
-            ':icono'     => mb_substr(trim($datos['icono']), 0, 10),
-            ':categoria' => mb_substr(trim($datos['categoria']), 0, 50),
-            ':stock'     => (int)($datos['stock'] ?? 0),
+            ':referencia'     => mb_substr(trim($datos['referencia']), 0, 50),
+            ':nombre'         => mb_substr(trim($datos['nombre']), 0, 100),
+            ':descripcion'    => $datos['descripcion'] ?? '',
+            ':precio_coste'   => round((float)($datos['precio_coste'] ?? 0), 2),
+            ':precio_venta'   => round((float)($datos['precio_venta'] ?? 0), 2),
+            ':iva'            => round((float)($datos['iva'] ?? 21), 2),
+            ':stock_actual'   => (int)($datos['stock_actual'] ?? 0),
+            ':stock_minimo'   => (int)($datos['stock_minimo'] ?? 0),
+            ':meses_garantia' => (int)($datos['meses_garantia'] ?? 24),
+            ':icono'          => $iconoDato,
+            ':categoria'      => mb_substr(trim($datos['categoria']), 0, 50),
+            ':variantes'      => isset($datos['variantes']) ? json_encode($datos['variantes']) : null,
         ]);
 
-        // Obtener el registro recién insertado
-        $q = DBPDO::ejecutarConsulta(
-            "SELECT * FROM productos ORDER BY id DESC LIMIT 1"
-        );
+        $q = DBPDO::ejecutarConsulta("SELECT * FROM productos ORDER BY id DESC LIMIT 1");
         return $q->fetch(PDO::FETCH_ASSOC);
     }
 
     /**
      * Actualiza los datos de un producto existente.
-     * @param int   $id
-     * @param array $datos Campos: nombre, codigo, precio, icono, categoria
      */
     public static function editarProducto(int $id, array $datos): void {
+        $iconoDato = $datos['icono'] ?? '';
+        if (strpos($iconoDato, 'data:image') === 0) {
+            $parts = explode(',', $iconoDato);
+            $iconoDato = base64_decode($parts[1]);
+        }
+
         $sql = "UPDATE productos
-                SET nombre = :nombre, codigo = :codigo, precio = :precio,
-                    icono = :icono, categoria = :categoria, stock = :stock
+                SET referencia = :referencia, nombre = :nombre, descripcion = :descripcion, 
+                    precio_coste = :precio_coste, precio_venta = :precio_venta, iva = :iva, 
+                    stock_actual = :stock_actual, stock_minimo = :stock_minimo, 
+                    meses_garantia = :meses_garantia, icono = :icono, categoria = :categoria,
+                    variantes = :variantes
                 WHERE id = :id";
+        
         DBPDO::ejecutarConsulta($sql, [
-            ':nombre'    => mb_substr(trim($datos['nombre']), 0, 100),
-            ':codigo'    => mb_substr(trim($datos['codigo']), 0, 50),
-            ':precio'    => round((float)$datos['precio'], 2),
-            ':icono'     => mb_substr(trim($datos['icono']), 0, 10),
-            ':categoria' => mb_substr(trim($datos['categoria']), 0, 50),
-            ':stock'     => (int)($datos['stock'] ?? 0),
-            ':id'        => $id,
+            ':referencia'     => mb_substr(trim($datos['referencia']), 0, 50),
+            ':nombre'         => mb_substr(trim($datos['nombre']), 0, 100),
+            ':descripcion'    => $datos['descripcion'] ?? '',
+            ':precio_coste'   => round((float)($datos['precio_coste'] ?? 0), 2),
+            ':precio_venta'   => round((float)($datos['precio_venta'] ?? 0), 2),
+            ':iva'            => round((float)($datos['iva'] ?? 21), 2),
+            ':stock_actual'   => (int)($datos['stock_actual'] ?? 0),
+            ':stock_minimo'   => (int)($datos['stock_minimo'] ?? 0),
+            ':meses_garantia' => (int)($datos['meses_garantia'] ?? 24),
+            ':icono'          => $iconoDato,
+            ':categoria'      => mb_substr(trim($datos['categoria']), 0, 50),
+            ':variantes'      => isset($datos['variantes']) ? json_encode($datos['variantes']) : null,
+            ':id'             => $id,
         ]);
     }
 
-    /**
-     * Elimina un producto de la base de datos.
-     * @param int $id
-     */
     public static function eliminarProducto(int $id): void {
-        $sql = "DELETE FROM productos WHERE id = :id";
-        DBPDO::ejecutarConsulta($sql, [':id' => $id]);
+        DBPDO::ejecutarConsulta("DELETE FROM productos WHERE id = :id", [':id' => $id]);
     }
 
-    /**
-     * Alterna el estado activo/inactivo (baja/alta) de un producto.
-     * @param int $id
-     * @return bool Nuevo estado activo (true = activo, false = baja)
-     */
     public static function toggleBaja(int $id): bool {
-        // Primero consultamos el estado actual
-        $q = DBPDO::ejecutarConsulta(
-            "SELECT activo FROM productos WHERE id = :id",
-            [':id' => $id]
-        );
+        $q = DBPDO::ejecutarConsulta("SELECT activo FROM productos WHERE id = :id", [':id' => $id]);
         $row = $q->fetch(PDO::FETCH_ASSOC);
         $nuevoEstado = $row['activo'] ? 0 : 1;
 
-        DBPDO::ejecutarConsulta(
-            "UPDATE productos SET activo = :activo WHERE id = :id",
-            [':activo' => $nuevoEstado, ':id' => $id]
-        );
+        DBPDO::ejecutarConsulta("UPDATE productos SET activo = :activo WHERE id = :id", [':activo' => $nuevoEstado, ':id' => $id]);
         return (bool)$nuevoEstado;
     }
 
-    /**
-     * Reduce el stock de un producto tras una venta.
-     * @param int $id
-     * @param int $cantidad
-     */
     public static function reducirStock(int $id, int $cantidad): void {
-        $sql = "UPDATE productos SET stock = stock - :cantidad WHERE id = :id";
-        DBPDO::ejecutarConsulta($sql, [
-            ':cantidad' => $cantidad,
-            ':id'       => $id
-        ]);
+        $sql = "UPDATE productos SET stock_actual = stock_actual - :cantidad WHERE id = :id";
+        DBPDO::ejecutarConsulta($sql, [':cantidad' => $cantidad, ':id' => $id]);
+    }
+
+    public static function aumentarStock(int $id, int $cantidad): void {
+        $sql = "UPDATE productos SET stock_actual = stock_actual + :cantidad WHERE id = :id";
+        DBPDO::ejecutarConsulta($sql, [':cantidad' => $cantidad, ':id' => $id]);
     }
 }

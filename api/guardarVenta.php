@@ -17,8 +17,13 @@ try {
     // Bootstrap: config, BD y modelos
     require_once __DIR__ . '/../config/confDBPDO.php';
     require_once __DIR__ . '/../model/DBPDO.php';
+    
+    // MIGRACIÓN AUTOMÁTICA (Provisional para estabilizar el sistema)
+    try {
+        DBPDO::ejecutarConsulta("ALTER TABLE ventas ADD COLUMN IF NOT EXISTS efectivo_recibido DECIMAL(10,2) DEFAULT 0.00");
+    } catch (Throwable $e) { /* Ya existe o error menor */ }
+
     // ⚠️ Usuario.php debe cargarse ANTES de session_start()
-    // para que PHP pueda deserializar el objeto guardado en $_SESSION
     require_once __DIR__ . '/../model/Usuario.php';
     require_once __DIR__ . '/../model/Venta.php';
     require_once __DIR__ . '/../model/VentaPDO.php';
@@ -40,6 +45,8 @@ try {
         exit;
     }
 
+    require_once __DIR__ . '/../core/231018libreriaValidacion.php';
+
     // Leer y validar el JSON del cuerpo
     $json = file_get_contents('php://input');
     $datos = json_decode($json, true);
@@ -50,9 +57,49 @@ try {
         exit;
     }
 
+    // Validaciones
+    $metodo_pago        = $datos['metodoPago'] ?? 'efectivo';
+    $id_cliente         = $datos['idCliente'] ?? null;
+    $nombre_cliente     = $datos['nombreCliente'] ?? null;
+    $nif_cliente        = null; // Inicializar nif_cliente
+    $total              = $datos['total'] ?? 0;
+    $subtotal           = $datos['subtotal'] ?? 0;
+    $descuento_pct      = $datos['descuentoPct'] ?? 0;
+    $lineas             = $datos['lineas'] ?? [];
+
+    if (isset($datos['tipoCliente']) && $datos['tipoCliente'] === 'empresa') {
+        $aErrores['empresaNombre'] = validacionFormularios::comprobarAlfaNumerico($datos['nombreCliente'] ?? '', 100, 3, 1);
+        $nifRaw = strtoupper(trim($datos['nifCliente'] ?? ''));
+        $nif_cliente = $nifRaw; // Asignar nif_cliente aquí
+        $aErrores['empresaNif'] = validacionFormularios::comprobarNoVacio($nifRaw);
+        if (!$aErrores['empresaNif']) {
+            // Validar NIF/CIF español:
+            // - CIF empresa: letra [ABCDEFGHJNPQRSUVW] + 7 dígitos + dígito o letra de control
+            // - DNI (autónomo): 8 dígitos + letra de control
+            // - NIE (extranjero): X, Y o Z + 7 dígitos + letra de control
+            $esCIF = preg_match('/^[ABCDEFGHJNPQRSUVW]\d{7}[0-9A-J]$/i', $nifRaw);
+            $esDNI = preg_match('/^\d{8}[TRWAGMYFPDXBNJZSQVHLCKE]$/i', $nifRaw);
+            $esNIE = preg_match('/^[XYZ]\d{7}[TRWAGMYFPDXBNJZSQVHLCKE]$/i', $nifRaw);
+            if (!$esCIF && !$esDNI && !$esNIE) {
+                $aErrores['empresaNif'] = 'El CIF/NIF no tiene un formato válido (ej: B12345678, 12345678A, X1234567A).';
+            }
+        }
+
+    }
+
+    $entradaOK = true;
+    foreach ($aErrores as $e) {
+        if ($e != null) $entradaOK = false;
+    }
+
+    if (!$entradaOK) {
+        echo json_encode(['ok' => false, 'aErrores' => $aErrores]);
+        exit;
+    }
+
     // Guardar la venta en BD
-    $idCajero  = $_SESSION['usuarioActualTPV']->getId();
-    $numTicket = VentaPDO::guardarVenta($datos, $idCajero);
+    $idUsuario  = $_SESSION['usuarioActualTPV']->getId();
+    $numTicket = VentaPDO::guardarVenta($datos, $idUsuario);
 
     // Obtener la venta completa para devolver al frontend
     $ventaCompleta = VentaPDO::obtenerVentaPorTicket($numTicket);
