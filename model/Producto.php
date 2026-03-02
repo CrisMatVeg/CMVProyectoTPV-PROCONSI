@@ -20,8 +20,9 @@ class Producto {
     private $categoria;
     private $variantes;
     private $activo;
+    private $requiere_serial;
 
-    public function __construct($id, $referencia, $nombre, $descripcion, $precio_coste, $precio_venta, $iva, $stock_actual, $stock_minimo, $meses_garantia, $icono, $categoria, $variantes, $activo) {
+    public function __construct($id, $referencia, $nombre, $descripcion, $precio_coste, $precio_venta, $iva, $stock_actual, $stock_minimo, $meses_garantia, $icono, $categoria, $variantes, $activo, $requiere_serial = 0) {
         $this->id = $id;
         $this->referencia = $referencia;
         $this->nombre = $nombre;
@@ -36,6 +37,7 @@ class Producto {
         $this->categoria = $categoria;
         $this->variantes = $variantes;
         $this->activo = $activo;
+        $this->requiere_serial = $requiere_serial;
     }
 
     // Getters
@@ -53,4 +55,5 @@ class Producto {
     public function getCategoria() { return $this->categoria; }
     public function getVariantes() { return $this->variantes; }
     public function getActivo() { return $this->activo; }
+    public function getRequiereSerial() { return $this->requiere_serial; }
 }

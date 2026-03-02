@@ -43,6 +43,12 @@ if (isset($_REQUEST['irMiPerfil'])) {
     exit;
 }
 
+if (isset($_REQUEST['Analitica'])) {
+    $_SESSION['paginaEnCurso'] = 'Analitica';
+    header('Location: index.php');
+    exit;
+}
+
 // Datos de analítica para el admin
 $avDashboard = [
     'kpis' => null,

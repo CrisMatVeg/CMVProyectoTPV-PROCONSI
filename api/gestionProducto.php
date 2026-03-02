@@ -17,7 +17,14 @@ try {
     require_once __DIR__ . '/../model/ProductoPDO.php';
     require_once __DIR__ . '/../core/231018libreriaValidacion.php';
 
+    // Auto-migración: crear columnas si no existen
+    try { DBPDO::ejecutarConsulta("ALTER TABLE productos ADD COLUMN IF NOT EXISTS iva DECIMAL(5,2) DEFAULT 21.00"); } catch (Throwable $e) {}
+    try { DBPDO::ejecutarConsulta("ALTER TABLE productos ADD COLUMN IF NOT EXISTS meses_garantia INT DEFAULT 24"); } catch (Throwable $e) {}
+    try { DBPDO::ejecutarConsulta("ALTER TABLE productos ADD COLUMN IF NOT EXISTS requiere_serial TINYINT(1) DEFAULT 0"); } catch (Throwable $e) {}
+    try { DBPDO::ejecutarConsulta("ALTER TABLE lineas_venta ADD COLUMN IF NOT EXISTS numero_serie VARCHAR(100) DEFAULT NULL"); } catch (Throwable $e) {}
+
     session_start();
+
 
     // Solo POST
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -78,6 +85,7 @@ try {
                     'name'     => $nuevo['nombre'],
                     'codigo'   => $nuevo['referencia'],
                     'price'    => (float)$nuevo['precio_venta'],
+                    'iva'      => (float)$nuevo['iva'],
                     'icono'    => $nuevo['icono'],
                     'cat'      => $nuevo['categoria'],
                     'stock'    => (int)$nuevo['stock_actual'],
@@ -90,7 +98,20 @@ try {
             $id = (int)($datos['id'] ?? 0);
             if (!$id) throw new InvalidArgumentException('ID de producto inválido');
             ProductoPDO::editarProducto($id, $datos);
-            echo json_encode(['ok' => true]);
+            // DEBUG: Leer valores reales de BD tras el UPDATE
+            $qCheck = DBPDO::ejecutarConsulta("SELECT iva, meses_garantia, nombre, precio_venta FROM productos WHERE id = :id", [':id' => $id]);
+            $rowCheck = $qCheck->fetch(PDO::FETCH_ASSOC);
+            echo json_encode([
+                'ok' => true,
+                '_debug' => [
+                    'enviado_iva' => $datos['iva'] ?? 'NO_ENVIADO',
+                    'enviado_meses' => $datos['meses_garantia'] ?? 'NO_ENVIADO',
+                    'bd_iva' => $rowCheck['iva'] ?? 'ERROR',
+                    'bd_meses' => $rowCheck['meses_garantia'] ?? 'ERROR',
+                    'bd_nombre' => $rowCheck['nombre'] ?? 'ERROR',
+                    'bd_precio' => $rowCheck['precio_venta'] ?? 'ERROR',
+                ]
+            ]);
             break;
 
         case 'eliminar':

@@ -144,6 +144,22 @@ body {
   gap: 6px;
 }
 
+.btn-filter {
+  background: var(--accent);
+  color: white;
+  border: none;
+  padding: 0 20px;
+  border-radius: var(--radius);
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition: all 0.2s;
+  height: 48px;
+}
+
 .topbar-btn {
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.15);
@@ -712,8 +728,10 @@ body {
   inset: 0;
   background: rgba(26, 25, 23, 0.5);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
+  padding: 24px 16px;
+  overflow-y: auto;
   z-index: 100;
   backdrop-filter: blur(4px);
   opacity: 0;
@@ -725,17 +743,27 @@ body {
   pointer-events: all;
 }
 .modal {
-  background: var(--surface);
-  border-radius: 16px;
-  padding: 32px;
-  width: 360px;
-  box-shadow: var(--shadow-lg);
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 16px;
   transform: scale(0.96);
   transition: transform 0.2s;
+}
+.modal-content {
+  background: var(--surface);
+  padding: 32px;
+  border-radius: 20px;
+  width: 90%;
+  max-width: 500px;
+  position: relative;
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  /* Quitamos max-height y overflow aquí porque el scroll lo gestiona el overlay */
+  height: fit-content;
+  align-self: flex-start;
+  margin: auto;
 }
 .modal-overlay.visible .modal {
   transform: scale(1);
@@ -1164,6 +1192,40 @@ input[type="submit"].btn-clear {
 
 .shadow-lg {
   box-shadow: var(--shadow-lg) !important;
+}
+
+/* ── ADVANCED FILTERS TPV ─────────────────────────────────────────────────── */
+.btn-filter-toggle:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--blue-light) !important;
+}
+
+.advanced-filters-panel {
+  animation: slideDownFade 0.3s ease-out;
+  overflow: hidden;
+}
+
+@keyframes slideDownFade {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 200px;
+  }
+}
+
+.advanced-filters-panel select.form-input {
+  cursor: pointer;
+}
+
+.advanced-filters-panel .form-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(26, 47, 191, 0.1);
 }
 
 @media (max-width: 900px) {

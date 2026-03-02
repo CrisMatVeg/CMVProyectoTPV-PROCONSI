@@ -12,8 +12,12 @@
                     class="search-input"
                     type="text"
                     id="searchInput"
+                    oninput="handleSearch(this.value)"
                     placeholder="Buscar producto o referencia…" />
             </div>
+            <button onclick="toggleAdvancedFilters()" class="btn-filter-toggle p-10 br-10 bg-surface border-2 cursor-pointer transition-all" title="Filtros avanzados">
+                <i class="fa-solid fa-filter"></i>
+            </button>
             <?php if ($avInicioPrivado['esAdmin']): ?>
             <button onclick="abrirModalNuevoProducto()" class="btn-add p-7-14 fs-13">
                 <i class="fa-solid fa-plus"></i>
@@ -21,6 +25,40 @@
             </button>
             <?php endif; ?>
         </div>
+
+        <!-- ADVANCED FILTERS PANEL -->
+        <div id="advancedFilters" class="advanced-filters-panel d-none bg-surface p-16 br-12 border-2 mb-10 shadow-sm">
+            <div class="grid-4 gap-12 ai-end">
+                <div class="form-group mb-0">
+                    <label class="form-label fs-11 tt-uppercase opacity-70">Precio Mín (€)</label>
+                    <input type="number" id="filterPriceMin" class="form-input fs-13" placeholder="0.00" oninput="applyAdvancedFilters()">
+                </div>
+                <div class="form-group mb-0">
+                    <label class="form-label fs-11 tt-uppercase opacity-70">Precio Máx (€)</label>
+                    <input type="number" id="filterPriceMax" class="form-input fs-13" placeholder="999.99" oninput="applyAdvancedFilters()">
+                </div>
+                <div class="form-group mb-0">
+                    <label class="form-label fs-11 tt-uppercase opacity-70">Stock</label>
+                    <select id="filterStock" class="form-input fs-13" onchange="applyAdvancedFilters()">
+                        <option value="all">Todos</option>
+                        <option value="in-stock">En Stock</option>
+                        <option value="low-stock">Stock Bajo (≤5)</option>
+                    </select>
+                </div>
+                <div class="form-group mb-0">
+                    <label class="form-label fs-11 tt-uppercase opacity-70">Ordenar por</label>
+                    <select id="filterSort" class="form-input fs-13" onchange="applyAdvancedFilters()">
+                        <option value="name-asc">Nombre (A-Z)</option>
+                        <option value="name-desc">Nombre (Z-A)</option>
+                        <option value="price-asc">Precio (Menor a Mayor)</option>
+                        <option value="price-desc">Precio (Mayor a Menor)</option>
+                        <option value="stock-asc">Stock (Menor a Mayor)</option>
+                        <option value="stock-desc">Stock (Mayor a Menor)</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
 
         <div class="cat-tabs" id="catTabs">
             <button class="cat-tab active" data-cat="all">Todo</button>
@@ -159,6 +197,20 @@
                     <input id="editPrice" class="form-input font-mono text-right" type="text" />
                     <span class="form-error" id="err-editPrecio"></span>
                 </div>
+                <div class="form-group">
+                    <label class="form-label">IVA (%)</label>
+                    <input id="editIva" class="form-input font-mono text-right" type="number" min="0" max="100" step="1" placeholder="21" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Garantía (meses)</label>
+                    <input id="editMesesGarantia" class="form-input font-mono text-right" type="number" min="0" max="120" step="1" placeholder="24" />
+                </div>
+            </div>
+            <div class="form-group mb-0">
+                <label class="d-flex ai-center gap-8 cursor-pointer fs-13">
+                    <input type="checkbox" id="editSerial" class="w-16 h-16" />
+                    <span>Requiere controlar Número de Serie en la venta</span>
+                </label>
             </div>
         </div>
         <button class="btn-save mt-4 full-width" onclick="saveEdit()">
@@ -195,7 +247,7 @@
                 <input id="addName" class="form-input" placeholder="Nombre completo" />
                 <span class="form-error" id="err-addNombre"></span>
             </div>
-            <div class="form-group-wrap grid-2">
+            <div class="form-group-wrap grid-3">
                 <div class="form-group">
                     <label class="form-label">Referencia (SKU)</label>
                     <input id="addSku" class="form-input font-mono" placeholder="PRO-001" />
@@ -205,6 +257,16 @@
                     <input id="addPrice" class="form-input font-mono text-right" type="text" placeholder="0.00" />
                     <span class="form-error" id="err-addPrecio"></span>
                 </div>
+                <div class="form-group">
+                    <label class="form-label">IVA (%)</label>
+                    <input id="addIva" class="form-input font-mono text-right" type="text" value="21" />
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="d-flex ai-center gap-8 cursor-pointer fs-13">
+                    <input type="checkbox" id="addSerial" class="w-16 h-16" />
+                    <span>Requiere controlar Número de Serie en la venta</span>
+                </label>
             </div>
             <div class="form-group">
                 <label class="form-label">Categoría</label>
@@ -313,6 +375,23 @@
         <div class="modal-footer">
             <button onclick="cerrarModalCliente()" class="btn-cancel">Cancelar</button>
             <button id="confirmarClienteBtn" onclick="confirmarCliente()" class="btn-save">Cobrar</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: NÚMERO DE SERIE -->
+<div class="modal-overlay" id="serialModal">
+    <div class="modal modal-content gap-16 ai-stretch w-400">
+        <div class="modal-icon text-accent bg-blue-light">
+            <i class="fa-solid fa-barcode"></i>
+        </div>
+        <div class="modal-title text-center">Control de Números de Serie</div>
+        <div class="modal-sub">Este producto requiere registrar un número de serie para continuar.</div>
+        <div id="serialInputsContainer" class="d-flex flex-column gap-12 max-h-300 overflow-y-auto pr-8">
+            <!-- Dinámico -->
+        </div>
+        <div class="modal-footer full-width mt-12">
+            <button id="confirmSerialBtn" class="btn-save py-12">Confirmar y Continuar</button>
         </div>
     </div>
 </div>

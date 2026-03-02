@@ -92,6 +92,7 @@
     <?php
     require_once $view[$_SESSION['paginaEnCurso']];
     ?>
+
     <div class="modal-overlay" id="ticketModal">
         <div class="modal ticket-wrapper" id="ticketContenido">
             <div class="ticket-brand-header">
@@ -167,7 +168,33 @@
             </div>
         </div>
     </div>
-    <script src="./webroot/js/main.js?v=4"></script>
+
+    <!-- MODAL: MOTIVO DE DEVOLUCIÓN (global, reutilizado en TPV / Historial / Cierre) -->
+    <div class="modal-overlay" id="returnModal">
+        <div class="modal modal-content gap-16 ai-stretch w-360">
+            <div class="modal-icon text-red bg-red-light">
+                <i class="fa-solid fa-arrow-rotate-left"></i>
+            </div>
+            <div class="modal-title text-center">Motivo de Devolución</div>
+            <div class="form-group">
+                <label class="form-label">Por favor, indica el motivo:</label>
+                <select id="returnReason" class="form-input">
+                    <option value="Defectuoso">Producto Defectuoso</option>
+                    <option value="Garantía">Tramitación de Garantía</option>
+                    <option value="Error Cliente">Error en la compra</option>
+                    <option value="Otro">Otro motivo</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <textarea id="returnNote" class="form-input fs-12" placeholder="Notas adicionales..." rows="3"></textarea>
+            </div>
+            <div class="modal-footer full-width">
+                <button onclick="document.getElementById('returnModal').classList.remove('visible')" class="btn-cancel">Cancelar</button>
+                <button id="confirmReturnBtn" class="btn-save bg-red">Confirmar Devolución</button>
+            </div>
+        </div>
+    </div>
+    <script src="./webroot/js/main.js?v=6"></script>
 </body>
 
 </html>

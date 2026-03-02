@@ -59,15 +59,19 @@ foreach ($oProductos as $oProd) {
     }
 
     $listaProductos[] = [
-        'id'        => $oProd->getId(),
-        'nombre'    => $oProd->getNombre(),
-        'codigo'    => $oProd->getReferencia(),
-        'precio'    => (float)$oProd->getPrecioVenta(),
-        'icono'     => $icono,
-        'categoria' => $oProd->getCategoria(),
-        'activo'    => $oProd->getActivo(),
-        'stock'     => (int)$oProd->getStockActual()
-    ];
+    'id'             => $oProd->getId(),
+    'nombre'         => $oProd->getNombre(),
+    'codigo'         => $oProd->getReferencia(),
+    'precio'         => (float)$oProd->getPrecioVenta(),
+    'precio_coste'   => (float)$oProd->getPrecioCoste(),   // ← añadir
+    'iva'            => (float)$oProd->getIva(),           // ← añadir
+    'meses_garantia' => (int)$oProd->getMesesGarantia(),   // ← añadir
+    'stock_minimo'   => (int)$oProd->getStockMinimo(),     // ← añadir
+    'icono'          => $icono,
+    'categoria'      => $oProd->getCategoria(),
+    'activo'         => $oProd->getActivo(),
+    'stock'          => (int)$oProd->getStockActual()
+];
 }
 
 $avProductos = [

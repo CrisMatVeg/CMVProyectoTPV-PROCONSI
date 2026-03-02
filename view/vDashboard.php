@@ -74,6 +74,16 @@
                     <span class="btn-desc">Buscador de tickets y auditoría</span>
                 </button>
             </form>
+            
+            <!-- Analítica -->
+            <form method="post">
+                <input type="hidden" name="Analitica" value="">
+                <button type="submit" class="dashboard-btn" style="border-color: var(--accent);">
+                    <i class="fa-solid fa-chart-line text-accent"></i>
+                    <span class="btn-title">Analítica Avanzada</span>
+                    <span class="btn-desc">Reportes de ventas, categorías y márgenes</span>
+                </button>
+            </form>
             <?php else: ?>
             <div class="dashboard-btn-locked">
                 <i class="fa-solid fa-lock"></i>

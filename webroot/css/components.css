@@ -479,6 +479,41 @@
   transition: all 0.2s;
 }
 
+.btn-filter-toggle {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: 1.5px solid var(--border);
+  background: var(--surface2);
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition:
+    background 0.2s,
+    color 0.2s,
+    border-color 0.2s,
+    transform 0.1s;
+}
+
+.btn-filter-toggle:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--blue-light);
+}
+
+.btn-filter-toggle.is-open {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+}
+
+.btn-filter-toggle.is-open:hover {
+  transform: translateY(-1px);
+}
+
 .btn-filter {
   padding: 10px 25px;
   border-radius: 8px;
@@ -1515,4 +1550,54 @@
   font-size: 11px;
   font-weight: 600;
   margin-top: 4px;
+}
+/* ── MODAL GESTIÓN DE PRODUCTOS ─────────────────────────────────────────────
+   Añadir al final de components.css
+   ─────────────────────────────────────────────────────────────────────────── */
+
+#modalProducto .modal-content {
+    max-height: 90vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    width: 800px;
+    max-width: 95vw;
+    padding: 0;                  /* El padding lo gestionan header/body/footer */
+}
+
+/* Scrollbar discreta */
+#modalProducto .modal-content::-webkit-scrollbar {
+    width: 4px;
+}
+#modalProducto .modal-content::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 4px;
+}
+
+/* Header fijo arriba mientras se hace scroll */
+#modalProducto .modal-header {
+    position: sticky;
+    top: 0;
+    background: var(--surface);
+    z-index: 10;
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 0;
+}
+
+/* Cuerpo del formulario con su propio padding */
+#modalProducto .modal-body {
+    overflow-y: visible;
+    overflow-x: hidden;
+    padding: 24px;
+}
+
+/* Footer fijo abajo mientras se hace scroll */
+#modalProducto form .modal-footer {
+    position: sticky;
+    bottom: 0;
+    background: var(--surface);
+    z-index: 10;
+    padding: 16px 24px;
+    border-top: 1px solid var(--border);
+    margin-top: 0;
 }

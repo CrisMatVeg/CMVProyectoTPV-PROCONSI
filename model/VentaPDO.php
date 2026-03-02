@@ -81,10 +81,20 @@ class VentaPDO {
             $qty        = (int)$linea['qty'];
             $totalLinea = round($precioUnit * $qty, 2);
             $ivaAplicado = (float)($linea['iva'] ?? 21.00);
+            
+            // Obtener garantía del producto (snapshot)
+            $mesesGarantia = 24; // Valor por defecto
+            if (isset($linea['id'])) {
+                require_once 'ProductoPDO.php';
+                $prodData = ProductoPDO::obtenerProductoPorId((int)$linea['id']);
+                if ($prodData) {
+                    $mesesGarantia = (int)($prodData['meses_garantia'] ?? 24);
+                }
+            }
 
             $sqlLinea = "INSERT INTO lineas_venta
-                (id_venta, id_producto, nombre_producto, codigo_producto, precio_unitario, iva_aplicado, cantidad, total_linea)
-                VALUES (:venta, :prod, :nombre, :codigo, :precio, :iva, :qty, :total)";
+                (id_venta, id_producto, nombre_producto, codigo_producto, precio_unitario, iva_aplicado, cantidad, meses_garantia, total_linea, numero_serie)
+                VALUES (:venta, :prod, :nombre, :codigo, :precio, :iva, :qty, :garantia, :total, :serial)";
 
             DBPDO::ejecutarConsulta($sqlLinea, [
                 ':venta'  => $idVenta,
@@ -94,7 +104,9 @@ class VentaPDO {
                 ':precio' => $precioUnit,
                 ':iva'    => $ivaAplicado,
                 ':qty'    => $qty,
-                ':total'  => $totalLinea
+                ':garantia' => $mesesGarantia,
+                ':total'  => $totalLinea,
+                ':serial' => isset($linea['serials']) ? json_encode($linea['serials']) : null
             ]);
 
             // Gestión de Números de Serie si vienen en la línea
@@ -170,21 +182,48 @@ class VentaPDO {
     /**
      * Marca una línea de venta como devuelta y repone stock.
      */
-    public static function devolverLinea(int $idLinea): bool {
+    public static function devolverLinea(int $idLinea, ?string $motivo = null): bool {
         // 1. Obtener datos de la línea
-        $sql = "SELECT id_producto, cantidad, devuelta FROM lineas_venta WHERE id = :id";
+        $sql = "SELECT id_producto, cantidad, devuelta, id_venta FROM lineas_venta WHERE id = :id";
         $q = DBPDO::ejecutarConsulta($sql, [':id' => $idLinea]);
         $l = $q->fetch(PDO::FETCH_ASSOC);
 
         if (!$l || $l['devuelta']) return false;
 
-        // 2. Marcar como devuelta
-        DBPDO::ejecutarConsulta("UPDATE lineas_venta SET devuelta = 1 WHERE id = :id", [':id' => $idLinea]);
+        // 2. Marcar como devuelta con motivo y fecha
+        $sqlUpd = "UPDATE lineas_venta 
+                   SET devuelta = 1, motivo_devolucion = :motivo, fecha_devolucion = NOW() 
+                   WHERE id = :id";
+        DBPDO::ejecutarConsulta($sqlUpd, [
+            ':id' => $idLinea,
+            ':motivo' => $motivo ? mb_substr($motivo, 0, 255) : 'Devolución estándar'
+        ]);
 
         // 3. Reponer stock
         if ($l['id_producto']) {
             require_once 'ProductoPDO.php';
             ProductoPDO::aumentarStock((int)$l['id_producto'], (int)$l['cantidad']);
+        }
+
+        // 4. Si todas las líneas de la venta están devueltas, marcar la venta como devuelta
+        if (!empty($l['id_venta'])) {
+            $sqlStats = "SELECT 
+                            COUNT(*) AS total,
+                            SUM(CASE WHEN devuelta = 1 THEN 1 ELSE 0 END) AS devueltas
+                         FROM lineas_venta
+                         WHERE id_venta = :idv";
+            $qStats = DBPDO::ejecutarConsulta($sqlStats, [':idv' => $l['id_venta']]);
+            $stats = $qStats->fetch(PDO::FETCH_ASSOC);
+
+            if ($stats 
+                && (int)$stats['total'] > 0 
+                && (int)$stats['total'] === (int)$stats['devueltas']
+            ) {
+                DBPDO::ejecutarConsulta(
+                    "UPDATE ventas SET estado = 'devuelta' WHERE id = :idv",
+                    [':idv' => $l['id_venta']]
+                );
+            }
         }
         return true;
     }
@@ -192,13 +231,13 @@ class VentaPDO {
     /**
      * Devuelve una venta completa.
      */
-    public static function devolverVenta(int $numTicket): bool {
+    public static function devolverVenta(int $numTicket, ?string $motivo = null): bool {
         $v = self::obtenerVentaPorTicket($numTicket);
         if (!$v || $v['estado'] !== 'completada') return false;
 
         foreach ($v['lineas'] as $l) {
             if (!$l['devuelta']) {
-                self::devolverLinea((int)$l['id']);
+                self::devolverLinea((int)$l['id'], $motivo);
             }
         }
 
@@ -267,6 +306,65 @@ class VentaPDO {
                 WHERE v.estado = 'completada' AND DATE(v.fecha) BETWEEN :desde AND :hasta
                 GROUP BY u.id
                 ORDER BY total DESC";
+        $q = DBPDO::ejecutarConsulta($sql, [':desde' => $desde, ':hasta' => $hasta]);
+        return $q->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Obtiene ventas agrupadas por categoría.
+     */
+    public static function obtenerVentasPorCategoria(string $desde, string $hasta): array {
+        $sql = "SELECT p.categoria, COALESCE(SUM(lv.total_linea), 0) as total, COUNT(lv.id) as cantidad
+                FROM lineas_venta lv
+                JOIN productos p ON lv.id_producto = p.id
+                JOIN ventas v ON lv.id_venta = v.id
+                WHERE v.estado = 'completada' AND lv.devuelta = 0 
+                AND DATE(v.fecha) BETWEEN :desde AND :hasta
+                GROUP BY p.categoria
+                ORDER BY total DESC";
+        $q = DBPDO::ejecutarConsulta($sql, [':desde' => $desde, ':hasta' => $hasta]);
+        return $q->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Obtiene los productos más vendidos.
+     */
+    public static function obtenerTopProductos(string $desde, string $hasta, int $limite = 10): array {
+        $sql = "SELECT lv.nombre_producto, lv.codigo_producto, 
+                       SUM(lv.cantidad) as unidades, 
+                       SUM(lv.total_linea) as total_recaudado
+                FROM lineas_venta lv
+                JOIN ventas v ON lv.id_venta = v.id
+                WHERE v.estado = 'completada' AND lv.devuelta = 0
+                AND DATE(v.fecha) BETWEEN :desde AND :hasta
+                GROUP BY lv.id_producto, lv.nombre_producto, lv.codigo_producto
+                ORDER BY unidades DESC
+                LIMIT :limite";
+        
+        // PDO::prepare LIMIT doesn't work well with params in some configs depending on emulation
+        // we'll cast to int or use string replacement if needed, but standard DBPDO uses prepare
+        // Since we know $limite is an int we'll just use it in the query string safely or cast it.
+        $sql = str_replace(':limite', (int)$limite, $sql);
+        
+        $q = DBPDO::ejecutarConsulta($sql, [':desde' => $desde, ':hasta' => $hasta]);
+        return $q->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Obtiene el desglose de márgenes (Ingreso vs Coste).
+     */
+    public static function obtenerMargenesDetallados(string $desde, string $hasta): array {
+        $sql = "SELECT DATE(v.fecha) as fecha,
+                       SUM(lv.total_linea) as ingresos,
+                       SUM(p.precio_coste * lv.cantidad) as costes,
+                       SUM(lv.total_linea - (p.precio_coste * lv.cantidad)) as beneficio
+                FROM lineas_venta lv
+                JOIN productos p ON lv.id_producto = p.id
+                JOIN ventas v ON lv.id_venta = v.id
+                WHERE v.estado = 'completada' AND lv.devuelta = 0
+                AND DATE(v.fecha) BETWEEN :desde AND :hasta
+                GROUP BY DATE(v.fecha)
+                ORDER BY fecha ASC";
         $q = DBPDO::ejecutarConsulta($sql, [':desde' => $desde, ':hasta' => $hasta]);
         return $q->fetchAll(PDO::FETCH_ASSOC);
     }

@@ -7,6 +7,10 @@ let discountPct = 0;
 let ticketNum = 1001;
 let activeCat = "all";
 let searchTerm = "";
+let minPrice = 0;
+let maxPrice = Infinity;
+let stockFilter = "all";
+let sortOrder = "name-asc";
 let isAdmin =
   typeof IS_ADMIN_BACKEND !== "undefined" ? IS_ADMIN_BACKEND : false;
 let currentTicketNum = null;
@@ -35,10 +39,42 @@ function renderProducts() {
 
     if (!matchesCat) return false;
 
+    // Filtros Avanzados
     const matchesSearch =
-      p.name.toLowerCase().includes(searchTerm) ||
-      p.codigo.toLowerCase().includes(searchTerm);
-    return matchesSearch;
+      p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.codigo.toLowerCase().includes(searchTerm.toLowerCase());
+    if (!matchesSearch) return false;
+
+    const matchesPrice = p.price >= minPrice && p.price <= maxPrice;
+    if (!matchesPrice) return false;
+
+    let matchesStock = true;
+    if (stockFilter === "in-stock") matchesStock = p.stock > 0;
+    else if (stockFilter === "low-stock")
+      matchesStock = p.stock > 0 && p.stock <= 5;
+    if (!matchesStock) return false;
+
+    return true;
+  });
+
+  // Ordenación
+  filtered.sort((a, b) => {
+    switch (sortOrder) {
+      case "name-asc":
+        return a.name.localeCompare(b.name);
+      case "name-desc":
+        return b.name.localeCompare(a.name);
+      case "price-asc":
+        return a.price - b.price;
+      case "price-desc":
+        return b.price - a.price;
+      case "stock-asc":
+        return a.stock - b.stock;
+      case "stock-desc":
+        return b.stock - a.stock;
+      default:
+        return 0;
+    }
   });
 
   grid.innerHTML = filtered
@@ -98,6 +134,10 @@ function addToCart(id, el) {
   } else {
     if (p.stock <= 0) return;
     cart[id] = { ...p, qty: 1 };
+    // Ensure IVA is a number, fallback to 21
+    cart[id].iva = parseFloat(p.iva || 21);
+    // Support for serial numbers
+    cart[id].serials = [];
   }
 
   el.classList.add("adding");
@@ -181,13 +221,25 @@ function renderCart() {
 }
 
 function updateTotals(subtotal) {
+  const items = Object.values(cart);
   const discountAmt = (subtotal * discountPct) / 100;
   const socioAmt =
     socioActual && socioActual.es_socio ? (subtotal * SOCIO_DISCOUNT) / 100 : 0;
 
   const totalDiscount = discountAmt + socioAmt;
+  const discountFactor =
+    subtotal > 0 ? (subtotal - totalDiscount) / subtotal : 1;
+
+  // Calculate VAT per item considering its specific rate and applied discount
+  let vat = 0;
+  items.forEach((item) => {
+    const itemSubtotal = item.price * item.qty;
+    const itemBase = itemSubtotal * discountFactor;
+    const itemVat = itemBase * (item.iva / 100);
+    vat += itemVat;
+  });
+
   const base = subtotal - totalDiscount;
-  const vat = base * 0.21;
   const total = base + vat;
 
   document.getElementById("subtotal").textContent = fmt(subtotal);
@@ -432,6 +484,74 @@ function calcularCambio() {
 
 // Paso 3: Confirmar cliente y enviar la venta a la BD via API
 async function confirmarCliente() {
+  const items = Object.values(cart);
+
+  // 1. Verificar si hay productos que requieren Nº Serie
+  const itemsWithSerial = items.filter(
+    (it) => it.requiere_serial && it.qty > 0,
+  );
+
+  if (itemsWithSerial.length > 0) {
+    cerrarModalCliente();
+    pedirNumerosSerie(itemsWithSerial);
+    return;
+  }
+
+  ejecutarCobroFinal();
+}
+
+function pedirNumerosSerie(items) {
+  const modal = document.getElementById("serialModal");
+  const container = document.getElementById("serialInputsContainer");
+  container.innerHTML = "";
+
+  items.forEach((item) => {
+    for (let i = 0; i < item.qty; i++) {
+      const div = document.createElement("div");
+      div.className = "form-group";
+      div.innerHTML = `
+            <label class="fs-11 font-bold tt-uppercase text-muted">${item.name} (${i + 1}/${item.qty})</label>
+            <input type="text" class="form-input font-mono serial-input" 
+                   data-id="${item.id}" data-idx="${i}" 
+                   placeholder="Introduce el nº de serie..." required />
+        `;
+      container.appendChild(div);
+    }
+  });
+
+  modal.classList.add("visible");
+
+  document.getElementById("confirmSerialBtn").onclick = () => {
+    const inputs = container.querySelectorAll(".serial-input");
+    let allOk = true;
+
+    inputs.forEach((input) => {
+      const val = input.value.trim();
+      if (!val) {
+        input.style.borderColor = "var(--red)";
+        allOk = false;
+      } else {
+        const id = parseInt(input.dataset.id);
+        const item = cart[id];
+        item.serials = item.serials || [];
+        item.serials[parseInt(input.dataset.idx)] = val;
+      }
+    });
+
+    if (allOk) {
+      modal.classList.remove("visible");
+      abrirModalPago(); // Volver al flujo de pago
+    } else {
+      showToast("⚠️ Debes introducir todos los números de serie");
+    }
+  };
+}
+
+function abrirModalPago() {
+  document.getElementById("clienteModal").classList.add("visible");
+}
+
+async function ejecutarCobroFinal() {
   const btn = document.getElementById("confirmarClienteBtn");
   btn.disabled = true;
   btn.textContent = "Guardando…";
@@ -439,12 +559,19 @@ async function confirmarCliente() {
   const items = Object.values(cart);
   const subtotal = items.reduce((a, b) => a + b.price * b.qty, 0);
 
+  // Calcular descuentos finales
+  const discountAmt = (subtotal * discountPct) / 100;
+  const socioAmt =
+    socioActual && socioActual.es_socio ? (subtotal * SOCIO_DISCOUNT) / 100 : 0;
+
   const payload = {
     tipoCliente: tipoClienteActual,
     nombreCliente:
       tipoClienteActual === "empresa"
         ? document.getElementById("empresaNombre").value
-        : null,
+        : socioActual
+          ? socioActual.nombre
+          : null,
     nifCliente:
       tipoClienteActual === "empresa"
         ? document.getElementById("empresaNif").value
@@ -469,6 +596,7 @@ async function confirmarCliente() {
       codigo: it.codigo,
       price: it.price,
       qty: it.qty,
+      serials: it.serials || [], // Enviar seriales
     })),
     efectivo: {
       recibido:
@@ -574,7 +702,7 @@ function mostrarTicket(v, isFromTPV = true) {
   if (btnAnular) {
     btnAnular.style.display =
       !isFromTPV && v.estado === "completada" ? "" : "none";
-    btnAnular.onclick = () => devolverTicket(v.numero_ticket);
+    btnAnular.onclick = () => abrirModalAnulacionTicket(v.numero_ticket);
   }
 
   // Resetear campo email y errores
@@ -672,31 +800,94 @@ function mostrarTicket(v, isFromTPV = true) {
   const lineasEl = document.getElementById("tkLineas");
   if (lineasEl)
     lineasEl.innerHTML = v.lineas
-      .map(
-        (l) => `
-    <div style="display:flex; justify-content:space-between; padding: 4px 0; border-bottom: 1px solid var(--surface2); ${l.devuelta ? "opacity:0.6; background:rgba(192,57,43,0.05);" : ""}">
-      <div>
-        <span style="font-weight:600; ${l.devuelta ? "text-decoration:line-through;" : ""}">${l.nombre_producto}</span>
-        <span style="color:var(--text-muted); font-size:11px; margin-left:6px;">${l.codigo_producto}</span>
-        ${l.devuelta ? '<span class="status-pill p-2-4 fs-10" style="background:var(--red); color:white; margin-left:8px;">DEVUELTO</span>' : ""}
-        <br>
-        <span style="color:var(--text-muted); font-size:11px;">${l.cantidad} × ${fmt2(l.precio_unitario)}</span>
-      </div>
-      <div style="display:flex; align-items:center; gap:12px;">
-        <span style="font-family:'DM Mono',monospace; font-weight:600;">${fmt2(l.total_linea)}</span>
+      .map((l) => {
+        // Cálculo de garantía
+        const vDate = new Date(v.fecha.replace(" ", "T"));
+        const months = parseInt(l.meses_garantia || 24);
+        const gDate = new Date(vDate);
+        gDate.setMonth(gDate.getMonth() + months);
+        const isExpired = gDate < new Date();
+        const gStr = gDate.toLocaleDateString("es-ES");
+        // Números de serie (pueden venir como JSON en numero_serie o como lista separada en numeros_serie)
+        let serialDisplay = "";
+        if (l.numeros_serie) {
+          serialDisplay = String(l.numeros_serie)
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
+            .join(", ");
+        } else if (l.numero_serie) {
+          try {
+            const parsed = JSON.parse(l.numero_serie);
+            if (Array.isArray(parsed)) {
+              serialDisplay = parsed.filter(Boolean).join(", ");
+            }
+          } catch (e) {
+            serialDisplay = l.numero_serie;
+          }
+        }
+
+        return `
+    <div style="display:flex; justify-content:space-between; padding: 10px 0; border-bottom: 1px solid var(--surface2); ${l.devuelta ? "opacity:0.6; background:rgba(192,57,43,0.05);" : ""}">
+      <div style="flex:1">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+            <div>
+                <span style="font-weight:600; ${l.devuelta ? "text-decoration:line-through;" : ""}">${l.nombre_producto}</span>
+                <span style="color:var(--text-muted); font-size:11px; margin-left:6px;">${l.codigo_producto}</span>
+            </div>
+            <span style="font-family:'DM Mono',monospace; font-weight:600;">${fmt2(l.total_linea)}</span>
+        </div>
+        
+        <div style="display:flex; align-items:center; gap:8px; margin-top:4px;">
+            <span style="color:var(--text-muted); font-size:11px;">${l.cantidad} × ${fmt2(l.precio_unitario)}</span>
+            <span class="fs-10 px-6 py-2 br-4" style="background:${isExpired ? "var(--red-light)" : "var(--green-light)"}; color:${isExpired ? "var(--red)" : "var(--green)"}; font-weight:700;">
+                <i class="fa-solid fa-shield-halved"></i> 
+                ${isExpired ? "Garantía AGOTADA" : "Garantía hasta " + gStr}
+            </span>
+            ${
+              l.devuelta
+                ? `
+                <span class="fs-10 px-6 py-2 br-4" style="background:var(--red); color:white; font-weight:700;">DEVUELTO</span>
+            `
+                : ""
+            }
+        </div>
+
         ${
-          !isFromTPV && !l.devuelta && v.estado === "completada"
+          serialDisplay
             ? `
-            <button onclick="devolverLinea(${l.id}, ${v.numero_ticket})" title="Devolver este producto" style="border:none; background:none; color:var(--red); cursor:pointer; padding:4px;">
-                <i class="fa-solid fa-arrow-rotate-left"></i>
-            </button>
+            <div style="margin-top:4px; font-size:11px; color:var(--text-muted);">
+                <i class="fa-solid fa-barcode"></i> N.º serie: ${serialDisplay}
+            </div>
+        `
+            : ""
+        }
+
+        ${
+          l.devuelta && l.motivo_devolucion
+            ? `
+            <div style="margin-top:4px; font-size:11px; color:var(--red); font-style:italic;">
+                <i class="fa-solid fa-circle-info"></i> Motivo: ${l.motivo_devolucion}
+            </div>
         `
             : ""
         }
       </div>
+
+      ${
+        !isFromTPV && !l.devuelta && v.estado === "completada"
+          ? `
+          <div style="padding-left:12px; display:flex; align-items:center;">
+              <button onclick="abrirModalDevolucion(${l.id}, ${v.numero_ticket})" title="Devolver este producto" class="btn-icon text-red">
+                  <i class="fa-solid fa-arrow-rotate-left"></i>
+              </button>
+          </div>
+      `
+          : ""
+      }
     </div>
-  `,
-      )
+  `;
+      })
       .join("");
 
   // Totales
@@ -813,45 +1004,33 @@ function closeModal() {
 }
 
 async function devolverLinea(idLinea, numTicket) {
-  if (!confirm("¿Deseas devolver este producto y reponer stock?")) return;
-  try {
-    const resp = await fetch("api/gestionDevolucion.php", {
-      method: "POST",
-      body: JSON.stringify({ accion: "devolverLinea", idLinea }),
-    });
-    const r = await resp.json();
-    if (r.ok) {
-      showToast("Producto devuelto con éxito");
-      // Recargar ticket
-      const v = await cargarVenta(numTicket);
-      mostrarTicket(v, false);
-    } else {
-      throw new Exception(r.error);
-    }
-  } catch (e) {
-    showToast("Error: " + e.message);
-  }
+  // Mantener compatibilidad: redirigir al flujo con modal
+  abrirModalDevolucion(idLinea, numTicket);
 }
 
 async function devolverTicket(numTicket) {
-  if (
-    !confirm(
-      "¿Deseas ANULAR y DEVOLVER el ticket completo? Esta acción es irreversible.",
-    )
-  )
-    return;
+  // Mantener compatibilidad si quedara alguna llamada legacy
+  abrirModalAnulacionTicket(numTicket);
+}
+
+async function confirmarAnulacionTicket(numTicket) {
+  const motivoBase = document.getElementById("returnReason").value;
+  const nota = document.getElementById("returnNote").value.trim();
+  const motivo = nota ? `${motivoBase}: ${nota}` : motivoBase;
+
   try {
     const resp = await fetch("api/gestionDevolucion.php", {
       method: "POST",
-      body: JSON.stringify({ accion: "devolverTicket", numTicket }),
+      body: JSON.stringify({ accion: "devolverTicket", numTicket, motivo }),
     });
     const r = await resp.json();
     if (r.ok) {
+      document.getElementById("returnModal").classList.remove("visible");
       showToast("Ticket devuelto y stock restaurado");
       const v = await cargarVenta(numTicket);
       mostrarTicket(v, false);
     } else {
-      throw new Exception(r.error);
+      throw new Error(r.error || "No se pudo anular el ticket");
     }
   } catch (e) {
     showToast("Error: " + e.message);
@@ -901,6 +1080,7 @@ async function guardarNuevoProducto() {
   const name = document.getElementById("addName").value.trim();
   const codigo = document.getElementById("addSku").value.trim();
   const price = parseFloat(document.getElementById("addPrice").value);
+  const iva = parseFloat(document.getElementById("addIva").value) || 21;
   const icono = document.getElementById("addEmoji").value.trim();
   const cat = document.getElementById("addCat").value;
 
@@ -912,11 +1092,16 @@ async function guardarNuevoProducto() {
       body: JSON.stringify({
         accion: "añadir",
         nombre: name,
-        codigo,
-        precio: price,
+        referencia: codigo,
+        precio_venta: price,
+        precio_coste: 0,
+        iva: iva,
+        stock_actual: 0,
+        stock_minimo: 0,
+        meses_garantia: 24,
+        requiere_serial: document.getElementById("addSerial").checked ? 1 : 0,
         icono,
         categoria: cat,
-        stock: 0, // Default stock for new products from TPV
       }),
     });
     const data = await resp.json();
@@ -953,6 +1138,9 @@ function editProduct(e, id) {
   document.getElementById("editName").value = p.name;
   document.getElementById("editSku").value = p.codigo;
   document.getElementById("editPrice").value = p.price;
+  document.getElementById("editIva").value = p.iva || 21;
+  document.getElementById("editMesesGarantia").value = p.meses_garantia || 24;
+  document.getElementById("editSerial").checked = !!p.requiere_serial;
   document.getElementById("editEmoji").value = p.icono;
 
   const preview = document.getElementById("editImgPreview");
@@ -967,14 +1155,20 @@ function editProduct(e, id) {
 }
 
 async function saveEdit() {
-  const id = parseInt(document.getElementById("editId").value);
-  const name = document.getElementById("editName").value.trim();
-  const codigo = document.getElementById("editSku").value.trim();
-  const price = parseFloat(document.getElementById("editPrice").value);
-  const icono = document.getElementById("editEmoji").value.trim();
-
   document.querySelectorAll(".form-error").forEach((el) => (el.innerText = ""));
   try {
+    alert(
+      "🔧 DEBUG v6: saveEdit ejecutado. Si ves este mensaje, el JS actualizado está activo.",
+    );
+    const id = parseInt(document.getElementById("editId")?.value);
+    const name = document.getElementById("editName")?.value.trim();
+    const codigo = document.getElementById("editSku")?.value.trim();
+    const price = parseFloat(document.getElementById("editPrice")?.value);
+    const iva = parseFloat(document.getElementById("editIva")?.value) || 21;
+    const mesesGarantia =
+      parseInt(document.getElementById("editMesesGarantia")?.value) || 24;
+    const icono = document.getElementById("editEmoji")?.value.trim();
+
     const pOrig = PRODUCTS.find((x) => x.id === id);
     const resp = await fetch("./api/gestionProducto.php", {
       method: "POST",
@@ -983,17 +1177,24 @@ async function saveEdit() {
         accion: "editar",
         id,
         nombre: name,
-        codigo,
-        precio: price,
+        referencia: codigo,
+        precio_venta: price,
+        precio_coste: pOrig.precio_coste || 0,
+        iva: iva,
+        stock_actual: pOrig.stock || 0,
+        stock_minimo: pOrig.stock_minimo || 0,
+        meses_garantia: mesesGarantia,
+        requiere_serial: document.getElementById("editSerial").checked ? 1 : 0,
         icono,
         categoria: pOrig.cat,
-        stock: pOrig.stock,
       }),
     });
     const data = await resp.json();
 
     if (!data.ok) {
       if (data.aErrores) {
+        const msgs = Object.values(data.aErrores).filter(Boolean);
+        showToast("\u274c Errores de validaci\u00f3n: " + msgs.join(" / "));
         for (const [key, msg] of Object.entries(data.aErrores)) {
           const errEl = document.getElementById(
             "err-edit" + key.charAt(0).toUpperCase() + key.slice(1),
@@ -1006,14 +1207,20 @@ async function saveEdit() {
     }
 
     const p = PRODUCTS.find((x) => x.id === id);
-    p.name = name || p.name;
-    p.codigo = codigo || p.codigo;
-    p.price = price || p.price;
+    p.name = name;
+    p.codigo = codigo;
+    p.price = price;
+    p.iva = iva;
+    p.meses_garantia = mesesGarantia;
+    p.requiere_serial = document.getElementById("editSerial").checked ? 1 : 0;
     p.icono = icono || p.icono;
 
     document.getElementById("editModal").classList.remove("visible");
     renderProducts();
-    showToast("✅ Producto actualizado en BD");
+    const d = data._debug || {};
+    showToast(
+      `✅ Enviado IVA=${d.enviado_iva} → BD=${d.bd_iva} | Meses=${d.enviado_meses} → BD=${d.bd_meses}`,
+    );
   } catch (err) {
     showToast("<i class='fa-solid fa-circle-xmark'></i> " + err.message);
   }
@@ -1055,6 +1262,73 @@ function deleteProduct(e, id) {
   document.getElementById("deleteModal").classList.add("visible");
 }
 
+// Devoluciones promediadas con Modal
+function abrirModalDevolucion(idLinea, numTicket) {
+  const modal = document.getElementById("returnModal");
+  if (!modal) {
+    console.error(
+      "No se encontró el modal de devolución (returnModal) en esta vista.",
+    );
+    showToast(
+      "<i class='fa-solid fa-circle-xmark'></i> No se puede abrir el modal de devolución en esta pantalla.",
+    );
+    return;
+  }
+
+  modal.classList.add("visible");
+
+  document.getElementById("confirmReturnBtn").onclick = () => {
+    confirmarDevolucion(idLinea, numTicket);
+  };
+}
+
+// Anulación total de ticket usando el mismo modal de motivo
+function abrirModalAnulacionTicket(numTicket) {
+  const modal = document.getElementById("returnModal");
+  if (!modal) {
+    console.error(
+      "No se encontró el modal de devolución (returnModal) en esta vista.",
+    );
+    showToast(
+      "<i class='fa-solid fa-circle-xmark'></i> No se puede abrir el modal de anulación en esta pantalla.",
+    );
+    return;
+  }
+
+  modal.classList.add("visible");
+
+  document.getElementById("confirmReturnBtn").onclick = () => {
+    confirmarAnulacionTicket(numTicket);
+  };
+}
+
+async function confirmarDevolucion(idLinea, numTicket) {
+  const motivo = document.getElementById("returnReason").value;
+  const nota = document.getElementById("returnNote").value.trim();
+  const finalMotivo = nota ? `${motivo}: ${nota}` : motivo;
+
+  try {
+    const resp = await fetch("./api/gestionDevolucion.php", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        accion: "devolverLinea",
+        idLinea: idLinea,
+        motivo: finalMotivo,
+      }),
+    });
+    const data = await resp.json();
+    if (!data.ok) throw new Error(data.error || "No se pudo realizar la devolución");
+
+    document.getElementById("returnModal").classList.remove("visible");
+    showToast("✅ Producto devuelto correctamente");
+    // Recargar ticket con los datos actualizados
+    const ventaActualizada = await cargarVenta(numTicket);
+    mostrarTicket(ventaActualizada, false);
+  } catch (err) {
+    showToast("❌ No se pudo procesar la devolución: " + err.message);
+  }
+}
 async function toggleBaja(e, id) {
   e.stopPropagation();
   if (!requireAdmin()) return;
@@ -1107,6 +1381,38 @@ function showToast(msg) {
     toast.style.animation = "toastOut 0.5s ease forwards";
     setTimeout(() => toast.remove(), 500);
   }, 4000);
+}
+
+// ── Búsqueda y Filtros Avanzados ───────────────────────────────────────────────
+function handleSearch(val) {
+  searchTerm = val;
+  renderProducts();
+}
+
+function toggleAdvancedFilters() {
+  const panel = document.getElementById("advancedFilters");
+  if (panel) {
+    const isHidden = panel.classList.contains("d-none");
+    panel.classList.toggle("d-none");
+    const btn = document.querySelector(".btn-filter-toggle");
+    if (btn) {
+      btn.classList.toggle("is-open", !isHidden);
+    }
+  }
+}
+
+function applyAdvancedFilters() {
+  const elMin = document.getElementById("filterPriceMin");
+  const elMax = document.getElementById("filterPriceMax");
+  const elStock = document.getElementById("filterStock");
+  const elSort = document.getElementById("filterSort");
+
+  minPrice = parseFloat(elMin.value) || 0;
+  maxPrice = parseFloat(elMax.value) || Infinity;
+  stockFilter = elStock.value;
+  sortOrder = elSort.value;
+
+  renderProducts();
 }
 
 // ── Reloj (Seguro) ─────────────────────────────────────────────────────────────
@@ -1167,16 +1473,6 @@ if (productsGrid) {
       renderProducts();
     });
   }
-
-  // Eventos de búsqueda
-  const searchInput = document.getElementById("searchInput");
-  if (searchInput) {
-    searchInput.addEventListener("input", (e) => {
-      searchTerm = e.target.value.toLowerCase();
-      renderProducts();
-    });
-  }
-
   // Carga inicial de productos
   renderProducts();
 }

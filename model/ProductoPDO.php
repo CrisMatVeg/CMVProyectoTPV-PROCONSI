@@ -35,7 +35,8 @@ class ProductoPDO {
                 $registro['icono'],
                 $registro['categoria'],
                 $registro['variantes'],
-                $registro['activo']
+                $registro['activo'],
+                $registro['requiere_serial'] ?? 0
             );
         }
         return $productos;
@@ -53,8 +54,8 @@ class ProductoPDO {
             $iconoDato = base64_decode($parts[1]);
         }
 
-        $sql = "INSERT INTO productos (referencia, nombre, descripcion, precio_coste, precio_venta, iva, stock_actual, stock_minimo, meses_garantia, icono, categoria, variantes, activo)
-                VALUES (:referencia, :nombre, :descripcion, :precio_coste, :precio_venta, :iva, :stock_actual, :stock_minimo, :meses_garantia, :icono, :categoria, :variantes, 1)";
+        $sql = "INSERT INTO productos (referencia, nombre, descripcion, precio_coste, precio_venta, iva, stock_actual, stock_minimo, meses_garantia, icono, categoria, variantes, activo, requiere_serial)
+                VALUES (:referencia, :nombre, :descripcion, :precio_coste, :precio_venta, :iva, :stock_actual, :stock_minimo, :meses_garantia, :icono, :categoria, :variantes, 1, :requiere_serial)";
         
         DBPDO::ejecutarConsulta($sql, [
             ':referencia'     => mb_substr(trim($datos['referencia']), 0, 50),
@@ -69,6 +70,7 @@ class ProductoPDO {
             ':icono'          => $iconoDato,
             ':categoria'      => mb_substr(trim($datos['categoria']), 0, 50),
             ':variantes'      => isset($datos['variantes']) ? json_encode($datos['variantes']) : null,
+            ':requiere_serial' => (int)($datos['requiere_serial'] ?? 0)
         ]);
 
         $q = DBPDO::ejecutarConsulta("SELECT * FROM productos ORDER BY id DESC LIMIT 1");
@@ -90,7 +92,7 @@ class ProductoPDO {
                     precio_coste = :precio_coste, precio_venta = :precio_venta, iva = :iva, 
                     stock_actual = :stock_actual, stock_minimo = :stock_minimo, 
                     meses_garantia = :meses_garantia, icono = :icono, categoria = :categoria,
-                    variantes = :variantes
+                    variantes = :variantes, requiere_serial = :requiere_serial
                 WHERE id = :id";
         
         DBPDO::ejecutarConsulta($sql, [
@@ -106,6 +108,7 @@ class ProductoPDO {
             ':icono'          => $iconoDato,
             ':categoria'      => mb_substr(trim($datos['categoria']), 0, 50),
             ':variantes'      => isset($datos['variantes']) ? json_encode($datos['variantes']) : null,
+            ':requiere_serial' => (int)($datos['requiere_serial'] ?? 0),
             ':id'             => $id,
         ]);
     }
@@ -131,5 +134,11 @@ class ProductoPDO {
     public static function aumentarStock(int $id, int $cantidad): void {
         $sql = "UPDATE productos SET stock_actual = stock_actual + :cantidad WHERE id = :id";
         DBPDO::ejecutarConsulta($sql, [':cantidad' => $cantidad, ':id' => $id]);
+    }
+
+    public static function obtenerProductoPorId(int $id): ?array {
+        $q = DBPDO::ejecutarConsulta("SELECT * FROM productos WHERE id = :id", [':id' => $id]);
+        $row = $q->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
     }
 }

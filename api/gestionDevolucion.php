@@ -24,14 +24,15 @@ try {
 
     $input = json_decode(file_get_contents('php://input'), true);
     $accion = $input['accion'] ?? '';
+    $motivo = $input['motivo'] ?? null;
 
     if ($accion === 'devolverLinea') {
         $idLinea = (int)($input['idLinea'] ?? 0);
-        $res = VentaPDO::devolverLinea($idLinea);
+        $res = VentaPDO::devolverLinea($idLinea, $motivo);
         echo json_encode(['ok' => $res]);
     } else if ($accion === 'devolverTicket') {
         $numTicket = (int)($input['numTicket'] ?? 0);
-        $res = VentaPDO::devolverVenta($numTicket);
+        $res = VentaPDO::devolverVenta($numTicket, $motivo);
         echo json_encode(['ok' => $res]);
     } else {
         throw new Exception('Acción no válida');
