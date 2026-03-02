@@ -6,6 +6,7 @@ require_once './model/Producto.php';
 require_once './model/ProductoPDO.php';
 require_once './model/Venta.php';
 require_once './model/VentaPDO.php';
+require_once './model/ClientePDO.php';
 $controller = [
     "inicioPublico" => "controller/cInicioPublico.php",
     "Login" => "controller/cLogin.php",
@@ -13,6 +14,7 @@ $controller = [
     "cierreCaja" => "controller/cCierreCaja.php",
     "Dashboard" => "controller/cDashboard.php",
     "Usuarios" => "controller/cUsuarios.php",
+    "Clientes" => "controller/cClientes.php",
     // "Detalle" => "controller/cDetalle.php",
     // "MiCuenta" => "controller/cMiCuenta.php",
     // "BorrarCuenta" => "controller/cBorrarCuenta.php",
@@ -21,6 +23,9 @@ $controller = [
     // "WIP" => "controller/cWIP.php",
     "error" => "controller/cError.php",
     "Productos" => "controller/cProductos.php",
+    "Promociones" => "controller/cPromociones.php",
+    "TiposIVA" => "controller/cTiposIVA.php",
+    "Tarifas" => "controller/cTarifas.php",
     "Historial" => "controller/cHistorial.php",
     "MiPerfil" => "controller/cMiPerfil.php",
     "Analitica" => "controller/cAnalitica.php",
@@ -44,6 +49,7 @@ $view = [
     "cierreCaja" => "view/vCierreCaja.php",
     "Dashboard" => "view/vDashboard.php",
     "Usuarios" => "view/vUsuarios.php",
+    "Clientes" => "view/vClientes.php",
     "layout" => "view/layout.php",
     "Login" => "view/vLogin.php",
     // "Detalle" => "view/vDetalle.php",
@@ -54,6 +60,9 @@ $view = [
     // "WIP" => "view/vWIP.php",
     "error" => "view/vError.php",
     "Productos" => "view/vProductos.php",
+    "Promociones" => "view/vPromociones.php",
+    "TiposIVA" => "view/vTiposIVA.php",
+    "Tarifas" => "view/vTarifas.php",
     "Historial" => "view/vHistorial.php",
     "MiPerfil" => "view/vMiPerfil.php",
     "Analitica" => "view/vAnalitica.php",

@@ -305,6 +305,31 @@
 </div>
 
 
+<!-- MODAL APERTURA DE CAJA (antes de poder vender) -->
+<div class="modal-overlay" id="aperturaCajaModal">
+    <div class="modal modal-content gap-16 ai-stretch w-360">
+        <div class="modal-icon text-accent bg-blue-light">
+            <i class="fa-solid fa-cash-register"></i>
+        </div>
+        <div class="modal-title text-center">Apertura de Caja</div>
+        <p class="text-muted fs-13 text-center">
+            Antes de empezar a vender, introduce el fondo inicial de efectivo en la caja.
+        </p>
+        <form method="post" action="index.php" class="d-flex flex-column gap-12">
+            <input type="hidden" name="irTPV" value="1">
+            <div class="form-group">
+                <label class="form-label fs-13">Fondo inicial (€)</label>
+                <input type="number" step="0.01" min="0" name="fondoInicial" class="form-input font-mono fs-16 text-right" placeholder="0.00" required>
+            </div>
+            <div class="modal-footer full-width">
+                <button type="submit" name="abrirCaja" class="btn-save w-auto px-32">
+                    <i class="fa-solid fa-door-open"></i> Abrir caja y continuar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <!-- MODAL 1: TIPO DE CLIENTE (aparece al pulsar Cobrar) -->
 <div class="modal-overlay" id="clienteModal">
     <div class="modal modal-content gap-18 ai-stretch w-360">
@@ -326,7 +351,18 @@
                 <span class="font-bold">Empresa</span>
             </button>
         </div>
-        
+
+        <!-- Buscador genérico de clientes guardados (particular/empresa) -->
+        <div id="clienteBusquedaGenerica" class="d-none flex-column gap-8 p-12 bg-surface2 br-8 border-2 mb-8">
+            <div class="d-flex gap-8">
+                <input id="clienteSearch" class="form-input fs-13 flex-1" placeholder="Buscar cliente por nombre o NIF..." />
+                <button type="button" onclick="buscarClienteGuardado()" class="btn-save w-auto p-4-12">
+                    <i class="fa-solid fa-search"></i>
+                </button>
+            </div>
+            <div id="clienteResultados" class="fs-12 mt-4 text-accent font-bold"></div>
+        </div>
+
         <!-- Buscador de Socio -->
         <div id="socioBusqueda" class="d-none flex-column gap-8 p-12 bg-surface2 br-8 border-2 mb-8">
             <div class="d-flex gap-8">

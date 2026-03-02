@@ -25,8 +25,32 @@ if (isset($_REQUEST['irUsuarios'])) {
     exit;
 }
 
+if (isset($_REQUEST['irClientes'])) {
+    $_SESSION['paginaEnCurso'] = 'Clientes';
+    header('Location: index.php');
+    exit;
+}
+
 if (isset($_REQUEST['irProductos'])) {
     $_SESSION['paginaEnCurso'] = 'Productos';
+    header('Location: index.php');
+    exit;
+}
+
+if (isset($_REQUEST['irTiposIVA'])) {
+    $_SESSION['paginaEnCurso'] = 'TiposIVA';
+    header('Location: index.php');
+    exit;
+}
+
+if (isset($_REQUEST['irTarifas'])) {
+    $_SESSION['paginaEnCurso'] = 'Tarifas';
+    header('Location: index.php');
+    exit;
+}
+
+if (isset($_REQUEST['irPromociones'])) {
+    $_SESSION['paginaEnCurso'] = 'Promociones';
     header('Location: index.php');
     exit;
 }

@@ -38,13 +38,13 @@
             </div>
         </div>
         <div class="stat-card">
-            <div class="summary-label">Efectivo</div>
+            <div class="summary-label">Efectivo en caja</div>
             <div class="fs-22 font-bold font-mono mt-6 text-green">
                 <?php echo number_format($avCierreCaja['resumen']['totalEfectivo'], 2, ',', '.'); ?> €
             </div>
         </div>
         <div class="stat-card">
-            <div class="summary-label">Tarjeta</div>
+            <div class="summary-label">Ventas a cuenta / tarjeta</div>
             <div class="fs-22 font-bold font-mono mt-6 text-blue">
                 <?php echo number_format($avCierreCaja['resumen']['totalTarjeta'], 2, ',', '.'); ?> €
             </div>
@@ -73,6 +73,68 @@
         </div>
     </div>
 
+    <!-- APERTURA Y RETIRADAS DE CAJA -->
+    <div class="table-container p-24 mb-28 border-2">
+        <h3 class="mb-16 d-flex ai-center gap-10">
+            <i class="fa-solid fa-cash-register text-accent"></i> 
+            Gestión de Caja (Apertura y Retiradas)
+        </h3>
+
+        <?php if (!$avCierreCaja['turno']): ?>
+            <form method="post" class="d-grid grid-3 gap-16">
+                <div class="form-group">
+                    <label class="form-label fs-13">Fondo inicial de caja (€)</label>
+                    <input type="number" step="0.01" name="fondoInicial" class="form-input font-mono" placeholder="0.00" required>
+                </div>
+                <div class="form-group d-flex ai-flex-end">
+                    <button type="submit" name="abrirCaja" class="btn-save w-auto p-12-24">
+                        <i class="fa-solid fa-door-open"></i> Abrir caja
+                    </button>
+                </div>
+                <div class="form-group fs-12 text-muted">
+                    Registra aquí el efectivo que dejas al inicio del turno. Se tendrá en cuenta para el arqueo final.
+                </div>
+            </form>
+        <?php else: ?>
+            <div class="d-grid grid-3 gap-24 mb-16">
+                <div>
+                    <div class="summary-label">Fondo inicial del turno</div>
+                    <div class="fs-18 font-mono font-bold mt-4">
+                        <?php echo number_format($avCierreCaja['fondoInicial'], 2, ',', '.'); ?> €
+                    </div>
+                </div>
+                <div>
+                    <div class="summary-label">Retirado durante el turno</div>
+                    <div class="fs-18 font-mono font-bold mt-4 text-red">
+                        <?php echo number_format($avCierreCaja['totalRetirado'], 2, ',', '.'); ?> €
+                    </div>
+                </div>
+                <div>
+                    <div class="summary-label">Efectivo esperado según turno</div>
+                    <div class="fs-18 font-mono font-bold mt-4 text-blue">
+                        <?php echo number_format($avCierreCaja['esperadoTurno'], 2, ',', '.'); ?> €
+                    </div>
+                </div>
+            </div>
+
+            <form method="post" class="d-grid grid-3 gap-16">
+                <div class="form-group">
+                    <label class="form-label fs-13">Registrar retirada de efectivo</label>
+                    <input type="number" step="0.01" name="importeRetiro" class="form-input font-mono" placeholder="0.00">
+                </div>
+                <div class="form-group">
+                    <label class="form-label fs-13">Concepto</label>
+                    <input type="text" name="conceptoRetiro" class="form-input" placeholder="Caja fuerte, banco, etc.">
+                </div>
+                <div class="form-group d-flex ai-flex-end">
+                    <button type="submit" name="registrarRetiro" class="btn-cancel">
+                        <i class="fa-solid fa-arrow-up-right-from-square"></i> Registrar retirada
+                    </button>
+                </div>
+            </form>
+        <?php endif; ?>
+    </div>
+
     <!-- ARQUEO DE CAJA (Z) -->
     <div class="table-container p-24 mb-28 border-2" style="border-color: var(--accent);">
         <h3 class="mb-16 d-flex ai-center gap-10">
@@ -82,8 +144,10 @@
         <form method="post" id="formCierre">
             <div class="grid-3 gap-24">
                 <div class="form-group">
-                    <label class="form-label fs-13">Efectivo esperado</label>
-                    <div class="fs-20 font-mono font-bold"><?php echo number_format($avCierreCaja['resumen']['totalEfectivo'], 2, ',', '.'); ?> €</div>
+                    <label class="form-label fs-13">Efectivo esperado (ventas + fondo - retiradas)</label>
+                    <div class="fs-20 font-mono font-bold">
+                        <?php echo number_format($avCierreCaja['esperadoTurno'], 2, ',', '.'); ?> €
+                    </div>
                 </div>
                 <div class="form-group">
                     <label class="form-label fs-13">Efectivo real en caja</label>
@@ -93,6 +157,16 @@
                 <div class="form-group">
                     <label class="form-label fs-13">Diferencia / Descuadre</label>
                     <div id="diffCaja" class="fs-20 font-mono font-bold">0,00 €</div>
+                </div>
+            </div>
+            <div class="grid-2 gap-24 mt-16">
+                <div class="form-group">
+                    <label class="form-label fs-13">Fondo para siguiente turno</label>
+                    <input type="number" step="0.01" name="fondoSiguiente" id="fondoSiguiente" class="form-input fs-16 font-mono" placeholder="0.00">
+                </div>
+                <div class="form-group">
+                    <label class="form-label fs-13">Importe que se retira al cierre</label>
+                    <div id="importeRetiradaCierre" class="fs-20 font-mono font-bold">0,00 €</div>
                 </div>
             </div>
             <div class="mt-20 d-flex jc-between ai-center">
@@ -108,13 +182,29 @@
 
     <script>
     function calcularDiferencia() {
-        const esperado = <?php echo $avCierreCaja['resumen']['totalEfectivo']; ?>;
-        const real = parseFloat(document.getElementById('realEfectivo').value) || 0;
+        const esperado = <?php echo $avCierreCaja['esperadoTurno']; ?>;
+        const realInput = document.getElementById('realEfectivo');
+        const real = parseFloat(realInput.value) || 0;
         const diff = real - esperado;
         const el = document.getElementById('diffCaja');
         el.innerText = (diff >= 0 ? '+' : '') + diff.toFixed(2).replace('.', ',') + ' €';
         el.className = 'fs-20 font-mono font-bold ' + (diff === 0 ? 'text-green' : 'text-red');
+
+        // Calcular importe que se retira al cierre según fondo que se deja
+        const fondoSig = parseFloat(document.getElementById('fondoSiguiente').value) || 0;
+        const retiradoCierre = Math.max(0, real - fondoSig);
+        const elRet = document.getElementById('importeRetiradaCierre');
+        elRet.innerText = retiradoCierre.toFixed(2).replace('.', ',') + ' €';
+
+        // Validación suave: no dejar un fondo superior al efectivo real en caja
+        if (fondoSig > real) {
+            realInput.setCustomValidity('No puedes dejar un fondo superior al efectivo real en caja.');
+        } else {
+            realInput.setCustomValidity('');
+        }
     }
+
+    document.getElementById('fondoSiguiente')?.addEventListener('input', calcularDiferencia);
     </script>
 
 

@@ -10,15 +10,48 @@
     <link rel="stylesheet" href="./webroot/css/fonts.css" />
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <?php
+    // Cargar tema del usuario actual (si existe)
+    $themeMode = 'light';
+    $themeAccent = 'blue';
+    if (isset($_SESSION['usuarioActualTPV'])) {
+        require_once __DIR__ . '/../config/confDBPDO.php';
+        require_once __DIR__ . '/../model/DBPDO.php';
+        try {
+            $qTheme = DBPDO::ejecutarConsulta(
+                "SELECT theme_mode, theme_accent FROM usuarios WHERE id = :id",
+                [':id' => $_SESSION['usuarioActualTPV']->getId()]
+            );
+            $rowTheme = $qTheme->fetch(PDO::FETCH_ASSOC);
+            if ($rowTheme) {
+                if (!empty($rowTheme['theme_mode'])) {
+                    $themeMode = $rowTheme['theme_mode'];
+                }
+                if (!empty($rowTheme['theme_accent'])) {
+                    $themeAccent = $rowTheme['theme_accent'];
+                }
+            }
+        } catch (\Throwable $e) {
+            // Ignorar errores de tema y usar valores por defecto
+        }
+    }
+    ?>
     <script>
         const IS_ADMIN_BACKEND = <?php echo json_encode(isset($avInicioPrivado['esAdmin']) && $avInicioPrivado['esAdmin']); ?>;
         const DB_PRODUCTS = <?php echo json_encode($avInicioPrivado['productos'] ?? []); ?>;
+        const DB_PROMOS = <?php echo json_encode($avInicioPrivado['promos'] ?? []); ?>;
         const CAJERO_NOMBRE = <?php echo json_encode($avInicioPrivado['nombre_completo'] ?? (isset($_SESSION['usuarioActualTPV']) ? $_SESSION['usuarioActualTPV']->getNombreCompleto() : '')); ?>;
         const IS_TPV = <?php echo json_encode(isset($_SESSION['paginaEnCurso']) && $_SESSION['paginaEnCurso'] === 'inicioPrivado'); ?>;
+        const CAJA_ABIERTA = <?php echo json_encode($avInicioPrivado['cajaAbierta'] ?? false); ?>;
+        const ESC_POS_ENABLED = true;
+        const USER_THEME_MODE = <?php echo json_encode($themeMode); ?>;
+        const USER_THEME_ACCENT = <?php echo json_encode($themeAccent); ?>;
     </script>
 </head>
 
-<body data-page="<?php echo $_SESSION['paginaEnCurso'] ?? ''; ?>">
+<body data-page="<?php echo $_SESSION['paginaEnCurso'] ?? ''; ?>"
+      data-theme-mode="<?php echo htmlspecialchars($themeMode, ENT_QUOTES, 'UTF-8'); ?>"
+      data-theme-accent="<?php echo htmlspecialchars($themeAccent, ENT_QUOTES, 'UTF-8'); ?>">
     <!-- TOPBAR -->
     <header class="topbar">
         <div class="topbar-brand">

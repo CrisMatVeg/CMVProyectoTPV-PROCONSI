@@ -235,7 +235,13 @@
                 </div>
                 <div class="form-group mb-0">
                     <label class="form-label fs-11 tt-uppercase">IVA (%)</label>
-                    <input type="text" id="prodIva" placeholder="21.00" class="form-input text-right">
+                    <select id="prodIvaTipo" class="form-input">
+                        <?php foreach ($avProductos['tipos_iva'] as $t): ?>
+                            <option value="<?php echo htmlspecialchars($t['codigo']); ?>">
+                                <?php echo htmlspecialchars($t['codigo'] . ' - ' . $t['porcentaje'] . '%'); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
                     <span class="form-error" id="err-iva"></span>
                 </div>
             </div>
@@ -300,6 +306,9 @@
 </div>
 
 <script>
+    // IVA general vigente, calculado en el backend (para que se actualice automáticamente si cambia en tipos_iva)
+    const IVA_GENERAL_ACTUAL = <?php echo json_encode($avProductos['ivaGeneral'] ?? 21.00); ?>;
+    const TIPOS_IVA = <?php echo json_encode($avProductos['tipos_iva'] ?? []); ?>;
     /** 
      * Lógica de gestión de productos (JS integrado por ahora)
      */
@@ -312,7 +321,7 @@
         // Limpiar errores previos
         document.querySelectorAll('.form-error').forEach(el => el.innerText = '');
 
-        if (producto) {
+            if (producto) {
             title.innerText = 'Editar Producto';
             document.getElementById('prodId').value = producto.id;
             document.getElementById('prodIcono').value = producto.icono;
@@ -320,7 +329,12 @@
             document.getElementById('prodNombre').value = producto.nombre;
             document.getElementById('prodDesc').value = producto.descripcion || '';
             document.getElementById('prodCat').value = producto.categoria;
-            document.getElementById('prodIva').value = producto.iva || '21.00';
+
+            // Seleccionar el tipo de IVA actual del producto en el select
+            const selIva = document.getElementById('prodIvaTipo');
+            if (selIva) {
+                selIva.value = producto.codigo_iva || 'GENERAL';
+            }
             document.getElementById('prodGarantia').value = producto.meses_garantia || '24';
             document.getElementById('prodPrecioCoste').value = producto.precio_coste || '0.00';
             document.getElementById('prodPrecioVenta').value = producto.precio || '0.00';
@@ -360,6 +374,10 @@
             document.getElementById('sectionNS').classList.add('d-none');
             document.getElementById('variantesContainer').innerHTML = '';
             document.getElementById('prodVariantes').value = '';
+
+            // Nuevo producto: usar IVA general vigente como valor por defecto
+            const selIva = document.getElementById('prodIvaTipo');
+            if (selIva) selIva.value = 'GENERAL';
         }
 
         modal.style.display = 'flex';
@@ -422,7 +440,13 @@
 
         const id = document.getElementById('prodId').value;
 
-        // ── CORRECCIÓN: objeto datos completo con todos los campos requeridos ──
+        // Resolver tipo de IVA seleccionado
+        const selIva = document.getElementById('prodIvaTipo');
+        const codigoIva = selIva ? selIva.value : 'GENERAL';
+        const tipoIva = TIPOS_IVA.find(t => t.codigo === codigoIva);
+        const ivaValor = tipoIva ? tipoIva.porcentaje : IVA_GENERAL_ACTUAL;
+
+        // ── Objeto datos completo con todos los campos requeridos ──
         const datos = {
             accion: id ? 'editar' : 'añadir',
             id: id,
@@ -431,14 +455,15 @@
             nombre: document.getElementById('prodNombre').value,
             descripcion: document.getElementById('prodDesc').value,
             categoria: document.getElementById('prodCat').value,
-            iva: document.getElementById('prodIva').value,
+            iva: ivaValor,
             meses_garantia: document.getElementById('prodGarantia').value,
             precio_coste: document.getElementById('prodPrecioCoste').value,
             precio_venta: document.getElementById('prodPrecioVenta').value,
             stock_actual: document.getElementById('prodStock').value,
             stock_minimo: document.getElementById('prodStockMin').value,
             requiere_serial: 0, // ── CORRECCIÓN: campo obligatorio para ProductoPDO
-            variantes: document.getElementById('prodVariantes').value || null // ── CORRECCIÓN: campo obligatorio para ProductoPDO
+            variantes: document.getElementById('prodVariantes').value || null, // ── CORRECCIÓN: campo obligatorio para ProductoPDO
+            codigo_iva: codigoIva,
         };
 
         try {

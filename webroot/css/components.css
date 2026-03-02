@@ -41,7 +41,7 @@
 
 .dashboard-card {
   width: 100%;
-  max-width: 1200px;
+  max-width: 90vw;
   padding: 40px;
   display: flex;
   flex-direction: column;
@@ -137,6 +137,13 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 20px;
+}
+
+/* En pantallas muy anchas, reorganizar a 3 columnas para que entren más botones sin tanto scroll vertical */
+@media (min-width: 1400px) {
+  .dashboard-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
 }
 
 .dashboard-btn {

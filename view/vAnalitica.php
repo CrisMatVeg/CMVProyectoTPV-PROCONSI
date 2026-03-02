@@ -98,8 +98,12 @@
                                         <?php echo $idx + 1; ?>
                                     </div>
                                     <div>
-                                        <div class="font-bold"><?php echo htmlspecialchars($p['nombre_producto']); ?></div>
-                                        <div class="fs-11 text-muted"><?php echo htmlspecialchars($p['codigo_producto']); ?></div>
+                                        <div class="font-bold">
+                                            <?php echo htmlspecialchars($p['nombre_producto'] ?? 'Producto sin nombre'); ?>
+                                        </div>
+                                        <div class="fs-11 text-muted">
+                                            <?php echo htmlspecialchars($p['codigo_producto'] ?? ''); ?>
+                                        </div>
                                     </div>
                                 </div>
                             </td>

@@ -27,6 +27,8 @@ try {
     require_once __DIR__ . '/../model/Usuario.php';
     require_once __DIR__ . '/../model/Venta.php';
     require_once __DIR__ . '/../model/VentaPDO.php';
+    require_once __DIR__ . '/../model/CajaTurnoPDO.php';
+    require_once __DIR__ . '/../model/ClientePDO.php';
 
     // Iniciar sesión para verificar autenticación
     session_start();
@@ -42,6 +44,14 @@ try {
     if (!isset($_SESSION['usuarioActualTPV'])) {
         http_response_code(401);
         echo json_encode(['ok' => false, 'error' => 'No autenticado. Por favor, inicia sesión.']);
+        exit;
+    }
+
+    // Verificar que la caja está abierta (existe un turno de caja abierto)
+    $turnoActual = CajaTurnoPDO::obtenerTurnoAbierto();
+    if (!$turnoActual) {
+        http_response_code(409);
+        echo json_encode(['ok' => false, 'error' => 'No hay una caja abierta. Debes abrir la caja antes de registrar ventas.']);
         exit;
     }
 
@@ -97,8 +107,47 @@ try {
         exit;
     }
 
+    // Resolver / crear cliente en tabla clientes
+    // - Si viene idCliente desde el TPV (socio ya seleccionado), se usa directamente
+    // - Si es empresa con NIF, se busca por NIF y, si no existe, se crea
+    // - Para particulares sin datos, se puede dejar null (venta anónima)
+    $clienteIdParaVenta = null;
+    $tipoCliente = $datos['tipoCliente'] ?? 'particular';
+
+    if (!empty($id_cliente)) {
+        $clienteIdParaVenta = (int)$id_cliente;
+    } elseif ($tipoCliente === 'empresa') {
+        $nombreEmpresa = trim($datos['nombreCliente'] ?? '');
+        $nifEmpresa    = trim($nif_cliente ?? ($datos['nifCliente'] ?? ''));
+
+        if ($nifEmpresa !== '') {
+            $cli = ClientePDO::obtenerPorNif($nifEmpresa);
+            if ($cli) {
+                $clienteIdParaVenta = (int)$cli['id'];
+            } elseif ($nombreEmpresa !== '') {
+                $clienteIdParaVenta = ClientePDO::crear([
+                    'tipo'      => 'empresa',
+                    'nombre'    => $nombreEmpresa,
+                    'apellidos' => '',
+                    'nif'       => $nifEmpresa,
+                    'email'     => null,
+                    'telefono'  => null,
+                    'es_socio'  => 0,
+                ]);
+            }
+        }
+    } elseif ($tipoCliente === 'socio') {
+        // Para socios siempre debería llegar idCliente desde el buscador/registro del TPV
+        if (!empty($id_cliente)) {
+            $clienteIdParaVenta = (int)$id_cliente;
+        }
+    }
+
     // Guardar la venta en BD
     $idUsuario  = $_SESSION['usuarioActualTPV']->getId();
+    if ($clienteIdParaVenta) {
+        $datos['idCliente'] = $clienteIdParaVenta;
+    }
     $numTicket = VentaPDO::guardarVenta($datos, $idUsuario);
 
     // Obtener la venta completa para devolver al frontend

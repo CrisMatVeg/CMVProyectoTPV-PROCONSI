@@ -49,9 +49,18 @@ class CierreFiscalPDO {
      * Lista históricos de cierres.
      */
     public static function listarCierres(): array {
-        $sql = "SELECT cf.*, u.nombre as nombre_usuario 
+        $sql = "SELECT 
+                    cf.*,
+                    u.nombre as nombre_usuario,
+                    COUNT(DISTINCT v.id) as num_tickets,
+                    COALESCE(MIN(v.fecha), cf.fecha) as primera_venta,
+                    COALESCE(MAX(v.fecha), cf.fecha) as ultima_venta,
+                    COALESCE(SUM(d.importe), 0) as deuda_generada
                 FROM cierres_fiscales cf
                 JOIN usuarios u ON cf.id_usuario = u.id
+                LEFT JOIN ventas v ON v.num_z = cf.id
+                LEFT JOIN caja_deudas d ON d.id_cierre_fiscal = cf.id
+                GROUP BY cf.id
                 ORDER BY cf.fecha DESC";
         $q = DBPDO::ejecutarConsulta($sql);
         return $q->fetchAll(PDO::FETCH_ASSOC);

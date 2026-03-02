@@ -41,6 +41,48 @@
             </div>
 
             <hr class="border-none border-top m-10-0">
+            <div class="form-label">Temas</div>
+            <p class="fs-12 text-muted mt-neg-15">Personaliza el modo y el color de acento de la interfaz. Se aplican en tiempo real y se guardan para tu usuario.</p>
+
+            <div class="form-group-wrap gap-15">
+                <div class="form-group mb-0">
+                    <label class="form-label fs-12">Modo</label>
+                    <div class="d-flex gap-8">
+                        <button type="button" id="themeModeLight" class="cat-tab" onclick="setThemeMode('light')">
+                            <i class="fa-solid fa-sun"></i> Claro
+                        </button>
+                        <button type="button" id="themeModeDark" class="cat-tab" onclick="setThemeMode('dark')">
+                            <i class="fa-solid fa-moon"></i> Oscuro azul/gris
+                        </button>
+                        <button type="button" id="themeModeBlack" class="cat-tab" onclick="setThemeMode('black')">
+                            <i class="fa-solid fa-moon"></i> Negro puro
+                        </button>
+                    </div>
+                </div>
+
+                <div class="form-group mb-0">
+                    <label class="form-label fs-12">Color de acento</label>
+                    <div class="d-flex gap-8">
+                        <button type="button" id="themeAccentBlue" class="cat-tab" style="border-color:#1d4ed8" onclick="setThemeAccent('blue')">
+                            <span style="width:10px;height:10px;border-radius:999px;background:#1d4ed8;display:inline-block;"></span> Azul
+                        </button>
+                        <button type="button" id="themeAccentGreen" class="cat-tab" style="border-color:#16a34a" onclick="setThemeAccent('green')">
+                            <span style="width:10px;height:10px;border-radius:999px;background:#16a34a;display:inline-block;"></span> Verde
+                        </button>
+                        <button type="button" id="themeAccentRed" class="cat-tab" style="border-color:#dc2626" onclick="setThemeAccent('red')">
+                            <span style="width:10px;height:10px;border-radius:999px;background:#dc2626;display:inline-block;"></span> Rojo
+                        </button>
+                        <button type="button" id="themeAccentPurple" class="cat-tab" style="border-color:#7c3aed" onclick="setThemeAccent('purple')">
+                            <span style="width:10px;height:10px;border-radius:999px;background:#7c3aed;display:inline-block;"></span> Morado
+                        </button>
+                        <button type="button" id="themeAccentAmber" class="cat-tab" style="border-color:#d97706" onclick="setThemeAccent('amber')">
+                            <span style="width:10px;height:10px;border-radius:999px;background:#d97706;display:inline-block;"></span> Ámbar
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <hr class="border-none border-top m-10-0">
             <div class="form-label">Cambiar Contraseña</div>
             <p class="fs-12 text-muted mt-neg-15">Deja en blanco si no quieres cambiarla.</p>
 
@@ -73,5 +115,40 @@
     </div>
 
 </div>
+
+<script>
+    (function initThemeSelectors() {
+        const mode = document.body.dataset.themeMode || 'light';
+        const accent = document.body.dataset.themeAccent || 'blue';
+        const modeIds = {
+            light: 'themeModeLight',
+            dark: 'themeModeDark',
+            black: 'themeModeBlack',
+        };
+        const accentIds = {
+            blue: 'themeAccentBlue',
+            green: 'themeAccentGreen',
+            red: 'themeAccentRed',
+            purple: 'themeAccentPurple',
+            amber: 'themeAccentAmber',
+        };
+
+        Object.values(modeIds).forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.classList.remove('active');
+        });
+        if (modeIds[mode] && document.getElementById(modeIds[mode])) {
+            document.getElementById(modeIds[mode]).classList.add('active');
+        }
+
+        Object.values(accentIds).forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.classList.remove('active');
+        });
+        if (accentIds[accent] && document.getElementById(accentIds[accent])) {
+            document.getElementById(accentIds[accent]).classList.add('active');
+        }
+    })();
+</script>
 
 </div>

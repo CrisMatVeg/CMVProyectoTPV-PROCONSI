@@ -20,6 +20,70 @@
   --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.12);
 }
 
+/* Modos de tema (modo claro por defecto) */
+body[data-theme-mode="light"] {
+  --bg: #f0f2f7;
+  --surface: #ffffff;
+  --surface2: #ebeef5;
+  --border: #d8dce8;
+  --text: #0f1623;
+  --text-muted: #6b7490;
+}
+
+body[data-theme-mode="dark"] {
+  --bg: #020617;
+  --surface: #020617;
+  --surface2: #0b1120;
+  --border: #1f2937;
+  --text: #e5e7eb;
+  --text-muted: #9ca3af;
+}
+
+body[data-theme-mode="black"] {
+  --bg: #000000;
+  --surface: #020617;
+  --surface2: #020617;
+  --border: #111827;
+  --text: #f9fafb;
+  --text-muted: #6b7280;
+}
+
+/* Acentos de color */
+body[data-theme-accent="blue"] {
+  --accent: #1d4ed8;
+  --accent2: #0ea5e9;
+  --blue: #1d4ed8;
+  --blue-light: #1e293b;
+}
+
+body[data-theme-accent="green"] {
+  --accent: #16a34a;
+  --accent2: #22c55e;
+  --blue: #16a34a;
+  --blue-light: #022c22;
+}
+
+body[data-theme-accent="red"] {
+  --accent: #dc2626;
+  --accent2: #f97316;
+  --blue: #b91c1c;
+  --blue-light: #3b0d0c;
+}
+
+body[data-theme-accent="purple"] {
+  --accent: #7c3aed;
+  --accent2: #a855f7;
+  --blue: #7c3aed;
+  --blue-light: #2e1065;
+}
+
+body[data-theme-accent="amber"] {
+  --accent: #d97706;
+  --accent2: #f59e0b;
+  --blue: #d97706;
+  --blue-light: #451a03;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;

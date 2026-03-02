@@ -21,8 +21,9 @@ class Producto {
     private $variantes;
     private $activo;
     private $requiere_serial;
+    private $codigo_iva;
 
-    public function __construct($id, $referencia, $nombre, $descripcion, $precio_coste, $precio_venta, $iva, $stock_actual, $stock_minimo, $meses_garantia, $icono, $categoria, $variantes, $activo, $requiere_serial = 0) {
+    public function __construct($id, $referencia, $nombre, $descripcion, $precio_coste, $precio_venta, $iva, $stock_actual, $stock_minimo, $meses_garantia, $icono, $categoria, $variantes, $activo, $requiere_serial = 0, $codigo_iva = 'GENERAL') {
         $this->id = $id;
         $this->referencia = $referencia;
         $this->nombre = $nombre;
@@ -38,6 +39,7 @@ class Producto {
         $this->variantes = $variantes;
         $this->activo = $activo;
         $this->requiere_serial = $requiere_serial;
+        $this->codigo_iva = $codigo_iva;
     }
 
     // Getters
@@ -56,4 +58,5 @@ class Producto {
     public function getVariantes() { return $this->variantes; }
     public function getActivo() { return $this->activo; }
     public function getRequiereSerial() { return $this->requiere_serial; }
+    public function getCodigoIva() { return $this->codigo_iva; }
 }

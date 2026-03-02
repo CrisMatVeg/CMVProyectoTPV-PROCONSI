@@ -76,20 +76,37 @@ class VentaPDO {
         $rowId = $qId->fetch(PDO::FETCH_ASSOC);
         $idVenta = (int)$rowId['id'];
 
+        $fechaVenta = date('Y-m-d');
+
         foreach ($datos['lineas'] as $linea) {
             $precioUnit = round((float)$linea['price'], 2);
             $qty        = (int)$linea['qty'];
             $totalLinea = round($precioUnit * $qty, 2);
             $ivaAplicado = (float)($linea['iva'] ?? 21.00);
             
-            // Obtener garantía del producto (snapshot)
+            // Obtener datos del producto (garantía, código IVA lógico, etc.)
             $mesesGarantia = 24; // Valor por defecto
+            $codigoIva     = 'GENERAL';
             if (isset($linea['id'])) {
                 require_once 'ProductoPDO.php';
                 $prodData = ProductoPDO::obtenerProductoPorId((int)$linea['id']);
                 if ($prodData) {
                     $mesesGarantia = (int)($prodData['meses_garantia'] ?? 24);
+                    if (!empty($prodData['codigo_iva'])) {
+                        $codigoIva = $prodData['codigo_iva'];
+                    }
                 }
+            }
+
+            // Resolver IVA aplicado a partir de tipos_iva y fecha de la venta
+            try {
+                require_once 'TipoIVAPDO.php';
+                $tipoIva = TipoIVAPDO::obtenerVigentePorCodigo($codigoIva, $fechaVenta);
+                if ($tipoIva && isset($tipoIva['porcentaje'])) {
+                    $ivaAplicado = (float)$tipoIva['porcentaje'];
+                }
+            } catch (\Throwable $e) {
+                // En caso de error en la resolución de tipos de IVA, mantenemos el valor existente
             }
 
             $sqlLinea = "INSERT INTO lineas_venta
@@ -330,14 +347,27 @@ class VentaPDO {
      * Obtiene los productos más vendidos.
      */
     public static function obtenerTopProductos(string $desde, string $hasta, int $limite = 10): array {
-        $sql = "SELECT lv.nombre_producto, lv.codigo_producto, 
-                       SUM(lv.cantidad) as unidades, 
-                       SUM(lv.total_linea) as total_recaudado
+        $sql = "SELECT 
+                    lv.id_producto,
+                    COALESCE(
+                        NULLIF(TRIM(lv.nombre_producto), ''),
+                        NULLIF(TRIM(p.nombre), ''),
+                        CONCAT('Producto ID ', lv.id_producto)
+                    ) AS nombre_producto,
+                    COALESCE(
+                        NULLIF(TRIM(lv.codigo_producto), ''),
+                        NULLIF(TRIM(p.referencia), ''),
+                        CONCAT('REF-', lv.id_producto)
+                    ) AS codigo_producto,
+                    SUM(lv.cantidad) AS unidades,
+                    SUM(lv.total_linea) AS total_recaudado
                 FROM lineas_venta lv
                 JOIN ventas v ON lv.id_venta = v.id
-                WHERE v.estado = 'completada' AND lv.devuelta = 0
-                AND DATE(v.fecha) BETWEEN :desde AND :hasta
-                GROUP BY lv.id_producto, lv.nombre_producto, lv.codigo_producto
+                LEFT JOIN productos p ON lv.id_producto = p.id
+                WHERE v.estado = 'completada' 
+                  AND lv.devuelta = 0
+                  AND DATE(v.fecha) BETWEEN :desde AND :hasta
+                GROUP BY lv.id_producto, nombre_producto, codigo_producto
                 ORDER BY unidades DESC
                 LIMIT :limite";
         

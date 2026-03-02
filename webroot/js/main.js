@@ -17,6 +17,47 @@ let currentTicketNum = null;
 let socioActual = null; // Almacena el objeto cliente si es socio/empresa identificado
 const SOCIO_DISCOUNT = 5; // 5% de descuento para socios
 
+// ── Tema (modo + acento) ──────────────────────────────────────────────────────
+function applyTheme(mode, accent) {
+  const body = document.body;
+  if (!body) return;
+  if (mode) body.dataset.themeMode = mode;
+  if (accent) body.dataset.themeAccent = accent;
+}
+
+function setThemeMode(mode, persist = true) {
+  applyTheme(mode, null);
+  if (!persist) return;
+  try {
+    fetch("api/guardarTema.php", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ theme_mode: mode }),
+    });
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+function setThemeAccent(accent, persist = true) {
+  applyTheme(null, accent);
+  if (!persist) return;
+  try {
+    fetch("api/guardarTema.php", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ theme_accent: accent }),
+    });
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+// Inicializar tema desde constantes PHP si existen
+if (typeof USER_THEME_MODE !== "undefined" || typeof USER_THEME_ACCENT !== "undefined") {
+  applyTheme(USER_THEME_MODE || "light", USER_THEME_ACCENT || "blue");
+}
+
 // ── Formato monetario ──────────────────────────────────────────────────────────
 function fmt(n) {
   return n.toFixed(2).replace(".", ",") + " €";
@@ -257,6 +298,9 @@ function updateTotals(subtotal) {
 }
 
 // ── Pago ───────────────────────────────────────────────────────────────────────
+// Catálogo de promociones cargado desde backend
+const PROMOS = typeof DB_PROMOS !== "undefined" ? DB_PROMOS : [];
+let currentPromo = null;
 function selectPayment(el) {
   document
     .querySelectorAll(".pay-btn")
@@ -270,28 +314,52 @@ function applyDiscount() {
     .getElementById("discountCode")
     .value.trim()
     .toUpperCase();
-  const codes = { DESC10: 10, OFERTA20: 20, VIP15: 15 };
   const el_errDiscount = document.getElementById("err-discount");
   if (el_errDiscount) el_errDiscount.innerText = "";
 
-  if (codes[code]) {
-    discountPct = codes[code];
+  const subtotal = Object.values(cart).reduce(
+    (a, b) => a + b.price * b.qty,
+    0,
+  );
+
+  const promo = PROMOS.find((p) => p.code === code);
+
+  if (promo) {
+    if (subtotal < promo.minSubtotal) {
+      if (el_errDiscount) {
+        el_errDiscount.innerText = `Importe mínimo ${fmt(promo.minSubtotal)} para usar este cupón`;
+      } else {
+        showToast(
+          `<i class="fa-solid fa-circle-exclamation"></i> Importe mínimo ${fmt(promo.minSubtotal)} para usar este cupón`,
+        );
+      }
+      return;
+    }
+
+    if (promo.type === "percent") {
+      discountPct = promo.value;
+    } else {
+      // importe fijo → lo convertimos a % sobre el subtotal actual
+      discountPct = subtotal > 0 ? (promo.value / subtotal) * 100 : 0;
+    }
+
+    currentPromo = promo;
     document.getElementById("discountRow").style.display = "flex";
-    const subtotal = Object.values(cart).reduce(
-      (a, b) => a + b.price * b.qty,
-      0,
-    );
     updateTotals(subtotal);
-    showToast(
-      `<i class="fa-solid fa-circle-check"></i> Descuento del ${discountPct}% aplicado`,
-    );
+
+    const descText =
+      promo.type === "percent"
+        ? `${promo.value}% aplicado (${promo.code})`
+        : `-${promo.value.toFixed(2)} € aplicado (${promo.code})`;
+
+    showToast(`<i class="fa-solid fa-circle-check"></i> ${descText}`);
   } else {
     if (el_errDiscount) {
       el_errDiscount.innerText =
-        "Código no válido. Prueba: DESC10, OFERTA20, VIP15";
+        "Código no válido o inactivo";
     } else {
       showToast(
-        '<i class="fa-solid fa-circle-xmark"></i> Código no válido. Prueba: DESC10, OFERTA20, VIP15',
+        '<i class="fa-solid fa-circle-xmark"></i> Código no válido o inactivo',
       );
     }
   }
@@ -299,6 +367,9 @@ function applyDiscount() {
 
 // Estado del tipo de cliente seleccionado
 let tipoClienteActual = "particular";
+// Cliente seleccionado desde búsquedas (particular / empresa)
+let clienteSeleccionado = null;
+let ULTIMOS_CLIENTES_BUSCADOS = [];
 
 // Paso 1: Abrir el modal de tipo de cliente
 function processPayment() {
@@ -333,6 +404,13 @@ function processPayment() {
   document.getElementById("socioBusqueda").style.display = "none";
   document.getElementById("socioRegistro").style.display = "none";
   document.getElementById("socioInfo").innerText = "";
+  clienteSeleccionado = null;
+  const gen = document.getElementById("clienteBusquedaGenerica");
+  if (gen) {
+    gen.style.display = "none";
+    const res = document.getElementById("clienteResultados");
+    if (res) res.innerHTML = "";
+  }
 
   document.querySelectorAll(".form-error").forEach((el) => (el.innerText = ""));
   document.getElementById("clienteModal").classList.add("visible");
@@ -357,10 +435,14 @@ function seleccionarTipoCliente(tipo) {
   document.getElementById("empresaDatos").style.display = "none";
   document.getElementById("socioBusqueda").style.display = "none";
   document.getElementById("socioRegistro").style.display = "none";
+  const gen = document.getElementById("clienteBusquedaGenerica");
+  if (gen) gen.style.display = "none";
+  clienteSeleccionado = null;
 
   if (tipo === "particular") {
     btnP.classList.add("selected-type");
     socioActual = null;
+    if (gen) gen.style.display = "flex";
   } else if (tipo === "socio") {
     if (btnS) btnS.classList.add("selected-type");
     document.getElementById("socioBusqueda").style.display = "flex";
@@ -370,6 +452,7 @@ function seleccionarTipoCliente(tipo) {
     document.getElementById("empresaDatos").style.display = "flex";
     setTimeout(() => document.getElementById("empresaNombre").focus(), 100);
     socioActual = null;
+    if (gen) gen.style.display = "flex";
   }
 
   const subtotal = Object.values(cart).reduce((a, b) => a + b.price * b.qty, 0);
@@ -408,6 +491,82 @@ async function buscarSocio() {
   } catch (e) {
     console.error(e);
   }
+}
+
+async function buscarClienteGuardado() {
+  const term = document.getElementById("clienteSearch")?.value.trim() || "";
+  if (!term) return;
+
+  const resEl = document.getElementById("clienteResultados");
+  if (resEl) resEl.innerText = "Buscando...";
+  ULTIMOS_CLIENTES_BUSCADOS = [];
+
+  let tipo = null;
+  if (tipoClienteActual === "particular") {
+    tipo = "particular";
+  } else if (tipoClienteActual === "empresa") {
+    tipo = "empresa";
+  } else {
+    // socios usan buscarSocio()
+    if (resEl) resEl.innerText = "Selecciona Particular o Empresa para esta búsqueda.";
+    return;
+  }
+
+  try {
+    const resp = await fetch("api/gestionCliente.php", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ accion: "buscarTexto", term, tipo }),
+    });
+    const r = await resp.json();
+    if (!r.ok) {
+      if (resEl) resEl.innerText = r.error || "Error al buscar clientes.";
+      return;
+    }
+    const lista = r.lista || [];
+    ULTIMOS_CLIENTES_BUSCADOS = lista;
+    if (!lista.length) {
+      if (resEl) resEl.innerText = "Sin resultados para ese término.";
+      return;
+    }
+    if (!resEl) return;
+    resEl.innerHTML = lista
+      .map((c, idx) => {
+        const nombreCompleto = (c.nombre || "") + (c.apellidos ? " " + c.apellidos : "");
+        const nifTxt = c.nif ? ` (${c.nif})` : "";
+        return `<button type="button" class="cat-tab p-4-8 fs-11 mb-4" onclick="seleccionarClienteGuardado(${idx})">
+  <i class="fa-solid ${c.tipo === "empresa" ? "fa-building" : "fa-user"}"></i>
+  ${nombreCompleto}${nifTxt}
+</button>`;
+      })
+      .join("");
+  } catch (e) {
+    console.error(e);
+    if (resEl) resEl.innerText = "Error de conexión al buscar clientes.";
+  }
+}
+
+function seleccionarClienteGuardado(idx) {
+  const c = ULTIMOS_CLIENTES_BUSCADOS[idx];
+  if (!c) return;
+  clienteSeleccionado = c;
+
+  if (tipoClienteActual === "empresa") {
+    const nombreCompleto = (c.nombre || "") + (c.apellidos ? " " + c.apellidos : "");
+    const nomEl = document.getElementById("empresaNombre");
+    const nifEl = document.getElementById("empresaNif");
+    if (nomEl) nomEl.value = nombreCompleto;
+    if (nifEl) nifEl.value = c.nif || "";
+  }
+
+  const resEl = document.getElementById("clienteResultados");
+  if (resEl) {
+    const nombreCompleto = (c.nombre || "") + (c.apellidos ? " " + c.apellidos : "");
+    const nifTxt = c.nif ? ` (${c.nif})` : "";
+    resEl.innerHTML = `<i class="fa-solid fa-check-circle"></i> ${nombreCompleto}${nifTxt}`;
+  }
+
+  showToast("Cliente seleccionado");
 }
 
 function mostrarRegistroSocio() {
@@ -564,6 +723,15 @@ async function ejecutarCobroFinal() {
   const socioAmt =
     socioActual && socioActual.es_socio ? (subtotal * SOCIO_DISCOUNT) / 100 : 0;
 
+  const clienteId =
+    tipoClienteActual === "socio"
+      ? socioActual
+        ? socioActual.id
+        : null
+      : clienteSeleccionado
+        ? clienteSeleccionado.id
+        : null;
+
   const payload = {
     tipoCliente: tipoClienteActual,
     nombreCliente:
@@ -571,14 +739,18 @@ async function ejecutarCobroFinal() {
         ? document.getElementById("empresaNombre").value
         : socioActual
           ? socioActual.nombre
-          : null,
+          : clienteSeleccionado
+            ? clienteSeleccionado.nombre
+            : null,
     nifCliente:
       tipoClienteActual === "empresa"
         ? document.getElementById("empresaNif").value
         : socioActual
           ? socioActual.nif
-          : null,
-    idCliente: socioActual ? socioActual.id : null,
+          : clienteSeleccionado
+            ? clienteSeleccionado.nif
+            : null,
+    idCliente: clienteId,
     metodoPago: selectedPayment,
     subtotal: subtotal,
     total:
@@ -933,9 +1105,37 @@ function mostrarTicket(v, isFromTPV = true) {
   document.getElementById("ticketModal").classList.add("visible");
 }
 
-// Imprimir solo el área del ticket
-function imprimirTicket() {
-  window.print();
+// Imprimir ticket: intenta ESC/POS vía API y, si falla o está desactivado, usa window.print()
+async function imprimirTicket() {
+  if (typeof ESC_POS_ENABLED !== "undefined" && ESC_POS_ENABLED) {
+    if (!currentTicketNum) {
+      showToast(
+        "<i class='fa-solid fa-circle-xmark'></i> No hay ticket cargado para imprimir",
+      );
+      return;
+    }
+
+    try {
+      const resp = await fetch("./api/imprimirTicket.php?id=" + currentTicketNum);
+      const data = await resp.json();
+      if (data.ok) {
+        showToast(
+          "<i class='fa-solid fa-print'></i> Ticket enviado a la impresora térmica",
+        );
+        return;
+      }
+      throw new Error(data.error || "Error al imprimir el ticket (ESC/POS)");
+    } catch (err) {
+      console.error("ESC/POS print error:", err);
+      showToast(
+        "<i class='fa-solid fa-circle-exclamation'></i> Error ESC/POS, usando impresión del navegador",
+      );
+      // Fallback
+      window.print();
+    }
+  } else {
+    window.print();
+  }
 }
 
 // Enviar ticket por email
@@ -1459,6 +1659,16 @@ if (ticketOverlay) {
 const productsGrid = document.getElementById("productsGrid");
 
 if (productsGrid) {
+  // Si estamos en TPV y la caja no está abierta, forzamos apertura antes de permitir ventas
+  if (typeof IS_TPV !== "undefined" && IS_TPV) {
+    if (typeof CAJA_ABIERTA !== "undefined" && !CAJA_ABIERTA) {
+      const modalApertura = document.getElementById("aperturaCajaModal");
+      if (modalApertura) {
+        modalApertura.classList.add("visible");
+      }
+    }
+  }
+
   // Eventos de categorías
   const catTabs = document.getElementById("catTabs");
   if (catTabs) {

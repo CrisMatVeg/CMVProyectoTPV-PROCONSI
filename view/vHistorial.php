@@ -149,9 +149,11 @@
                     <th class="w-100">ID Cierre</th>
                     <th class="w-180">Fecha de Cierre</th>
                     <th>Cajero Responsable</th>
+                    <th class="text-right">Tickets</th>
                     <th class="text-right">Efectivo</th>
                     <th class="text-right">Tarjeta</th>
                     <th class="text-right">Total Z</th>
+                    <th class="text-right">Deuda generada</th>
                     <th class="text-center">Acciones</th>
                 </tr>
             </thead>
@@ -180,6 +182,9 @@
                         </span>
                     </td>
                     <td class="text-right font-mono">
+                        <?php echo (int)($c['num_tickets'] ?? 0); ?>
+                    </td>
+                    <td class="text-right font-mono">
                         <?php echo number_format($c['total_efectivo'], 2, ',', '.'); ?> €
                     </td>
                     <td class="text-right font-mono">
@@ -187,6 +192,9 @@
                     </td>
                     <td class="text-right font-bold font-mono">
                         <?php echo number_format($c['total_general'], 2, ',', '.'); ?> €
+                    </td>
+                    <td class="text-right font-mono <?php echo ($c['deuda_generada'] ?? 0) > 0 ? 'text-red' : 'text-muted'; ?>">
+                        <?php echo number_format($c['deuda_generada'] ?? 0, 2, ',', '.'); ?> €
                     </td>
                     <td>
                         <div class="d-flex gap-8 jc-center">
@@ -223,6 +231,18 @@
                     <span class="font-mono font-bold" id="z-id"></span>
                 </div>
                 <div class="d-flex jc-between border-bottom pb-8">
+                    <span class="text-muted">Rango de ventas:</span>
+                    <span class="font-mono fs-12" id="z-rango"></span>
+                </div>
+                <div class="d-flex jc-between border-bottom pb-8">
+                    <span class="text-muted">Tickets incluidos:</span>
+                    <span class="font-mono" id="z-tickets"></span>
+                </div>
+                <div class="d-flex jc-between border-bottom pb-8">
+                    <span class="text-muted">Deuda generada:</span>
+                    <span class="font-mono text-red" id="z-deuda"></span>
+                </div>
+                <div class="d-flex jc-between border-bottom pb-8">
                     <span class="text-muted">Efectivo:</span>
                     <span class="font-mono font-bold text-green" id="z-efectivo"></span>
                 </div>
@@ -234,6 +254,40 @@
                     <span class="fs-18 font-bold">Total Arqueo:</span>
                     <span class="fs-18 font-bold font-mono text-accent" id="z-total"></span>
                 </div>
+            </div>
+
+            <div class="mt-20">
+                <div class="summary-label mb-8">Retiradas de efectivo del turno</div>
+                <table class="data-table mb-12 fs-12">
+                    <thead>
+                        <tr>
+                            <th>Fecha/Hora</th>
+                            <th>Usuario</th>
+                            <th class="text-right">Importe</th>
+                            <th>Concepto</th>
+                        </tr>
+                    </thead>
+                    <tbody id="z-retiros-body">
+                        <tr><td colspan="4" class="text-muted fs-12">Sin retiradas registradas.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="mt-12">
+                <div class="summary-label mb-8">Deudas de caja asociadas</div>
+                <table class="data-table fs-12">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Usuario</th>
+                            <th class="text-right">Importe</th>
+                            <th>Concepto</th>
+                        </tr>
+                    </thead>
+                    <tbody id="z-deudas-body">
+                        <tr><td colspan="4" class="text-muted fs-12">Sin deudas registradas.</td></tr>
+                    </tbody>
+                </table>
             </div>
 
             <div class="text-center mt-32">
@@ -262,11 +316,69 @@ function verReporteZ(data) {
     
     const fmt = (num) => new Intl.NumberFormat('de-DE', { minimumFractionDigits: 2 }).format(num) + ' €';
     
+    const rango = (data.primera_venta && data.ultima_venta)
+        ? `${data.primera_venta} → ${data.ultima_venta}`
+        : 'Sin datos de ventas';
+    document.getElementById('z-rango').innerText = rango;
+    document.getElementById('z-tickets').innerText = data.num_tickets || 0;
+    const deuda = data.deuda_generada || 0;
+    document.getElementById('z-deuda').innerText =
+        new Intl.NumberFormat('de-DE', { minimumFractionDigits: 2 }).format(deuda) + ' €';
+
     document.getElementById('z-efectivo').innerText = fmt(data.total_efectivo);
     document.getElementById('z-tarjeta').innerText = fmt(data.total_tarjeta);
     document.getElementById('z-total').innerText = fmt(data.total_general);
-    
-    document.getElementById('modalReporteZ').style.display = 'flex';
+
+    // Cargar detalles de caja (retiros y deudas) vía API
+    fetch('api/cajaInfoCierre.php?id=' + data.id)
+        .then(r => r.json())
+        .then(info => {
+            const bodyRet = document.getElementById('z-retiros-body');
+            const bodyDeu = document.getElementById('z-deudas-body');
+            bodyRet.innerHTML = '';
+            bodyDeu.innerHTML = '';
+
+            const fmtNum = (n) => new Intl.NumberFormat('de-DE', { minimumFractionDigits: 2 }).format(n) + ' €';
+
+            if (info.ok && info.retiros && info.retiros.length) {
+                info.retiros.forEach(m => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td class="font-mono">${m.created_at}</td>
+                        <td>${m.nombre_usuario || '-'}</td>
+                        <td class="text-right font-mono">${fmtNum(m.importe)}</td>
+                        <td>${m.concepto || ''}</td>
+                    `;
+                    bodyRet.appendChild(tr);
+                });
+            } else {
+                bodyRet.innerHTML = '<tr><td colspan="4" class="text-muted fs-12">Sin retiradas registradas.</td></tr>';
+            }
+
+            if (info.ok && info.deudas && info.deudas.length) {
+                info.deudas.forEach(d => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td class="font-mono">${d.fecha_creacion}</td>
+                        <td>${d.nombre_usuario || '-'}</td>
+                        <td class="text-right font-mono text-red">${fmtNum(d.importe)}</td>
+                        <td>${d.concepto || ''}</td>
+                    `;
+                    bodyDeu.appendChild(tr);
+                });
+            } else {
+                bodyDeu.innerHTML = '<tr><td colspan="4" class="text-muted fs-12">Sin deudas registradas.</td></tr>';
+            }
+        })
+        .catch(() => {
+            document.getElementById('z-retiros-body').innerHTML =
+                '<tr><td colspan="4" class="text-muted fs-12">No se pudieron cargar las retiradas.</td></tr>';
+            document.getElementById('z-deudas-body').innerHTML =
+                '<tr><td colspan="4" class="text-muted fs-12">No se pudieron cargar las deudas.</td></tr>';
+        })
+        .finally(() => {
+            document.getElementById('modalReporteZ').style.display = 'flex';
+        });
 }
 
 function cerrarModalZ() {

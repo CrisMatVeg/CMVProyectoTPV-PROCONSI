@@ -57,12 +57,48 @@
                 </button>
             </form>
 
+            <!-- Gestión de Clientes/Socios -->
+            <form method="post">
+                <button type="submit" name="irClientes" class="dashboard-btn">
+                    <i class="fa-solid fa-user-group"></i>
+                    <span class="btn-title">Clientes y Socios</span>
+                    <span class="btn-desc">Gestionar clientes habituales y socios del TPV</span>
+                </button>
+            </form>
+
             <!-- Gestión de Productos -->
             <form method="post">
                 <button type="submit" name="irProductos" class="dashboard-btn">
                     <i class="fa-solid fa-box-archive"></i>
                     <span class="btn-title">Gestión de Productos</span>
                     <span class="btn-desc">Editar catálogo, precios e iconos</span>
+                </button>
+            </form>
+
+            <!-- Gestión de IVAs -->
+            <form method="post">
+                <button type="submit" name="irTiposIVA" class="dashboard-btn">
+                    <i class="fa-solid fa-percent"></i>
+                    <span class="btn-title">Tipos de IVA</span>
+                    <span class="btn-desc">Configurar tipos de IVA y fechas</span>
+                </button>
+            </form>
+
+            <!-- Tarifas de precios -->
+            <form method="post">
+                <button type="submit" name="irTarifas" class="dashboard-btn">
+                    <i class="fa-solid fa-arrow-up-wide-short"></i>
+                    <span class="btn-title">Tarifas de precios</span>
+                    <span class="btn-desc">Subidas/bajadas generales por fecha</span>
+                </button>
+            </form>
+
+            <!-- Gestión de Descuentos -->
+            <form method="post">
+                <button type="submit" name="irPromociones" class="dashboard-btn">
+                    <i class="fa-solid fa-ticket-simple"></i>
+                    <span class="btn-title">Descuentos y Promos</span>
+                    <span class="btn-desc">Cupones y reglas de descuento del TPV</span>
                 </button>
             </form>
 
