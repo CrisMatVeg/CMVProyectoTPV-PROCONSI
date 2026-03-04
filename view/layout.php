@@ -50,8 +50,8 @@
 </head>
 
 <body data-page="<?php echo $_SESSION['paginaEnCurso'] ?? ''; ?>"
-      data-theme-mode="<?php echo htmlspecialchars($themeMode, ENT_QUOTES, 'UTF-8'); ?>"
-      data-theme-accent="<?php echo htmlspecialchars($themeAccent, ENT_QUOTES, 'UTF-8'); ?>">
+    data-theme-mode="<?php echo htmlspecialchars($themeMode, ENT_QUOTES, 'UTF-8'); ?>"
+    data-theme-accent="<?php echo htmlspecialchars($themeAccent, ENT_QUOTES, 'UTF-8'); ?>">
     <!-- TOPBAR -->
     <header class="topbar">
         <div class="topbar-brand">
@@ -64,62 +64,62 @@
         </div>
 
         <?php if (isset($_SESSION['usuarioActualTPV']) && ($_SESSION['paginaEnCurso'] ?? '') !== 'login'): ?>
-        <div class="topbar-actions">
-            <div class="topbar-user-mini">
-                <div class="avatar-mini">
-                    <?php 
+            <div class="topbar-actions">
+                <div class="topbar-user-mini">
+                    <div class="avatar-mini">
+                        <?php
                         $nombreComp = $_SESSION['usuarioActualTPV']->getNombreCompleto();
                         $nombres = explode(" ", $nombreComp);
                         echo strtoupper(substr($nombres[0], 0, 1) . (isset($nombres[1]) ? substr($nombres[1], 0, 1) : ""));
-                    ?>
+                        ?>
+                    </div>
+                    <div class="user-details">
+                        <span class="u-name"><?php echo $nombreComp; ?></span>
+                        <span class="u-rol"><?php echo strtoupper($_SESSION['usuarioActualTPV']->getRol()); ?></span>
+                    </div>
                 </div>
-                <div class="user-details">
-                    <span class="u-name"><?php echo $nombreComp; ?></span>
-                    <span class="u-rol"><?php echo strtoupper($_SESSION['usuarioActualTPV']->getRol()); ?></span>
-                </div>
+
+                <div class="v-divider"></div>
+
+                <nav class="topbar-nav">
+                    <form method="post" action="index.php">
+                        <button type="submit" name="irDashboard" class="topbar-btn" title="Panel de Control">
+                            <i class="fa-solid fa-gauge-high"></i>
+                            <span>Inicio</span>
+                        </button>
+                    </form>
+
+                    <form method="post" action="index.php">
+                        <button type="submit" name="irTPV" class="topbar-btn" title="Terminal Punto de Venta">
+                            <i class="fa-solid fa-cart-shopping"></i>
+                            <span>TPV</span>
+                        </button>
+                    </form>
+
+                    <form method="post" action="index.php">
+                        <button type="submit" name="irMiPerfil" class="topbar-btn" title="Mi Perfil">
+                            <i class="fa-solid fa-user-gear"></i>
+                            <span>Perfil</span>
+                        </button>
+                    </form>
+
+                    <?php if ($_SESSION['usuarioActualTPV']->getRol() === 'admin'): ?>
+                        <form method="post" action="index.php">
+                            <button type="submit" name="irCierreCaja" class="topbar-btn" title="Cierre de caja">
+                                <i class="fa-solid fa-vault"></i>
+                                <span>Caja</span>
+                            </button>
+                        </form>
+                    <?php endif; ?>
+
+                    <form method="post" action="index.php">
+                        <button type="submit" name="salir" class="topbar-btn btn-exit" title="Cerrar sesión">
+                            <i class="fa-solid fa-power-off"></i>
+                            <span>Salir</span>
+                        </button>
+                    </form>
+                </nav>
             </div>
-
-            <div class="v-divider"></div>
-
-            <nav class="topbar-nav">
-                <form method="post" action="index.php">
-                    <button type="submit" name="irDashboard" class="topbar-btn" title="Panel de Control">
-                        <i class="fa-solid fa-gauge-high"></i>
-                        <span>Inicio</span>
-                    </button>
-                </form>
-                
-                <form method="post" action="index.php">
-                    <button type="submit" name="irTPV" class="topbar-btn" title="Terminal Punto de Venta">
-                        <i class="fa-solid fa-cart-shopping"></i>
-                        <span>TPV</span>
-                    </button>
-                </form>
-
-                <form method="post" action="index.php">
-                    <button type="submit" name="irMiPerfil" class="topbar-btn" title="Mi Perfil">
-                        <i class="fa-solid fa-user-gear"></i>
-                        <span>Perfil</span>
-                    </button>
-                </form>
-
-                <?php if ($_SESSION['usuarioActualTPV']->getRol() === 'admin'): ?>
-                <form method="post" action="index.php">
-                    <button type="submit" name="irCierreCaja" class="topbar-btn" title="Cierre de caja">
-                        <i class="fa-solid fa-vault"></i>
-                        <span>Caja</span>
-                    </button>
-                </form>
-                <?php endif; ?>
-
-                <form method="post" action="index.php">
-                    <button type="submit" name="salir" class="topbar-btn btn-exit" title="Cerrar sesión">
-                        <i class="fa-solid fa-power-off"></i>
-                        <span>Salir</span>
-                    </button>
-                </form>
-            </nav>
-        </div>
         <?php endif; ?>
     </header>
     <?php
@@ -155,6 +155,23 @@
             </div>
 
             <div id="tkLineas" class="ticket-items"></div>
+
+            <!-- SECCIÓN FINANCIACIÓN -->
+            <div id="tkFinancingSection" class="d-none" style="margin-top: 10px; padding: 10px; border: 1px dashed var(--accent); border-radius: 6px; background: rgba(52,152,219,0.05);">
+                <div style="font-size: 11px; font-weight: 700; color: var(--accent); text-transform: uppercase; margin-bottom: 4px;">Detalles de Financiación</div>
+                <div style="display: flex; justify-content: space-between; font-size: 12px;">
+                    <span class="text-muted">Entidad:</span>
+                    <span id="tkFinEntity" class="font-bold">—</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 12px;">
+                    <span class="text-muted">Plazo:</span>
+                    <span id="tkFinCuotas">—</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 12px;">
+                    <span class="text-muted">Cuota:</span>
+                    <span id="tkFinImporteCuota" class="font-bold text-accent">—</span>
+                </div>
+            </div>
 
             <div class="ticket-totals">
                 <div class="ticket-total-row label text-muted">
@@ -192,8 +209,17 @@
 
             <div class="modal-footer p-0-24-20">
                 <button onclick="imprimirTicket()" class="btn-cancel d-flex ai-center jc-center gap-8">
-                    <i class="fa-solid fa-print"></i> Ticket
+                    <i class="fa-solid fa-print"></i> Thermal
                 </button>
+                <button onclick="descargarPDFDirecto()" class="btn-cancel d-flex ai-center jc-center gap-8" style="background: var(--blue-light); color: var(--blue); border-color: var(--blue);">
+                    <i class="fa-solid fa-file-pdf"></i> PDF
+                </button>
+
+                <!-- Botón dinámico Conversión -->
+                <button id="btnToggleFactura" class="btn-cancel btn-toggle-factura d-flex ai-center jc-center gap-8" style="background: var(--surface2); color: var(--accent); border-color: var(--accent); display:none;">
+                    <i class="fa-solid fa-rotate"></i> <span id="btnToggleFacturaText">Convertir</span>
+                </button>
+
                 <button id="btnNuevaVenta" onclick="nuevaVenta()" class="btn-save">Nueva venta</button>
                 <button id="btnAnularTicket" class="btn-cancel" style="background: var(--red); color: white; border-color: var(--red); display: none;">
                     <i class="fa-solid fa-ban"></i> Anular Ticket

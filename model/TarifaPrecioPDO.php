@@ -1,23 +1,27 @@
 <?php
+
 /**
  * Clase: TarifaPrecioPDO
  * Gestiona las subidas/bajadas globales de precios.
  */
 
-require_once 'DBPDO.php';
+require_once __DIR__ . '/DBPDO.php';
 
-class TarifaPrecioPDO {
-    public static function listarTodas(): array {
+class TarifaPrecioPDO
+{
+    public static function listarTodas(): array
+    {
         $sql = "SELECT * FROM tarifas_precios ORDER BY fecha_aplicacion DESC, id DESC";
         $q = DBPDO::ejecutarConsulta($sql);
         return $q->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    public static function añadir(array $d, int $idUsuario): void {
+    public static function añadir(array $d, int $idUsuario): void
+    {
         $sql = "INSERT INTO tarifas_precios
                 (nombre, tipo, valor, fecha_aplicacion, scope, categoria, producto_ids, creado_por)
                 VALUES (:nombre, :tipo, :valor, :fecha, :scope, :categoria, :producto_ids, :usuario)";
-        $scope = in_array($d['scope'] ?? 'todos', ['todos','categoria','productos'], true)
+        $scope = in_array($d['scope'] ?? 'todos', ['todos', 'categoria', 'productos'], true)
             ? $d['scope']
             : 'todos';
         $productoIds = null;
@@ -26,7 +30,7 @@ class TarifaPrecioPDO {
         }
         DBPDO::ejecutarConsulta($sql, [
             ':nombre'       => mb_substr(trim($d['nombre']), 0, 100),
-            ':tipo'         => in_array($d['tipo'], ['percent','amount'], true) ? $d['tipo'] : 'percent',
+            ':tipo'         => in_array($d['tipo'], ['percent', 'amount'], true) ? $d['tipo'] : 'percent',
             ':valor'        => (float)$d['valor'],
             ':fecha'        => $d['fecha_aplicacion'],
             ':scope'        => $scope,
@@ -36,7 +40,8 @@ class TarifaPrecioPDO {
         ]);
     }
 
-    public static function aplicar(int $id): void {
+    public static function aplicar(int $id): void
+    {
         $q = DBPDO::ejecutarConsulta("SELECT * FROM tarifas_precios WHERE id = :id", [':id' => $id]);
         $t = $q->fetch(PDO::FETCH_ASSOC);
         if (!$t) {
@@ -87,4 +92,3 @@ class TarifaPrecioPDO {
         );
     }
 }
-

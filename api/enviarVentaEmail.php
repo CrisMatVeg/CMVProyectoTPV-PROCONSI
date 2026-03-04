@@ -1,164 +1,217 @@
 <?php
-// Suprimir errores PHP para que nunca contaminen el JSON
-ini_set('display_errors', 0);
-error_reporting(0);
 
+/**
+ * API: enviarVentaEmail.php
+ * Envía ticket/factura por correo con opción de adjuntar HTML o PDF
+ */
 header('Content-Type: application/json; charset=utf-8');
 
 try {
-    // Bootstrap: rutas absolutas
     require_once __DIR__ . '/../config/confDBPDO.php';
     require_once __DIR__ . '/../model/DBPDO.php';
-    require_once __DIR__ . '/../model/Usuario.php';
-    require_once __DIR__ . '/../model/Venta.php';
     require_once __DIR__ . '/../model/VentaPDO.php';
 
-    // Iniciar sesión para seguridad
     session_start();
     if (!isset($_SESSION['usuarioActualTPV'])) {
         http_response_code(401);
-        echo json_encode(['ok' => false, 'error' => 'Sesión no válida o expirada']);
+        echo json_encode(['ok' => false, 'error' => 'No autorizado']);
         exit;
     }
-
-    require_once __DIR__ . '/../core/231018libreriaValidacion.php';
 
     $input = json_decode(file_get_contents('php://input'), true);
-    $numTicket = $input['numTicket'] ?? null;
-    $emailRaw  = $input['email'] ?? '';
+    $numTicket = (int)($input['numTicket'] ?? 0);
+    $destinatario = trim($input['destinatario'] ?? '');
+    $tipo = $input['tipo'] ?? 'ticket'; // 'ticket' o 'factura'
 
-    $aErrores = [
-        'email' => validacionFormularios::validarEmail($emailRaw, 1)
-    ];
-
-    if ($aErrores['email'] != null) {
-        echo json_encode(['ok' => false, 'aErrores' => $aErrores]);
+    // Validación
+    if ($numTicket <= 0) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Número de ticket inválido']);
         exit;
     }
 
-    $email = $emailRaw;
-
-    if (!$numTicket) {
-        throw new Exception('Número de ticket faltante');
+    if (!filter_var($destinatario, FILTER_VALIDATE_EMAIL)) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Email inválido']);
+        exit;
     }
 
-    // Obtener los datos de la venta
-    $v = VentaPDO::obtenerVentaPorTicket($numTicket);
-    if (!$v) {
-        throw new Exception('No se encontró la venta con el ticket especificado');
+    // Cargar venta
+    $venta = VentaPDO::obtenerVentaPorTicket($numTicket);
+    if (!$venta) {
+        http_response_code(404);
+        echo json_encode(['ok' => false, 'error' => 'Venta no encontrada']);
+        exit;
     }
 
-$esFactura = $v['tipo_cliente'] === 'empresa';
-$tipoDoc = $esFactura ? 'Factura' : 'Ticket de Venta';
-$numeroStr = '#' . str_pad($v['numero_ticket'], 4, '0', STR_PAD_LEFT);
-$fechaStr = date("d/m/Y H:i", strtotime($v['fecha']));
+    $adjuntarPDF = !empty($input['adjuntarPDF']);
 
-// Generar el cuerpo del mensaje HTML (Diseño profesional similar al ticket)
-$html = "
-<div style='font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; border: 1px solid #ddd; padding: 20px; color: #333;'>
-    <div style='text-align: center; border-bottom: 2px solid #1a2fbf; padding-bottom: 20px; margin-bottom: 20px;'>
-        <h1 style='color: #1a2fbf; margin: 0;'>ElectroBazar</h1>
-        <p style='font-size: 12px; color: #666; margin: 5px 0;'>C/ Tecnología 24, 28001 Madrid · NIF: B87654321</p>
-    </div>
-    
-    <div style='margin-bottom: 20px;'>
-        <h2 style='font-size: 18px; margin: 0;'>$tipoDoc $numeroStr</h2>
-        <p style='font-size: 13px; color: #666; margin: 5px 0;'>Fecha: $fechaStr</p>
-        <p style='font-size: 13px; color: #666; margin: 5px 0;'>Método de pago: " . ucfirst($v['metodo_pago']) . "</p>
-    </div>";
+    // Generar HTML del ticket
+    $htmlTicket = generarHTMLTicket($venta, $tipo);
 
-if ($esFactura) {
-    $html .= "
-    <div style='background: #f9f9f9; padding: 10px; margin-bottom: 20px; border-radius: 5px;'>
-        <p style='font-size: 12px; font-weight: bold; margin: 0 0 5px;'>Datos del Cliente:</p>
-        <p style='font-size: 13px; margin: 0;'>" . htmlspecialchars($v['nombre_cliente']) . "</p>
-        <p style='font-size: 13px; margin: 0;'>NIF: " . htmlspecialchars($v['nif_cliente']) . "</p>
-    </div>";
-}
+    // Intentar enviar con PHPMailer
+    $enviado = false;
+    $errorMsg = '';
 
-$html .= "
-    <table style='width: 100%; border-collapse: collapse; margin-bottom: 20px;'>
-        <thead>
-            <tr style='border-bottom: 1px solid #ddd; text-align: left; font-size: 13px;'>
-                <th style='padding: 8px 0;'>Producto</th>
-                <th style='padding: 8px 0; text-align: right;'>Total</th>
-            </tr>
-        </thead>
-        <tbody>";
+    // Rutas para PHPMailer (ajustar si se usa composer o manual)
+    $pathPHPMailer = __DIR__ . '/../vendor/PHPMailer/src/';
 
-foreach ($v['lineas'] as $l) {
-    $html .= "
-            <tr style='border-bottom: 1px solid #eee; font-size: 13px;'>
-                <td style='padding: 10px 0;'>
-                    <strong>" . htmlspecialchars($l['nombre_producto']) . "</strong><br>
-                    <small style='color: #666;'>" . $l['cantidad'] . " x " . number_format($l['precio_unitario'], 2, ',', '.') . " €</small>
-                </td>
-                <td style='padding: 10px 0; text-align: right;'>" . number_format($l['total_linea'], 2, ',', '.') . " €</td>
-            </tr>";
-}
+    if (file_exists($pathPHPMailer . 'PHPMailer.php')) {
+        try {
+            require_once $pathPHPMailer . 'Exception.php';
+            require_once $pathPHPMailer . 'PHPMailer.php';
+            require_once $pathPHPMailer . 'SMTP.php';
 
-$html .= "
-        </tbody>
-    </table>
+            $mail = new PHPMailer\PHPMailer\PHPMailer(true);
 
-    <div style='border-top: 2px solid #ddd; padding-top: 10px;'>
-        <div style='display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 14px;'>
-            <span>Subtotal:</span>
-            <span>" . number_format($v['subtotal'], 2, ',', '.') . " €</span>
-        </div>";
+            // Server settings - CONFIGURAR AQUÍ
+            $mail->isSMTP();
+            $mail->Host       = 'smtp.gmail.com'; // Cambiar por tu servidor
+            $mail->SMTPAuth   = true;
+            $mail->Username   = 'tu-email@gmail.com'; // Cambiar por tu email
+            $mail->Password   = 'tu-app-password'; // Cambiar por tu password o app password
+            $mail->SMTPSecure = PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
+            $mail->Port       = 587;
+            $mail->CharSet    = 'UTF-8';
 
-if ($v['descuento_pct'] > 0) {
-    $html .= "
-        <div style='display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 14px; color: #c0392b;'>
-            <span>Descuento (" . $v['descuento_pct'] . "%):</span>
-            <span>-" . number_format($v['descuento_amt'], 2, ',', '.') . " €</span>
-        </div>";
-}
+            // Recipients
+            $mail->setFrom('noreply@electrobazar.es', 'ElectroBazar');
+            $mail->addAddress($destinatario);
 
-$html .= "
-        <div style='display: flex; justify-content: space-between; margin-top: 10px; font-size: 18px; font-weight: bold; color: #1a2fbf;'>
-            <span>TOTAL:</span>
-            <span>" . number_format($v['total'], 2, ',', '.') . " €</span>
-        </div>
-    </div>
+            // Content
+            $mail->isHTML(true);
+            $mail->Subject = $asunto;
+            $mail->Body    = $htmlTicket;
+            $mail->AltBody = strip_tags(str_replace('<br>', "\n", $htmlTicket));
 
-    <div style='margin-top: 30px; text-align: center; font-size: 11px; color: #999;'>
-        <p>Gracias por su compra en ElectroBazar.</p>
-        <p>Este es un documento oficial emitido por nuestro TPV.</p>
-    </div>
-</div>";
+            // Si se solicita adjuntar PDF, y tenemos el generador PDF...
+            if ($adjuntarPDF) {
+                // Aquí podrías generar el PDF en el servidor y adjuntarlo
+                // Como fallback, avisamos que el PDF está incluido en el cuerpo HTML
+            }
 
-// Cabeceras para correo HTML
-$headers = "MIME-Version: 1.0" . "\r\n";
-$headers .= "Content-type:text/html;charset=UTF-8" . "\r\n";
-$headers .= "From: ElectroBazar <noreply@electrobazar.com>" . "\r\n";
-
-    // Intentar enviar el correo
-    ob_start();
-    $success = mail($email, "$tipoDoc No. $numeroStr - ElectroBazar", $html, $headers);
-    $errorCapture = ob_get_clean();
-
-    // Sistema de Log como Fallback (útil para desarrollo en local sin SMTP)
-    if (!$success) {
-        $logDir = __DIR__ . '/../doc/mail_logs';
-        if (!is_dir($logDir)) {
-            mkdir($logDir, 0777, true);
+            $enviado = $mail->send();
+        } catch (Exception $e) {
+            $errorMsg = "Error PHPMailer: {$mail->ErrorInfo}";
         }
-        $logFile = $logDir . "/ticket_" . $v['numero_ticket'] . "_" . time() . ".html";
-        file_put_contents($logFile, $html);
-        
+    } else {
+        // Fallback: usar mail() si PHPMailer no está instalado o falló
+        $headers = "MIME-Version: 1.0\r\n";
+        $headers .= "From: ElectroBazar <noreply@electrobazar.es>\r\n";
+        $headers .= "Content-Type: text/html; charset=UTF-8\r\n";
+        $enviado = @mail($destinatario, $asunto, $htmlTicket, $headers);
+        if (!$enviado) $errorMsg = "Error en función mail() de PHP. Verifica configuración SMTP.";
+    }
+
+    if ($enviado) {
         echo json_encode([
-            'ok' => true, 
-            'message' => 'El servidor no tiene configurado correo, pero se ha guardado una copia en local.',
-            'log_path' => 'doc/mail_logs/' . basename($logFile)
+            'ok' => true,
+            'message' => 'Ticket enviado correctamente a ' . $destinatario,
+            'email' => $destinatario
         ]);
     } else {
-        echo json_encode(['ok' => true, 'message' => 'Email enviado correctamente']);
+        // Si falló el envío por red, guardamos en log local como respaldo
+        $logDir = __DIR__ . '/../doc/mail_logs';
+        if (!is_dir($logDir)) @mkdir($logDir, 0777, true);
+
+        $logFile = $logDir . "/ticket_" . $numTicket . "_" . time() . ".html";
+        file_put_contents($logFile, "<!-- Error: $errorMsg -->\n" . $htmlTicket);
+
+        echo json_encode([
+            'ok' => false,
+            'error' => 'No se pudo enviar el email: ' . $errorMsg,
+            'info' => 'El ticket ha sido guardado localmente en doc/mail_logs/ por seguridad.'
+        ]);
     }
 
+    exit;
 } catch (Throwable $e) {
-    echo json_encode([
-        'ok'    => false,
-        'error' => 'Error del servidor: ' . $e->getMessage()
-    ]);
+    http_response_code(500);
+    echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+}
+
+/**
+ * Genera HTML del ticket para email
+ */
+function generarHTMLTicket($venta, $tipo = 'ticket')
+{
+    $esFactura = $tipo === 'factura' || $venta['tipo_cliente'] === 'empresa';
+    $templatePath = $esFactura ? __DIR__ . '/../factura-electrobazar.html' : __DIR__ . '/../ticket-electrobazar.html';
+
+    if (!file_exists($templatePath)) {
+        // Fallback or legacy generation if template missing
+        return "Plantilla no encontrada.";
+    }
+
+    $html = file_get_contents($templatePath);
+    $fmt2 = fn($n) => number_format((float)$n, 2, ',', '.') . ' €';
+    $numeroStr = str_pad($venta['numero_ticket'], 4, '0', STR_PAD_LEFT);
+    $fechaStr = date("d/m/Y H:i", strtotime($venta['fecha']));
+
+    if ($esFactura) {
+        $lineasHTML = "";
+        foreach ($venta['lineas'] as $l) {
+            $desc = htmlspecialchars($l['nombre_producto'] ?? $l['codigo_producto']);
+            $detalle = "";
+            if (!empty($l['numeros_serie'])) $detalle .= "SN: " . htmlspecialchars($l['numeros_serie']);
+
+            $lineasHTML .= "<tr>
+                <td>$desc" . ($detalle ? "<span class='small'>$detalle</span>" : "") . "</td>
+                <td style='text-align:center;'>" . (int)$l['cantidad'] . "</td>
+                <td>" . $fmt2($l['precio_unitario']) . "</td>
+                <td>" . ((float)$venta['descuento_pct'] > 0 ? (float)$venta['descuento_pct'] . '%' : '—') . "</td>
+                <td>" . $fmt2($l['total_linea']) . "</td>
+            </tr>";
+        }
+
+        $reemplazos = [
+            '{{FACTURA_NUM}}' => 'FAC-' . date('Y', strtotime($venta['fecha'])) . '-' . $numeroStr,
+            '{{FECHA_EMISION}}' => date("d/m/Y", strtotime($venta['fecha'])),
+            '{{FECHA_VENCIMIENTO}}' => date("d/m/Y", strtotime($venta['fecha'] . " + 30 days")),
+            '{{METODO_PAGO}}' => ucfirst($venta['metodo_pago']),
+            '{{CLIENTE_NOMBRE}}' => htmlspecialchars($venta['nombre_cliente'] ?? '—'),
+            '{{CLIENTE_CIF}}' => htmlspecialchars($venta['nif_cliente'] ?? '—'),
+            '{{CLIENTE_DIRECCION}}' => htmlspecialchars($venta['direccion_cliente'] ?? '—'),
+            '{{CLIENTE_POBLACION}}' => htmlspecialchars(($venta['poblacion_cliente'] ?? '') . ' ' . ($venta['cp_cliente'] ?? '')),
+            '{{CLIENTE_EMAIL}}' => htmlspecialchars($venta['email_cliente'] ?? ''),
+            '{{LINEAS}}' => $lineasHTML,
+            '{{BASE_IMPONIBLE}}' => $fmt2($venta['base_imponible']),
+            '{{DESCUENTO_AMT}}' => $fmt2($venta['descuento_amt']),
+            '{{IVA_AMT}}' => $fmt2($venta['iva_amt']),
+            '{{TOTAL}}' => $fmt2($venta['total']),
+            '{{DISPLAY_DESCUENTO}}' => (float)$venta['descuento_amt'] > 0 ? '' : 'display:none;'
+        ];
+    } else {
+        $lineasHTML = "";
+        foreach ($venta['lineas'] as $l) {
+            $nombre = htmlspecialchars($l['nombre_producto'] ?? $l['codigo_producto']);
+            $lineasHTML .= "<div class='item'><span class='item-desc'>$nombre</span><span class='item-price'>" . $fmt2($l['total_linea']) . "</span></div>";
+            $lineasHTML .= "<div class='item-detail'>Ref: " . htmlspecialchars($l['codigo_producto']) . " · " . (int)$l['cantidad'] . " ud x " . $fmt2($l['precio_unitario']) . "</div>";
+        }
+
+        $reemplazos = [
+            '{{NUMERO_TICKET}}' => $numeroStr,
+            '{{FECHA}}' => $fechaStr,
+            '{{OPERADOR}}' => $venta['nombre_cajero'] ?? 'Sistema',
+            '{{LINEAS}}' => $lineasHTML,
+            '{{SUBTOTAL}}' => $fmt2($venta['subtotal']),
+            '{{DESCUENTO_PCT}}' => (float)$venta['descuento_pct'],
+            '{{DESCUENTO_AMT}}' => $fmt2($venta['descuento_amt']),
+            '{{IVA_AMT}}' => $fmt2($venta['iva_amt']),
+            '{{TOTAL}}' => $fmt2($venta['total']),
+            '{{METODO_PAGO}}' => ucfirst($venta['metodo_pago']),
+            '{{EFECTIVO_RECIBIDO}}' => $fmt2($venta['efectivo_recibido'] ?? 0),
+            '{{EFECTIVO_CAMBIO}}' => $fmt2(($venta['efectivo_recibido'] ?? 0) - $venta['total']),
+            '{{BASE_IMPONIBLE}}' => $fmt2($venta['base_imponible']),
+            '{{DISPLAY_DESCUENTO}}' => (float)$venta['descuento_amt'] > 0 ? '' : 'display:none;',
+            '{{DISPLAY_EFECTIVO}}' => ($venta['metodo_pago'] === 'efectivo') ? '' : 'display:none;',
+            '{{PAGO_DETALLE}}' => ''
+        ];
+    }
+
+    foreach ($reemplazos as $key => $val) {
+        $html = str_replace($key, $val, $html);
+    }
+
+    return $html;
 }

@@ -18,7 +18,9 @@
   --radius: 10px;
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.05);
   --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.12);
-}
+  /* ancho por defecto del panel de pedido */
+  --sidebar-width: 420px;
+} 
 
 /* Modos de tema (modo claro por defecto) */
 body[data-theme-mode="light"] {
@@ -37,6 +39,9 @@ body[data-theme-mode="dark"] {
   --border: #1f2937;
   --text: #e5e7eb;
   --text-muted: #9ca3af;
+  --blue-light: #1e293b;
+  --green-light: #064e3b;
+  --red-light: #7f1d1d;
 }
 
 body[data-theme-mode="black"] {
@@ -46,42 +51,35 @@ body[data-theme-mode="black"] {
   --border: #111827;
   --text: #f9fafb;
   --text-muted: #6b7280;
+  --blue-light: #020617;
+  --green-light: #052e16;
+  --red-light: #450a0a;
 }
 
 /* Acentos de color */
 body[data-theme-accent="blue"] {
   --accent: #1d4ed8;
   --accent2: #0ea5e9;
-  --blue: #1d4ed8;
-  --blue-light: #1e293b;
 }
 
 body[data-theme-accent="green"] {
   --accent: #16a34a;
   --accent2: #22c55e;
-  --blue: #16a34a;
-  --blue-light: #022c22;
 }
 
 body[data-theme-accent="red"] {
   --accent: #dc2626;
   --accent2: #f97316;
-  --blue: #b91c1c;
-  --blue-light: #3b0d0c;
 }
 
 body[data-theme-accent="purple"] {
   --accent: #7c3aed;
   --accent2: #a855f7;
-  --blue: #7c3aed;
-  --blue-light: #2e1065;
 }
 
 body[data-theme-accent="amber"] {
   --accent: #d97706;
   --accent2: #f59e0b;
-  --blue: #d97706;
-  --blue-light: #451a03;
 }
 
 * {
@@ -502,6 +500,22 @@ body {
   border-radius: 20px;
   text-transform: uppercase;
 }
+.variants-pill {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 2px 7px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
 
 /* RIGHT: ORDER PANEL */
 .order-panel {
@@ -510,6 +524,8 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  width: var(--sidebar-width, 420px);
+  min-width: 360px;
 }
 
 .order-header {
@@ -624,28 +640,52 @@ body {
 .qty-ctrl {
   display: flex;
   align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
+  gap: 4px;
+  background: var(--bg);
+  padding: 2px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
 }
 .qty-btn {
   width: 24px;
   height: 24px;
-  border-radius: 50%;
-  border: 1.5px solid var(--border);
-  background: var(--surface);
-  font-size: 14px;
-  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.1s;
-  font-weight: 600;
-  color: var(--text);
+  background: none;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: all 0.2s;
 }
 .qty-btn:hover {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: var(--accent-fg);
+  background: var(--surface);
+  color: var(--accent);
+}
+.qty-input {
+  width: 32px;
+  height: 24px;
+  border: none;
+  background: none;
+  text-align: center;
+  font-family: "DM Mono", monospace;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.qty-input::-webkit-outer-spin-button,
+.qty-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+}
+.qty-input:focus {
+  outline: none;
+  background: var(--surface);
+  border-radius: 4px;
 }
 .qty-val {
   font-family: "DM Mono", monospace;
@@ -1158,6 +1198,16 @@ input[type="submit"].btn-clear {
   margin-top: -15px;
 }
 
+.grid-6 {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+}
+
+.grid-5 {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+}
+
 .grid-4 {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -1293,6 +1343,8 @@ input[type="submit"].btn-clear {
 }
 
 @media (max-width: 900px) {
+  .grid-6,
+  .grid-5,
   .grid-4 {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -1301,10 +1353,518 @@ input[type="submit"].btn-clear {
   }
 }
 @media (max-width: 600px) {
+  .grid-6,
+  .grid-5,
   .grid-4,
   .grid-3,
   .grid-2,
   .grid-1-3 {
     grid-template-columns: 1fr;
+  }
+}
+
+/* --- FINANCIACIÓN INTELIGENTE & RENTABILIDAD --- */
+.profit-alert {
+  padding: 12px 16px;
+  border-radius: 10px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1.5px solid transparent;
+  animation: fadeIn 0.3s ease;
+}
+
+.profit-alert.danger {
+  background: var(--red-light);
+  color: var(--red);
+  border-color: rgba(192, 57, 43, 0.2);
+}
+
+.profit-alert.warning {
+  background: #fff8e1;
+  color: #b8860b;
+  border-color: rgba(184, 134, 11, 0.2);
+}
+
+.profit-alert.success {
+  background: var(--green-light);
+  color: var(--green);
+  border-color: rgba(15, 128, 96, 0.2);
+}
+
+.upsell-assistant {
+  background: linear-gradient(135deg, #1a2fbf 0%, #3b82f6 100%);
+  color: white;
+  padding: 14px;
+  border-radius: 12px;
+  margin-bottom: 16px;
+  box-shadow: 0 4px 12px rgba(26, 47, 191, 0.2);
+}
+
+.upsell-assistant .title {
+  font-size: 11px;
+  text-transform: uppercase;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  opacity: 0.9;
+  margin-bottom: 4px;
+}
+
+.upsell-assistant .message {
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.upsell-assistant .amount {
+  font-family: "DM Mono", monospace;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.2);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.fin-entity-card {
+  padding: 16px;
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--surface);
+}
+
+.fin-entity-card:hover {
+  border-color: var(--accent);
+  background: var(--blue-light);
+}
+
+.fin-entity-card.selected {
+  border-color: var(--accent);
+  background: var(--blue-light);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.fin-option-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px dashed var(--border);
+  font-size: 13px;
+}
+
+.fin-option-row:last-child {
+  border-bottom: none;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.btn-mini-fin {
+  background: var(--blue-light);
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-left: auto;
+  text-transform: uppercase;
+}
+
+.btn-mini-fin:hover {
+  background: var(--accent);
+  color: white;
+}
+
+.profit-alert.danger .btn-mini-fin {
+  background: white;
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.profit-alert.danger .btn-mini-fin:hover {
+  background: var(--red);
+  color: white;
+}
+
+.profit-alert.warning .btn-mini-fin {
+  background: white;
+  border-color: #b8860b;
+  color: #b8860b;
+}
+
+.profit-alert.warning .btn-mini-fin:hover {
+  background: #b8860b;
+  color: white;
+}
+
+#btnFinanciacion:disabled {
+  filter: grayscale(1);
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* --- IMPORT / EXPORT BUTTONS --- */
+.btn-ie {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1.5px solid transparent;
+  transition: all 0.2s;
+  font-family: inherit;
+  height: 42px;
+}
+
+.btn-ie-export {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.btn-ie-export:hover {
+  border-color: var(--green);
+  color: var(--green);
+  background: var(--green-light);
+}
+
+.btn-ie-import {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.btn-ie-import:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--blue-light);
+}
+
+.ie-dropdown-wrap {
+  position: relative;
+}
+
+.ie-dropdown {
+  display: none;
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  min-width: 160px;
+  z-index: 500;
+  overflow: hidden;
+}
+
+.ie-dropdown.open {
+  display: block;
+  animation: fadeIn 0.15s ease;
+}
+
+.ie-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.ie-dropdown-item:hover {
+  background: var(--bg);
+}
+
+/* UX IMPROVEMENTS: TOGGLE SWITCH */
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+  margin-top: 10px;
+}
+.toggle-label {
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 22px;
+}
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--border);
+  transition: 0.4s;
+  border-radius: 22px;
+}
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.4s;
+  border-radius: 50%;
+}
+input:checked + .slider {
+  background-color: var(--accent);
+}
+input:checked + .slider:before {
+  transform: translateX(18px);
+}
+input:focus + .slider {
+  box-shadow: 0 0 1px var(--accent);
+}
+/* FINANCING INDICATOR & REDESIGNED MODAL */
+.fin-profit-indicator {
+  margin: 10px 20px;
+  background: var(--surface2);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 16px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.fin-profit-indicator.gain {
+  border-color: var(--green);
+  background: var(--green-light);
+  color: var(--green);
+}
+
+.fin-profit-indicator.loss {
+  border-color: var(--red);
+  background: var(--red-light);
+  color: var(--red);
+}
+
+.indicator-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.indicator-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.indicator-main i {
+  font-size: 16px;
+}
+
+.btn-details-fin {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.btn-details-fin:hover {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+  transform: translateX(2px);
+}
+
+.fin-option-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  font-size: 13px;
+}
+
+#finProfitPanel {
+  transition: all 0.3s;
+}
+
+#finProfitPanel.gain {
+  border-color: var(--green);
+  background: var(--green-light);
+}
+
+#finProfitPanel.loss {
+  border-color: var(--red);
+  background: var(--red-light);
+}
+
+.fin-profit-indicator .indicator-main span b {
+  font-family: "DM Mono", monospace;
+  font-size: 15px;
+}
+/* FINANCING INFO PANEL - WARNING WITH SIMPLE SELECTS */
+.fin-info-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 16px 20px;
+  padding: 16px;
+  border: 2px solid var(--green);
+  border-radius: 12px;
+  background: rgba(76, 175, 80, 0.05);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.fin-info-panel.loss {
+  border-color: var(--red);
+  background: rgba(244, 67, 54, 0.05);
+}
+
+.fin-info-panel .form-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.fin-info-panel .form-input {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  transition: all 0.2s;
+}
+
+.fin-info-panel .form-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.1);
+}
+
+.fin-info-panel input[type="checkbox"] {
+  accent-color: var(--green);
+}
+
+.fin-info-panel input[type="checkbox"]:checked {
+  accent-color: var(--accent);
+}/* =====================================================
+   FIX: Cart sidebar overflow
+   Add these rules to your main CSS (or paste at the end)
+   ===================================================== */
+
+/* 1. Root: reduce sidebar width so it fits on screen */
+:root {
+  --sidebar-width: 360px;
+}
+
+/* 2. Main grid: use the CSS variable so both columns stay in sync */
+.main {
+  display: grid;
+  grid-template-columns: 1fr var(--sidebar-width);
+  flex: 1;
+  overflow: hidden;
+  min-width: 0; /* prevents grid blowout */
+}
+
+/* 3. Order panel: respect the grid column, no overflow */
+.order-panel {
+  width: var(--sidebar-width);
+  min-width: 0;          /* allow shrinking inside grid */
+  max-width: 100%;       /* never exceed its column */
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 4. Catalog panel: also needs min-width:0 to shrink properly */
+.catalog-panel {
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* 5. Payment methods: allow wrapping on narrow sidebars */
+.payment-methods {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+/* 6. Responsive: on smaller screens stack panels vertically */
+@media (max-width: 860px) {
+  :root {
+    --sidebar-width: 100%;
+  }
+
+  .main {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr auto;
+    overflow-y: auto;
+  }
+
+  .order-panel {
+    width: 100%;
+    max-height: 50vh;
+    border-left: none;
+    border-top: 1.5px solid var(--border);
+  }
+
+  .catalog-panel {
+    overflow-y: auto;
+  }
+}
+
+/* 7. On very wide screens allow a slightly wider sidebar */
+@media (min-width: 1400px) {
+  :root {
+    --sidebar-width: 400px;
   }
 }

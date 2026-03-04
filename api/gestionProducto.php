@@ -1,4 +1,5 @@
 <?php
+
 /**
  * API: gestionProducto.php
  * Gestiona las operaciones CRUD de productos (solo admins).
@@ -18,10 +19,22 @@ try {
     require_once __DIR__ . '/../core/231018libreriaValidacion.php';
 
     // Auto-migración: crear columnas si no existen
-    try { DBPDO::ejecutarConsulta("ALTER TABLE productos ADD COLUMN IF NOT EXISTS iva DECIMAL(5,2) DEFAULT 21.00"); } catch (Throwable $e) {}
-    try { DBPDO::ejecutarConsulta("ALTER TABLE productos ADD COLUMN IF NOT EXISTS meses_garantia INT DEFAULT 24"); } catch (Throwable $e) {}
-    try { DBPDO::ejecutarConsulta("ALTER TABLE productos ADD COLUMN IF NOT EXISTS requiere_serial TINYINT(1) DEFAULT 0"); } catch (Throwable $e) {}
-    try { DBPDO::ejecutarConsulta("ALTER TABLE lineas_venta ADD COLUMN IF NOT EXISTS numero_serie VARCHAR(100) DEFAULT NULL"); } catch (Throwable $e) {}
+    try {
+        DBPDO::ejecutarConsulta("ALTER TABLE productos ADD COLUMN IF NOT EXISTS iva DECIMAL(5,2) DEFAULT 21.00");
+    } catch (Throwable $e) {
+    }
+    try {
+        DBPDO::ejecutarConsulta("ALTER TABLE productos ADD COLUMN IF NOT EXISTS meses_garantia INT DEFAULT 24");
+    } catch (Throwable $e) {
+    }
+    try {
+        DBPDO::ejecutarConsulta("ALTER TABLE productos ADD COLUMN IF NOT EXISTS requiere_serial TINYINT(1) DEFAULT 0");
+    } catch (Throwable $e) {
+    }
+    try {
+        DBPDO::ejecutarConsulta("ALTER TABLE lineas_venta ADD COLUMN IF NOT EXISTS numero_serie VARCHAR(100) DEFAULT NULL");
+    } catch (Throwable $e) {
+    }
 
     session_start();
 
@@ -90,6 +103,7 @@ try {
                     'cat'      => $nuevo['categoria'],
                     'stock'    => (int)$nuevo['stock_actual'],
                     'inactive' => false,
+                    'variantes' => json_decode($nuevo['variantes'] ?? '[]', true)
                 ]
             ]);
             break;
@@ -132,7 +146,6 @@ try {
             http_response_code(400);
             echo json_encode(['ok' => false, 'error' => "Acción desconocida: $accion"]);
     }
-
 } catch (Throwable $e) {
     http_response_code(500);
     echo json_encode(['ok' => false, 'error' => 'Error del servidor: ' . $e->getMessage()]);

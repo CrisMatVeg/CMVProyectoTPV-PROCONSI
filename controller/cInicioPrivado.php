@@ -11,29 +11,7 @@ if ($_SESSION['usuarioActualTPV']->getRol() == "admin") {
     $esAdmin = false;
 }
 
-if (isset($_REQUEST['salir'])) {
-    session_destroy();
-    header('Location: index.php');
-    exit;
-}
-
-if (isset($_REQUEST['irCierreCaja'])) {
-    $_SESSION['paginaEnCurso'] = 'cierreCaja';
-    header('Location: index.php');
-    exit;
-}
-
-if (isset($_REQUEST['irDashboard']) || isset($_REQUEST['volver'])) {
-    $_SESSION['paginaEnCurso'] = 'Dashboard';
-    header('Location: index.php');
-    exit;
-}
-
-if (isset($_REQUEST['irMiPerfil'])) {
-    $_SESSION['paginaEnCurso'] = 'MiPerfil';
-    header('Location: index.php');
-    exit;
-}
+// Navegación Global handled by index.php
 
 // Estado de caja (turno actual) y posible apertura desde el TPV
 require_once 'model/CajaTurnoPDO.php';
@@ -69,7 +47,8 @@ foreach ($oProductos as $oProducto) {
         "icono" => $icono,
         "cat" => $oProducto->getCategoria(),
         "stock" => (int)$oProducto->getStockActual(),
-        "inactive" => !$oProducto->getActivo()
+        "inactive" => !$oProducto->getActivo(),
+        "variantes" => $oProducto->getVariantes()
     ];
 }
 

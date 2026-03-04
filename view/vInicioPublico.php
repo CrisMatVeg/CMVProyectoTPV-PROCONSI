@@ -1,5 +1,5 @@
 </header>
-<div class="main container-full">
+<div class="container-full">
     <div class="hero-box">
         <div class="hero-icon">
             <i class="fa-solid fa-shop"></i>

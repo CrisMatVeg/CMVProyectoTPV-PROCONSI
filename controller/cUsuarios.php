@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Controlador: cUsuarios
  * 
@@ -43,18 +44,28 @@ if (isset($_REQUEST['volver']) || isset($_REQUEST['irDashboard'])) {
     exit;
 }
 
+if (isset($_REQUEST['irRoles'])) {
+    $_SESSION['paginaEnCurso'] = 'Roles';
+    header('Location: index.php');
+    exit;
+}
+
 $aErrores = [
     'nombre' => null,
     'login' => null,
     'password' => null
 ];
 $entradaOK = true;
-$showModal = false;
+// Obtener lista de roles para los formularios
+$listaRoles = RolPDO::listarRoles();
+
+// Cargar la lista de usuarios para la vista
+$listaUsuarios = UsuarioPDO::listarUsuarios();
 
 // Acción: Añadir Usuario
 if (isset($_REQUEST['addUsuario'])) {
     $showModal = true;
-    
+
     $aErrores['nombre'] = validacionFormularios::comprobarAlfabetico($_REQUEST['nombre'] ?? '', 100, 3, 1);
     $aErrores['login'] = validacionFormularios::comprobarAlfaNumerico($_REQUEST['username'] ?? '', 15, 4, 1);
     $aErrores['password'] = validacionFormularios::validarPassword($_REQUEST['password'] ?? '', 20, 4, 1, 1);
@@ -67,9 +78,18 @@ if (isset($_REQUEST['addUsuario'])) {
         $nombre = $_REQUEST['nombre'];
         $login = $_REQUEST['username'];
         $pass = $_REQUEST['password'];
-        $rol = $_REQUEST['rol'] ?? 'cajero';
+        $idRol = (int)($_REQUEST['idRol'] ?? 0);
 
-        UsuarioPDO::añadirUsuario($nombre, $login, $pass, $rol);
+        // Buscar el nombre del rol para el campo legacy 'rol'
+        $nombreRol = 'cajero';
+        foreach ($listaRoles as $r) {
+            if ($r['id'] == $idRol) {
+                $nombreRol = strtolower($r['nombre']);
+                break;
+            }
+        }
+
+        UsuarioPDO::añadirUsuario($nombre, $login, $pass, $nombreRol, $idRol);
         header('Location: index.php'); // Recargar para ver cambios
         exit;
     }
@@ -78,10 +98,20 @@ if (isset($_REQUEST['addUsuario'])) {
 // Acción: Cambiar Rol
 if (isset($_REQUEST['cambiarRol'])) {
     $id = (int)$_REQUEST['idUsuario'];
-    $nuevoRol = $_REQUEST['nuevoRol'];
+    $idRol = (int)$_REQUEST['idRol'];
+
+    // Buscar el nombre del rol
+    $nombreRol = 'cajero';
+    foreach ($listaRoles as $r) {
+        if ($r['id'] == $idRol) {
+            $nombreRol = strtolower($r['nombre']);
+            break;
+        }
+    }
+
     // No permitir que un usuario se cambie el rol a sí mismo
     if ($id !== $_SESSION['usuarioActualTPV']->getId()) {
-        UsuarioPDO::editarRol($id, $nuevoRol);
+        UsuarioPDO::editarRol($id, $nombreRol, $idRol);
     }
     header('Location: index.php');
     exit;
@@ -102,4 +132,3 @@ if (isset($_REQUEST['toggleEstado'])) {
 $listaUsuarios = UsuarioPDO::listarUsuarios();
 
 require_once $view['layout'];
-?>

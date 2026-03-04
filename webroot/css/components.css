@@ -1241,7 +1241,8 @@
 
 .modal-footer {
   display: flex;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 10px;
   margin-top: 10px;
   width: 100%;
 }
@@ -1316,7 +1317,7 @@
 .ticket-wrapper {
   gap: 0;
   align-items: stretch;
-  width: 380px;
+  width: 450px;
   padding: 0;
   border-radius: 12px;
   overflow: hidden;
@@ -1404,6 +1405,28 @@
   margin-bottom: 16px;
 }
 
+/* TPV Footer Overrides for many buttons */
+body[data-page="inicioPrivado"] .modal-footer {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)) !important;
+  gap: 8px !important;
+  padding: 0 24px 20px !important;
+}
+
+body[data-page="inicioPrivado"] .modal-footer button {
+  padding: 10px 8px !important;
+  font-size: 12px !important;
+  min-height: 44px !important;
+}
+
+body[data-page="inicioPrivado"] .modal-footer .btn-save {
+  grid-column: span 1 !important;
+}
+
+.btn-toggle-factura {
+  font-size: 11px !important;
+}
+
 /* IMPRESIÓN */
 @media print {
   @page {
@@ -1456,11 +1479,6 @@
     background: white !important;
     border-bottom: 2px solid #000 !important;
     padding: 8px 0 10px 0 !important;
-  }
-
-  body[data-page="inicioPrivado"] .ticket-items {
-    max-height: none !important;
-    overflow: visible !important;
   }
 
   body[data-page="inicioPrivado"] .ticket-email-section,
@@ -1563,48 +1581,48 @@
    ─────────────────────────────────────────────────────────────────────────── */
 
 #modalProducto .modal-content {
-    max-height: 90vh;
-    overflow-y: auto;
-    overflow-x: hidden;
-    width: 800px;
-    max-width: 95vw;
-    padding: 0;                  /* El padding lo gestionan header/body/footer */
+  max-height: 90vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  width: 800px;
+  max-width: 95vw;
+  padding: 0; /* El padding lo gestionan header/body/footer */
 }
 
 /* Scrollbar discreta */
 #modalProducto .modal-content::-webkit-scrollbar {
-    width: 4px;
+  width: 4px;
 }
 #modalProducto .modal-content::-webkit-scrollbar-thumb {
-    background: var(--border);
-    border-radius: 4px;
+  background: var(--border);
+  border-radius: 4px;
 }
 
 /* Header fijo arriba mientras se hace scroll */
 #modalProducto .modal-header {
-    position: sticky;
-    top: 0;
-    background: var(--surface);
-    z-index: 10;
-    padding: 20px 24px 16px;
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 0;
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  z-index: 10;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0;
 }
 
 /* Cuerpo del formulario con su propio padding */
 #modalProducto .modal-body {
-    overflow-y: visible;
-    overflow-x: hidden;
-    padding: 24px;
+  overflow-y: visible;
+  overflow-x: hidden;
+  padding: 24px;
 }
 
 /* Footer fijo abajo mientras se hace scroll */
 #modalProducto form .modal-footer {
-    position: sticky;
-    bottom: 0;
-    background: var(--surface);
-    z-index: 10;
-    padding: 16px 24px;
-    border-top: 1px solid var(--border);
-    margin-top: 0;
+  position: sticky;
+  bottom: 0;
+  background: var(--surface);
+  z-index: 10;
+  padding: 16px 24px;
+  border-top: 1px solid var(--border);
+  margin-top: 0;
 }

@@ -8,7 +8,27 @@
             <h1>Gestión de Productos</h1>
             <p>Administra el catálogo de productos, precios y categorías.</p>
         </div>
-        <div class="d-flex gap-12">
+        <div class="d-flex gap-12 ai-center">
+            <!-- Botón Exportar con dropdown -->
+            <div class="ie-dropdown-wrap" id="exportDropdownWrap">
+                <button class="btn-ie btn-ie-export" onclick="toggleExportDropdown()">
+                    <i class="fa-solid fa-file-export"></i> Exportar <i class="fa-solid fa-chevron-down fs-10"></i>
+                </button>
+                <div class="ie-dropdown" id="exportDropdown">
+                    <a href="api/exportarProductos.php?format=csv" class="ie-dropdown-item">
+                        <i class="fa-solid fa-file-csv text-green"></i> CSV (Excel)
+                    </a>
+                    <a href="api/exportarProductos.php?format=json" class="ie-dropdown-item">
+                        <i class="fa-solid fa-file-code text-accent"></i> JSON
+                    </a>
+                </div>
+            </div>
+            <!-- Botón Importar -->
+            <button class="btn-ie btn-ie-import" onclick="document.getElementById('importFileInput').click()">
+                <i class="fa-solid fa-file-import"></i> Importar
+            </button>
+            <input type="file" id="importFileInput" accept=".csv,.json" class="d-none" onchange="importarProductos(this)">
+            <!-- Nuevo Producto -->
             <button onclick="abrirModalProducto()" class="btn-add">
                 <i class="fa-solid fa-plus"></i> Nuevo Producto
             </button>
@@ -112,6 +132,9 @@
                                 </button>
                                 <button onclick="toggleEstadoProducto(<?php echo $p['id']; ?>)" title="<?php echo $p['activo'] ? 'Dar de baja' : 'Activar'; ?>" class="btn-icon <?php echo $p['activo'] ? 'text-red' : 'text-green'; ?>">
                                     <i class="fa-solid fa-<?php echo $p['activo'] ? 'arrow-down' : 'arrow-up'; ?>"></i>
+                                </button>
+                                <button onclick="eliminarProducto(<?php echo $p['id']; ?>, '<?php echo addslashes(htmlspecialchars($p['nombre'])); ?>')" title="Eliminar" class="btn-icon text-red" style="opacity:0.7;">
+                                    <i class="fa-solid fa-trash"></i>
                                 </button>
                             </div>
                         </td>
@@ -321,7 +344,7 @@
         // Limpiar errores previos
         document.querySelectorAll('.form-error').forEach(el => el.innerText = '');
 
-            if (producto) {
+        if (producto) {
             title.innerText = 'Editar Producto';
             document.getElementById('prodId').value = producto.id;
             document.getElementById('prodIcono').value = producto.icono;
@@ -348,7 +371,11 @@
                 try {
                     const vars = typeof producto.variantes === 'string' ? JSON.parse(producto.variantes) : producto.variantes;
                     for (const [l, v] of Object.entries(vars)) {
-                        añadirVarianteUI(l, v);
+                        if (Array.isArray(v)) {
+                            v.forEach(val => añadirVarianteUI(l, val));
+                        } else {
+                            añadirVarianteUI(l, v);
+                        }
                     }
                     syncVariantes();
                 } catch (e) {
@@ -411,7 +438,14 @@
         const pills = document.querySelectorAll('#variantesContainer > div');
         const variantes = {};
         pills.forEach(p => {
-            variantes[p.dataset.label] = p.dataset.value;
+            const label = p.dataset.label;
+            const value = p.dataset.value;
+            if (!variantes[label]) {
+                variantes[label] = [];
+            }
+            if (!variantes[label].includes(value)) {
+                variantes[label].push(value);
+            }
         });
         document.getElementById('prodVariantes').value = JSON.stringify(variantes);
     }
@@ -508,7 +542,6 @@
 
     async function toggleEstadoProducto(id) {
         try {
-            // ── CORRECCIÓN: añadir Content-Type ──
             const resp = await fetch('api/gestionProducto.php', {
                 method: 'POST',
                 headers: {
@@ -521,14 +554,78 @@
             });
             const r = await resp.json();
             if (r.ok) {
-                showToast('✅ Estado actualizado');
-                location.reload();
+                const activo = r.activo; // true = activado, false = dado de baja
+
+                // Encontrar la fila por el botón
+                const btn = document.querySelector(`button[onclick="toggleEstadoProducto(${id})"]`);
+                if (!btn) return;
+                const row = btn.closest('tr');
+
+                // Actualizar botón
+                btn.className = `btn-icon ${activo ? 'text-red' : 'text-green'}`;
+                btn.title = activo ? 'Dar de baja' : 'Activar';
+                btn.querySelector('i').className = `fa-solid fa-${activo ? 'arrow-down' : 'arrow-up'}`;
+
+                // Actualizar data-activo (para los filtros)
+                row.dataset.activo = activo ? '1' : '0';
+
+                // Actualizar pastilla de estado
+                const pill = row.querySelector('.status-pill');
+                if (pill) {
+                    pill.className = activo ? 'status-pill status-active' : 'status-pill status-inactive';
+                    pill.innerHTML = activo ?
+                        '<i class="fa-solid fa-circle-check"></i> Activo' :
+                        '<i class="fa-solid fa-circle-xmark"></i> Inactivo';
+                }
+
+                showNotification(
+                    `<i class="fa-solid fa-circle-check"></i> Producto ${activo ? 'activado' : 'dado de baja'}.`,
+                    activo ? 'success' : 'info'
+                );
             } else {
-                showToast("<i class='fa-solid fa-circle-xmark'></i> " + (r.error || 'No se pudo cambiar estado'));
+                showNotification("<i class='fa-solid fa-circle-xmark'></i> " + (r.error || 'No se pudo cambiar estado'), 'error');
             }
         } catch (err) {
             console.error(err);
-            showToast("<i class='fa-solid fa-circle-xmark'></i> Error al cambiar estado");
+            showNotification("<i class='fa-solid fa-circle-xmark'></i> Error al cambiar estado", 'error');
+        }
+    }
+
+    async function eliminarProducto(id, nombre) {
+        if (!confirm(`¿Seguro que deseas ELIMINAR el producto "${nombre}"?\n\nEsta acción no se puede deshacer.`)) return;
+        try {
+            const resp = await fetch('api/gestionProducto.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    accion: 'eliminar',
+                    id: id
+                })
+            });
+            const r = await resp.json();
+            if (r.ok) {
+                // Eliminar la fila del DOM sin recargar
+                const allBtns = document.querySelectorAll('.product-row td:last-child button');
+                let targetRow = null;
+                document.querySelectorAll('.product-row').forEach(row => {
+                    const btn = row.querySelector(`button[onclick*="eliminarProducto(${id},"]`);
+                    if (btn) targetRow = row;
+                });
+                if (targetRow) {
+                    targetRow.style.transition = 'opacity 0.3s, transform 0.3s';
+                    targetRow.style.opacity = '0';
+                    targetRow.style.transform = 'translateX(12px)';
+                    setTimeout(() => targetRow.remove(), 300);
+                }
+                showNotification('<i class="fa-solid fa-circle-check"></i> Producto eliminado.', 'success');
+            } else {
+                showNotification('<i class="fa-solid fa-circle-xmark"></i> Error: ' + (r.error || 'No se pudo eliminar'), 'error');
+            }
+        } catch (err) {
+            console.error(err);
+            showNotification('<i class="fa-solid fa-circle-xmark"></i> Error de conexión.', 'error');
         }
     }
 
@@ -705,4 +802,82 @@
     document.getElementById('filterCat').addEventListener('change', applyFilters);
     document.getElementById('filterEstado').addEventListener('change', applyFilters);
     document.getElementById('sortOrder').addEventListener('change', applySort);
+
+    // ── IMPORT / EXPORT ────────────────────────────────────────────────────────
+    function toggleExportDropdown() {
+        document.getElementById('exportDropdown').classList.toggle('open');
+    }
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function(e) {
+        const wrap = document.getElementById('exportDropdownWrap');
+        if (wrap && !wrap.contains(e.target)) {
+            document.getElementById('exportDropdown').classList.remove('open');
+        }
+    });
+
+    async function importarProductos(input) {
+        if (!input.files || !input.files[0]) return;
+        const file = input.files[0];
+        const ext = file.name.split('.').pop().toLowerCase();
+
+        if (!['csv', 'json'].includes(ext)) {
+            showNotification('<i class="fa-solid fa-circle-xmark"></i> Formato no soportado. Usa CSV o JSON.', 'error');
+            input.value = '';
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        showNotification('<i class="fa-solid fa-spinner fa-spin"></i> Importando productos...', 'info');
+
+        try {
+            const resp = await fetch('api/importarProductos.php', {
+                method: 'POST',
+                body: formData
+            });
+            const r = await resp.json();
+            if (r.ok) {
+                const {
+                    creados,
+                    actualizados,
+                    errores
+                } = r.stats;
+                showNotification(
+                    `<i class="fa-solid fa-circle-check"></i> Importación completada: <strong>${creados} creados</strong>, <strong>${actualizados} actualizados</strong>${errores > 0 ? `, <span class="text-red">${errores} errores</span>` : ''}`,
+                    'success'
+                );
+                setTimeout(() => location.reload(), 2500);
+            } else {
+                showNotification('<i class="fa-solid fa-circle-xmark"></i> Error: ' + (r.error || 'Desconocido'), 'error');
+            }
+        } catch (err) {
+            showNotification('<i class="fa-solid fa-circle-xmark"></i> Error de conexión.', 'error');
+        }
+
+        input.value = '';
+    }
+
+    // Mini-toast local para esta página (puede no tener el global de main.js)
+    function showNotification(html, type = 'info') {
+        let notif = document.getElementById('ie-notif');
+        if (!notif) {
+            notif = document.createElement('div');
+            notif.id = 'ie-notif';
+            document.body.appendChild(notif);
+        }
+        const colors = {
+            info: '#1a2fbf',
+            success: '#0f8060',
+            error: '#c0392b'
+        };
+        notif.style.cssText = `position:fixed;bottom:24px;right:24px;background:${colors[type]};color:white;padding:14px 20px;border-radius:12px;font-size:13px;font-weight:600;z-index:99999;box-shadow:0 4px 20px rgba(0,0,0,0.2);transition:opacity 0.3s;max-width:400px;line-height:1.4;`;
+        notif.innerHTML = html;
+        notif.style.opacity = '1';
+        clearTimeout(notif._timeout);
+        notif._timeout = setTimeout(() => {
+            notif.style.opacity = '0';
+        }, 3500);
+    }
 </script>

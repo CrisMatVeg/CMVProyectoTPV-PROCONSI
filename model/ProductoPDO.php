@@ -1,21 +1,24 @@
 <?php
+
 /**
  * Clase: ProductoPDO
  * Gestiona la persistencia de los productos mediante DBPDO.
  * @package Modelos
  * @author Cristian Mateos Vega
  */
-require_once 'DBPDO.php';
-require_once 'Producto.php';
+require_once __DIR__ . '/DBPDO.php';
+require_once __DIR__ . '/Producto.php';
 
-class ProductoPDO {
+class ProductoPDO
+{
 
     /**
      * Obtiene los productos de la base de datos.
      * @param bool $soloActivos Si es true, solo devuelve productos con activo=1. Default true.
      * @return Producto[]
      */
-    public static function listarProductos(bool $soloActivos = true): array {
+    public static function listarProductos(bool $soloActivos = true): array
+    {
         $sql = "SELECT * FROM productos" . ($soloActivos ? " WHERE activo = 1" : "");
         $consulta = DBPDO::ejecutarConsulta($sql);
 
@@ -48,7 +51,8 @@ class ProductoPDO {
      * @param array $datos
      * @return array El nuevo producto como array asociativo
      */
-    public static function añadirProducto(array $datos): array {
+    public static function añadirProducto(array $datos): array
+    {
         $iconoDato = $datos['icono'] ?? '';
         if (strpos($iconoDato, 'data:image') === 0) {
             $parts = explode(',', $iconoDato);
@@ -57,7 +61,7 @@ class ProductoPDO {
 
         $sql = "INSERT INTO productos (referencia, nombre, descripcion, precio_coste, precio_venta, iva, stock_actual, stock_minimo, meses_garantia, icono, categoria, variantes, activo, requiere_serial, codigo_iva)
                 VALUES (:referencia, :nombre, :descripcion, :precio_coste, :precio_venta, :iva, :stock_actual, :stock_minimo, :meses_garantia, :icono, :categoria, :variantes, 1, :requiere_serial, :codigo_iva)";
-        
+
         DBPDO::ejecutarConsulta($sql, [
             ':referencia'     => mb_substr(trim($datos['referencia']), 0, 50),
             ':nombre'         => mb_substr(trim($datos['nombre']), 0, 100),
@@ -70,7 +74,7 @@ class ProductoPDO {
             ':meses_garantia' => (int)($datos['meses_garantia'] ?? 24),
             ':icono'          => $iconoDato,
             ':categoria'      => mb_substr(trim($datos['categoria']), 0, 50),
-            ':variantes'      => isset($datos['variantes']) ? json_encode($datos['variantes']) : null,
+            ':variantes'      => self::normalizarVariantes($datos['variantes'] ?? null),
             ':requiere_serial' => (int)($datos['requiere_serial'] ?? 0),
             ':codigo_iva'     => $datos['codigo_iva'] ?? 'GENERAL',
         ]);
@@ -82,7 +86,8 @@ class ProductoPDO {
     /**
      * Actualiza los datos de un producto existente.
      */
-    public static function editarProducto(int $id, array $datos): void {
+    public static function editarProducto(int $id, array $datos): void
+    {
         $iconoDato = $datos['icono'] ?? '';
         if (strpos($iconoDato, 'data:image') === 0) {
             $parts = explode(',', $iconoDato);
@@ -96,7 +101,7 @@ class ProductoPDO {
                     meses_garantia = :meses_garantia, icono = :icono, categoria = :categoria,
                     variantes = :variantes, requiere_serial = :requiere_serial, codigo_iva = :codigo_iva
                 WHERE id = :id";
-        
+
         DBPDO::ejecutarConsulta($sql, [
             ':referencia'     => mb_substr(trim($datos['referencia']), 0, 50),
             ':nombre'         => mb_substr(trim($datos['nombre']), 0, 100),
@@ -109,18 +114,70 @@ class ProductoPDO {
             ':meses_garantia' => (int)($datos['meses_garantia'] ?? 24),
             ':icono'          => $iconoDato,
             ':categoria'      => mb_substr(trim($datos['categoria']), 0, 50),
-            ':variantes'      => isset($datos['variantes']) ? json_encode($datos['variantes']) : null,
+            ':variantes'      => self::normalizarVariantes($datos['variantes'] ?? null),
             ':requiere_serial' => (int)($datos['requiere_serial'] ?? 0),
             ':codigo_iva'     => $datos['codigo_iva'] ?? 'GENERAL',
             ':id'             => $id,
         ]);
     }
 
-    public static function eliminarProducto(int $id): void {
+    public static function eliminarProducto(int $id): void
+    {
         DBPDO::ejecutarConsulta("DELETE FROM productos WHERE id = :id", [':id' => $id]);
     }
 
-    public static function toggleBaja(int $id): bool {
+    /**
+     * Normaliza el campo variantes antes de guardarlo en BD.
+     * Acepta: null, string JSON (objeto o [{label,valor}]), array PHP.
+     * Devuelve: null o JSON string con formato {"clave":"valor"}.
+     */
+    private static function normalizarVariantes($variantes): ?string
+    {
+        if ($variantes === null || $variantes === '' || $variantes === 'null' || $variantes === '[]' || $variantes === '{}') return null;
+
+        // Si viene como string, parsearlo
+        if (is_string($variantes)) {
+            $decoded = json_decode($variantes, true);
+            if (json_last_error() !== JSON_ERROR_NONE || $decoded === null) return null;
+            $variantes = $decoded;
+        }
+
+        // Si después de parsear es nulo o vacío
+        if (empty($variantes)) return null;
+
+        // Caso A: Array de objetos [{label, valor}, ...] (vía Import / JSON export)
+        if (is_array($variantes) && isset($variantes[0]) && (is_array($variantes[0]) || is_object($variantes[0]))) {
+            $obj = [];
+            foreach ($variantes as $item) {
+                $label = $item['label'] ?? $item['Label'] ?? '';
+                $valor = $item['valor'] ?? $item['Valor'] ?? $item['value'] ?? $item['Value'] ?? '';
+                if ($label !== '') {
+                    if (!isset($obj[$label])) {
+                        $obj[$label] = $valor;
+                    } else {
+                        // Si ya existe, convertir a array si no lo es y añadir el nuevo valor
+                        if (!is_array($obj[$label])) {
+                            $obj[$label] = [$obj[$label]];
+                        }
+                        if (!in_array($valor, $obj[$label])) {
+                            $obj[$label][] = $valor;
+                        }
+                    }
+                }
+            }
+            return count($obj) > 0 ? json_encode($obj, JSON_UNESCAPED_UNICODE) : null;
+        }
+
+        // Caso B: Objeto asociativo {"Color":"Rojo"} (vía Formulario Gestión)
+        if (is_array($variantes)) {
+            return json_encode($variantes, JSON_UNESCAPED_UNICODE);
+        }
+
+        return null;
+    }
+
+    public static function toggleBaja(int $id): bool
+    {
         $q = DBPDO::ejecutarConsulta("SELECT activo FROM productos WHERE id = :id", [':id' => $id]);
         $row = $q->fetch(PDO::FETCH_ASSOC);
         $nuevoEstado = $row['activo'] ? 0 : 1;
@@ -129,18 +186,28 @@ class ProductoPDO {
         return (bool)$nuevoEstado;
     }
 
-    public static function reducirStock(int $id, int $cantidad): void {
+    public static function reducirStock(int $id, int $cantidad): void
+    {
         $sql = "UPDATE productos SET stock_actual = stock_actual - :cantidad WHERE id = :id";
         DBPDO::ejecutarConsulta($sql, [':cantidad' => $cantidad, ':id' => $id]);
     }
 
-    public static function aumentarStock(int $id, int $cantidad): void {
+    public static function aumentarStock(int $id, int $cantidad): void
+    {
         $sql = "UPDATE productos SET stock_actual = stock_actual + :cantidad WHERE id = :id";
         DBPDO::ejecutarConsulta($sql, [':cantidad' => $cantidad, ':id' => $id]);
     }
 
-    public static function obtenerProductoPorId(int $id): ?array {
+    public static function obtenerProductoPorId(int $id): ?array
+    {
         $q = DBPDO::ejecutarConsulta("SELECT * FROM productos WHERE id = :id", [':id' => $id]);
+        $row = $q->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
+    }
+
+    public static function obtenerProductoPorReferencia(string $referencia): ?array
+    {
+        $q = DBPDO::ejecutarConsulta("SELECT * FROM productos WHERE referencia = :referencia", [':referencia' => $referencia]);
         $row = $q->fetch(PDO::FETCH_ASSOC);
         return $row ?: null;
     }

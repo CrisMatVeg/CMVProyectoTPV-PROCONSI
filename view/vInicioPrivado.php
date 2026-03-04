@@ -1,7 +1,3 @@
-</header>
-</header>
-
-
 <div class="main">
     <!-- CATALOG PANEL -->
     <div class="catalog-panel">
@@ -19,10 +15,10 @@
                 <i class="fa-solid fa-filter"></i>
             </button>
             <?php if ($avInicioPrivado['esAdmin']): ?>
-            <button onclick="abrirModalNuevoProducto()" class="btn-add p-7-14 fs-13">
-                <i class="fa-solid fa-plus"></i>
-                Nuevo producto
-            </button>
+                <button onclick="abrirModalNuevoProducto()" class="btn-add p-7-14 fs-13">
+                    <i class="fa-solid fa-plus"></i>
+                    Nuevo producto
+                </button>
             <?php endif; ?>
         </div>
 
@@ -116,6 +112,59 @@
             </div>
         </div>
 
+        <!-- RENTABILIDAD Y SOPORTE VENTA -->
+        <div id="finProfitIndicator" class="fin-profit-indicator d-none">
+            <div class="indicator-content">
+                <div class="indicator-main">
+                    <i class="fa-solid fa-chart-line"></i>
+                    <span id="finProfitStatus">Análisis de financiación...</span>
+                </div>
+                <button type="button" class="btn-details-fin" onclick="openFinancingModal()">
+                    Ver detalles <i class="fa-solid fa-chevron-right"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- AVISO DE FINANCIACIÓN CON SELECTORES -->
+        <div id="finInfoPanel" class="fin-info-panel d-none" style="border: 2px solid var(--green); background: rgba(76, 175, 80, 0.05); padding: 16px; border-radius: 12px; display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+                <div>
+                    <div style="font-size: 11px; text-transform: uppercase; color: #999; margin-bottom: 4px; font-weight: bold;">Resultado de la operación</div>
+                    <div style="display: flex; align-items: baseline; gap: 8px;">
+                        <span id="finInfoStatus" style="font-weight: bold; font-size: 14px; color: var(--green);">✓ GANANCIA</span>
+                        <span id="finInfoAmount" style="font-size: 18px; font-weight: bold; color: var(--green);">0,00 €</span>
+                    </div>
+                </div>
+                <button type="button" class="btn-save p-8-16" onclick="openFinancingModal()" style="white-space: nowrap;">
+                    <i class="fa-solid fa-sliders-h"></i> Ver detalles
+                </button>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <div class="form-group mb-0">
+                    <label class="form-label fs-11 tt-uppercase">Entidad Financiera</label>
+                    <select id="finanEntidad" class="form-input fs-13" onchange="calcularCuotaFinanciacion('inline')">
+                        <option value="">Seleccione...</option>
+                    </select>
+                </div>
+                <div class="form-group mb-0">
+                    <label class="form-label fs-11 tt-uppercase">Plazo (meses)</label>
+                    <select id="finanMeses" class="form-input fs-13" onchange="calcularCuotaFinanciacion('inline')">
+                        <option value="3">3 meses</option>
+                        <option value="6">6 meses</option>
+                        <option value="12" selected>12 meses</option>
+                        <option value="18">18 meses</option>
+                        <option value="24">24 meses</option>
+                    </select>
+                </div>
+            </div>
+
+            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 13px; background: rgba(0,0,0,0.02); padding: 10px; border-radius: 6px;">
+                <input type="checkbox" id="finanPagaCliente" onchange="calcularCuotaFinanciacion('inline')" style="width: 18px; height: 18px; cursor: pointer;">
+                <span><strong>El cliente paga intereses</strong> (la tienda no asume comisión)</span>
+            </label>
+        </div>
+
         <div class="payment-section">
             <div class="payment-label">Método de pago</div>
             <div class="payment-methods">
@@ -133,7 +182,22 @@
                     <i class="fa-solid fa-credit-card"></i>
                     Tarjeta
                 </button>
-                </div>
+                <button
+                    class="pay-btn"
+                    data-method="bizum"
+                    onclick="selectPayment(this)">
+                    <i class="fa-solid fa-mobile-screen-button"></i>
+                    Bizum
+                </button>
+                <button
+                    class="pay-btn"
+                    id="btnFinanciacion"
+                    data-method="financiado"
+                    onclick="selectPayment(this)">
+                    <i class="fa-solid fa-calendar-check"></i>
+                    Financiación
+                </button>
+            </div>
 
             <div class="discount-row">
                 <input
@@ -146,6 +210,16 @@
                 </button>
             </div>
             <span id="err-discount" class="form-error"></span>
+
+            <div class="toggle-row">
+                <div class="toggle-label text-accent">
+                    <i class="fa-solid fa-file-invoice"></i> Requiere Factura
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="facturaToggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
 
             <button
                 class="charge-btn"
@@ -379,19 +453,19 @@
             <input id="newSocioNombre" class="form-input fs-12" placeholder="Nombre completo" />
             <input id="newSocioNif" class="form-input fs-12 font-mono" placeholder="DNI / NIE" />
             <div class="d-flex gap-8">
-               <button onclick="cancelarRegistroSocio()" class="btn-cancel fs-11 p-4">Cancelar</button>
-               <button onclick="guardarNuevoSocio()" class="btn-save fs-11 p-4">Guardar y Usar</button>
+                <button onclick="cancelarRegistroSocio()" class="btn-cancel fs-11 p-4">Cancelar</button>
+                <button onclick="guardarNuevoSocio()" class="btn-save fs-11 p-4">Guardar y Usar</button>
             </div>
         </div>
         <!-- Datos de empresa -->
         <div id="empresaDatos" class="d-none flex-column gap-8">
             <div class="form-group">
-                <label class="form-label">Razón social</label>
+                <label class="form-label" id="labelEmpresaNombre">Razón social</label>
                 <input id="empresaNombre" class="form-input" placeholder="Nombre de la empresa" />
                 <span class="form-error" id="err-empresaNombre"></span>
             </div>
             <div class="form-group">
-                <label class="form-label">CIF / NIF</label>
+                <label class="form-label" id="labelEmpresaNif">CIF / NIF</label>
                 <input id="empresaNif" class="form-input font-mono" placeholder="B12345678" />
                 <span class="form-error" id="err-empresaNif"></span>
             </div>
@@ -415,6 +489,22 @@
     </div>
 </div>
 
+<!-- MODAL: SELECCIÓN DE VARIANTES -->
+<div class="modal-overlay" id="variantsModal">
+    <div class="modal modal-content gap-16 ai-stretch w-400">
+        <div class="modal-header mb-0">
+            <div class="modal-title fs-16" id="variantsModalTitle">Seleccionar opciones</div>
+            <button onclick="document.getElementById('variantsModal').classList.remove('visible')" class="btn-close-modal">×</button>
+        </div>
+        <div id="variantsOptionsContainer" class="d-flex flex-column gap-16 py-10">
+            <!-- Dinámico: Atributos y sus valores seleccionables -->
+        </div>
+        <div class="modal-footer full-width mt-12">
+            <button id="confirmVariantsBtn" class="btn-save py-12 full-width">Añadir al carrito</button>
+        </div>
+    </div>
+</div>
+
 <!-- MODAL: NÚMERO DE SERIE -->
 <div class="modal-overlay" id="serialModal">
     <div class="modal modal-content gap-16 ai-stretch w-400">
@@ -432,4 +522,88 @@
     </div>
 </div>
 
+<!-- MODAL: SELECCIÓN DE FINANCIACIÓN -->
+<div class="modal-overlay" id="financiacionModal">
+    <div class="modal modal-content gap-20 ai-stretch w-600">
+        <div class="modal-header">
+            <div class="modal-title d-flex ai-center gap-10">
+                <i class="fa-solid fa-piggy-bank text-accent"></i>
+                Configurar Financiación
+            </div>
+            <button onclick="document.getElementById('financiacionModal').classList.remove('visible')" class="btn-close-modal">×</button>
+        </div>
 
+        <div class="form-group">
+            <label class="form-label fs-11 tt-uppercase">Entidad Financiera</label>
+            <select id="finanEntidad_modal" class="form-input fs-15" onchange="calcularCuotaFinanciacion('modal')">
+                <option value="">Seleccione una entidad...</option>
+            </select>
+        </div>
+
+        <div id="finDetalleConfig" class="d-none flex-column gap-16">
+            <div class="grid-2 gap-16">
+                <div class="form-group mb-0">
+                    <label class="form-label fs-11 tt-uppercase">Plazo de financiación</label>
+                    <select id="finanMeses_modal" class="form-input" onchange="calcularCuotaFinanciacion('modal')">
+                        <option value="3">3 Meses</option>
+                        <option value="6">6 Meses</option>
+                        <option value="12" selected>12 Meses</option>
+                        <option value="18">18 Meses</option>
+                        <option value="24">24 Meses</option>
+                    </select>
+                </div>
+                <div class="form-group mb-0 d-flex ai-end">
+                    <label class="d-flex ai-center gap-10 cursor-pointer p-8 bg-surface2 br-8 border-1 w-full">
+                        <input type="checkbox" id="finanPagaCliente_modal" class="w-18 h-18" onchange="calcularCuotaFinanciacion('modal')">
+                        <div class="flex-1">
+                            <div class="fs-12 font-bold">Intereses cliente</div>
+                            <div class="fs-10 text-muted">La tienda no asume comisión</div>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <div class="grid-2 gap-16">
+                <!-- PANEL: DETALLES PAGO -->
+                <div class="bg-surface2 p-16 br-12 border-1">
+                    <div class="fs-11 tt-uppercase text-muted mb-8 font-bold">Detalles del Pago</div>
+                    <div class="fin-option-row">
+                        <span>Cuota mensual</span>
+                        <span class="font-bold text-accent" id="finanCuota_modal">0,00 €/mes</span>
+                    </div>
+                    <div class="fin-option-row">
+                        <span>Total pagado</span>
+                        <span id="finTotalAmt">0,00 €</span>
+                    </div>
+                    <div class="fin-option-row text-muted fs-11 border-top mt-4 pt-4">
+                        <span>Cargas financieras</span>
+                        <span id="finInteresesAmt">0,00 €</span>
+                    </div>
+                </div>
+
+                <!-- PANEL: RENTABILIDAD -->
+                <div class="bg-surface2 p-16 br-12 border-1" id="finProfitPanel">
+                    <div class="fs-11 tt-uppercase text-muted mb-8 font-bold">Análisis de Operación</div>
+                    <div class="fin-option-row">
+                        <span>Margen Bruto</span>
+                        <span id="finMargenBruto">0,00 €</span>
+                    </div>
+                    <div class="fin-option-row">
+                        <span>Comisión Banco</span>
+                        <span id="finComisionPct" class="fs-10 text-muted"></span>
+                        <span id="finComisionBanco" class="text-red">0,00 €</span>
+                    </div>
+                    <div class="fin-option-row border-top mt-4 pt-4">
+                        <span class="font-bold">Resultado Neto</span>
+                        <span id="profitStatus_modal" class="font-bold">0,00 €</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal-footer pt-0 border-top mt-10">
+            <button onclick="document.getElementById('financiacionModal').classList.remove('visible')" class="btn-cancel">Cerrar</button>
+            <button id="btnConfirmarFinanciacion" onclick="confirmarFinanciacionModal()" class="btn-save" disabled>Confirmar Selección</button>
+        </div>
+    </div>
+</div>

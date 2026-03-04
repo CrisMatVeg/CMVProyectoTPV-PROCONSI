@@ -1,19 +1,23 @@
 <?php
+
 /**
  * Clase: ClientePDO
  * Gestiona clientes (particulares y empresas) y el flag de socio.
  */
 
-require_once 'DBPDO.php';
+require_once __DIR__ . '/DBPDO.php';
 
-class ClientePDO {
-    public static function listarTodos(): array {
+class ClientePDO
+{
+    public static function listarTodos(): array
+    {
         $sql = "SELECT * FROM clientes ORDER BY nombre, apellidos";
         $q = DBPDO::ejecutarConsulta($sql);
         return $q->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    public static function obtenerPorId(int $id): ?array {
+    public static function obtenerPorId(int $id): ?array
+    {
         $q = DBPDO::ejecutarConsulta(
             "SELECT * FROM clientes WHERE id = :id",
             [':id' => $id]
@@ -22,7 +26,8 @@ class ClientePDO {
         return $row ?: null;
     }
 
-    public static function obtenerPorNif(string $nif): ?array {
+    public static function obtenerPorNif(string $nif): ?array
+    {
         $nif = trim($nif);
         if ($nif === '') return null;
         $q = DBPDO::ejecutarConsulta(
@@ -33,12 +38,13 @@ class ClientePDO {
         return $row ?: null;
     }
 
-    public static function crear(array $d): int {
+    public static function crear(array $d): int
+    {
         $sql = "INSERT INTO clientes
                 (tipo, nombre, apellidos, nif, email, telefono, direccion, cp, poblacion, provincia, es_socio, notas)
                 VALUES (:tipo, :nombre, :apellidos, :nif, :email, :tel, :dir, :cp, :pob, :prov, :socio, :notas)";
         DBPDO::ejecutarConsulta($sql, [
-            ':tipo'      => in_array($d['tipo'] ?? 'particular', ['particular','empresa'], true) ? $d['tipo'] : 'particular',
+            ':tipo'      => in_array($d['tipo'] ?? 'particular', ['particular', 'empresa'], true) ? $d['tipo'] : 'particular',
             ':nombre'    => mb_substr(trim($d['nombre'] ?? ''), 0, 100),
             ':apellidos' => mb_substr(trim($d['apellidos'] ?? ''), 0, 150),
             ':nif'       => $d['nif'] ?? null,
@@ -57,7 +63,8 @@ class ClientePDO {
         return (int)$row['id'];
     }
 
-    public static function actualizar(int $id, array $d): void {
+    public static function actualizar(int $id, array $d): void
+    {
         $sql = "UPDATE clientes
                 SET tipo = :tipo,
                     nombre = :nombre,
@@ -74,7 +81,7 @@ class ClientePDO {
                 WHERE id = :id";
         DBPDO::ejecutarConsulta($sql, [
             ':id'        => $id,
-            ':tipo'      => in_array($d['tipo'] ?? 'particular', ['particular','empresa'], true) ? $d['tipo'] : 'particular',
+            ':tipo'      => in_array($d['tipo'] ?? 'particular', ['particular', 'empresa'], true) ? $d['tipo'] : 'particular',
             ':nombre'    => mb_substr(trim($d['nombre'] ?? ''), 0, 100),
             ':apellidos' => mb_substr(trim($d['apellidos'] ?? ''), 0, 150),
             ':nif'       => $d['nif'] ?? null,
@@ -89,14 +96,16 @@ class ClientePDO {
         ]);
     }
 
-    public static function marcarBaja(int $id): void {
+    public static function marcarBaja(int $id): void
+    {
         DBPDO::ejecutarConsulta(
             "UPDATE clientes SET fecha_baja = NOW() WHERE id = :id AND fecha_baja IS NULL",
             [':id' => $id]
         );
     }
 
-    public static function listarSocios(): array {
+    public static function listarSocios(): array
+    {
         $q = DBPDO::ejecutarConsulta(
             "SELECT * FROM clientes WHERE es_socio = 1 AND (fecha_baja IS NULL) ORDER BY nombre, apellidos"
         );

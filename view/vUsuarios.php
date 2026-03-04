@@ -15,10 +15,16 @@
             <i class="fa-solid fa-magnifying-glass"></i>
             <input type="text" id="userSearch" class="search-input" placeholder="Escribe para buscar por nombre de usuario...">
         </div>
-        <button onclick="document.getElementById('modalAddUser').classList.add('visible')" class="btn-add">
-            <i class="fa-solid fa-user-plus"></i>
-            Nuevo Usuario
-        </button>
+        <div class="d-flex gap-12">
+            <button onclick="window.location.href='index.php?irRoles'" class="btn-filter w-auto h-auto gap-8 fs-14 p-10-20 shadow-none" style="background:var(--surface2); color:var(--text-muted); border-color:var(--surface3);">
+                <i class="fa-solid fa-user-shield"></i>
+                Roles y Permisos
+            </button>
+            <button onclick="document.getElementById('modalAddUser').classList.add('visible')" class="btn-add">
+                <i class="fa-solid fa-user-plus"></i>
+                Nuevo Usuario
+            </button>
+        </div>
     </div>
 
     <!-- Tabla de Usuarios -->
@@ -35,50 +41,56 @@
             </thead>
             <tbody id="usersTableBody">
                 <?php foreach ($listaUsuarios as $u): ?>
-                <tr class="user-row">
-                    <td><?php echo $u->getNombreCompleto(); ?></td>
-                    <td class="username-cell font-mono text-muted"><?php echo $u->getUsername(); ?></td>
-                    <td>
-                        <span class="status-pill <?php echo $u->getRol()==='admin' ? 'status-active' : ''; ?> p-0 tt-uppercase">
-                            <?php echo $u->getRol(); ?>
-                        </span>
-                    </td>
-                    <td>
-                        <span class="status-pill <?php echo $u->getActivo() ? 'status-active' : 'status-inactive'; ?>">
-                            <?php echo $u->getActivo() ? 'Activo' : 'Baja (Inactivo)'; ?>
-                        </span>
-                    </td>
-                    <td class="text-right">
-                        <div class="d-flex gap-8 jc-flex-end">
-                            <!-- Botón Cambiar Rol (Solo si no es el usuario actual) -->
-                            <?php if ($u->getId() !== $_SESSION['usuarioActualTPV']->getId()): ?>
-                                <form method="post" class="d-inline">
-                                    <input type="hidden" name="idUsuario" value="<?php echo $u->getId(); ?>">
-                                    <input type="hidden" name="nuevoRol" value="<?php echo $u->getRol()==='admin' ? 'cajero' : 'admin'; ?>">
-                                    <button type="submit" name="cambiarRol" title="Cambiar Rol" class="btn-icon">
-                                        <i class="fa-solid fa-arrows-rotate"></i>
-                                    </button>
-                                </form>
-                            <?php endif; ?>
-                            <!-- Botón Dar Baja/Alta (Solo si no es el usuario actual) -->
-                            <?php if ($u->getId() !== $_SESSION['usuarioActualTPV']->getId()): ?>
-                                <form method="post" class="d-inline">
-                                    <input type="hidden" name="idUsuario" value="<?php echo $u->getId(); ?>">
-                                    <button type="submit" name="toggleEstado" 
-                                        class="status-pill <?php echo $u->getActivo() ? 'status-inactive' : 'status-active'; ?> border-none cursor-pointer gap-6 font-bold">
-                                        <i class="fa-solid <?php echo $u->getActivo() ? 'fa-user-slash' : 'fa-user-check'; ?>"></i>
-                                        <?php echo $u->getActivo() ? 'Baja' : 'Reactivar'; ?>
-                                    </button>
-                                </form>
-                            <?php else: ?>
-                                <span class="status-pill bg-blue-light text-accent border-none gap-6 font-bold">
-                                    <i class="fa-solid fa-user-check"></i>
-                                    Eres tú
-                                </span>
-                            <?php endif; ?>
-                        </div>
-                    </td>
-                </tr>
+                    <tr class="user-row">
+                        <td><?php echo $u->getNombreCompleto(); ?></td>
+                        <td class="username-cell font-mono text-muted"><?php echo $u->getUsername(); ?></td>
+                        <td>
+                            <span class="status-pill <?php echo strtolower($u->getRol()) === 'admin' ? 'status-active' : 'bg-surface2 text-muted'; ?> p-4-12 tt-uppercase fs-10 font-bold border-none">
+                                <i class="fa-solid <?php echo strtolower($u->getRol()) === 'admin' ? 'fa-shield-halved' : 'fa-user'; ?> mr-4"></i>
+                                <?php echo $u->getRol(); ?>
+                            </span>
+                        </td>
+                        <td>
+                            <span class="status-pill <?php echo $u->getActivo() ? 'status-active' : 'status-inactive'; ?>">
+                                <?php echo $u->getActivo() ? 'Activo' : 'Baja (Inactivo)'; ?>
+                            </span>
+                        </td>
+                        <td class="text-right">
+                            <div class="d-flex gap-8 jc-flex-end">
+                                <!-- Botón Cambiar Rol (Solo si no es el usuario actual) -->
+                                <?php if ($u->getId() !== $_SESSION['usuarioActualTPV']->getId()): ?>
+                                    <form method="post" class="d-inline d-flex ai-center gap-4">
+                                        <input type="hidden" name="idUsuario" value="<?php echo $u->getId(); ?>">
+                                        <select name="idRol" class="form-input p-4-8 fs-11 w-auto br-8" onchange="this.form.submit()">
+                                            <option value="" disabled selected>Cambiar Rol...</option>
+                                            <?php foreach ($listaRoles as $r): ?>
+                                                <option value="<?php echo $r['id']; ?>" <?php echo $u->getIdRol() == $r['id'] ? 'selected' : ''; ?>>
+                                                    <?php echo htmlspecialchars($r['nombre']); ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                        <input type="hidden" name="cambiarRol" value="1">
+                                    </form>
+                                <?php endif; ?>
+                                <!-- Botón Dar Baja/Alta (Solo si no es el usuario actual) -->
+                                <?php if ($u->getId() !== $_SESSION['usuarioActualTPV']->getId()): ?>
+                                    <form method="post" class="d-inline">
+                                        <input type="hidden" name="idUsuario" value="<?php echo $u->getId(); ?>">
+                                        <button type="submit" name="toggleEstado"
+                                            class="status-pill <?php echo $u->getActivo() ? 'status-inactive' : 'status-active'; ?> border-none cursor-pointer gap-6 font-bold">
+                                            <i class="fa-solid <?php echo $u->getActivo() ? 'fa-user-slash' : 'fa-user-check'; ?>"></i>
+                                            <?php echo $u->getActivo() ? 'Baja' : 'Reactivar'; ?>
+                                        </button>
+                                    </form>
+                                <?php else: ?>
+                                    <span class="status-pill bg-blue-light text-accent border-none gap-6 font-bold">
+                                        <i class="fa-solid fa-user-check"></i>
+                                        Eres tú
+                                    </span>
+                                <?php endif; ?>
+                            </div>
+                        </td>
+                    </tr>
                 <?php endforeach; ?>
                 <tr id="noResults" class="d-none">
                     <td colspan="5">
@@ -123,9 +135,12 @@
                 </div>
                 <div class="form-group">
                     <label class="form-label">ROL INICIAL</label>
-                    <select name="rol" class="form-input">
-                        <option value="cajero" <?php echo (isset($_REQUEST['rol']) && $_REQUEST['rol'] === 'cajero') ? 'selected' : ''; ?>>Cajero</option>
-                        <option value="admin" <?php echo (isset($_REQUEST['rol']) && $_REQUEST['rol'] === 'admin') ? 'selected' : ''; ?>>Administrador</option>
+                    <select name="idRol" class="form-input">
+                        <?php foreach ($listaRoles as $r): ?>
+                            <option value="<?php echo $r['id']; ?>" <?php echo (isset($_REQUEST['idRol']) && $_REQUEST['idRol'] == $r['id']) ? 'selected' : ''; ?>>
+                                <?php echo htmlspecialchars($r['nombre']); ?>
+                            </option>
+                        <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="modal-footer p-0 mt-10">

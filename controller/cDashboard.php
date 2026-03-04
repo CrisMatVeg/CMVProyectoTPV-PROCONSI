@@ -1,23 +1,12 @@
 <?php
+
 /**
  * Controlador: cDashboard
  * 
  * Pantalla intermedia tras el login para elegir entre TPV o Gestión.
  */
 
-// Si se pulsa salir, cerramos sesión
-if (isset($_REQUEST['salir'])) {
-    session_destroy();
-    header('Location: index.php');
-    exit;
-}
-
-// Navegación
-if (isset($_REQUEST['irTPV'])) {
-    $_SESSION['paginaEnCurso'] = 'inicioPrivado';
-    header('Location: index.php');
-    exit;
-}
+// Navegación Global handled by index.php
 
 if (isset($_REQUEST['irUsuarios'])) {
     $_SESSION['paginaEnCurso'] = 'Usuarios';
@@ -61,11 +50,7 @@ if (isset($_REQUEST['irHistorial'])) {
     exit;
 }
 
-if (isset($_REQUEST['irMiPerfil'])) {
-    $_SESSION['paginaEnCurso'] = 'MiPerfil';
-    header('Location: index.php');
-    exit;
-}
+// irMiPerfil handled by index.php
 
 if (isset($_REQUEST['Analitica'])) {
     $_SESSION['paginaEnCurso'] = 'Analitica';
@@ -83,10 +68,10 @@ $avDashboard = [
 if ($_SESSION['usuarioActualTPV']->getRol() === 'admin') {
     require_once 'model/VentaPDO.php';
     require_once 'model/ProductoPDO.php';
-    
+
     $desde = date('Y-m-d', strtotime('-7 days'));
     $hasta = date('Y-m-d');
-    
+
     $avDashboard['kpis'] = VentaPDO::obtenerKPIs($desde, $hasta);
     $avDashboard['metodos'] = VentaPDO::obtenerVentasPorMetodo($desde, $hasta);
     $avDashboard['cajeros'] = VentaPDO::obtenerVentasPorCajero($desde, $hasta);
@@ -95,4 +80,3 @@ if ($_SESSION['usuarioActualTPV']->getRol() === 'admin') {
 
 // Cargamos la vista de dashboard
 require_once $view['layout'];
-?>

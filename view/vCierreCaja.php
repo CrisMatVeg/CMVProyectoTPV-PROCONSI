@@ -30,7 +30,7 @@
     </div>
 
     <!-- RESUMEN EN CARDS -->
-    <div class="grid-4 gap-14 mb-28">
+    <div class="grid-6 gap-14 mb-28">
         <div class="stat-card">
             <div class="summary-label">Ventas</div>
             <div class="fs-28 font-bold font-mono mt-6">
@@ -38,15 +38,27 @@
             </div>
         </div>
         <div class="stat-card">
-            <div class="summary-label">Efectivo en caja</div>
+            <div class="summary-label">Efectivo</div>
             <div class="fs-22 font-bold font-mono mt-6 text-green">
                 <?php echo number_format($avCierreCaja['resumen']['totalEfectivo'], 2, ',', '.'); ?> €
             </div>
         </div>
         <div class="stat-card">
-            <div class="summary-label">Ventas a cuenta / tarjeta</div>
+            <div class="summary-label">Tarjeta</div>
             <div class="fs-22 font-bold font-mono mt-6 text-blue">
                 <?php echo number_format($avCierreCaja['resumen']['totalTarjeta'], 2, ',', '.'); ?> €
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="summary-label">Bizum</div>
+            <div class="fs-22 font-bold font-mono mt-6 text-accent">
+                <?php echo number_format($avCierreCaja['resumen']['totalBizum'], 2, ',', '.'); ?> €
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="summary-label">Financiación</div>
+            <div class="fs-22 font-bold font-mono mt-6" style="color: #6c5ce7;">
+                <?php echo number_format($avCierreCaja['resumen']['totalFinanciado'], 2, ',', '.'); ?> €
             </div>
         </div>
         <div class="stat-card bg-accent border-accent">
@@ -76,7 +88,7 @@
     <!-- APERTURA Y RETIRADAS DE CAJA -->
     <div class="table-container p-24 mb-28 border-2">
         <h3 class="mb-16 d-flex ai-center gap-10">
-            <i class="fa-solid fa-cash-register text-accent"></i> 
+            <i class="fa-solid fa-cash-register text-accent"></i>
             Gestión de Caja (Apertura y Retiradas)
         </h3>
 
@@ -138,7 +150,7 @@
     <!-- ARQUEO DE CAJA (Z) -->
     <div class="table-container p-24 mb-28 border-2" style="border-color: var(--accent);">
         <h3 class="mb-16 d-flex ai-center gap-10">
-            <i class="fa-solid fa-vault text-accent"></i> 
+            <i class="fa-solid fa-vault text-accent"></i>
             Arqueo de Caja y Cierre Fiscal (Z)
         </h3>
         <form method="post" id="formCierre">
@@ -153,6 +165,8 @@
                     <label class="form-label fs-13">Efectivo real en caja</label>
                     <input type="number" step="0.01" name="realEfectivo" id="realEfectivo" class="form-input fs-18 font-mono" placeholder="0.00" oninput="calcularDiferencia()" required>
                     <input type="hidden" name="totalTarjeta" value="<?php echo $avCierreCaja['resumen']['totalTarjeta']; ?>">
+                    <input type="hidden" name="totalBizum" value="<?php echo $avCierreCaja['resumen']['totalBizum']; ?>">
+                    <input type="hidden" name="totalFinanciado" value="<?php echo $avCierreCaja['resumen']['totalFinanciado']; ?>">
                 </div>
                 <div class="form-group">
                     <label class="form-label fs-13">Diferencia / Descuadre</label>
@@ -181,30 +195,30 @@
     </div>
 
     <script>
-    function calcularDiferencia() {
-        const esperado = <?php echo $avCierreCaja['esperadoTurno']; ?>;
-        const realInput = document.getElementById('realEfectivo');
-        const real = parseFloat(realInput.value) || 0;
-        const diff = real - esperado;
-        const el = document.getElementById('diffCaja');
-        el.innerText = (diff >= 0 ? '+' : '') + diff.toFixed(2).replace('.', ',') + ' €';
-        el.className = 'fs-20 font-mono font-bold ' + (diff === 0 ? 'text-green' : 'text-red');
+        function calcularDiferencia() {
+            const esperado = <?php echo $avCierreCaja['esperadoTurno']; ?>;
+            const realInput = document.getElementById('realEfectivo');
+            const real = parseFloat(realInput.value) || 0;
+            const diff = real - esperado;
+            const el = document.getElementById('diffCaja');
+            el.innerText = (diff >= 0 ? '+' : '') + diff.toFixed(2).replace('.', ',') + ' €';
+            el.className = 'fs-20 font-mono font-bold ' + (diff === 0 ? 'text-green' : 'text-red');
 
-        // Calcular importe que se retira al cierre según fondo que se deja
-        const fondoSig = parseFloat(document.getElementById('fondoSiguiente').value) || 0;
-        const retiradoCierre = Math.max(0, real - fondoSig);
-        const elRet = document.getElementById('importeRetiradaCierre');
-        elRet.innerText = retiradoCierre.toFixed(2).replace('.', ',') + ' €';
+            // Calcular importe que se retira al cierre según fondo que se deja
+            const fondoSig = parseFloat(document.getElementById('fondoSiguiente').value) || 0;
+            const retiradoCierre = Math.max(0, real - fondoSig);
+            const elRet = document.getElementById('importeRetiradaCierre');
+            elRet.innerText = retiradoCierre.toFixed(2).replace('.', ',') + ' €';
 
-        // Validación suave: no dejar un fondo superior al efectivo real en caja
-        if (fondoSig > real) {
-            realInput.setCustomValidity('No puedes dejar un fondo superior al efectivo real en caja.');
-        } else {
-            realInput.setCustomValidity('');
+            // Validación suave: no dejar un fondo superior al efectivo real en caja
+            if (fondoSig > real) {
+                realInput.setCustomValidity('No puedes dejar un fondo superior al efectivo real en caja.');
+            } else {
+                realInput.setCustomValidity('');
+            }
         }
-    }
 
-    document.getElementById('fondoSiguiente')?.addEventListener('input', calcularDiferencia);
+        document.getElementById('fondoSiguiente')?.addEventListener('input', calcularDiferencia);
     </script>
 
 
@@ -232,53 +246,62 @@
                 </thead>
                 <tbody>
                     <?php foreach ($avCierreCaja['ventas'] as $i => $v): ?>
-                    <tr>
-                        <td class="pl-20 ticket-num">
-                            #<?php echo str_pad($v['numero_ticket'], 4, '0', STR_PAD_LEFT); ?>
-                        </td>
-                        <td class="font-mono text-muted">
-                            <?php echo date('H:i', strtotime($v['fecha'])); ?>
-                        </td>
-                        <td>
-                            <?php if ($v['tipo_cliente'] === 'empresa'): ?>
-                                <span class="status-pill status-active p-4-8 fs-11 gap-5">
-                                    <i class="fa-solid fa-building"></i> <?php echo htmlspecialchars($v['nombre_cliente'] ?? 'Empresa'); ?>
-                                </span>
-                            <?php else: ?>
-                                <span class="fs-11 text-muted d-inline-flex ai-center gap-5">
-                                    <i class="fa-solid fa-user"></i> Particular
-                                </span>
-                            <?php endif; ?>
-                        </td>
-                        <td>
-                            <?php if ($v['metodo_pago'] === 'efectivo'): ?>
-                                <span class="status-pill status-active p-4-8 fs-11 gap-5 bg-green-light text-green">
-                                    <i class="fa-solid fa-money-bill-1-wave"></i> Efectivo
-                                </span>
-                            <?php else: ?>
-                                <span class="status-pill status-active p-4-8 fs-11 gap-5 bg-blue-light text-blue-light">
-                                    <i class="fa-solid fa-credit-card"></i> Tarjeta
-                                </span>
-                            <?php endif; ?>
-                        </td>
-                        <td class="text-right font-mono">
-                            <?php echo number_format($v['base_imponible'], 2, ',', '.'); ?> €
-                        </td>
-                        <td class="text-right font-mono text-accent">
-                            <?php echo number_format($v['iva_amt'], 2, ',', '.'); ?> €
-                        </td>
-                        <td class="text-right font-mono font-bold pr-20">
-                            <?php echo number_format($v['total'], 2, ',', '.'); ?> €
-                        </td>
-                        <td class="text-center">
-                            <button title="Ver ticket/factura" class="btn-icon" onclick="verTicket(<?php echo $v['numero_ticket']; ?>)">
-                                <i class="fa-solid fa-receipt"></i>
-                            </button>
-                        </td>
-                    </tr>
+                        <tr>
+                            <td class="pl-20 ticket-num">
+                                #<?php echo str_pad($v['numero_ticket'], 4, '0', STR_PAD_LEFT); ?>
+                            </td>
+                            <td class="font-mono text-muted">
+                                <?php echo date('H:i', strtotime($v['fecha'])); ?>
+                            </td>
+                            <td>
+                                <?php if ($v['tipo_cliente'] === 'empresa'): ?>
+                                    <span class="status-pill status-active p-4-8 fs-11 gap-5">
+                                        <i class="fa-solid fa-building"></i> <?php echo htmlspecialchars($v['nombre_cliente'] ?? 'Empresa'); ?>
+                                    </span>
+                                <?php else: ?>
+                                    <span class="fs-11 text-muted d-inline-flex ai-center gap-5">
+                                        <i class="fa-solid fa-user"></i> Particular
+                                    </span>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <?php if ($v['metodo_pago'] === 'efectivo'): ?>
+                                    <span class="status-pill status-active p-4-8 fs-11 gap-5 bg-green-light text-green">
+                                        <i class="fa-solid fa-money-bill-1-wave"></i> Efectivo
+                                    </span>
+                                <?php elseif ($v['metodo_pago'] === 'bizum'): ?>
+                                    <span class="status-pill status-active p-4-8 fs-11 gap-5 bg-accent-light text-accent">
+                                        <i class="fa-solid fa-mobile-screen-button"></i> Bizum
+                                    </span>
+                                <?php elseif ($v['metodo_pago'] === 'financiado'): ?>
+                                    <span class="status-pill status-active p-4-8 fs-11 gap-5" style="background: #efecff; color: #6c5ce7;">
+                                        <i class="fa-solid fa-calendar-check"></i> Financiación
+                                    </span>
+                                <?php else: ?>
+                                    <span class="status-pill status-active p-4-8 fs-11 gap-5 bg-blue-light text-blue">
+                                        <i class="fa-solid fa-credit-card"></i> Tarjeta
+                                    </span>
+                                <?php endif; ?>
+                            </td>
+                            <td class="text-right font-mono">
+                                <?php echo number_format($v['base_imponible'], 2, ',', '.'); ?> €
+                            </td>
+                            <td class="text-right font-mono text-accent">
+                                <?php echo number_format($v['iva_amt'], 2, ',', '.'); ?> €
+                            </td>
+                            <td class="text-right font-mono font-bold pr-20">
+                                <?php echo number_format($v['total'], 2, ',', '.'); ?> €
+                            </td>
+                            <td class="text-center">
+                                <button title="Ver ticket/factura" class="btn-icon" onclick="verTicket(<?php echo $v['numero_ticket']; ?>)">
+                                    <i class="fa-solid fa-receipt"></i>
+                                </button>
+                            </td>
+                        </tr>
                     <?php endforeach; ?>
                 </tbody>
             </table>
-        <?php endif; ?>    </div>
+        <?php endif; ?>
+    </div>
 
 </div>

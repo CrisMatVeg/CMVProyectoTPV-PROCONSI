@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Controller: cProductos.php
  * Gestiona la lista de productos para administración.
@@ -72,6 +73,7 @@ foreach ($oProductos as $oProd) {
         'activo'         => $oProd->getActivo(),
         'stock'          => (int)$oProd->getStockActual(),
         'codigo_iva'     => $oProd->getCodigoIva(),
+        'variantes'      => $oProd->getVariantes(),
     ];
 }
 
@@ -89,4 +91,3 @@ $avProductos = [
 ];
 
 require_once $view['layout'];
-?>

@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS ventas (
     tipo_cliente ENUM('particular','empresa') DEFAULT 'particular',
     nombre_cliente VARCHAR(100) DEFAULT NULL,        -- obligatorio si es empresa
     nif_cliente VARCHAR(20) DEFAULT NULL,            -- CIF/NIF si es empresa
-    metodo_pago ENUM('efectivo','tarjeta') NOT NULL,
+    metodo_pago ENUM('efectivo', 'tarjeta', 'bizum', 'financiado') NOT NULL,
     subtotal DECIMAL(10,2) NOT NULL,
     descuento_pct DECIMAL(5,2) DEFAULT 0,
     descuento_amt DECIMAL(10,2) DEFAULT 0,

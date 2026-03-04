@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Controller: cAnalitica.php
  * Procesa los datos de analítica de ventas para el administrador.
@@ -64,6 +65,7 @@ $avAnalitica = [
     'porCategoria' => VentaPDO::obtenerVentasPorCategoria($fechaDesde, $fechaHasta),
     'topProductos' => VentaPDO::obtenerTopProductos($fechaDesde, $fechaHasta, 10),
     'margenes' => VentaPDO::obtenerMargenesDetallados($fechaDesde, $fechaHasta),
+    'desgloseIva' => VentaPDO::obtenerDesgloseIVA($fechaDesde, $fechaHasta),
     'filtros' => [
         'desde' => $fechaDesde,
         'hasta' => $fechaHasta
@@ -73,4 +75,3 @@ $avAnalitica = [
 
 // Cargar la vista
 require_once $view['layout'];
-?>

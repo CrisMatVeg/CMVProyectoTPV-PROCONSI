@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Controller: cMiPerfil.php
  * Gestiona el perfil del usuario actual.
@@ -23,9 +24,9 @@ $entradaOK = true;
 
 // Procesar cambio de perfil
 if (isset($_REQUEST['guardarCambios'])) {
-    
+
     $aErrores['nombre_completo'] = validacionFormularios::comprobarAlfabetico($_REQUEST['nombre_completo'], 100, 3, 1);
-    
+
     if (!empty($_REQUEST['pass1'])) {
         $aErrores['pass1'] = validacionFormularios::validarPassword($_REQUEST['pass1'], 20, 4, 1, 1);
         if ($_REQUEST['pass1'] !== $_REQUEST['pass2']) {
@@ -44,15 +45,37 @@ if (isset($_REQUEST['guardarCambios'])) {
         try {
             // Actualizar en BD
             $id = $_SESSION['usuarioActualTPV']->getId();
-            
+
             // Actualizamos nombre siempre
             DBPDO::ejecutarConsulta("UPDATE usuarios SET nombre_completo = :nom WHERE id = :id", [':nom' => $nombre, ':id' => $id]);
-            
+
             // Si hay password, la actualizamos
             if (!empty($pass1)) {
                 DBPDO::ejecutarConsulta("UPDATE usuarios SET password = SHA2(:pass,256) WHERE id = :id", [':pass' => $pass1, ':id' => $id]);
             }
-            
+
+            // Actualizar tema si viene en el formulario
+            $campos = [];
+            $params = [':id' => $id];
+            if (!empty($_REQUEST['theme_mode'])) {
+                $mode = $_REQUEST['theme_mode'];
+                if (in_array($mode, ['light', 'dark', 'black'], true)) {
+                    $campos[] = "theme_mode = :mode";
+                    $params[':mode'] = $mode;
+                }
+            }
+            if (!empty($_REQUEST['theme_accent'])) {
+                $accent = $_REQUEST['theme_accent'];
+                if (in_array($accent, ['blue', 'green', 'red', 'purple', 'amber'], true)) {
+                    $campos[] = "theme_accent = :accent";
+                    $params[':accent'] = $accent;
+                }
+            }
+            if ($campos) {
+                $sql = "UPDATE usuarios SET " . implode(', ', $campos) . " WHERE id = :id";
+                DBPDO::ejecutarConsulta($sql, $params);
+            }
+
             // Actualizar objeto en sesión
             $_SESSION['usuarioActualTPV']->setNombreCompleto($nombre);
             $success = "Perfil actualizado correctamente.";
@@ -62,36 +85,7 @@ if (isset($_REQUEST['guardarCambios'])) {
     }
 }
 
-// Navegación Global
-if (isset($_REQUEST['salir'])) {
-    session_destroy();
-    header('Location: index.php');
-    exit;
-}
-
-if (isset($_REQUEST['irTPV'])) {
-    $_SESSION['paginaEnCurso'] = 'inicioPrivado';
-    header('Location: index.php');
-    exit;
-}
-
-if (isset($_REQUEST['irCierreCaja'])) {
-    $_SESSION['paginaEnCurso'] = 'cierreCaja';
-    header('Location: index.php');
-    exit;
-}
-
-if (isset($_REQUEST['irMiPerfil'])) {
-    $_SESSION['paginaEnCurso'] = 'MiPerfil';
-    header('Location: index.php');
-    exit;
-}
-
-if (isset($_REQUEST['volver']) || isset($_REQUEST['irDashboard'])) {
-    $_SESSION['paginaEnCurso'] = 'Dashboard';
-    header('Location: index.php');
-    exit;
-}
+// Navegación Global handled by index.php
 
 
 $avMiPerfil = [
@@ -102,4 +96,3 @@ $avMiPerfil = [
 ];
 
 require_once $view['layout'];
-?>

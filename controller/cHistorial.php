@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Controller: cHistorial.php
  * Gestiona el historial de ventas con filtros.
@@ -53,6 +54,7 @@ if (isset($_REQUEST['volver']) || isset($_REQUEST['irDashboard'])) {
 $fechaDesdeRaw = $_REQUEST['fechaDesde'] ?? date('Y-m-d', strtotime('-7 days'));
 $fechaHastaRaw = $_REQUEST['fechaHasta'] ?? date('Y-m-d');
 $idCajero   = isset($_REQUEST['idCajero']) && $_REQUEST['idCajero'] !== '' ? (int)$_REQUEST['idCajero'] : null;
+$numeroTicket = isset($_REQUEST['numeroTicket']) && $_REQUEST['numeroTicket'] !== '' ? (int)$_REQUEST['numeroTicket'] : null;
 
 $aErrores = [
     'fechaDesde' => validacionFormularios::validarFecha($fechaDesdeRaw, '2050-01-01', '2020-01-01', 0),
@@ -74,7 +76,7 @@ if ($verCierres) {
     $listaVentas = [];
 } else {
     // Obtener ventas filtradas
-    $listaVentas = VentaPDO::buscarVentas($fechaDesde, $fechaHasta, $idCajero);
+    $listaVentas = VentaPDO::buscarVentas($fechaDesde, $fechaHasta, $idCajero, $numeroTicket);
     $listaCierres = [];
 }
 
@@ -87,10 +89,10 @@ $avHistorial = [
     'filtros'      => [
         'desde'   => $fechaDesde,
         'hasta'   => $fechaHasta,
-        'cajero'  => $idCajero
+        'cajero'  => $idCajero,
+        'ticket'  => $numeroTicket
     ],
     'usuario'      => $_SESSION['usuarioActualTPV']->getNombreCompleto()
 ];
 
 require_once $view['layout'];
-?>

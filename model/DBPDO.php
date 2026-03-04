@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Clase: DBPDO
  *
@@ -10,9 +11,10 @@
  */
 
 require_once __DIR__ . '/../config/confDBPDO.php';
-require_once 'AppError.php';
+require_once __DIR__ . '/AppError.php';
 
-class DBPDO {
+class DBPDO
+{
 
     /**
      * Ejecuta una consulta SQL y devuelve el PDOStatement.
@@ -22,14 +24,15 @@ class DBPDO {
      * @param array|null $parametros Parámetros para consultas preparadas
      * @return PDOStatement Objeto PDOStatement ya ejecutado
      */
-    public static function ejecutarConsulta($sql, $parametros = null) {
+    public static function ejecutarConsulta($sql, $parametros = null)
+    {
         try {
             $conexion = new PDO(DSN, USERNAME, PASSWORD);
             $conexion->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
             date_default_timezone_set('Europe/Madrid');
             $conexion->exec("SET time_zone = '+01:00'");
-            
+
             $consulta = $conexion->prepare($sql);
 
             // Ejecutar con o sin parámetros
@@ -40,9 +43,16 @@ class DBPDO {
             }
 
             return $consulta;
-
         } catch (PDOException $e) {
-            // Guardar error en sesión y redirigir a la página de error
+            // Si es una petición API o AJAX, relanzamos la excepción para que el controlador la maneje (p.ej. devolver JSON)
+            if (strpos($_SERVER['SCRIPT_NAME'], '/api/') !== false || (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && $_SERVER['HTTP_X_REQUESTED_WITH'] === 'XMLHttpRequest')) {
+                throw $e;
+            }
+
+            // Guardar error en sesión y redirigir a la página de error (flujo web normal)
+            if (session_status() === PHP_SESSION_NONE) {
+                session_start();
+            }
             $_SESSION['paginaAnterior'] = $_SESSION['paginaEnCurso'] ?? '';
             $_SESSION['paginaEnCurso'] = 'error';
             $_SESSION['error'] = new AppError(
@@ -57,4 +67,3 @@ class DBPDO {
         }
     }
 }
-?>

@@ -1,16 +1,19 @@
 <?php
+
 /**
  * Clase: TipoIVAPDO
  * Gestiona los tipos de IVA y sus vigencias.
  */
 
-require_once 'DBPDO.php';
+require_once __DIR__ . '/DBPDO.php';
 
-class TipoIVAPDO {
+class TipoIVAPDO
+{
     /**
      * Lista todos los tipos de IVA para administración.
      */
-    public static function listarTodos(): array {
+    public static function listarTodos(): array
+    {
         $sql = "SELECT * FROM tipos_iva ORDER BY codigo ASC, fecha_inicio DESC";
         $q = DBPDO::ejecutarConsulta($sql);
         return $q->fetchAll(PDO::FETCH_ASSOC);
@@ -19,7 +22,8 @@ class TipoIVAPDO {
     /**
      * Devuelve el tipo de IVA vigente para un código y fecha concretos.
      */
-    public static function obtenerVigentePorCodigo(string $codigo, string $fecha): ?array {
+    public static function obtenerVigentePorCodigo(string $codigo, string $fecha): ?array
+    {
         $sql = "SELECT *
                 FROM tipos_iva
                 WHERE codigo = :codigo
@@ -36,7 +40,8 @@ class TipoIVAPDO {
         return $row ?: null;
     }
 
-    public static function añadir(array $d): void {
+    public static function añadir(array $d): void
+    {
         $sql = "INSERT INTO tipos_iva
                 (codigo, nombre, porcentaje, fecha_inicio, fecha_fin, activo)
                 VALUES (:codigo, :nombre, :porcentaje, :inicio, :fin, :activo)";
@@ -50,7 +55,8 @@ class TipoIVAPDO {
         ]);
     }
 
-    public static function editar(int $id, array $d): void {
+    public static function editar(int $id, array $d): void
+    {
         $sql = "UPDATE tipos_iva SET
                     codigo = :codigo,
                     nombre = :nombre,
@@ -70,8 +76,8 @@ class TipoIVAPDO {
         ]);
     }
 
-    public static function eliminar(int $id): void {
+    public static function eliminar(int $id): void
+    {
         DBPDO::ejecutarConsulta("DELETE FROM tipos_iva WHERE id = :id", [':id' => $id]);
     }
 }
-

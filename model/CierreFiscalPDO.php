@@ -1,21 +1,26 @@
 <?php
+
 /**
  * Clase: CierreFiscalPDO
  * Gestiona los informes de cierre de caja (Reporte Z).
  */
 require_once 'DBPDO.php';
 
-class CierreFiscalPDO {
+class CierreFiscalPDO
+{
 
     /**
      * Obtiene el resumen de ventas para el cierre actual.
      */
-    public static function obtenerResumenParaCierre(): array {
+    public static function obtenerResumenParaCierre(): array
+    {
         // Ventas no cerradas (num_z is null)
         $sql = "SELECT 
-                    SUM(CASE WHEN metodo_pago = 'efectivo' THEN total ELSE 0 END) as esperado_efectivo,
-                    SUM(CASE WHEN metodo_pago = 'tarjeta' THEN total ELSE 0 END) as esperado_tarjeta,
-                    SUM(total) as esperado_total
+                    SUM(CASE WHEN metodo_pago = 'efectivo' THEN total ELSE 0 END) as total_efectivo,
+                    SUM(CASE WHEN metodo_pago = 'tarjeta' THEN total ELSE 0 END) as total_tarjeta,
+                    SUM(CASE WHEN metodo_pago = 'bizum' THEN total ELSE 0 END) as total_bizum,
+                    SUM(CASE WHEN metodo_pago = 'financiado' THEN total ELSE 0 END) as total_financiado,
+                    SUM(total) as total_general
                 FROM ventas 
                 WHERE num_z IS NULL";
         $q = DBPDO::ejecutarConsulta($sql);
@@ -25,15 +30,19 @@ class CierreFiscalPDO {
     /**
      * Registra un nuevo cierre fiscal.
      */
-    public static function realizarCierre($idUsuario, $totalEfectivo, $totalTarjeta, $totalGeneral): int {
-        $sql = "INSERT INTO cierres_fiscales (id_usuario, total_efectivo, total_tarjeta, total_general) 
-                VALUES (:usuario, :efectivo, :tarjeta, :total)";
-        DBPDO::ejecutarConsulta($sql, [
-            ':usuario'  => $idUsuario,
-            ':efectivo' => $totalEfectivo,
-            ':tarjeta'  => $totalTarjeta,
-            ':total'    => $totalGeneral
-        ]);
+    public static function realizarCierre($idUsuario, $totalEfectivo, $totalTarjeta, $totalBizum, $totalFinanciado, $totalGeneral): int
+    {
+        $sql = "INSERT INTO cierres_fiscales (id_usuario, fecha, total_efectivo, total_tarjeta, total_bizum, total_financiado, total_general) 
+                VALUES (:user, NOW(), :efe, :tar, :biz, :fin, :total)";
+        $params = [
+            ':user'  => $idUsuario,
+            ':efe'   => $totalEfectivo,
+            ':tar'   => $totalTarjeta,
+            ':biz'   => $totalBizum,
+            ':fin'   => $totalFinanciado,
+            ':total' => $totalGeneral
+        ];
+        DBPDO::ejecutarConsulta($sql, $params);
 
         $q = DBPDO::ejecutarConsulta("SELECT id FROM cierres_fiscales ORDER BY id DESC LIMIT 1");
         $idZ = (int)$q->fetch(PDO::FETCH_ASSOC)['id'];
@@ -48,7 +57,8 @@ class CierreFiscalPDO {
     /**
      * Lista históricos de cierres.
      */
-    public static function listarCierres(): array {
+    public static function listarCierres(): array
+    {
         $sql = "SELECT 
                     cf.*,
                     u.nombre as nombre_usuario,

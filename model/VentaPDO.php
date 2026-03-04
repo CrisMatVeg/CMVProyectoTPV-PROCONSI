@@ -1,16 +1,19 @@
 <?php
+
 /**
  * Clase: VentaPDO
  * Gestiona la persistencia de las ventas mediante DBPDO.
  * @package Modelos
  * @author Cristian Mateos Vega
  */
-require_once 'DBPDO.php';
-require_once 'Venta.php';
+require_once __DIR__ . '/DBPDO.php';
+require_once __DIR__ . '/Venta.php';
 
-class VentaPDO {
+class VentaPDO
+{
 
-    public static function obtenerSiguienteTicket(): int {
+    public static function obtenerSiguienteTicket(): int
+    {
         $sql = "SELECT COALESCE(MAX(numero_ticket), 1000) + 1 AS siguiente FROM ventas";
         $q = DBPDO::ejecutarConsulta($sql);
         $row = $q->fetch(PDO::FETCH_ASSOC);
@@ -23,27 +26,28 @@ class VentaPDO {
      * @param int $idUsuario ID del usuario que realiza la venta
      * @return int Número de ticket asignado
      */
-    public static function guardarVenta(array $datos, int $idUsuario): int {
+    public static function guardarVenta(array $datos, int $idUsuario): int
+    {
         $numTicket = self::obtenerSiguienteTicket();
 
         $subtotal    = round((float)$datos['subtotal'], 2);
         $descPct     = round((float)($datos['descuentoPct'] ?? 0), 2);
         $descAmt     = round($subtotal * $descPct / 100, 2);
         $base        = round($subtotal - $descAmt, 2);
-        
+
         // Si no viene el total, lo calculamos (Base + 21% IVA estándar)
         if (!isset($datos['total']) || (float)$datos['total'] <= 0) {
             $total = round($base * 1.21, 2);
         } else {
             $total = round((float)$datos['total'], 2);
         }
-        
+
         $ivaAmt = round($total - $base, 2);
 
         $tipoCliente    = in_array($datos['tipoCliente'] ?? '', ['particular', 'empresa']) ? $datos['tipoCliente'] : 'particular';
         $nombreCliente  = isset($datos['nombreCliente']) ? mb_substr(trim($datos['nombreCliente']), 0, 100) : null;
         $nifCliente     = isset($datos['nifCliente']) ? mb_substr(trim($datos['nifCliente']), 0, 20) : null;
-        $metodoPago     = in_array($datos['metodoPago'] ?? '', ['efectivo', 'tarjeta']) ? $datos['metodoPago'] : 'efectivo';
+        $metodoPago     = in_array($datos['metodoPago'] ?? '', ['efectivo', 'tarjeta', 'bizum', 'financiado']) ? $datos['metodoPago'] : 'efectivo';
         $idCliente      = isset($datos['idCliente']) ? (int)$datos['idCliente'] : null;
         $efectivoRecibido = ($metodoPago === 'efectivo') ? round((float)($datos['efectivo']['recibido'] ?? $datos['efectivoRecibido'] ?? 0), 2) : 0;
 
@@ -83,7 +87,7 @@ class VentaPDO {
             $qty        = (int)$linea['qty'];
             $totalLinea = round($precioUnit * $qty, 2);
             $ivaAplicado = (float)($linea['iva'] ?? 21.00);
-            
+
             // Obtener datos del producto (garantía, código IVA lógico, etc.)
             $mesesGarantia = 24; // Valor por defecto
             $codigoIva     = 'GENERAL';
@@ -110,8 +114,8 @@ class VentaPDO {
             }
 
             $sqlLinea = "INSERT INTO lineas_venta
-                (id_venta, id_producto, nombre_producto, codigo_producto, precio_unitario, iva_aplicado, cantidad, meses_garantia, total_linea, numero_serie)
-                VALUES (:venta, :prod, :nombre, :codigo, :precio, :iva, :qty, :garantia, :total, :serial)";
+                (id_venta, id_producto, nombre_producto, codigo_producto, precio_unitario, iva_aplicado, cantidad, meses_garantia, total_linea, numero_serie, variantes)
+                VALUES (:venta, :prod, :nombre, :codigo, :precio, :iva, :qty, :garantia, :total, :serial, :variantes)";
 
             DBPDO::ejecutarConsulta($sqlLinea, [
                 ':venta'  => $idVenta,
@@ -123,7 +127,8 @@ class VentaPDO {
                 ':qty'    => $qty,
                 ':garantia' => $mesesGarantia,
                 ':total'  => $totalLinea,
-                ':serial' => isset($linea['serials']) ? json_encode($linea['serials']) : null
+                ':serial' => isset($linea['serials']) ? json_encode($linea['serials']) : null,
+                ':variantes' => isset($linea['variants']) ? json_encode($linea['variants'], JSON_UNESCAPED_UNICODE) : null
             ]);
 
             // Gestión de Números de Serie si vienen en la línea
@@ -144,10 +149,37 @@ class VentaPDO {
             }
         }
 
+        // --- NUEVO: GUARDAR DETALLES DE FINANCIACIÓN ---
+        if ($metodoPago === 'financiado' && !empty($datos['financiacion'])) {
+            $fin = $datos['financiacion'];
+            // Mapear los nombres de claves que vienen del frontend
+            $idFinanciera = $fin['idFinanciera'] ?? $fin['id_financiera'] ?? null;
+            $meses = $fin['meses'] ?? null;
+            $cuota = $fin['cuotaMensual'] ?? $fin['cuota'] ?? 0;
+            $intereses = $fin['importeIntereses'] ?? $fin['intereses'] ?? 0;
+            $modalidad = $fin['modalidad'] ?? 'vendedor_paga_intereses';
+            
+            if ($idFinanciera && $meses) {
+                $sqlFin = "INSERT INTO ventas_financiacion 
+                    (id_venta, id_financiera, meses, cuota_mensual, importe_intereses, modalidad, estado)
+                    VALUES (:venta, :financiera, :meses, :cuota, :intereses, :modalidad, 'aprobada')";
+
+                DBPDO::ejecutarConsulta($sqlFin, [
+                    ':venta'      => $idVenta,
+                    ':financiera' => (int)$idFinanciera,
+                    ':meses'      => (int)$meses,
+                    ':cuota'      => round((float)$cuota, 2),
+                    ':intereses'  => round((float)$intereses, 2),
+                    ':modalidad'  => $modalidad
+                ]);
+            }
+        }
+
         return $numTicket;
     }
 
-    public static function obtenerVentasHoy(): array {
+    public static function obtenerVentasHoy(): array
+    {
         $sql = "SELECT v.*, u.nombre AS nombre_cajero 
                 FROM ventas v 
                 LEFT JOIN usuarios u ON v.id_usuario = u.id
@@ -156,7 +188,8 @@ class VentaPDO {
         return $q->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    public static function obtenerVentaPorTicket(int $numTicket): ?array {
+    public static function obtenerVentaPorTicket(int $numTicket): ?array
+    {
         $sqlVenta = "SELECT v.*, u.nombre AS nombre_cajero
                      FROM ventas v
                      LEFT JOIN usuarios u ON v.id_usuario = u.id
@@ -165,7 +198,7 @@ class VentaPDO {
         $venta = $q->fetch(PDO::FETCH_ASSOC);
         if (!$venta) return null;
 
-        $sqlLineas = "SELECT lv.*, GROUP_CONCAT(ns.numero_serie) as numeros_serie
+        $sqlLineas = "SELECT lv.*, lv.variantes as variantes_json, GROUP_CONCAT(ns.numero_serie) as numeros_serie
                       FROM lineas_venta lv
                       LEFT JOIN lineas_serie_venta lsv ON lv.id = lsv.id_linea_venta
                       LEFT JOIN numeros_serie ns ON lsv.id_numero_serie = ns.id
@@ -175,22 +208,33 @@ class VentaPDO {
         $qL = DBPDO::ejecutarConsulta($sqlLineas, [':v' => $venta['id']]);
         $venta['lineas'] = $qL->fetchAll(PDO::FETCH_ASSOC);
 
+        // --- NUEVO: FETCH FINANCING DETAILS ---
+        if ($venta['metodo_pago'] === 'financiado') {
+            $sqlFin = "SELECT vf.*, f.nombre as nombre_financiera 
+                       FROM ventas_financiacion vf
+                       JOIN financieras f ON vf.id_financiera = f.id
+                       WHERE vf.id_venta = :v";
+            $qF = DBPDO::ejecutarConsulta($sqlFin, [':v' => $venta['id']]);
+            $venta['financiacion'] = $qF->fetch(PDO::FETCH_ASSOC);
+        }
+
         return $venta;
     }
 
-    public static function buscarVentas(string $desde, string $hasta, ?int $idUsuario = null): array {
+    public static function buscarVentas(string $desde, string $hasta, ?int $idUsuario = null): array
+    {
         $sql = "SELECT v.*, u.nombre as nombre_cajero 
                 FROM ventas v
                 LEFT JOIN usuarios u ON v.id_usuario = u.id
                 WHERE DATE(v.fecha) BETWEEN :desde AND :hasta";
-        
+
         $params = [':desde' => $desde, ':hasta' => $hasta];
-        
+
         if ($idUsuario) {
             $sql .= " AND v.id_usuario = :usuario";
             $params[':usuario'] = $idUsuario;
         }
-        
+
         $sql .= " ORDER BY v.fecha DESC";
         $q = DBPDO::ejecutarConsulta($sql, $params);
         return $q->fetchAll(PDO::FETCH_ASSOC);
@@ -199,7 +243,8 @@ class VentaPDO {
     /**
      * Marca una línea de venta como devuelta y repone stock.
      */
-    public static function devolverLinea(int $idLinea, ?string $motivo = null): bool {
+    public static function devolverLinea(int $idLinea, ?string $motivo = null): bool
+    {
         // 1. Obtener datos de la línea
         $sql = "SELECT id_producto, cantidad, devuelta, id_venta FROM lineas_venta WHERE id = :id";
         $q = DBPDO::ejecutarConsulta($sql, [':id' => $idLinea]);
@@ -232,8 +277,9 @@ class VentaPDO {
             $qStats = DBPDO::ejecutarConsulta($sqlStats, [':idv' => $l['id_venta']]);
             $stats = $qStats->fetch(PDO::FETCH_ASSOC);
 
-            if ($stats 
-                && (int)$stats['total'] > 0 
+            if (
+                $stats
+                && (int)$stats['total'] > 0
                 && (int)$stats['total'] === (int)$stats['devueltas']
             ) {
                 DBPDO::ejecutarConsulta(
@@ -248,7 +294,8 @@ class VentaPDO {
     /**
      * Devuelve una venta completa.
      */
-    public static function devolverVenta(int $numTicket, ?string $motivo = null): bool {
+    public static function devolverVenta(int $numTicket, ?string $motivo = null): bool
+    {
         $v = self::obtenerVentaPorTicket($numTicket);
         if (!$v || $v['estado'] !== 'completada') return false;
 
@@ -265,7 +312,8 @@ class VentaPDO {
     /**
      * Obtiene métricas clave para el dashboard.
      */
-    public static function obtenerKPIs(string $desde, string $hasta): array {
+    public static function obtenerKPIs(string $desde, string $hasta): array
+    {
         $sql = "SELECT 
                     COUNT(v.id) as total_tickets,
                     COALESCE(SUM(v.total), 0) as total_ventas,
@@ -278,12 +326,14 @@ class VentaPDO {
                      AND DATE(v2.fecha) BETWEEN :desde AND :hasta), 0) as margen_estimado
                 FROM ventas v
                 WHERE v.estado = 'completada' AND DATE(v.fecha) BETWEEN :desde2 AND :hasta2";
-        
+
         $params = [
-            ':desde'  => $desde, ':hasta'  => $hasta,
-            ':desde2' => $desde, ':hasta2' => $hasta
+            ':desde'  => $desde,
+            ':hasta'  => $hasta,
+            ':desde2' => $desde,
+            ':hasta2' => $hasta
         ];
-        
+
         $q = DBPDO::ejecutarConsulta($sql, $params);
         return $q->fetch(PDO::FETCH_ASSOC);
     }
@@ -291,7 +341,8 @@ class VentaPDO {
     /**
      * Obtiene ventas agrupadas por método de pago.
      */
-    public static function obtenerVentasPorMetodo(string $desde, string $hasta): array {
+    public static function obtenerVentasPorMetodo(string $desde, string $hasta): array
+    {
         $sql = "SELECT metodo_pago, COALESCE(SUM(total), 0) as total, COUNT(*) as cantidad
                 FROM ventas
                 WHERE estado = 'completada' AND DATE(fecha) BETWEEN :desde AND :hasta
@@ -303,7 +354,8 @@ class VentaPDO {
     /**
      * Obtiene evolución de ventas por día.
      */
-    public static function obtenerVentasPorFecha(string $desde, string $hasta): array {
+    public static function obtenerVentasPorFecha(string $desde, string $hasta): array
+    {
         $sql = "SELECT DATE(fecha) as fecha, SUM(total) as total
                 FROM ventas
                 WHERE estado = 'completada' AND DATE(fecha) BETWEEN :desde AND :hasta
@@ -316,7 +368,8 @@ class VentaPDO {
     /**
      * Obtiene ventas agrupadas por cajero/usuario.
      */
-    public static function obtenerVentasPorCajero(string $desde, string $hasta): array {
+    public static function obtenerVentasPorCajero(string $desde, string $hasta): array
+    {
         $sql = "SELECT u.nombre, COALESCE(SUM(v.total), 0) as total, COUNT(v.id) as cantidad
                 FROM ventas v
                 JOIN usuarios u ON v.id_usuario = u.id
@@ -330,7 +383,8 @@ class VentaPDO {
     /**
      * Obtiene ventas agrupadas por categoría.
      */
-    public static function obtenerVentasPorCategoria(string $desde, string $hasta): array {
+    public static function obtenerVentasPorCategoria(string $desde, string $hasta): array
+    {
         $sql = "SELECT p.categoria, COALESCE(SUM(lv.total_linea), 0) as total, COUNT(lv.id) as cantidad
                 FROM lineas_venta lv
                 JOIN productos p ON lv.id_producto = p.id
@@ -346,7 +400,8 @@ class VentaPDO {
     /**
      * Obtiene los productos más vendidos.
      */
-    public static function obtenerTopProductos(string $desde, string $hasta, int $limite = 10): array {
+    public static function obtenerTopProductos(string $desde, string $hasta, int $limite = 10): array
+    {
         $sql = "SELECT 
                     lv.id_producto,
                     COALESCE(
@@ -370,12 +425,12 @@ class VentaPDO {
                 GROUP BY lv.id_producto, nombre_producto, codigo_producto
                 ORDER BY unidades DESC
                 LIMIT :limite";
-        
+
         // PDO::prepare LIMIT doesn't work well with params in some configs depending on emulation
         // we'll cast to int or use string replacement if needed, but standard DBPDO uses prepare
         // Since we know $limite is an int we'll just use it in the query string safely or cast it.
         $sql = str_replace(':limite', (int)$limite, $sql);
-        
+
         $q = DBPDO::ejecutarConsulta($sql, [':desde' => $desde, ':hasta' => $hasta]);
         return $q->fetchAll(PDO::FETCH_ASSOC);
     }
@@ -383,7 +438,8 @@ class VentaPDO {
     /**
      * Obtiene el desglose de márgenes (Ingreso vs Coste).
      */
-    public static function obtenerMargenesDetallados(string $desde, string $hasta): array {
+    public static function obtenerMargenesDetallados(string $desde, string $hasta): array
+    {
         $sql = "SELECT DATE(v.fecha) as fecha,
                        SUM(lv.total_linea) as ingresos,
                        SUM(p.precio_coste * lv.cantidad) as costes,

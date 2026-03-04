@@ -1,4 +1,5 @@
 <?php
+
 /**
  * API: guardarVenta.php
  * Recibe la venta desde el frontend (JSON via fetch),
@@ -17,11 +18,13 @@ try {
     // Bootstrap: config, BD y modelos
     require_once __DIR__ . '/../config/confDBPDO.php';
     require_once __DIR__ . '/../model/DBPDO.php';
-    
+
     // MIGRACIÓN AUTOMÁTICA (Provisional para estabilizar el sistema)
     try {
         DBPDO::ejecutarConsulta("ALTER TABLE ventas ADD COLUMN IF NOT EXISTS efectivo_recibido DECIMAL(10,2) DEFAULT 0.00");
-    } catch (Throwable $e) { /* Ya existe o error menor */ }
+        DBPDO::ejecutarConsulta("ALTER TABLE lineas_venta ADD COLUMN IF NOT EXISTS variantes JSON DEFAULT NULL");
+    } catch (Throwable $e) { /* Ya existe o error menor */
+    }
 
     // ⚠️ Usuario.php debe cargarse ANTES de session_start()
     require_once __DIR__ . '/../model/Usuario.php';
@@ -94,7 +97,6 @@ try {
                 $aErrores['empresaNif'] = 'El CIF/NIF no tiene un formato válido (ej: B12345678, 12345678A, X1234567A).';
             }
         }
-
     }
 
     $entradaOK = true;
@@ -158,7 +160,6 @@ try {
         'ticket' => $numTicket,
         'venta'  => $ventaCompleta
     ]);
-
 } catch (Throwable $e) {
     // Captura cualquier error PHP o excepción y lo devuelve como JSON
     http_response_code(500);
@@ -167,4 +168,3 @@ try {
         'error' => 'Error del servidor: ' . $e->getMessage()
     ]);
 }
-

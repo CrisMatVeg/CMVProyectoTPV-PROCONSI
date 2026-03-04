@@ -1,13 +1,16 @@
 <?php
+
 /**
  * Clase: CajaTurnoPDO
  * Gestiona la apertura/cierre de caja y retiradas de efectivo.
  */
 
-require_once 'DBPDO.php';
+require_once __DIR__ . '/DBPDO.php';
 
-class CajaTurnoPDO {
-    public static function obtenerTurnoAbierto(): ?array {
+class CajaTurnoPDO
+{
+    public static function obtenerTurnoAbierto(): ?array
+    {
         $q = DBPDO::ejecutarConsulta(
             "SELECT * FROM caja_turnos WHERE estado = 'abierto' ORDER BY id DESC LIMIT 1"
         );
@@ -15,7 +18,8 @@ class CajaTurnoPDO {
         return $row ?: null;
     }
 
-    public static function abrirTurno(int $idUsuario, float $fondoInicial): int {
+    public static function abrirTurno(int $idUsuario, float $fondoInicial): int
+    {
         if ($fondoInicial < 0) {
             $fondoInicial = 0;
         }
@@ -27,7 +31,8 @@ class CajaTurnoPDO {
         return (int)$q->fetch(PDO::FETCH_ASSOC)['id'];
     }
 
-    public static function registrarRetiro(int $idTurno, int $idUsuario, float $importe, string $concepto = ''): void {
+    public static function registrarRetiro(int $idTurno, int $idUsuario, float $importe, string $concepto = ''): void
+    {
         if ($importe <= 0) {
             return;
         }
@@ -64,7 +69,8 @@ class CajaTurnoPDO {
         );
     }
 
-    public static function listarRetiros(int $idTurno): array {
+    public static function listarRetiros(int $idTurno): array
+    {
         try {
             $sql = "SELECT m.*, u.nombre as nombre_usuario
                     FROM caja_movimientos m
@@ -92,7 +98,8 @@ class CajaTurnoPDO {
      * - retiradas registradas
      * - devoluciones parciales de líneas (sobre tickets aún completados)
      */
-    public static function obtenerEfectivoDisponible(): float {
+    public static function obtenerEfectivoDisponible(): float
+    {
         $turno = self::obtenerTurnoAbierto();
         if (!$turno) {
             return 0.0;
@@ -141,4 +148,3 @@ class CajaTurnoPDO {
         return $efectivo > 0 ? $efectivo : 0.0;
     }
 }
-

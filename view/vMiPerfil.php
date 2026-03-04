@@ -26,6 +26,8 @@
         <?php endif; ?>
 
         <form method="post" class="form-grid gap-20 d-flex flex-column" novalidate>
+            <input type="hidden" name="theme_mode" id="theme_mode_input">
+            <input type="hidden" name="theme_accent" id="theme_accent_input">
             <div class="form-group">
                 <label class="form-label">Nombre Completo</label>
                 <input type="text" name="nombre_completo" class="form-input" value="<?php echo htmlspecialchars($_REQUEST['nombre_completo'] ?? $avMiPerfil['usuario']->getNombreCompleto()); ?>">
@@ -148,6 +150,11 @@
         if (accentIds[accent] && document.getElementById(accentIds[accent])) {
             document.getElementById(accentIds[accent]).classList.add('active');
         }
+
+        const modeInput = document.getElementById('theme_mode_input');
+        const accentInput = document.getElementById('theme_accent_input');
+        if (modeInput) modeInput.value = mode;
+        if (accentInput) accentInput.value = accent;
     })();
 </script>
 

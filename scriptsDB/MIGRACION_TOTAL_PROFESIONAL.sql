@@ -45,7 +45,7 @@ ALTER TABLE ventas
     ADD COLUMN id_usuario INT AFTER fecha,
     ADD COLUMN estado ENUM('completada', 'devuelta', 'anulada') DEFAULT 'completada' AFTER total,
     ADD COLUMN num_z INT DEFAULT NULL AFTER estado,
-    MODIFY COLUMN metodo_pago ENUM('efectivo', 'tarjeta') NOT NULL;
+    MODIFY COLUMN metodo_pago ENUM('efectivo', 'tarjeta', 'bizum', 'financiado') NOT NULL;
 
 -- Vinculamos cajero antiguo al nuevo campo de usuario
 UPDATE ventas SET id_usuario = id_cajero;

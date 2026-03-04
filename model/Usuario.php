@@ -1,38 +1,97 @@
 <?php
+
 /**
  * Clase: Usuario
  * * Entidad que representa a un usuario del sistema TPV.
  * * @package Modelos
  * @author Cristian Mateos Vega
  */
-class Usuario {
+class Usuario
+{
     private $id;
     private $nombre;
     private $login;
     private $password;
-    private $rol;
+    private $rol; // Nombre del rol (legacy)
+    private $idRol; // ID del nuevo sistema de roles
     private $activo;
 
-    public function __construct($id, $nombre, $login, $password, $rol, $activo) {
+    public function __construct($id, $nombre, $login, $password, $rol, $activo, $idRol = null)
+    {
         $this->id = $id;
         $this->nombre = $nombre;
         $this->login = $login;
         $this->password = $password;
         $this->rol = $rol;
+        $this->idRol = $idRol;
         $this->activo = $activo;
     }
 
     // Getters
-    public function getId() { return $this->id; }
-    public function getNombre() { return $this->nombre; }
-    public function getNombreCompleto() { return $this->nombre; } // Alias para compatibilidad
-    public function getLogin() { return $this->login; }
-    public function getUsername() { return $this->login; } // Alias para compatibilidad
-    public function getPassword() { return $this->password; }
-    public function getRol() { return $this->rol; }
-    public function getActivo() { return $this->activo; }
+    public function getId()
+    {
+        return $this->id;
+    }
+    public function getNombre()
+    {
+        return $this->nombre;
+    }
+    public function getNombreCompleto()
+    {
+        return $this->nombre;
+    } // Alias para compatibilidad
+    public function getLogin()
+    {
+        return $this->login;
+    }
+    public function getUsername()
+    {
+        return $this->login;
+    } // Alias para compatibilidad
+    public function getPassword()
+    {
+        return $this->password;
+    }
+    public function getRol()
+    {
+        return $this->rol;
+    }
+    public function getIdRol()
+    {
+        return $this->idRol;
+    }
+    public function getActivo()
+    {
+        return $this->activo;
+    }
+
+    /**
+     * Verifica si el usuario tiene un permiso específico por clave.
+     */
+    public function tienePermiso($permisoClave)
+    {
+        // Por seguridad, si es admin total por legacy, permitimos todo
+        if ($this->rol === 'admin') return true;
+
+        if (!isset($_SESSION['permisos_usuario'])) {
+            require_once 'model/RolPDO.php';
+            $_SESSION['permisos_usuario'] = RolPDO::obtenerPermisosRol($this->idRol);
+        }
+
+        return in_array($permisoClave, $_SESSION['permisos_usuario'] ?? []);
+    }
 
     // Setters (opcional, para edición)
-    public function setNombre($nombre) { $this->nombre = $nombre; }
-    public function setRol($rol) { $this->rol = $rol; }
+    public function setNombre($nombre)
+    {
+        $this->nombre = $nombre;
+    }
+    public function setRol($rol)
+    {
+        $this->rol = $rol;
+    }
+    public function setIdRol($id)
+    {
+        $this->idRol = $id;
+    }
 }

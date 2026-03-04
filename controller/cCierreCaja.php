@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Controller: cCierreCaja.php
  * Obtiene todas las ventas del día y las pasa a la vista de cierre.
@@ -40,18 +41,47 @@ if (isset($_REQUEST['irMiPerfil'])) {
 require_once 'model/CierreFiscalPDO.php';
 require_once 'model/CajaTurnoPDO.php';
 require_once 'model/CajaDeudaPDO.php';
+require_once 'model/VentaPDO.php';
 
-// Obtener turno actual (si existe)
+// 1. Definir funciones auxiliares
+if (!function_exists('calcularResumenCaja')) {
+    function calcularResumenCaja($ventas)
+    {
+        $r = [
+            'totalVentas'     => count($ventas),
+            'totalEfectivo'   => 0.0,
+            'totalTarjeta'    => 0.0,
+            'totalBizum'      => 0.0,
+            'totalFinanciado' => 0.0,
+            'totalIVA'        => 0.0,
+            'totalBruto'      => 0.0,
+        ];
+
+        foreach ($ventas as $v) {
+            $r['totalBruto'] += (float)$v['total'];
+            $r['totalIVA']   += (float)$v['iva_amt'];
+            $m = $v['metodo_pago'];
+            if ($m === 'efectivo') $r['totalEfectivo'] += (float)$v['total'];
+            elseif ($m === 'tarjeta') $r['totalTarjeta'] += (float)$v['total'];
+            elseif ($m === 'bizum') $r['totalBizum'] += (float)$v['total'];
+            elseif ($m === 'financiado') $r['totalFinanciado'] += (float)$v['total'];
+        }
+        return $r;
+    }
+}
+
+// 2. Obtener datos base
+$ventasHoy = VentaPDO::obtenerVentasHoy();
+$resumen = calcularResumenCaja($ventasHoy);
 $turnoActual = CajaTurnoPDO::obtenerTurnoAbierto();
 
-// Apertura de caja
+// 3. Procesar acciones de apertura y retiradas
 if (isset($_POST['abrirCaja']) && !$turnoActual) {
-    $fondoInicial = max(0, (float)($_POST['fondoInicial'] ?? 0));
-    $idTurno = CajaTurnoPDO::abrirTurno($_SESSION['usuarioActualTPV']->getId(), $fondoInicial);
+    $fondoInicialInput = max(0, (float)($_POST['fondoInicial'] ?? 0));
+    CajaTurnoPDO::abrirTurno($_SESSION['usuarioActualTPV']->getId(), $fondoInicialInput);
     $turnoActual = CajaTurnoPDO::obtenerTurnoAbierto();
 }
 
-// Registrar retirada de efectivo durante el turno
 if (isset($_POST['registrarRetiro']) && $turnoActual) {
     $importe = max(0, (float)($_POST['importeRetiro'] ?? 0));
     $concepto = trim($_POST['conceptoRetiro'] ?? '');
@@ -62,44 +92,53 @@ if (isset($_POST['registrarRetiro']) && $turnoActual) {
             $importe,
             $concepto
         );
-        // Refrescar datos del turno
         $turnoActual = CajaTurnoPDO::obtenerTurnoAbierto();
     }
 }
 
-// Procesar Cierre Definitivo
-if (isset($_POST['doCierre'])) {
-    $totalEfectivoReal = max(0, (float)$_POST['realEfectivo']);
-    $totalTarjeta      = max(0, (float)$_POST['totalTarjeta']); // Tarjeta suele ser lo que dice el TPV (datáfono externo)
-    $totalGeneral      = $totalEfectivoReal + $totalTarjeta;
+// 4. Calcular estado esperado de la caja
+$fondoInicial = $turnoActual ? (float)$turnoActual['fondo_inicial'] : 0.0;
+$totalRetirado = $turnoActual ? (float)$turnoActual['total_retirado'] : 0.0;
+$esperadoEfectivoTurno = max(0, $fondoInicial + $resumen['totalEfectivo'] - $totalRetirado);
 
-    // Registrar cierre fiscal (Reporte Z)
-    $idCierre = CierreFiscalPDO::realizarCierre(
+// 5. Procesar Cierre Definitivo
+if (isset($_POST['doCierre'])) {
+    $totalEfectivo = (float)($resumen['totalEfectivo'] ?? 0);
+    $totalTarjeta  = (float)($resumen['totalTarjeta'] ?? 0);
+    $totalBizum    = (float)($resumen['totalBizum'] ?? 0);
+    $totalFinan    = (float)($resumen['totalFinanciado'] ?? 0);
+    $totalGeneral  = (float)($resumen['totalBruto'] ?? 0);
+
+    // Registrar el cierre fiscal
+    $idZ = CierreFiscalPDO::realizarCierre(
         $_SESSION['usuarioActualTPV']->getId(),
-        $totalEfectivoReal,
+        $totalEfectivo,
         $totalTarjeta,
+        $totalBizum,
+        $totalFinan,
         $totalGeneral
     );
 
-    // Si hay faltante (real < esperado), registrar deuda de caja
-    $diferencia = $totalEfectivoReal - $esperadoEfectivoTurno;
-    if ($diferencia < -0.009) { // margen pequeño para decimales
-        $importeDeuda = abs($diferencia);
+    // Registrar deuda si hay descuadre negativo
+    $realEfectivoForm = max(0, (float)($_POST['realEfectivo'] ?? 0));
+    $diferencia = $realEfectivoForm - $esperadoEfectivoTurno;
+
+    if ($diferencia < -0.009) {
         CajaDeudaPDO::crearDeuda(
-            $idCierre,
+            $idZ,
             $_SESSION['usuarioActualTPV']->getId(),
-            $importeDeuda,
+            abs($diferencia),
             'Faltante de caja detectado en cierre'
         );
     }
 
-    // Cierre de turno de caja (si existe)
+    // Cerrar turno de caja
     if ($turnoActual) {
         $fondoSiguiente = max(0, (float)($_POST['fondoSiguiente'] ?? 0));
         CajaTurnoPDO::cerrarTurno(
             (int)$turnoActual['id'],
             $_SESSION['usuarioActualTPV']->getId(),
-            $totalEfectivoReal,
+            $realEfectivoForm,
             $fondoSiguiente
         );
         $turnoActual = null;
@@ -109,36 +148,7 @@ if (isset($_POST['doCierre'])) {
 }
 
 $esAdmin = $_SESSION['usuarioActualTPV']->getRol() === 'admin';
-
-// Registrar la página actual en sesión (para data-page en el layout)
 $_SESSION['paginaEnCurso'] = 'cierreCaja';
-
-// Obtener ventas del día
-$ventasHoy = VentaPDO::obtenerVentasHoy();
-
-// Calcular resumen
-$resumen = [
-    'totalVentas'   => count($ventasHoy),
-    'totalEfectivo' => 0.0,
-    'totalTarjeta'  => 0.0,
-    'totalIVA'      => 0.0,
-    'totalBruto'    => 0.0,
-];
-
-foreach ($ventasHoy as $v) {
-    $resumen['totalBruto'] += (float)$v['total'];
-    $resumen['totalIVA']   += (float)$v['iva_amt'];
-    if ($v['metodo_pago'] === 'efectivo') {
-        $resumen['totalEfectivo'] += (float)$v['total'];
-    } else {
-        $resumen['totalTarjeta'] += (float)$v['total'];
-    }
-}
-
-// Cálculo de efectivo esperado según turno
-$fondoInicial = $turnoActual ? (float)$turnoActual['fondo_inicial'] : 0.0;
-$totalRetirado = $turnoActual ? (float)$turnoActual['total_retirado'] : 0.0;
-$esperadoEfectivoTurno = max(0, $fondoInicial + $resumen['totalEfectivo'] - $totalRetirado);
 
 $avCierreCaja = [
     'nombre_completo' => $_SESSION['usuarioActualTPV']->getNombreCompleto(),
