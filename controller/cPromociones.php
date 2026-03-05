@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Controlador: cPromociones
  * Pantalla de administración de descuentos y promociones.
@@ -44,9 +45,14 @@ if (isset($_REQUEST['volver']) || isset($_REQUEST['irDashboard'])) {
     exit;
 }
 
+require_once 'model/ProductoPDO.php';
+require_once 'model/CategoriaPDO.php';
+
 $avPromos = [
     'lista' => PromocionPDO::listarTodas(),
+    'productos' => ProductoPDO::listarProductos(false),
+    'categorias' => CategoriaPDO::listarTodas(),
 ];
 
-require_once $view['layout'];
 
+require_once $view['layout'];

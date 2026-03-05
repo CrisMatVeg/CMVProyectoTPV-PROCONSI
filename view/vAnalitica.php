@@ -72,122 +72,243 @@
 
     <div class="container d-flex flex-column gap-24">
         <div class="d-grid grid-2-1 gap-24 ai-start">
-        <!-- TOP PRODUCTOS -->
-        <div class="card p-0 br-20 bg-white shadow-sm border-2 overflow-hidden" style="min-height: 400px;">
-            <div class="p-20 border-bottom d-flex jc-between ai-center">
-                <h3 class="m-0 fs-16"><i class="fa-solid fa-crown text-orange mr-8"></i> Top 10 Productos más vendidos</h3>
-                <span class="fs-11 text-muted tt-uppercase">Por unidades</span>
-            </div>
-            <table class="data-table mb-0">
-                <thead>
-                    <tr>
-                        <th class="pl-20">Producto</th>
-                        <th class="text-right">Unidades</th>
-                        <th class="text-right pr-20">Ingresos Totales</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php if (empty($avAnalitica['topProductos'])): ?>
-                        <tr><td colspan="3" class="empty-state p-40">Sin datos en este rango.</td></tr>
-                    <?php endif; ?>
-                    <?php foreach ($avAnalitica['topProductos'] as $idx => $p): ?>
+            <!-- TOP PRODUCTOS -->
+            <div class="card p-0 br-20 bg-white shadow-sm border-2 overflow-hidden" style="min-height: 400px;">
+                <div class="p-20 border-bottom d-flex jc-between ai-center">
+                    <h3 class="m-0 fs-16"><i class="fa-solid fa-crown text-orange mr-8"></i> Top 10 Productos más vendidos</h3>
+                    <span class="fs-11 text-muted tt-uppercase">Por unidades</span>
+                </div>
+                <table class="data-table mb-0">
+                    <thead>
                         <tr>
-                            <td class="pl-20">
-                                <div class="d-flex ai-center gap-12">
-                                    <div class="avatar-sm <?php echo $idx < 3 ? 'bg-orange-light text-orange' : ''; ?>">
-                                        <?php echo $idx + 1; ?>
-                                    </div>
-                                    <div>
-                                        <div class="font-bold">
-                                            <?php echo htmlspecialchars($p['nombre_producto'] ?? 'Producto sin nombre'); ?>
-                                        </div>
-                                        <div class="fs-11 text-muted">
-                                            <?php echo htmlspecialchars($p['codigo_producto'] ?? ''); ?>
-                                        </div>
-                                    </div>
-                                </div>
-                            </td>
-                            <td class="text-right font-mono font-bold"><?php echo $p['unidades']; ?></td>
-                            <td class="text-right pr-20 font-mono text-accent"><?php echo number_format($p['total_recaudado'], 2, ',', '.'); ?> €</td>
+                            <th class="pl-20">Producto</th>
+                            <th class="text-right">Unidades</th>
+                            <th class="text-right pr-20">Ingresos Totales</th>
                         </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
-
-        <!-- VENTAS POR CATEGORÍA -->
-        <div class="card p-0 br-20 bg-white shadow-sm border-2 overflow-hidden">
-            <div class="p-20 border-bottom">
-                <h3 class="m-0 fs-16"><i class="fa-solid fa-tags text-blue mr-8"></i> Ventas por Categoría</h3>
+                    </thead>
+                    <tbody>
+                        <?php if (empty($avAnalitica['topProductos'])): ?>
+                            <tr>
+                                <td colspan="3" class="empty-state p-40">Sin datos en este rango.</td>
+                            </tr>
+                        <?php endif; ?>
+                        <?php foreach ($avAnalitica['topProductos'] as $idx => $p): ?>
+                            <tr>
+                                <td class="pl-20">
+                                    <div class="d-flex ai-center gap-12">
+                                        <div class="avatar-sm <?php echo $idx < 3 ? 'bg-orange-light text-orange' : ''; ?>">
+                                            <?php echo $idx + 1; ?>
+                                        </div>
+                                        <div>
+                                            <div class="font-bold">
+                                                <?php echo htmlspecialchars($p['nombre_producto'] ?? 'Producto sin nombre'); ?>
+                                            </div>
+                                            <div class="fs-11 text-muted">
+                                                <?php echo htmlspecialchars($p['codigo_producto'] ?? ''); ?>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="text-right font-mono font-bold"><?php echo $p['unidades']; ?></td>
+                                <td class="text-right pr-20 font-mono text-accent"><?php echo number_format($p['total_recaudado'], 2, ',', '.'); ?> €</td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
             </div>
-            <div class="p-20">
-                <div class="d-flex flex-column gap-16">
-                    <?php if (empty($avAnalitica['porCategoria'])): ?>
-                        <div class="empty-state">No hay datos por categoría.</div>
-                    <?php endif; ?>
-                    <?php 
-                    $maxTotal = !empty($avAnalitica['porCategoria']) ? $avAnalitica['porCategoria'][0]['total'] : 1;
-                    foreach ($avAnalitica['porCategoria'] as $cat): 
-                        $pct = ($cat['total'] / $maxTotal) * 100;
-                    ?>
-                        <div class="category-stat">
-                            <div class="d-flex jc-between ai-end mb-8">
-                                <span class="fs-13 font-bold tt-uppercase"><?php echo htmlspecialchars($cat['categoria'] ?: 'Sin categoría'); ?></span>
-                                <span class="fs-14 font-mono"><?php echo number_format($cat['total'], 2, ',', '.'); ?> €</span>
+
+            <!-- VENTAS POR CATEGORÍA -->
+            <div class="card p-0 br-20 bg-white shadow-sm border-2 overflow-hidden">
+                <div class="p-20 border-bottom">
+                    <h3 class="m-0 fs-16"><i class="fa-solid fa-tags text-blue mr-8"></i> Ventas por Categoría</h3>
+                </div>
+                <div class="p-20">
+                    <div class="d-flex flex-column gap-16">
+                        <?php if (empty($avAnalitica['porCategoria'])): ?>
+                            <div class="empty-state">No hay datos por categoría.</div>
+                        <?php endif; ?>
+                        <?php
+                        $maxTotal = !empty($avAnalitica['porCategoria']) ? $avAnalitica['porCategoria'][0]['total'] : 1;
+                        foreach ($avAnalitica['porCategoria'] as $cat):
+                            $pct = ($cat['total'] / $maxTotal) * 100;
+                        ?>
+                            <div class="category-stat">
+                                <div class="d-flex jc-between ai-end mb-8">
+                                    <span class="fs-13 font-bold tt-uppercase"><?php echo htmlspecialchars($cat['categoria'] ?: 'Sin categoría'); ?></span>
+                                    <span class="fs-14 font-mono"><?php echo number_format($cat['total'], 2, ',', '.'); ?> €</span>
+                                </div>
+                                <div class="progress-bar w-full h-8 bg-surface2 br-10 overflow-hidden">
+                                    <div class="h-full bg-accent" style="width: <?php echo $pct; ?>%; border-radius: 10px;"></div>
+                                </div>
+                                <div class="text-right fs-10 text-muted mt-4"><?php echo $cat['cantidad']; ?> ventas</div>
                             </div>
-                            <div class="progress-bar w-full h-8 bg-surface2 br-10 overflow-hidden">
-                                <div class="h-full bg-accent" style="width: <?php echo $pct; ?>%; border-radius: 10px;"></div>
-                            </div>
-                            <div class="text-right fs-10 text-muted mt-4"><?php echo $cat['cantidad']; ?> ventas</div>
-                        </div>
-                    <?php endforeach; ?>
+                        <?php endforeach; ?>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- ANÁLISIS DE MÁRGENES POR DÍA -->
-    <div class="container mt-24">
-        <div class="card p-0 br-20 bg-white shadow-sm border-2 overflow-hidden">
-            <div class="p-20 border-bottom bg-surface">
-                <h3 class="m-0 fs-16"><i class="fa-solid fa-chart-area text-green mr-8"></i> Desglose de Rentabilidad Diaria</h3>
+        <!-- RANKING COMPLETO DE PRODUCTOS -->
+        <div class="container mt-24">
+            <div class="card p-0 br-20 bg-white shadow-sm border-2 overflow-hidden">
+                <div class="p-20 border-bottom d-flex jc-between ai-center bg-surface">
+                    <h3 class="m-0 fs-16"><i class="fa-solid fa-list-ol text-accent mr-8"></i> Ranking Completo de Productos</h3>
+                    <div class="d-flex gap-12 ai-center">
+                        <span class="fs-11 text-muted tt-uppercase">Incluye productos con 0 ventas</span>
+                        <button onclick="exportRankingToExcel()" class="btn-icon p-4-12 fs-12 bg-green-light text-green border-1 border-green">
+                            <i class="fa-solid fa-file-excel"></i> Exportar
+                        </button>
+                    </div>
+                </div>
+                <div class="max-h-600 overflow-y-auto">
+                    <table class="data-table mb-0" id="rankingTable">
+                        <thead style="position: sticky; top: 0; z-index: 10; background: var(--bg);">
+                            <tr>
+                                <th class="pl-20">Pos</th>
+                                <th>Producto</th>
+                                <th class="text-right">Categoría</th>
+                                <th class="text-right">Unidades</th>
+                                <th class="text-right pr-20">Ingresos</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($avAnalitica['rankingProductos'] as $idx => $rp): ?>
+                                <tr class="<?php echo $rp['unidades'] == 0 ? 'opacity-50 grayscale' : ''; ?>">
+                                    <td class="pl-20 font-mono text-muted fs-12"><?php echo $idx + 1; ?></td>
+                                    <td>
+                                        <div class="font-bold fs-13"><?php echo htmlspecialchars($rp['nombre_producto']); ?></div>
+                                        <div class="fs-11 text-muted"><?php echo htmlspecialchars($rp['codigo_producto']); ?></div>
+                                    </td>
+                                    <td class="text-right">
+                                        <span class="fs-10 px-6 py-2 br-4 bg-surface2 tt-uppercase font-bold"><?php echo htmlspecialchars($rp['categoria'] ?: 'N/A'); ?></span>
+                                    </td>
+                                    <td class="text-right font-mono <?php echo $rp['unidades'] > 0 ? 'font-bold' : ''; ?>"><?php echo $rp['unidades']; ?></td>
+                                    <td class="text-right pr-20 font-mono <?php echo $rp['unidades'] > 0 ? 'text-accent' : 'text-muted'; ?>">
+                                        <?php echo number_format($rp['total_recaudado'], 2, ',', '.'); ?> €
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
             </div>
-            <table class="data-table mb-0">
-                <thead>
-                    <tr>
-                        <th class="pl-20">Fecha</th>
-                        <th class="text-right">Ingresos (Venta)</th>
-                        <th class="text-right">Coste de Artículos</th>
-                        <th class="text-right pr-20 text-green">Beneficio Neto</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php if (empty($avAnalitica['margenes'])): ?>
-                        <tr><td colspan="4" class="empty-state p-40">Sin datos históricos.</td></tr>
-                    <?php endif; ?>
-                    <?php foreach ($avAnalitica['margenes'] as $m): ?>
+        </div>
+
+        <!-- ANÁLISIS DE MÁRGENES POR DÍA -->
+
+        <div class="container mt-24">
+            <div class="card p-0 br-20 bg-white shadow-sm border-2 overflow-hidden">
+                <div class="p-20 border-bottom bg-surface">
+                    <h3 class="m-0 fs-16"><i class="fa-solid fa-chart-area text-green mr-8"></i> Desglose de Rentabilidad Diaria</h3>
+                </div>
+                <table class="data-table mb-0">
+                    <thead>
                         <tr>
-                            <td class="pl-20 font-bold"><?php echo date('d/m/Y', strtotime($m['fecha'])); ?></td>
-                            <td class="text-right font-mono"><?php echo number_format($m['ingresos'], 2, ',', '.'); ?> €</td>
-                            <td class="text-right font-mono text-muted"><?php echo number_format($m['costes'], 2, ',', '.'); ?> €</td>
-                            <td class="text-right pr-20 font-mono font-bold text-green"><?php echo number_format($m['beneficio'], 2, ',', '.'); ?> €</td>
+                            <th class="pl-20">Fecha</th>
+                            <th class="text-right">Ingresos (Venta)</th>
+                            <th class="text-right">Coste de Artículos</th>
+                            <th class="text-right pr-20 text-green">Beneficio Neto</th>
                         </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        <?php if (empty($avAnalitica['margenes'])): ?>
+                            <tr>
+                                <td colspan="4" class="empty-state p-40">Sin datos históricos.</td>
+                            </tr>
+                        <?php endif; ?>
+                        <?php foreach ($avAnalitica['margenes'] as $m): ?>
+                            <tr>
+                                <td class="pl-20 font-bold"><?php echo date('d/m/Y', strtotime($m['fecha'])); ?></td>
+                                <td class="text-right font-mono"><?php echo number_format($m['ingresos'], 2, ',', '.'); ?> €</td>
+                                <td class="text-right font-mono text-muted"><?php echo number_format($m['costes'], 2, ',', '.'); ?> €</td>
+                                <td class="text-right pr-20 font-mono font-bold text-green"><?php echo number_format($m['beneficio'], 2, ',', '.'); ?> €</td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
-</div>
 
-<style>
-.avatar-sm { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; background: var(--surface2); color: var(--text-muted); }
-.bg-orange-light { background: #fff7ed; color: #ea580c !important; }
-.bg-blue-light { background: #eff6ff; color: #2563eb !important; }
-.bg-green-light { background: #f0fdf4; color: #16a34a !important; }
-.bg-orange-light { background: #fff7ed; color: #ea580c !important; }
-.text-orange { color: #ea580c; }
-.text-blue { color: #2563eb; }
-.text-green { color: #16a34a; }
-.progress-bar { background-color: #f1f5f9; }
-.bg-accent { background-color: var(--accent); }
-</style>
+    <script>
+        function exportRankingToExcel() {
+            const table = document.getElementById("rankingTable");
+            let csv = [];
+            const rows = table.querySelectorAll("tr");
+
+            for (let i = 0; i < rows.length; i++) {
+                const row = [],
+                    cols = rows[i].querySelectorAll("td, th");
+                for (let j = 0; j < cols.length; j++) {
+                    // Limpiar texto de comas y espacios extra
+                    let text = cols[j].innerText.replace(/(\r\n|\n|\r)/gm, " ").replace(/,/g, ".");
+                    row.push(text.trim());
+                }
+                csv.push(row.join(","));
+            }
+
+            const csvContent = "data:text/csv;charset=utf-8," + csv.join("\n");
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "ranking_productos_electrobazar.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+
+    <style>
+        .avatar-sm {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 14px;
+            background: var(--surface2);
+            color: var(--text-muted);
+        }
+
+        .bg-orange-light {
+            background: #fff7ed;
+            color: #ea580c !important;
+        }
+
+        .bg-blue-light {
+            background: #eff6ff;
+            color: #2563eb !important;
+        }
+
+        .bg-green-light {
+            background: #f0fdf4;
+            color: #16a34a !important;
+        }
+
+        .bg-orange-light {
+            background: #fff7ed;
+            color: #ea580c !important;
+        }
+
+        .text-orange {
+            color: #ea580c;
+        }
+
+        .text-blue {
+            color: #2563eb;
+        }
+
+        .text-green {
+            color: #16a34a;
+        }
+
+        .progress-bar {
+            background-color: #f1f5f9;
+        }
+
+        .bg-accent {
+            background-color: var(--accent);
+        }
+    </style>

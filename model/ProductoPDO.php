@@ -38,6 +38,7 @@ class ProductoPDO
                 $registro['icono'],
                 $registro['categoria'],
                 $registro['variantes'],
+                $registro['atributos'],
                 $registro['activo'],
                 $registro['requiere_serial'] ?? 0,
                 $registro['codigo_iva'] ?? 'GENERAL'
@@ -59,8 +60,8 @@ class ProductoPDO
             $iconoDato = base64_decode($parts[1]);
         }
 
-        $sql = "INSERT INTO productos (referencia, nombre, descripcion, precio_coste, precio_venta, iva, stock_actual, stock_minimo, meses_garantia, icono, categoria, variantes, activo, requiere_serial, codigo_iva)
-                VALUES (:referencia, :nombre, :descripcion, :precio_coste, :precio_venta, :iva, :stock_actual, :stock_minimo, :meses_garantia, :icono, :categoria, :variantes, 1, :requiere_serial, :codigo_iva)";
+        $sql = "INSERT INTO productos (referencia, nombre, descripcion, precio_coste, precio_venta, iva, stock_actual, stock_minimo, meses_garantia, icono, categoria, variantes, atributos, activo, requiere_serial, codigo_iva)
+                VALUES (:referencia, :nombre, :descripcion, :precio_coste, :precio_venta, :iva, :stock_actual, :stock_minimo, :meses_garantia, :icono, :categoria, :variantes, :atributos, 1, :requiere_serial, :codigo_iva)";
 
         DBPDO::ejecutarConsulta($sql, [
             ':referencia'     => mb_substr(trim($datos['referencia']), 0, 50),
@@ -75,6 +76,7 @@ class ProductoPDO
             ':icono'          => $iconoDato,
             ':categoria'      => mb_substr(trim($datos['categoria']), 0, 50),
             ':variantes'      => self::normalizarVariantes($datos['variantes'] ?? null),
+            ':atributos'      => self::normalizarAtributos($datos['atributos'] ?? null),
             ':requiere_serial' => (int)($datos['requiere_serial'] ?? 0),
             ':codigo_iva'     => $datos['codigo_iva'] ?? 'GENERAL',
         ]);
@@ -99,7 +101,7 @@ class ProductoPDO
                     precio_coste = :precio_coste, precio_venta = :precio_venta, iva = :iva, 
                     stock_actual = :stock_actual, stock_minimo = :stock_minimo, 
                     meses_garantia = :meses_garantia, icono = :icono, categoria = :categoria,
-                    variantes = :variantes, requiere_serial = :requiere_serial, codigo_iva = :codigo_iva
+                    variantes = :variantes, atributos = :atributos, requiere_serial = :requiere_serial, codigo_iva = :codigo_iva
                 WHERE id = :id";
 
         DBPDO::ejecutarConsulta($sql, [
@@ -115,6 +117,7 @@ class ProductoPDO
             ':icono'          => $iconoDato,
             ':categoria'      => mb_substr(trim($datos['categoria']), 0, 50),
             ':variantes'      => self::normalizarVariantes($datos['variantes'] ?? null),
+            ':atributos'      => self::normalizarAtributos($datos['atributos'] ?? null),
             ':requiere_serial' => (int)($datos['requiere_serial'] ?? 0),
             ':codigo_iva'     => $datos['codigo_iva'] ?? 'GENERAL',
             ':id'             => $id,
@@ -124,6 +127,33 @@ class ProductoPDO
     public static function eliminarProducto(int $id): void
     {
         DBPDO::ejecutarConsulta("DELETE FROM productos WHERE id = :id", [':id' => $id]);
+    }
+
+    /**
+     * Normaliza los atributos antes de guardarlos en BD.
+     * Guarda el campo como un JSON Array simple Ej: ["Novedad", "Oferta"]
+     */
+    private static function normalizarAtributos($atributos): ?string
+    {
+        if ($atributos === null || $atributos === '' || $atributos === 'null' || $atributos === '[]') return null;
+
+        if (is_string($atributos)) {
+            $decoded = json_decode($atributos, true);
+            if (json_last_error() !== JSON_ERROR_NONE || $decoded === null) return null;
+            $atributos = $decoded;
+        }
+
+        if (empty($atributos)) return null;
+
+        if (is_array($atributos)) {
+            $clean = array_values(array_filter(array_map('trim', $atributos), function ($x) {
+                return $x !== '';
+            }));
+            if (count($clean) > 0) {
+                return json_encode($clean, JSON_UNESCAPED_UNICODE);
+            }
+        }
+        return null;
     }
 
     /**

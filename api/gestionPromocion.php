@@ -1,4 +1,5 @@
 <?php
+
 /**
  * API: gestionPromocion.php
  * CRUD de promociones de descuento.
@@ -82,32 +83,39 @@ try {
 /**
  * Validación básica de datos de promoción.
  */
-function validarPromocion(array $d): array {
-    $err = [
-        'codigo' => '',
-        'descripcion' => '',
-        'tipo' => '',
-        'valor' => '',
-        'min_subtotal' => '',
-    ];
+function validarPromocion(array $d): array
+{
+    $err = [];
+    $tipo = $d['tipo'] ?? '';
 
+    /* 
     if (empty($d['codigo'])) {
         $err['codigo'] = 'El código es obligatorio';
     }
+    */
     if (empty($d['descripcion'])) {
         $err['descripcion'] = 'La descripción es obligatoria';
     }
-    if (!in_array($d['tipo'] ?? '', ['percent','amount'], true)) {
+
+    if (!in_array($tipo, ['percent', 'amount', 'bundle', 'fixed_bundle'], true)) {
         $err['tipo'] = 'Tipo no válido';
     }
-    if (!isset($d['valor']) || !is_numeric($d['valor']) || (float)$d['valor'] <= 0) {
-        $err['valor'] = 'Valor inválido';
-    }
-    if (isset($d['min_subtotal']) && $d['min_subtotal'] !== '' && !is_numeric($d['min_subtotal'])) {
-        $err['min_subtotal'] = 'Importe mínimo inválido';
+
+    // Validación según tipo
+    if ($tipo === 'percent' || $tipo === 'amount' || $tipo === 'fixed_bundle') {
+        if (!isset($d['valor']) || !is_numeric($d['valor']) || (float)$d['valor'] <= 0) {
+            $err['valor'] = 'Valor inválido';
+        }
     }
 
-    // Limpia errores vacíos
-    return array_filter($err, fn($v) => $v !== '');
+    if ($tipo === 'bundle' || $tipo === 'fixed_bundle') {
+        if (empty($d['bundle_buy_qty']) || !is_numeric($d['bundle_buy_qty']) || (int)$d['bundle_buy_qty'] <= 1) {
+            $err['bundle_buy_qty'] = 'Cantidad de compra inválida (mín. 2)';
+        }
+        if ($tipo === 'bundle' && (empty($d['bundle_pay_qty']) || !is_numeric($d['bundle_pay_qty']) || (int)$d['bundle_pay_qty'] < 1)) {
+            $err['bundle_pay_qty'] = 'Cantidad de pago inválida';
+        }
+    }
+
+    return $err;
 }
-

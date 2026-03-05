@@ -37,13 +37,17 @@ class PromocionPDO
         $out = [];
         foreach ($rows as $r) {
             $out[] = [
-                'id'          => (int)$r['id'],
-                'code'        => $r['codigo'],
-                'type'        => $r['tipo'],
-                'value'       => (float)$r['valor'],
-                'minSubtotal' => (float)$r['min_subtotal'],
-                'label'       => $r['descripcion'],
-                'soloSocios'  => (int)$r['solo_socios'] === 1,
+                'id'             => (int)$r['id'],
+                'codigo'         => $r['codigo'],          // JS uses p.codigo for coupon matching
+                'tipo'           => $r['tipo'],
+                'valor'          => (float)$r['valor'],
+                'min_subtotal'   => (float)$r['min_subtotal'],
+                'bundle_buy_qty' => $r['bundle_buy_qty'] ? (int)$r['bundle_buy_qty'] : null,
+                'bundle_pay_qty' => $r['bundle_pay_qty'] ? (int)$r['bundle_pay_qty'] : null,
+                'id_producto'    => $r['id_producto'] ? (int)$r['id_producto'] : null,
+                'categoria_code' => $r['categoria_code'] ?? null,
+                'label'          => $r['descripcion'],
+                'solo_socios'    => (int)$r['solo_socios'] === 1,
             ];
         }
         return $out;
@@ -59,18 +63,22 @@ class PromocionPDO
     public static function añadir(array $datos): void
     {
         $sql = "INSERT INTO promociones
-                (codigo, descripcion, tipo, valor, min_subtotal, activo, solo_socios, fecha_inicio, fecha_fin)
-                VALUES (:codigo, :descripcion, :tipo, :valor, :min_subtotal, :activo, :solo_socios, :fecha_inicio, :fecha_fin)";
+                (codigo, descripcion, tipo, valor, min_subtotal, bundle_buy_qty, bundle_pay_qty, id_producto, categoria_code, activo, solo_socios, fecha_inicio, fecha_fin)
+                VALUES (:codigo, :descripcion, :tipo, :valor, :min_subtotal, :bundle_buy_qty, :bundle_pay_qty, :id_producto, :categoria_code, :activo, :solo_socios, :fecha_inicio, :fecha_fin)";
         DBPDO::ejecutarConsulta($sql, [
-            ':codigo'       => mb_substr(trim($datos['codigo']), 0, 50),
-            ':descripcion'  => mb_substr(trim($datos['descripcion']), 0, 255),
-            ':tipo'         => in_array($datos['tipo'], ['percent', 'amount']) ? $datos['tipo'] : 'percent',
-            ':valor'        => (float)$datos['valor'],
-            ':min_subtotal' => (float)($datos['min_subtotal'] ?? 0),
-            ':activo'       => !empty($datos['activo']) ? 1 : 0,
-            ':solo_socios'  => !empty($datos['solo_socios']) ? 1 : 0,
-            ':fecha_inicio' => $datos['fecha_inicio'] ?: null,
-            ':fecha_fin'    => $datos['fecha_fin'] ?: null,
+            ':codigo'          => !empty(trim($datos['codigo'] ?? '')) ? mb_substr(trim($datos['codigo']), 0, 50) : null,
+            ':descripcion'     => mb_substr(trim($datos['descripcion']), 0, 255),
+            ':tipo'            => in_array($datos['tipo'], ['percent', 'amount', 'bundle', 'fixed_bundle']) ? $datos['tipo'] : 'percent',
+            ':valor'           => (float)$datos['valor'],
+            ':min_subtotal'    => (float)($datos['min_subtotal'] ?? 0),
+            ':bundle_buy_qty'  => isset($datos['bundle_buy_qty']) ? (int)$datos['bundle_buy_qty'] : null,
+            ':bundle_pay_qty'  => isset($datos['bundle_pay_qty']) ? (int)$datos['bundle_pay_qty'] : null,
+            ':id_producto'     => isset($datos['id_producto']) ? (int)$datos['id_producto'] : null,
+            ':categoria_code'  => $datos['categoria_code'] ?? null, // Changed from id_categoria
+            ':activo'          => !empty($datos['activo']) ? 1 : 0,
+            ':solo_socios'     => !empty($datos['solo_socios']) ? 1 : 0,
+            ':fecha_inicio'    => $datos['fecha_inicio'] ?: null,
+            ':fecha_fin'       => $datos['fecha_fin'] ?: null,
         ]);
     }
 
@@ -82,24 +90,33 @@ class PromocionPDO
                     tipo = :tipo,
                     valor = :valor,
                     min_subtotal = :min_subtotal,
+                    bundle_buy_qty = :bundle_buy_qty,
+                    bundle_pay_qty = :bundle_pay_qty,
+                    id_producto = :id_producto,
+                    categoria_code = :categoria_code,
                     activo = :activo,
                     solo_socios = :solo_socios,
                     fecha_inicio = :fecha_inicio,
                     fecha_fin = :fecha_fin
                 WHERE id = :id";
         DBPDO::ejecutarConsulta($sql, [
-            ':codigo'       => mb_substr(trim($datos['codigo']), 0, 50),
-            ':descripcion'  => mb_substr(trim($datos['descripcion']), 0, 255),
-            ':tipo'         => in_array($datos['tipo'], ['percent', 'amount']) ? $datos['tipo'] : 'percent',
-            ':valor'        => (float)$datos['valor'],
-            ':min_subtotal' => (float)($datos['min_subtotal'] ?? 0),
-            ':activo'       => !empty($datos['activo']) ? 1 : 0,
-            ':solo_socios'  => !empty($datos['solo_socios']) ? 1 : 0,
-            ':fecha_inicio' => $datos['fecha_inicio'] ?: null,
-            ':fecha_fin'    => $datos['fecha_fin'] ?: null,
-            ':id'           => $id,
+            ':codigo'          => !empty(trim($datos['codigo'] ?? '')) ? mb_substr(trim($datos['codigo']), 0, 50) : null,
+            ':descripcion'     => mb_substr(trim($datos['descripcion']), 0, 255),
+            ':tipo'            => in_array($datos['tipo'], ['percent', 'amount', 'bundle', 'fixed_bundle']) ? $datos['tipo'] : 'percent',
+            ':valor'           => (float)$datos['valor'],
+            ':min_subtotal'    => (float)($datos['min_subtotal'] ?? 0),
+            ':bundle_buy_qty'  => isset($datos['bundle_buy_qty']) ? (int)$datos['bundle_buy_qty'] : null,
+            ':bundle_pay_qty'  => isset($datos['bundle_pay_qty']) ? (int)$datos['bundle_pay_qty'] : null,
+            ':id_producto'     => isset($datos['id_producto']) ? (int)$datos['id_producto'] : null,
+            ':categoria_code'  => $datos['categoria_code'] ?? null, // Changed from id_categoria
+            ':activo'          => !empty($datos['activo']) ? 1 : 0,
+            ':solo_socios'     => !empty($datos['solo_socios']) ? 1 : 0,
+            ':fecha_inicio'    => $datos['fecha_inicio'] ?: null,
+            ':fecha_fin'       => $datos['fecha_fin'] ?: null,
+            ':id'              => $id,
         ]);
     }
+
 
     public static function eliminar(int $id): void
     {

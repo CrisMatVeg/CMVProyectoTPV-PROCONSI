@@ -74,20 +74,25 @@ foreach ($oProductos as $oProd) {
         'stock'          => (int)$oProd->getStockActual(),
         'codigo_iva'     => $oProd->getCodigoIva(),
         'variantes'      => $oProd->getVariantes(),
+        'atributos'      => $oProd->getAtributos(),
     ];
 }
 
 // Obtener tipos de IVA y el general vigente para usarlo en la UI
 require_once 'model/TipoIVAPDO.php';
+require_once 'model/CategoriaPDO.php';
 $tipoGeneral = TipoIVAPDO::obtenerVigentePorCodigo('GENERAL', date('Y-m-d'));
 $ivaGeneralActual = $tipoGeneral['porcentaje'] ?? 21.00;
 $tiposIva = TipoIVAPDO::listarTodos();
+$listaCategorias = CategoriaPDO::listarTodas();
 
 $avProductos = [
     'productos'  => $listaProductos,
     'usuario'    => $_SESSION['usuarioActualTPV']->getNombre(),
     'ivaGeneral' => $ivaGeneralActual,
     'tipos_iva'  => $tiposIva,
+    'categorias' => $listaCategorias,
 ];
+
 
 require_once $view['layout'];

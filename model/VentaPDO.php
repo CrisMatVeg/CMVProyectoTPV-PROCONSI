@@ -32,7 +32,14 @@ class VentaPDO
 
         $subtotal    = round((float)$datos['subtotal'], 2);
         $descPct     = round((float)($datos['descuentoPct'] ?? 0), 2);
-        $descAmt     = round($subtotal * $descPct / 100, 2);
+
+        // Si el frontend ya calculó el importe del descuento, lo usamos directamente
+        if (isset($datos['descuentoAmt']) && (float)$datos['descuentoAmt'] > 0) {
+            $descAmt = round((float)$datos['descuentoAmt'], 2);
+        } else {
+            $descAmt = round($subtotal * $descPct / 100, 2);
+        }
+
         $base        = round($subtotal - $descAmt, 2);
 
         // Si no viene el total, lo calculamos (Base + 21% IVA estándar)
@@ -44,6 +51,7 @@ class VentaPDO
 
         $ivaAmt = round($total - $base, 2);
 
+
         $tipoCliente    = in_array($datos['tipoCliente'] ?? '', ['particular', 'empresa']) ? $datos['tipoCliente'] : 'particular';
         $nombreCliente  = isset($datos['nombreCliente']) ? mb_substr(trim($datos['nombreCliente']), 0, 100) : null;
         $nifCliente     = isset($datos['nifCliente']) ? mb_substr(trim($datos['nifCliente']), 0, 20) : null;
@@ -51,11 +59,13 @@ class VentaPDO
         $idCliente      = isset($datos['idCliente']) ? (int)$datos['idCliente'] : null;
         $efectivoRecibido = ($metodoPago === 'efectivo') ? round((float)($datos['efectivo']['recibido'] ?? $datos['efectivoRecibido'] ?? 0), 2) : 0;
 
+        $descuentoLabel = isset($datos['descuentoLabel']) ? mb_substr(trim($datos['descuentoLabel']), 0, 100) : null;
+
         $sqlVenta = "INSERT INTO ventas 
             (numero_ticket, fecha, id_usuario, id_cliente, tipo_cliente, nombre_cliente, nif_cliente, metodo_pago,
-             subtotal, descuento_pct, descuento_amt, base_imponible, iva_amt, total, efectivo_recibido)
+             subtotal, descuento_pct, descuento_amt, descuento_label, base_imponible, iva_amt, total, efectivo_recibido)
             VALUES (:ticket, NOW(), :usuario, :cliente, :tipo, :nombre, :nif, :metodo,
-             :subtotal, :descPct, :descAmt, :base, :ivaAmt, :total, :efectivo)";
+             :subtotal, :descPct, :descAmt, :descLabel, :base, :ivaAmt, :total, :efectivo)";
 
         $paramsVenta = [
             ':ticket'   => $numTicket,
@@ -68,6 +78,7 @@ class VentaPDO
             ':subtotal' => $subtotal,
             ':descPct'  => $descPct,
             ':descAmt'  => $descAmt,
+            ':descLabel' => $descuentoLabel,
             ':base'     => $base,
             ':ivaAmt'   => $ivaAmt,
             ':total'    => $total,
@@ -88,14 +99,16 @@ class VentaPDO
             $totalLinea = round($precioUnit * $qty, 2);
             $ivaAplicado = (float)($linea['iva'] ?? 21.00);
 
-            // Obtener datos del producto (garantía, código IVA lógico, etc.)
-            $mesesGarantia = 24; // Valor por defecto
+            // Obtener datos del producto (garantía, código IVA, coste)
+            $mesesGarantia = 24;
             $codigoIva     = 'GENERAL';
+            $precioCosteUnit = 0.00;
             if (isset($linea['id'])) {
                 require_once 'ProductoPDO.php';
                 $prodData = ProductoPDO::obtenerProductoPorId((int)$linea['id']);
                 if ($prodData) {
-                    $mesesGarantia = (int)($prodData['meses_garantia'] ?? 24);
+                    $mesesGarantia   = (int)($prodData['meses_garantia'] ?? 24);
+                    $precioCosteUnit = (float)($prodData['precio_coste'] ?? 0);
                     if (!empty($prodData['codigo_iva'])) {
                         $codigoIva = $prodData['codigo_iva'];
                     }
@@ -114,20 +127,25 @@ class VentaPDO
             }
 
             $sqlLinea = "INSERT INTO lineas_venta
-                (id_venta, id_producto, nombre_producto, codigo_producto, precio_unitario, iva_aplicado, cantidad, meses_garantia, total_linea, numero_serie, variantes)
-                VALUES (:venta, :prod, :nombre, :codigo, :precio, :iva, :qty, :garantia, :total, :serial, :variantes)";
+                (id_venta, id_producto, nombre_producto, codigo_producto,
+                 precio_unitario, precio_coste_unitario, iva_aplicado,
+                 cantidad, meses_garantia, total_linea, numero_serie, variantes)
+                VALUES (:venta, :prod, :nombre, :codigo,
+                        :precio, :coste, :iva,
+                        :qty, :garantia, :total, :serial, :variantes)";
 
             DBPDO::ejecutarConsulta($sqlLinea, [
-                ':venta'  => $idVenta,
-                ':prod'   => $linea['id'] ?? null,
-                ':nombre' => mb_substr($linea['name'], 0, 100),
-                ':codigo' => mb_substr($linea['referencia'] ?? $linea['codigo'] ?? '', 0, 50),
-                ':precio' => $precioUnit,
-                ':iva'    => $ivaAplicado,
-                ':qty'    => $qty,
+                ':venta'   => $idVenta,
+                ':prod'    => $linea['id'] ?? null,
+                ':nombre'  => mb_substr($linea['name'], 0, 100),
+                ':codigo'  => mb_substr($linea['referencia'] ?? $linea['codigo'] ?? '', 0, 50),
+                ':precio'  => $precioUnit,
+                ':coste'   => round($precioCosteUnit, 2),
+                ':iva'     => $ivaAplicado,
+                ':qty'     => $qty,
                 ':garantia' => $mesesGarantia,
-                ':total'  => $totalLinea,
-                ':serial' => isset($linea['serials']) ? json_encode($linea['serials']) : null,
+                ':total'   => $totalLinea,
+                ':serial'  => isset($linea['serials']) ? json_encode($linea['serials']) : null,
                 ':variantes' => isset($linea['variants']) ? json_encode($linea['variants'], JSON_UNESCAPED_UNICODE) : null
             ]);
 
@@ -158,7 +176,7 @@ class VentaPDO
             $cuota = $fin['cuotaMensual'] ?? $fin['cuota'] ?? 0;
             $intereses = $fin['importeIntereses'] ?? $fin['intereses'] ?? 0;
             $modalidad = $fin['modalidad'] ?? 'vendedor_paga_intereses';
-            
+
             if ($idFinanciera && $meses) {
                 $sqlFin = "INSERT INTO ventas_financiacion 
                     (id_venta, id_financiera, meses, cuota_mensual, importe_intereses, modalidad, estado)
@@ -318,12 +336,12 @@ class VentaPDO
                     COUNT(v.id) as total_tickets,
                     COALESCE(SUM(v.total), 0) as total_ventas,
                     COALESCE(SUM(v.base_imponible), 0) as total_base,
-                    COALESCE((SELECT SUM((lv.precio_unitario - p.precio_coste) * lv.cantidad)
+                    COALESCE((SELECT SUM((lv.precio_unitario - lv.precio_coste_unitario) * lv.cantidad)
                      FROM lineas_venta lv
-                     JOIN productos p ON lv.id_producto = p.id
                      JOIN ventas v2 ON lv.id_venta = v2.id
                      WHERE v2.estado = 'completada' 
-                     AND DATE(v2.fecha) BETWEEN :desde AND :hasta), 0) as margen_estimado
+                     AND DATE(v2.fecha) BETWEEN :desde AND :hasta
+                     AND lv.devuelta = 0), 0) as margen_estimado
                 FROM ventas v
                 WHERE v.estado = 'completada' AND DATE(v.fecha) BETWEEN :desde2 AND :hasta2";
 
@@ -442,8 +460,8 @@ class VentaPDO
     {
         $sql = "SELECT DATE(v.fecha) as fecha,
                        SUM(lv.total_linea) as ingresos,
-                       SUM(p.precio_coste * lv.cantidad) as costes,
-                       SUM(lv.total_linea - (p.precio_coste * lv.cantidad)) as beneficio
+                       SUM(lv.precio_coste_unitario * lv.cantidad) as costes,
+                       SUM(lv.total_linea - (lv.precio_coste_unitario * lv.cantidad)) as beneficio
                 FROM lineas_venta lv
                 JOIN productos p ON lv.id_producto = p.id
                 JOIN ventas v ON lv.id_venta = v.id
@@ -451,6 +469,46 @@ class VentaPDO
                 AND DATE(v.fecha) BETWEEN :desde AND :hasta
                 GROUP BY DATE(v.fecha)
                 ORDER BY fecha ASC";
+        $q = DBPDO::ejecutarConsulta($sql, [':desde' => $desde, ':hasta' => $hasta]);
+        return $q->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Obtiene el ranking completo de productos, incluyendo los que no han tenido ventas.
+     */
+    public static function obtenerRankingCompletoProductos(string $desde, string $hasta): array
+    {
+        $sql = "SELECT 
+                    p.id AS id_producto,
+                    p.nombre AS nombre_producto,
+                    p.referencia AS codigo_producto,
+                    p.categoria,
+                    COALESCE(SUM(lv.cantidad), 0) AS unidades,
+                    COALESCE(SUM(lv.total_linea), 0) AS total_recaudado
+                FROM productos p
+                LEFT JOIN lineas_venta lv ON p.id = lv.id_producto
+                LEFT JOIN ventas v ON lv.id_venta = v.id 
+                    AND v.estado = 'completada' 
+                    AND lv.devuelta = 0 
+                    AND DATE(v.fecha) BETWEEN :desde AND :hasta
+                GROUP BY p.id, p.nombre, p.referencia, p.categoria
+                ORDER BY unidades DESC, total_recaudado DESC";
+
+        $q = DBPDO::ejecutarConsulta($sql, [':desde' => $desde, ':hasta' => $hasta]);
+        return $q->fetchAll(PDO::FETCH_ASSOC);
+    }
+    /**
+     * Obtiene el desglose de IVA recaudado por tipo.
+     */
+    public static function obtenerDesgloseIVA(string $desde, string $hasta): array
+    {
+        $sql = "SELECT lv.iva_aplicado as porcentaje, SUM(lv.total_linea * (lv.iva_aplicado / (100 + lv.iva_aplicado))) as cuota, SUM(lv.total_linea) as total
+                FROM lineas_venta lv
+                JOIN ventas v ON lv.id_venta = v.id
+                WHERE v.estado = 'completada' AND lv.devuelta = 0
+                AND DATE(v.fecha) BETWEEN :desde AND :hasta
+                GROUP BY lv.iva_aplicado
+                ORDER BY lv.iva_aplicado DESC";
         $q = DBPDO::ejecutarConsulta($sql, [':desde' => $desde, ':hasta' => $hasta]);
         return $q->fetchAll(PDO::FETCH_ASSOC);
     }

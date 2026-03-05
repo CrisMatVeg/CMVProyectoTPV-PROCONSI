@@ -1,11 +1,13 @@
 <?php
+
 /**
  * Clase: Producto
  * Entidad que representa un producto del sistema.
  * @package Modelos
  * @author Cristian Mateos Vega
  */
-class Producto {
+class Producto
+{
     private $id;
     private $referencia;
     private $nombre;
@@ -19,11 +21,13 @@ class Producto {
     private $icono;
     private $categoria;
     private $variantes;
+    private $atributos;
     private $activo;
     private $requiere_serial;
     private $codigo_iva;
 
-    public function __construct($id, $referencia, $nombre, $descripcion, $precio_coste, $precio_venta, $iva, $stock_actual, $stock_minimo, $meses_garantia, $icono, $categoria, $variantes, $activo, $requiere_serial = 0, $codigo_iva = 'GENERAL') {
+    public function __construct($id, $referencia, $nombre, $descripcion, $precio_coste, $precio_venta, $iva, $stock_actual, $stock_minimo, $meses_garantia, $icono, $categoria, $variantes, $atributos, $activo, $requiere_serial = 0, $codigo_iva = 'GENERAL')
+    {
         $this->id = $id;
         $this->referencia = $referencia;
         $this->nombre = $nombre;
@@ -37,26 +41,79 @@ class Producto {
         $this->icono = $icono;
         $this->categoria = $categoria;
         $this->variantes = $variantes;
+        $this->atributos = $atributos;
         $this->activo = $activo;
         $this->requiere_serial = $requiere_serial;
         $this->codigo_iva = $codigo_iva;
     }
 
     // Getters
-    public function getId() { return $this->id; }
-    public function getReferencia() { return $this->referencia; }
-    public function getNombre() { return $this->nombre; }
-    public function getDescripcion() { return $this->descripcion; }
-    public function getPrecioCoste() { return $this->precio_coste; }
-    public function getPrecioVenta() { return $this->precio_venta; }
-    public function getIva() { return $this->iva; }
-    public function getStockActual() { return $this->stock_actual; }
-    public function getStockMinimo() { return $this->stock_minimo; }
-    public function getMesesGarantia() { return $this->meses_garantia; }
-    public function getIcono() { return $this->icono; }
-    public function getCategoria() { return $this->categoria; }
-    public function getVariantes() { return $this->variantes; }
-    public function getActivo() { return $this->activo; }
-    public function getRequiereSerial() { return $this->requiere_serial; }
-    public function getCodigoIva() { return $this->codigo_iva; }
+    public function getId()
+    {
+        return $this->id;
+    }
+    public function getReferencia()
+    {
+        return $this->referencia;
+    }
+    public function getNombre()
+    {
+        return $this->nombre;
+    }
+    public function getDescripcion()
+    {
+        return $this->descripcion;
+    }
+    public function getPrecioCoste()
+    {
+        return $this->precio_coste;
+    }
+    public function getPrecioVenta()
+    {
+        return $this->precio_venta;
+    }
+    public function getIva()
+    {
+        return $this->iva;
+    }
+    public function getStockActual()
+    {
+        return $this->stock_actual;
+    }
+    public function getStockMinimo()
+    {
+        return $this->stock_minimo;
+    }
+    public function getMesesGarantia()
+    {
+        return $this->meses_garantia;
+    }
+    public function getIcono()
+    {
+        return $this->icono;
+    }
+    public function getCategoria()
+    {
+        return $this->categoria;
+    }
+    public function getVariantes()
+    {
+        return $this->variantes;
+    }
+    public function getAtributos()
+    {
+        return $this->atributos;
+    }
+    public function getActivo()
+    {
+        return $this->activo;
+    }
+    public function getRequiereSerial()
+    {
+        return $this->requiere_serial;
+    }
+    public function getCodigoIva()
+    {
+        return $this->codigo_iva;
+    }
 }

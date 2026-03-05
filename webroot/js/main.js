@@ -4,21 +4,25 @@ const PRODUCTS = typeof DB_PRODUCTS !== "undefined" ? DB_PRODUCTS : [];
 const FINANCING_MIN_AMOUNT = 200;
 
 // ── Estado global ──────────────────────────────────────────────────────────────
-let cart = {};
+let cart = JSON.parse(localStorage.getItem("tpv_cart")) || [];
 let selectedPayment = "efectivo";
 let discountPct = 0;
 let ticketNum = 1001;
 let activeCat = "all";
+let activeAttr = null;
 let searchTerm = "";
 let minPrice = 0;
-let maxPrice = Infinity;
+let maxPrice = 999999;
 let stockFilter = "all";
 let sortOrder = "name-asc";
-let isAdmin = typeof IS_ADMIN_BACKEND !== "undefined" ? IS_ADMIN_BACKEND : false;
+let isAdmin =
+  typeof IS_ADMIN_BACKEND !== "undefined" ? IS_ADMIN_BACKEND : false;
 let currentTicketNum = null;
 let socioActual = null;
 const SOCIO_DISCOUNT = 5;
 let financingAccepted = false;
+let currentPromo = null;
+const PROMOS = typeof DB_PROMOS !== "undefined" ? DB_PROMOS : [];
 
 // ── Estado de venta pospuesta ──────────────────────────────────────────────────
 let postponedSale = JSON.parse(sessionStorage.getItem("postponedSale")) || null;
@@ -69,7 +73,10 @@ function setThemeAccent(accent) {
   if (input) input.value = accent;
 }
 
-if (typeof USER_THEME_MODE !== "undefined" || typeof USER_THEME_ACCENT !== "undefined") {
+if (
+  typeof USER_THEME_MODE !== "undefined" ||
+  typeof USER_THEME_ACCENT !== "undefined"
+) {
   applyTheme(USER_THEME_MODE || "light", USER_THEME_ACCENT || "blue");
 }
 
@@ -83,19 +90,49 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   // Trigger initial total calculation
-  const initialSubtotal = Object.values(cart).reduce((a, b) => a + b.price * b.qty, 0);
-  if (initialSubtotal > 0) {
-    updateTotals(initialSubtotal);
-  }
+  const initialSubtotal = Object.values(cart).reduce(
+    (a, b) => a + b.price * b.qty,
+    0,
+  );
+  updateTotals(initialSubtotal);
 
   try {
     const fp = document.getElementById("financingPanel");
-    if (fp && !fp.classList.contains("panel-resizable")) fp.classList.add("panel-resizable");
+    if (fp && !fp.classList.contains("panel-resizable"))
+      fp.classList.add("panel-resizable");
     const oi = document.getElementById("orderItems");
-    if (oi && !oi.classList.contains("panel-resizable")) oi.classList.add("panel-resizable");
+    if (oi && !oi.classList.contains("panel-resizable"))
+      oi.classList.add("panel-resizable");
   } catch (e) {}
 
-  try { initSidebarResizer(); } catch (e) { console.warn("Resizer init failed", e); }
+  try {
+    initSidebarResizer();
+  } catch (e) {
+    console.warn("Resizer init failed", e);
+  }
+
+  // Atributos filters
+  document.querySelectorAll(".attr-tab").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const isCurrentlyActive = btn.classList.contains("active");
+
+      // Desmarcar todos primero
+      document.querySelectorAll(".attr-tab").forEach((b) => {
+        b.classList.remove("active");
+      });
+
+      if (isCurrentlyActive) {
+        // Toggle off
+        activeAttr = null;
+      } else {
+        // Toggle on
+        btn.classList.add("active");
+        activeAttr = btn.dataset.attr;
+      }
+
+      renderProducts();
+    });
+  });
 });
 
 // ── Formato monetario ──────────────────────────────────────────────────────────
@@ -130,51 +167,101 @@ function renderProducts() {
 
     let matchesStock = true;
     if (stockFilter === "in-stock") matchesStock = p.stock > 0;
-    else if (stockFilter === "low-stock") matchesStock = p.stock > 0 && p.stock <= 5;
+    else if (stockFilter === "low-stock")
+      matchesStock = p.stock > 0 && p.stock <= 5;
     if (!matchesStock) return false;
+
+    if (activeAttr !== null) {
+      if (!p.atributos) return false;
+      try {
+        const pAttrs =
+          typeof p.atributos === "string"
+            ? JSON.parse(p.atributos)
+            : p.atributos;
+        if (!Array.isArray(pAttrs) || !pAttrs.includes(activeAttr))
+          return false;
+      } catch (e) {
+        return false;
+      }
+    }
 
     return true;
   });
 
   filtered.sort((a, b) => {
     switch (sortOrder) {
-      case "name-asc": return a.name.localeCompare(b.name);
-      case "name-desc": return b.name.localeCompare(a.name);
-      case "price-asc": return a.price - b.price;
-      case "price-desc": return b.price - a.price;
-      case "stock-asc": return a.stock - b.stock;
-      case "stock-desc": return b.stock - a.stock;
-      default: return 0;
+      case "name-asc":
+        return a.name.localeCompare(b.name);
+      case "name-desc":
+        return b.name.localeCompare(a.name);
+      case "price-asc":
+        return a.price - b.price;
+      case "price-desc":
+        return b.price - a.price;
+      case "stock-asc":
+        return a.stock - b.stock;
+      case "stock-desc":
+        return b.stock - a.stock;
+      default:
+        return 0;
     }
   });
 
   grid.innerHTML = filtered
-    .map((p) => `
+    .map(
+      (p) => `
       <div class="product-card${p.inactive ? " inactive" : ""}${p.stock <= 0 ? " out-of-stock" : ""}" id="card-${p.id}" onclick="handleCardClick(event, ${p.id}, this)">
           ${p.inactive ? '<div class="baja-pill">Baja</div>' : ""}
           ${p.stock <= 0 ? '<div class="stock-pill" style="background:var(--red); color:white; position:absolute; top:10px; right:10px; padding:2px 8px; border-radius:10px; font-size:10px; font-weight:700;">AGOTADO</div>' : ""}
           ${(() => {
             const v = p.variantes;
             if (!v) return "";
-            if (Array.isArray(v) && v.length > 0) return '<div class="variant-badge">Opciones</div>';
-            if (typeof v === "object" && Object.keys(v).length > 0) return '<div class="variant-badge">Opciones</div>';
+            if (Array.isArray(v) && v.length > 0)
+              return '<div class="variants-pill"><i class="fa-solid fa-tags"></i> Opciones</div>';
+            if (typeof v === "object" && Object.keys(v).length > 0)
+              return '<div class="variants-pill" style="top:5px; left:5px;"><i class="fa-solid fa-tags"></i> Opciones</div>';
             if (typeof v === "string" && v.length > 2) {
               try {
                 const parsed = JSON.parse(v);
                 if (
                   (Array.isArray(parsed) && parsed.length > 0) ||
-                  (typeof parsed === "object" && parsed !== null && Object.keys(parsed).length > 0)
+                  (typeof parsed === "object" &&
+                    parsed !== null &&
+                    Object.keys(parsed).length > 0)
                 ) {
-                  return '<div class="variant-badge">Opciones</div>';
+                  return '<div class="variants-pill" style="top:5px; left:5px;"><i class="fa-solid fa-tags"></i> Opciones</div>';
                 }
               } catch (e) {}
             }
             return "";
           })()}
+          ${(() => {
+            const attr = p.atributos;
+            if (!attr) return "";
+            try {
+              const parsedAttr =
+                typeof attr === "string" ? JSON.parse(attr) : attr;
+              if (Array.isArray(parsedAttr) && parsedAttr.length > 0) {
+                return (
+                  '<div style="position:absolute; top:35px; left:5px; display:flex; flex-direction:column; gap:4px;">' +
+                  parsedAttr
+                    .map(
+                      (a) =>
+                        `<span style="background:var(--accent-soft); color:var(--accent); font-size:9px; padding:2px 6px; border-radius:4px; font-weight:700; border:1px solid var(--accent); white-space:nowrap;">${a}</span>`,
+                    )
+                    .join("") +
+                  "</div>"
+                );
+              }
+            } catch (e) {}
+            return "";
+          })()}
           <div class="product-icon">
-              ${p.icono && p.icono.startsWith("data:image")
-                ? `<img src="${p.icono}" class="prod-img-tpv" alt="${p.name}">`
-                : `<span class="product-emoji">${p.icono}</span>`}
+              ${
+                p.icono && p.icono.startsWith("data:image")
+                  ? `<img src="${p.icono}" class="prod-img-tpv" alt="${p.name}">`
+                  : `<span class="product-emoji">${p.icono}</span>`
+              }
           </div>
           <div>
               <div class="product-name">${p.name}</div>
@@ -188,7 +275,8 @@ function renderProducts() {
               <button class="admin-action baja" onclick="toggleBaja(event,${p.id})"><i class="fa-solid ${p.inactive ? "fa-arrow-up" : "fa-arrow-down"}"></i> ${p.inactive ? "Alta" : "Baja"}</button>
           </div>
       </div>
-    `)
+    `,
+    )
     .join("");
 
   grid.classList.toggle("is-admin", isAdmin);
@@ -205,7 +293,11 @@ function handleCardClick(e, id, el) {
 
   let vars = p.variantes;
   if (typeof vars === "string") {
-    try { vars = JSON.parse(vars); } catch (e) { vars = null; }
+    try {
+      vars = JSON.parse(vars);
+    } catch (e) {
+      vars = null;
+    }
   }
 
   const hasVariants =
@@ -222,8 +314,8 @@ function handleCardClick(e, id, el) {
 }
 
 function showVariantPicker(p, el) {
-  const modal = document.getElementById("variantModal");
-  const container = document.getElementById("variantButtonsContainer");
+  const modal = document.getElementById("variantsModal");
+  const container = document.getElementById("variantsOptionsContainer");
   if (!modal || !container) return;
 
   container.innerHTML = "";
@@ -237,24 +329,40 @@ function showVariantPicker(p, el) {
       return { nombre: v.valor || v.nombre || "Opción", label: v.label || "" };
     });
   } else if (vars && typeof vars === "object") {
-    options = Object.entries(vars).map(([k, v]) => ({
-      nombre: v && typeof v !== "object" ? String(v) : k,
-      label: k,
-    }));
+    // Si es un objeto tipo {"Color": ["Rojo", "Azul"], "Talla": ["M", "L"]}
+    // Por ahora, para simplificar y que sea funcional, mostramos todos los valores como opciones individuales
+    Object.entries(vars).forEach(([k, v]) => {
+      if (Array.isArray(v)) {
+        v.forEach((val) => {
+          options.push({ nombre: val, label: k });
+        });
+      } else {
+        options.push({
+          nombre: v && typeof v !== "object" ? String(v) : k,
+          label: k,
+        });
+      }
+    });
   }
+
+  const titleEl = document.getElementById("variantsModalTitle");
+  if (titleEl) titleEl.textContent = `Opciones de ${p.name}`;
 
   options.forEach((opt) => {
     const btn = document.createElement("button");
-    btn.className = "cat-tab p-12-16 br-12 border-2 bg-surface2 cursor-pointer fs-13 d-flex flex-column ai-center gap-8 active-scale h-auto hover-accent";
+    btn.className = "variant-btn";
+
     const displayName = opt.nombre;
     const labelInfo = opt.label
-      ? `<span class="fs-10 opacity-70 tt-uppercase font-bold">${opt.label}</span>`
+      ? `<span class="variant-label">${opt.label}</span>`
       : "";
+
     btn.innerHTML = `
-      <i class="fa-solid fa-tag fs-18 text-accent"></i>
+      <i class="fa-solid fa-tag"></i>
       ${labelInfo}
-      <span class="font-bold fs-14">${displayName}</span>
+      <span class="variant-name">${displayName}</span>
     `;
+
     btn.onclick = () => {
       addToCart(p.id, el, displayName);
       modal.classList.remove("visible");
@@ -274,7 +382,9 @@ function addToCart(id, el, variantName = null) {
 
   if (cart[cartKey]) {
     if (cart[cartKey].qty >= p.stock) {
-      showToast('<i class="fa-solid fa-circle-exclamation"></i> No hay más stock disponible');
+      showToast(
+        '<i class="fa-solid fa-circle-exclamation"></i> No hay más stock disponible',
+      );
       return;
     }
     cart[cartKey].qty++;
@@ -283,7 +393,7 @@ function addToCart(id, el, variantName = null) {
 
     const finalItem = { ...p };
     if (variantName) {
-      finalItem.name = `${p.name} (${variantName})`;
+      // No modificamos el name aquí para que renderCart lo maneje por separado
       finalItem.variant = variantName;
       if (
         p.variantes &&
@@ -313,7 +423,9 @@ function changeQty(cartKey, delta) {
   const p = PRODUCTS.find((x) => x.id === item.id);
 
   if (delta > 0 && item.qty >= p.stock) {
-    showToast('<i class="fa-solid fa-circle-exclamation"></i> Límite de stock alcanzado');
+    showToast(
+      '<i class="fa-solid fa-circle-exclamation"></i> Límite de stock alcanzado',
+    );
     return;
   }
 
@@ -338,7 +450,9 @@ function clearCart() {
 
 function postponeSale() {
   if (Object.keys(cart).length === 0) {
-    showToast('<i class="fa-solid fa-circle-exclamation"></i> El carrito está vacío');
+    showToast(
+      '<i class="fa-solid fa-circle-exclamation"></i> El carrito está vacío',
+    );
     return;
   }
 
@@ -360,7 +474,12 @@ function resumeSale() {
   if (!postponedSale) return;
 
   if (Object.keys(cart).length > 0) {
-    if (!confirm("Se perderá el carrito actual. ¿Deseas retomar la venta pospuesta?")) return;
+    if (
+      !confirm(
+        "Se perderá el carrito actual. ¿Deseas retomar la venta pospuesta?",
+      )
+    )
+      return;
   }
 
   cart = postponedSale.cart;
@@ -389,7 +508,57 @@ function updatePostponeUI() {
   }
 }
 
+// ── Auto-aplicación de promociones de pack (sin código) ───────────────────────
+function autoApplyBundlePromos() {
+  // Si ya hay una promo manual activa (con código), no la pisamos
+  if (currentPromo && currentPromo.codigo) return;
+
+  const items = Object.values(cart);
+  if (!items.length) {
+    if (currentPromo && !currentPromo._manual) currentPromo = null;
+    return;
+  }
+
+  // Agrupar cantidades por id base del producto (suma de todas sus variantes)
+  const qtyByBaseId = {};
+  const catByBaseId = {};
+  items.forEach((item) => {
+    qtyByBaseId[item.id] = (qtyByBaseId[item.id] || 0) + item.qty;
+    catByBaseId[item.id] = item.cat;
+  });
+
+  // Buscar la primera promo de pack sin código que aplique al carrito
+  const autoPromo = PROMOS.find((p) => {
+    if (p.tipo !== "bundle" && p.tipo !== "fixed_bundle") return false;
+    if (p.codigo) return false;
+
+    const buyQty = parseInt(p.bundle_buy_qty) || 0;
+    if (buyQty < 2) return false;
+
+    // Comprobar si algún producto (suma de variantes) activa la promo
+    return Object.entries(qtyByBaseId).some(([baseId, totalQty]) => {
+      if (totalQty < buyQty) return false;
+      if (!p.id_producto && !p.categoria_code) return true;
+      if (p.id_producto && p.id_producto == baseId) return true;
+      if (p.categoria_code && p.categoria_code === catByBaseId[baseId])
+        return true;
+      return false;
+    });
+  });
+
+  if (autoPromo) {
+    if (!currentPromo || currentPromo.id !== autoPromo.id) {
+      currentPromo = { ...autoPromo, _manual: false };
+    }
+  } else {
+    if (currentPromo && !currentPromo._manual) currentPromo = null;
+  }
+}
+
 function renderCart() {
+  // Auto-aplicar promos de pack antes de calcular totales
+  autoApplyBundlePromos();
+
   const items = Object.values(cart);
   const container = document.getElementById("orderItems");
   const orderCountEl = document.getElementById("orderCount");
@@ -409,15 +578,23 @@ function renderCart() {
   }
 
   container.innerHTML = items
-    .map((item) => `
+    .map(
+      (item) => `
       <div class="order-item">
         <span class="order-item-emoji">
-          ${item.icono && item.icono.startsWith("data:image")
-            ? `<img src="${item.icono}" class="order-item-img" alt="${item.name}">`
-            : item.icono}
+          ${
+            item.icono && item.icono.startsWith("data:image")
+              ? `<img src="${item.icono}" class="order-item-img" alt="${item.name}">`
+              : item.icono
+          }
         </span>
         <div class="order-item-info">
           <div class="order-item-name">${item.name}</div>
+          ${
+            item.variant
+              ? `<div class="order-item-variant"><i class="fa-solid fa-tag"></i> ${item.variant}</div>`
+              : ""
+          }
           <div class="order-item-price">${fmt(item.price)} × ${item.qty}</div>
         </div>
         <div class="qty-ctrl">
@@ -427,32 +604,116 @@ function renderCart() {
         </div>
         <div class="order-item-total">${fmt(item.price * item.qty)}</div>
       </div>
-    `)
+    `,
+    )
     .join("");
 
   const subtotal = items.reduce((a, b) => a + b.price * b.qty, 0);
   updateTotals(subtotal);
 }
 
-function updateTotals(subtotal) {
+function updateTotals(initialSubtotal) {
   const items = Object.values(cart);
-  const discountAmt = (subtotal * discountPct) / 100;
-  const socioAmt = socioActual && socioActual.es_socio ? (subtotal * SOCIO_DISCOUNT) / 100 : 0;
-  const totalDiscount = discountAmt + socioAmt;
-  const discountFactor = subtotal > 0 ? (subtotal - totalDiscount) / subtotal : 1;
+  let subtotal = 0;
+  let bundleDiscountTotal = 0;
+
+  // 1. Calcular descuentos por PACK (2x1, 3 por 10€, etc.)
+  // Sumamos el subtotal por ítem primero
+  items.forEach((item) => {
+    subtotal += item.price * item.qty;
+  });
+
+  if (
+    currentPromo &&
+    (currentPromo.tipo === "bundle" || currentPromo.tipo === "fixed_bundle")
+  ) {
+    // Agrupar ítems por id base de producto (para manejar variantes)
+    const groups = {};
+    items.forEach((item) => {
+      const key = item.id;
+      if (!groups[key])
+        groups[key] = { baseId: item.id, cat: item.cat, units: [] };
+      for (let i = 0; i < item.qty; i++) groups[key].units.push(item.price);
+    });
+
+    Object.values(groups).forEach((group) => {
+      let promoApplies = false;
+      if (currentPromo.id_producto && currentPromo.id_producto == group.baseId)
+        promoApplies = true;
+      else if (
+        currentPromo.categoria_code &&
+        currentPromo.categoria_code === group.cat
+      )
+        promoApplies = true;
+      else if (!currentPromo.id_producto && !currentPromo.categoria_code)
+        promoApplies = true;
+
+      if (!promoApplies) return;
+
+      const buyQty = parseInt(currentPromo.bundle_buy_qty) || 0;
+      const payQty = parseInt(currentPromo.bundle_pay_qty) || 0;
+      const totalQty = group.units.length;
+
+      if (currentPromo.tipo === "bundle" && buyQty > 0 && payQty > 0) {
+        const sets = Math.floor(totalQty / buyQty);
+        const freeUnits = sets * (buyQty - payQty);
+        // La/s unidad/es más barata/s en cada set son las gratis
+        const sorted = [...group.units].sort((a, b) => a - b);
+        bundleDiscountTotal += sorted
+          .slice(0, freeUnits)
+          .reduce((s, p) => s + p, 0);
+      } else if (currentPromo.tipo === "fixed_bundle" && buyQty > 0) {
+        const sets = Math.floor(totalQty / buyQty);
+        const avgPrice = group.units.reduce((s, p) => s + p, 0) / totalQty;
+        const normalPrice = sets * buyQty * avgPrice;
+        const bundlePrice = sets * parseFloat(currentPromo.valor);
+        if (normalPrice > bundlePrice)
+          bundleDiscountTotal += normalPrice - bundlePrice;
+      }
+    });
+  }
+
+  // 2. Aplicar descuento global (cupón % o importe fijo sobre lo que queda)
+  const subtotalAfterBundles = subtotal - bundleDiscountTotal;
+  let generalDiscount = 0;
+
+  if (
+    currentPromo &&
+    (currentPromo.tipo === "percent" || currentPromo.tipo === "amount")
+  ) {
+    if (currentPromo.tipo === "percent") {
+      generalDiscount = (subtotalAfterBundles * currentPromo.valor) / 100;
+    } else {
+      generalDiscount = Math.min(subtotalAfterBundles, currentPromo.valor);
+    }
+  }
+
+  // Descuento de socio (5% sobre el total tras otros descuentos)
+  const socioAmt =
+    socioActual && socioActual.es_socio
+      ? (subtotalAfterBundles - generalDiscount) * (SOCIO_DISCOUNT / 100)
+      : 0;
+
+  const totalDiscount = bundleDiscountTotal + generalDiscount + socioAmt;
+  const subtotalFinal = subtotal - totalDiscount;
+
+  // Factor de prorrateo para el IVA (si el total tiene descuento, el IVA baja proporcionalmente)
+  const discountFactor = subtotal > 0 ? subtotalFinal / subtotal : 1;
 
   let vat = 0;
   items.forEach((item) => {
-    const itemSubtotal = item.price * item.qty;
-    const itemBase = itemSubtotal * discountFactor;
-    const itemVat = itemBase * (item.iva / 100);
-    vat += itemVat;
+    const itemOrigSubtotal = item.price * item.qty;
+    const itemDiscounted = itemOrigSubtotal * discountFactor;
+    vat += itemDiscounted * (item.iva / 100);
   });
 
-  const base = subtotal - totalDiscount;
-  const total = base + vat;
+  const total = subtotalFinal + vat;
 
-  document.getElementById("subtotal").textContent = fmt(subtotal);
+  // Actualizar UI
+  const elSubtotal = document.getElementById("subtotal");
+  if (!elSubtotal) return;
+
+  elSubtotal.textContent = fmt(subtotal);
   document.getElementById("vatAmt").textContent = fmt(vat);
   document.getElementById("totalAmt").textContent = fmt(total);
   document.getElementById("chargeTotal").textContent = fmt(total);
@@ -465,15 +726,18 @@ function updateTotals(subtotal) {
 
   document.getElementById("chargeBtn").disabled = subtotal === 0;
 
+  // Financiación
   if (selectedPayment === "financiado") {
     financingAccepted = false;
-    if (window._financingRecalcTimer) clearTimeout(window._financingRecalcTimer);
+    if (window._financingRecalcTimer)
+      clearTimeout(window._financingRecalcTimer);
     window._financingRecalcTimer = setTimeout(() => {
-      try { calcularCuotaFinanciacion(); } catch (e) { console.warn("Error recalculando financiación:", e); }
+      try {
+        calcularCuotaFinanciacion();
+      } catch (e) {}
     }, 80);
   }
 
-  // Gestión del botón de financiación
   const finanBtn = document.getElementById("btnFinanciacion");
   if (finanBtn) {
     const finanMinBadge = document.getElementById("finanMinBadge");
@@ -487,12 +751,16 @@ function updateTotals(subtotal) {
       finanBtn.style.filter = "none";
       finanBtn.style.cursor = "pointer";
       if (finanLockIcon) finanLockIcon.className = "fa-solid fa-percent";
-      if (finanMinBadge) { finanMinBadge.textContent = "DISPONIBLE"; finanMinBadge.classList.add("finan-badge-available"); }
+      if (finanMinBadge) {
+        finanMinBadge.textContent = "DISPONIBLE";
+        finanMinBadge.classList.add("finan-badge-available");
+      }
       if (finanBtnLabel) finanBtnLabel.textContent = "Financiación";
     } else {
-      // Si el método actual es financiado y el total baja del mínimo, volver a efectivo
       if (selectedPayment === "financiado") {
-        const efectivoBtn = document.querySelector('.pay-btn[data-method="efectivo"]');
+        const efectivoBtn = document.querySelector(
+          '.pay-btn[data-method="efectivo"]',
+        );
         if (efectivoBtn) selectPayment(efectivoBtn);
       }
       finanBtn.classList.add("locked");
@@ -501,27 +769,29 @@ function updateTotals(subtotal) {
       finanBtn.style.filter = "grayscale(100%) brightness(0.6)";
       finanBtn.style.cursor = "not-allowed";
       if (finanLockIcon) finanLockIcon.className = "fa-solid fa-lock";
-      if (finanMinBadge) { finanMinBadge.textContent = `Mín. ${fmt(FINANCING_MIN_AMOUNT)}`; finanMinBadge.classList.remove("finan-badge-available"); }
+      if (finanMinBadge) {
+        finanMinBadge.textContent = `Mín. ${fmt(FINANCING_MIN_AMOUNT)}`;
+        finanMinBadge.classList.remove("finan-badge-available");
+      }
       if (finanBtnLabel) finanBtnLabel.textContent = "Financiación";
     }
-  }
-
-  if (selectedPayment === "financiado") {
-    calcularCuotaFinanciacion();
   }
 }
 
 // ── Pago ───────────────────────────────────────────────────────────────────────
-const PROMOS = typeof DB_PROMOS !== "undefined" ? DB_PROMOS : [];
-let currentPromo = null;
 
 function selectPayment(el) {
   if (el.disabled) {
-    showToast('<i class="fa-solid fa-lock"></i> Financiación disponible a partir de ' + fmt(FINANCING_MIN_AMOUNT));
+    showToast(
+      '<i class="fa-solid fa-lock"></i> Financiación disponible a partir de ' +
+        fmt(FINANCING_MIN_AMOUNT),
+    );
     return;
   }
 
-  document.querySelectorAll(".pay-btn").forEach((b) => b.classList.remove("selected"));
+  document
+    .querySelectorAll(".pay-btn")
+    .forEach((b) => b.classList.remove("selected"));
   el.classList.add("selected");
   selectedPayment = el.dataset.method;
 
@@ -579,7 +849,10 @@ async function cargarFinancieras() {
     if (r.ok) {
       LISTA_FINANCIERAS = r.financieras;
       const opts = r.financieras
-        .map((f) => `<option value="${f.id}" data-min="${f.min_importe}">${f.nombre}</option>`)
+        .map(
+          (f) =>
+            `<option value="${f.id}" data-min="${f.min_importe}">${f.nombre}</option>`,
+        )
         .join("");
       if (el) {
         el.innerHTML = '<option value="">Seleccione...</option>' + opts;
@@ -589,8 +862,10 @@ async function cargarFinancieras() {
         elModal.innerHTML = '<option value="">Seleccione...</option>' + opts;
         if (financingParams.entidad) elModal.value = financingParams.entidad;
       }
-      if (mesesEl && financingParams.meses) mesesEl.value = financingParams.meses;
-      if (mesesModal && financingParams.meses) mesesModal.value = financingParams.meses;
+      if (mesesEl && financingParams.meses)
+        mesesEl.value = financingParams.meses;
+      if (mesesModal && financingParams.meses)
+        mesesModal.value = financingParams.meses;
       if (pagaEl) pagaEl.checked = financingParams.pagaCliente;
       if (pagaModal) pagaModal.checked = financingParams.pagaCliente;
     }
@@ -606,7 +881,9 @@ async function updateFinancingInfo() {
 
   if (!entidadEl || !mesesEl || !pagaEl) return;
 
-  const total = parseFloat(document.getElementById("totalAmt").textContent.replace(",", "."));
+  const total = parseFloat(
+    document.getElementById("totalAmt").textContent.replace(",", "."),
+  );
   if (isNaN(total)) return;
 
   const entidadId = entidadEl.value;
@@ -628,7 +905,9 @@ async function updateFinancingInfo() {
 
   let comisionPct = 0;
   try {
-    const comisionRes = await fetch(`api/obtenerComisionesPlazo.php?id=${financier.id}&meses=${meses}`);
+    const comisionRes = await fetch(
+      `api/obtenerComisionesPlazo.php?id=${financier.id}&meses=${meses}`,
+    );
     const comisionData = await comisionRes.json();
     if (comisionData.ok && comisionData.comision) {
       const valor = pagaCliente
@@ -681,7 +960,9 @@ function calcularCuotaFinanciacion(mode = "inline") {
   financingParams.meses = mesesEl.value;
   financingParams.pagaCliente = pagaEl.checked;
 
-  const total = parseFloat(document.getElementById("totalAmt").textContent.replace(",", "."));
+  const total = parseFloat(
+    document.getElementById("totalAmt").textContent.replace(",", "."),
+  );
   if (isNaN(total)) return;
 
   const entidadId = entidadEl.value;
@@ -713,7 +994,13 @@ function calcularCuotaFinanciacion(mode = "inline") {
   calcularRentabilidad(total, financier, meses, pagaCliente, mode);
 }
 
-async function calcularRentabilidad(total, financier, meses, pagaCliente, mode = "inline") {
+async function calcularRentabilidad(
+  total,
+  financier,
+  meses,
+  pagaCliente,
+  mode = "inline",
+) {
   const suffix = mode === "modal" ? "_modal" : "";
 
   const totalCost = Object.values(cart).reduce((acc, item) => {
@@ -726,7 +1013,9 @@ async function calcularRentabilidad(total, financier, meses, pagaCliente, mode =
 
   let comisionPct = 0;
   try {
-    const comisionRes = await fetch(`api/obtenerComisionesPlazo.php?id=${financier.id}&meses=${meses}`);
+    const comisionRes = await fetch(
+      `api/obtenerComisionesPlazo.php?id=${financier.id}&meses=${meses}`,
+    );
     const comisionData = await comisionRes.json();
     if (comisionData.ok && comisionData.comision) {
       const valor = pagaCliente
@@ -748,7 +1037,8 @@ async function calcularRentabilidad(total, financier, meses, pagaCliente, mode =
     if (margenEl) margenEl.textContent = fmt(subtotalSinIVA - totalCost);
 
     const comisionPctEl = document.getElementById("finComisionPct");
-    if (comisionPctEl) comisionPctEl.textContent = `(${comisionPct.toFixed(2)}%)`;
+    if (comisionPctEl)
+      comisionPctEl.textContent = `(${comisionPct.toFixed(2)}%)`;
 
     const comisionEl = document.getElementById("finComisionBanco");
     if (comisionEl) comisionEl.textContent = `-${fmt(comisionAmt)}`;
@@ -762,11 +1052,12 @@ async function calcularRentabilidad(total, financier, meses, pagaCliente, mode =
     const resultEl = document.getElementById("profitStatus_modal");
     if (resultEl) {
       resultEl.textContent = fmt(netProfit);
-      const color = netProfit >= subtotalSinIVA * 0.12
-        ? "var(--green)"
-        : netProfit > 0
-        ? "var(--orange)"
-        : "var(--red)";
+      const color =
+        netProfit >= subtotalSinIVA * 0.12
+          ? "var(--green)"
+          : netProfit > 0
+            ? "var(--orange)"
+            : "var(--red)";
       resultEl.style.color = color;
     }
 
@@ -782,7 +1073,9 @@ function confirmFinancingAccept() {
     confirmarBtn.disabled = false;
     confirmarBtn.style.opacity = "1";
   }
-  showToast('<i class="fa-solid fa-check-circle"></i> Financiación aceptada - Procede al pago');
+  showToast(
+    '<i class="fa-solid fa-check-circle"></i> Financiación aceptada - Procede al pago',
+  );
 
   ["", "_modal"].forEach((s) => {
     const dc = document.getElementById("financingDecisionContainer" + s);
@@ -793,15 +1086,27 @@ function confirmFinancingAccept() {
 function rejectFinancing() {
   financingAccepted = false;
 
-  const efectivoBtn = document.querySelector('.pay-btn[data-method="efectivo"]');
+  const efectivoBtn = document.querySelector(
+    '.pay-btn[data-method="efectivo"]',
+  );
   if (efectivoBtn) selectPayment(efectivoBtn);
 
-  try { document.getElementById("finanPagaCliente").checked = false; } catch (e) {}
-  try { document.getElementById("finanMeses").value = "12"; } catch (e) {}
-  try { document.getElementById("finanPagaCliente_modal").checked = false; } catch (e) {}
-  try { document.getElementById("finanMeses_modal").value = "12"; } catch (e) {}
+  try {
+    document.getElementById("finanPagaCliente").checked = false;
+  } catch (e) {}
+  try {
+    document.getElementById("finanMeses").value = "12";
+  } catch (e) {}
+  try {
+    document.getElementById("finanPagaCliente_modal").checked = false;
+  } catch (e) {}
+  try {
+    document.getElementById("finanMeses_modal").value = "12";
+  } catch (e) {}
 
-  showToast('<i class="fa-solid fa-arrow-right"></i> Financiación rechazada - Método cambiado a efectivo');
+  showToast(
+    '<i class="fa-solid fa-arrow-right"></i> Financiación rechazada - Método cambiado a efectivo',
+  );
 }
 
 function openFinancingModal() {
@@ -812,13 +1117,27 @@ function openFinancingModal() {
   const mesesModal = document.getElementById("finanMeses_modal");
   const pagaClienteModal = document.getElementById("finanPagaCliente_modal");
 
-  if (entidadModal && financingParams.entidad) entidadModal.value = financingParams.entidad;
-  if (mesesModal && financingParams.meses) mesesModal.value = financingParams.meses;
+  if (entidadModal && financingParams.entidad)
+    entidadModal.value = financingParams.entidad;
+  if (mesesModal && financingParams.meses)
+    mesesModal.value = financingParams.meses;
   if (pagaClienteModal) pagaClienteModal.checked = financingParams.pagaCliente;
 
-  if (entidadModal) entidadModal.onchange = () => { updateFinancingParams("modal"); calcularCuotaFinanciacion("modal"); };
-  if (mesesModal) mesesModal.onchange = () => { updateFinancingParams("modal"); calcularCuotaFinanciacion("modal"); };
-  if (pagaClienteModal) pagaClienteModal.onchange = () => { updateFinancingParams("modal"); calcularCuotaFinanciacion("modal"); };
+  if (entidadModal)
+    entidadModal.onchange = () => {
+      updateFinancingParams("modal");
+      calcularCuotaFinanciacion("modal");
+    };
+  if (mesesModal)
+    mesesModal.onchange = () => {
+      updateFinancingParams("modal");
+      calcularCuotaFinanciacion("modal");
+    };
+  if (pagaClienteModal)
+    pagaClienteModal.onchange = () => {
+      updateFinancingParams("modal");
+      calcularCuotaFinanciacion("modal");
+    };
 
   modal.classList.add("visible");
   cargarFinancieras();
@@ -856,7 +1175,9 @@ function confirmarFinanciacionModal() {
 
   if (entidadHidden) entidadHidden.value = entidadModal.value;
   if (mesesHidden) mesesHidden.value = mesesModal ? mesesModal.value : "12";
-  if (pagaClienteHidden) pagaClienteHidden.value = pagaClienteModal && pagaClienteModal.checked ? "1" : "0";
+  if (pagaClienteHidden)
+    pagaClienteHidden.value =
+      pagaClienteModal && pagaClienteModal.checked ? "1" : "0";
 
   closeFinancingModal();
   showToast("✓ Financiación configurada");
@@ -908,54 +1229,64 @@ function initSidebarResizer() {
     window.addEventListener("mouseup", stop);
   });
 
-  resizer.addEventListener("touchstart", (ev) => {
-    dragging = true;
-    startX = ev.touches[0].clientX;
-    startWidth = parseInt(getComputedStyle(sidebar).width, 10);
-    document.body.classList.add("resizing-sidebar");
-    window.addEventListener("touchmove", onMove);
-    window.addEventListener("touchend", stop);
-  }, { passive: true });
+  resizer.addEventListener(
+    "touchstart",
+    (ev) => {
+      dragging = true;
+      startX = ev.touches[0].clientX;
+      startWidth = parseInt(getComputedStyle(sidebar).width, 10);
+      document.body.classList.add("resizing-sidebar");
+      window.addEventListener("touchmove", onMove);
+      window.addEventListener("touchend", stop);
+    },
+    { passive: true },
+  );
 }
 
 // ── Descuentos ─────────────────────────────────────────────────────────────────
 function applyDiscount() {
-  const code = document.getElementById("discountCode").value.trim().toUpperCase();
+  const code = document
+    .getElementById("discountCode")
+    .value.trim()
+    .toUpperCase();
   const el_errDiscount = document.getElementById("err-discount");
   if (el_errDiscount) el_errDiscount.innerText = "";
 
   const subtotal = Object.values(cart).reduce((a, b) => a + b.price * b.qty, 0);
-  const promo = PROMOS.find((p) => p.code === code);
+  const promo = PROMOS.find((p) => p.codigo === code);
 
   if (promo) {
-    if (subtotal < promo.minSubtotal) {
+    const minSub = parseFloat(promo.min_subtotal) || 0;
+    if (subtotal < minSub) {
       if (el_errDiscount) {
-        el_errDiscount.innerText = `Importe mínimo ${fmt(promo.minSubtotal)} para usar este cupón`;
+        el_errDiscount.innerText = `Importe mínimo ${fmt(minSub)} para usar este cupón`;
       } else {
-        showToast(`<i class="fa-solid fa-circle-exclamation"></i> Importe mínimo ${fmt(promo.minSubtotal)} para usar este cupón`);
+        showToast(
+          `<i class="fa-solid fa-circle-exclamation"></i> Importe mínimo ${fmt(minSub)} para usar este cupón`,
+        );
       }
       return;
     }
 
-    if (promo.type === "percent") {
-      discountPct = promo.value;
-    } else {
-      discountPct = subtotal > 0 ? (promo.value / subtotal) * 100 : 0;
-    }
-
     currentPromo = promo;
-    document.getElementById("discountRow").style.display = "flex";
     updateTotals(subtotal);
 
-    const descText = promo.type === "percent"
-      ? `${promo.value}% aplicado (${promo.code})`
-      : `-${promo.value.toFixed(2)} € aplicado (${promo.code})`;
-    showToast(`<i class="fa-solid fa-circle-check"></i> ${descText}`);
+    let descText = "";
+    if (promo.tipo === "percent") descText = `${promo.valor}% aplicado`;
+    else if (promo.tipo === "amount")
+      descText = `-${fmt(promo.valor)} aplicado`;
+    else descText = "Promoción aplicada";
+
+    showToast(
+      `<i class="fa-solid fa-circle-check"></i> ${descText} (${promo.codigo})`,
+    );
   } else {
     if (el_errDiscount) {
       el_errDiscount.innerText = "Código no válido o inactivo";
     } else {
-      showToast('<i class="fa-solid fa-circle-xmark"></i> Código no válido o inactivo');
+      showToast(
+        '<i class="fa-solid fa-circle-xmark"></i> Código no válido o inactivo',
+      );
     }
   }
 }
@@ -1071,7 +1402,10 @@ async function buscarSocio() {
       socioActual = r.cliente;
       info.innerHTML = `<i class="fa-solid fa-check-circle"></i> ${r.cliente.nombre} (${r.cliente.nif})`;
       showToast("Socio identificado");
-      const subtotal = Object.values(cart).reduce((a, b) => a + b.price * b.qty, 0);
+      const subtotal = Object.values(cart).reduce(
+        (a, b) => a + b.price * b.qty,
+        0,
+      );
       updateTotals(subtotal);
     } else {
       info.innerText = "Socio no encontrado.";
@@ -1097,7 +1431,8 @@ async function buscarClienteGuardado() {
   } else if (tipoClienteActual === "empresa") {
     tipo = "empresa";
   } else {
-    if (resEl) resEl.innerText = "Selecciona Particular o Empresa para esta búsqueda.";
+    if (resEl)
+      resEl.innerText = "Selecciona Particular o Empresa para esta búsqueda.";
     return;
   }
 
@@ -1121,7 +1456,8 @@ async function buscarClienteGuardado() {
     if (!resEl) return;
     resEl.innerHTML = lista
       .map((c, idx) => {
-        const nombreCompleto = (c.nombre || "") + (c.apellidos ? " " + c.apellidos : "");
+        const nombreCompleto =
+          (c.nombre || "") + (c.apellidos ? " " + c.apellidos : "");
         const nifTxt = c.nif ? ` (${c.nif})` : "";
         return `<button type="button" class="cat-tab p-4-8 fs-11 mb-4" onclick="seleccionarClienteGuardado(${idx})">
   <i class="fa-solid ${c.tipo === "empresa" ? "fa-building" : "fa-user"}"></i>
@@ -1141,7 +1477,8 @@ function seleccionarClienteGuardado(idx) {
   clienteSeleccionado = c;
 
   if (tipoClienteActual === "empresa") {
-    const nombreCompleto = (c.nombre || "") + (c.apellidos ? " " + c.apellidos : "");
+    const nombreCompleto =
+      (c.nombre || "") + (c.apellidos ? " " + c.apellidos : "");
     const nomEl = document.getElementById("empresaNombre");
     const nifEl = document.getElementById("empresaNif");
     if (nomEl) nomEl.value = nombreCompleto;
@@ -1150,7 +1487,8 @@ function seleccionarClienteGuardado(idx) {
 
   const resEl = document.getElementById("clienteResultados");
   if (resEl) {
-    const nombreCompleto = (c.nombre || "") + (c.apellidos ? " " + c.apellidos : "");
+    const nombreCompleto =
+      (c.nombre || "") + (c.apellidos ? " " + c.apellidos : "");
     const nifTxt = c.nif ? ` (${c.nif})` : "";
     resEl.innerHTML = `<i class="fa-solid fa-check-circle"></i> ${nombreCompleto}${nifTxt}`;
   }
@@ -1161,7 +1499,8 @@ function seleccionarClienteGuardado(idx) {
 function mostrarRegistroSocio() {
   document.getElementById("socioBusqueda").style.display = "none";
   document.getElementById("socioRegistro").style.display = "flex";
-  document.getElementById("newSocioNif").value = document.getElementById("socioSearch").value;
+  document.getElementById("newSocioNif").value =
+    document.getElementById("socioSearch").value;
 }
 
 function cancelarRegistroSocio() {
@@ -1184,8 +1523,12 @@ async function guardarNuevoSocio() {
       socioActual = { id: r.id, nombre, nif, es_socio: true };
       document.getElementById("socioRegistro").style.display = "none";
       document.getElementById("socioBusqueda").style.display = "flex";
-      document.getElementById("socioInfo").innerHTML = `<i class="fa-solid fa-check-circle"></i> ${nombre} (${nif})`;
-      const subtotal = Object.values(cart).reduce((a, b) => a + b.price * b.qty, 0);
+      document.getElementById("socioInfo").innerHTML =
+        `<i class="fa-solid fa-check-circle"></i> ${nombre} (${nif})`;
+      const subtotal = Object.values(cart).reduce(
+        (a, b) => a + b.price * b.qty,
+        0,
+      );
       updateTotals(subtotal);
       showToast("Socio registrado y aplicado");
     }
@@ -1195,7 +1538,8 @@ async function guardarNuevoSocio() {
 }
 
 function calcularCambio() {
-  const recibido = parseFloat(document.getElementById("efectivoRecibido").value) || 0;
+  const recibido =
+    parseFloat(document.getElementById("efectivoRecibido").value) || 0;
   const items = Object.values(cart);
   const subtotal = items.reduce((a, b) => a + b.price * b.qty, 0);
   const discountAmt = (subtotal * discountPct) / 100;
@@ -1225,7 +1569,9 @@ function calcularCambio() {
 
 async function confirmarCliente() {
   const items = Object.values(cart);
-  const itemsWithSerial = items.filter((it) => it.requiere_serial && it.qty > 0);
+  const itemsWithSerial = items.filter(
+    (it) => it.requiere_serial && it.qty > 0,
+  );
 
   if (itemsWithSerial.length > 0) {
     cerrarModalCliente();
@@ -1293,14 +1639,120 @@ async function ejecutarCobroFinal() {
   btn.textContent = "Guardando…";
 
   const items = Object.values(cart);
-  const subtotal = items.reduce((a, b) => a + b.price * b.qty, 0);
-  const discountAmt = (subtotal * discountPct) / 100;
-  const socioAmt = socioActual && socioActual.es_socio ? (subtotal * SOCIO_DISCOUNT) / 100 : 0;
+
+  // ── Replicar exactamente el cálculo de updateTotals ──────────────────────────
+  let subtotal = 0;
+  let bundleDiscountTotal = 0;
+
+  // Acumular subtotal linea a linea
+  items.forEach((item) => {
+    subtotal += item.price * item.qty;
+  });
+
+  // Descuento de pack (bundle) — agrupa variantes del mismo producto
+  if (
+    currentPromo &&
+    (currentPromo.tipo === "bundle" || currentPromo.tipo === "fixed_bundle")
+  ) {
+    const groups = {};
+    items.forEach((item) => {
+      if (!groups[item.id])
+        groups[item.id] = { baseId: item.id, cat: item.cat, units: [] };
+      for (let i = 0; i < item.qty; i++) groups[item.id].units.push(item.price);
+    });
+    Object.values(groups).forEach((group) => {
+      let applies = false;
+      if (currentPromo.id_producto && currentPromo.id_producto == group.baseId)
+        applies = true;
+      else if (
+        currentPromo.categoria_code &&
+        currentPromo.categoria_code === group.cat
+      )
+        applies = true;
+      else if (!currentPromo.id_producto && !currentPromo.categoria_code)
+        applies = true;
+      if (!applies) return;
+
+      const buyQty = parseInt(currentPromo.bundle_buy_qty) || 0;
+      const payQty = parseInt(currentPromo.bundle_pay_qty) || 0;
+      const totalQty = group.units.length;
+
+      if (currentPromo.tipo === "bundle" && buyQty > 0 && payQty > 0) {
+        const sets = Math.floor(totalQty / buyQty);
+        const freeUnits = sets * (buyQty - payQty);
+        const sorted = [...group.units].sort((a, b) => a - b);
+        bundleDiscountTotal += sorted
+          .slice(0, freeUnits)
+          .reduce((s, p) => s + p, 0);
+      } else if (currentPromo.tipo === "fixed_bundle" && buyQty > 0) {
+        const sets = Math.floor(totalQty / buyQty);
+        const avgPrice = group.units.reduce((s, p) => s + p, 0) / totalQty;
+        const normalPrice = sets * buyQty * avgPrice;
+        const bundlePrice = sets * parseFloat(currentPromo.valor);
+        if (normalPrice > bundlePrice)
+          bundleDiscountTotal += normalPrice - bundlePrice;
+      }
+    });
+  }
+
+  const subtotalAfterBundles = subtotal - bundleDiscountTotal;
+
+  // Descuento de cupón (% o importe fijo)
+  let couponDiscount = 0;
+  if (
+    currentPromo &&
+    (currentPromo.tipo === "percent" || currentPromo.tipo === "amount")
+  ) {
+    if (currentPromo.tipo === "percent") {
+      couponDiscount = (subtotalAfterBundles * currentPromo.valor) / 100;
+    } else {
+      couponDiscount = Math.min(subtotalAfterBundles, currentPromo.valor);
+    }
+  }
+
+  // Descuento de socio (5%)
+  const socioAmt =
+    socioActual && socioActual.es_socio
+      ? (subtotalAfterBundles - couponDiscount) * (SOCIO_DISCOUNT / 100)
+      : 0;
+
+  const totalDiscountAmt = bundleDiscountTotal + couponDiscount + socioAmt;
+  const subtotalFinal = subtotal - totalDiscountAmt;
+
+  // IVA prorateado
+  const discountFactor = subtotal > 0 ? subtotalFinal / subtotal : 1;
+  let vatTotal = 0;
+  items.forEach((item) => {
+    const line = item.price * item.qty * discountFactor;
+    vatTotal += line * (item.iva / 100);
+  });
+  const totalFinal = subtotalFinal + vatTotal;
+
+  // Etiqueta del descuento para el ticket
+  let descuentoLabel = "";
+  if (bundleDiscountTotal > 0 && currentPromo) {
+    descuentoLabel =
+      currentPromo.label ||
+      `${currentPromo.bundle_buy_qty}x${currentPromo.bundle_pay_qty}`;
+  }
+  if (socioAmt > 0) {
+    descuentoLabel +=
+      (descuentoLabel ? " + " : "") + "Socio " + SOCIO_DISCOUNT + "%";
+  }
+  if (couponDiscount > 0 && currentPromo && currentPromo.codigo) {
+    descuentoLabel +=
+      (descuentoLabel ? " + " : "") + "Cupón " + currentPromo.codigo;
+  }
+  // ──────────────────────────────────────────────────────────────────────────────
 
   const clienteId =
     tipoClienteActual === "socio"
-      ? socioActual ? socioActual.id : null
-      : clienteSeleccionado ? clienteSeleccionado.id : null;
+      ? socioActual
+        ? socioActual.id
+        : null
+      : clienteSeleccionado
+        ? clienteSeleccionado.id
+        : null;
 
   if (selectedPayment === "financiado" && !financingAccepted) {
     showToast("⚠ Debes aceptar o rechazar la financiación antes de proceder");
@@ -1315,38 +1767,36 @@ async function ejecutarCobroFinal() {
       tipoClienteActual === "empresa"
         ? document.getElementById("empresaNombre").value
         : socioActual
-        ? socioActual.nombre
-        : clienteSeleccionado
-        ? clienteSeleccionado.nombre
-        : null,
+          ? socioActual.nombre
+          : clienteSeleccionado
+            ? clienteSeleccionado.nombre
+            : null,
     nifCliente:
       tipoClienteActual === "empresa"
         ? document.getElementById("empresaNif").value
         : socioActual
-        ? socioActual.nif
-        : clienteSeleccionado
-        ? clienteSeleccionado.nif
-        : null,
+          ? socioActual.nif
+          : clienteSeleccionado
+            ? clienteSeleccionado.nif
+            : null,
     idCliente: clienteId,
     metodoPago: selectedPayment,
     subtotal,
-    total:
-      (subtotal -
-        (subtotal *
-          (discountPct + (socioActual && socioActual.es_socio ? SOCIO_DISCOUNT : 0))) /
-          100) *
-      1.21,
-    descuentoPct: discountPct + (socioActual && socioActual.es_socio ? SOCIO_DISCOUNT : 0),
+    total: totalFinal,
+    descuentoPct: 0, // Siempre enviamos el importe, no el %
+    descuentoAmt: totalDiscountAmt,
+    descuentoLabel,
     lineas: items.map((it) => ({
       id: it.id,
-      name: it.name,
+      name: it.variant ? `${it.name} (${it.variant})` : it.name,
       codigo: it.codigo,
       price: it.price,
       qty: it.qty,
       serials: it.serials || [],
     })),
     efectivo: {
-      recibido: parseFloat(document.getElementById("efectivoRecibido").value) || 0,
+      recibido:
+        parseFloat(document.getElementById("efectivoRecibido").value) || 0,
     },
   };
 
@@ -1371,7 +1821,9 @@ async function ejecutarCobroFinal() {
       meses,
       cuotaMensual: totalVenta / meses,
       importeIntereses: 0,
-      modalidad: pagaCliente ? "cliente_paga_intereses" : "vendedor_paga_intereses",
+      modalidad: pagaCliente
+        ? "cliente_paga_intereses"
+        : "vendedor_paga_intereses",
       notas: "Financiado desde TPV (Smart System)",
     };
   }
@@ -1401,7 +1853,9 @@ async function ejecutarCobroFinal() {
       mostrarTicket(data.venta);
       cerrarModalCliente();
       clearCart();
-      showToast("<i class='fa-solid fa-circle-check'></i> Venta guardada correctamente");
+      showToast(
+        "<i class='fa-solid fa-circle-check'></i> Venta guardada correctamente",
+      );
     } else {
       throw new Error("La API no devolvió los datos de la venta.");
     }
@@ -1421,7 +1875,8 @@ async function cargarVenta(ticketNum) {
     body: JSON.stringify({ numTicket: ticketNum }),
   });
   const data = await resp.json();
-  if (!resp.ok || !data.ok) throw new Error(data.error || "Error al cargar venta");
+  if (!resp.ok || !data.ok)
+    throw new Error(data.error || "Error al cargar venta");
   return data.venta;
 }
 
@@ -1450,7 +1905,8 @@ function mostrarTicket(v, isFromTPV = true) {
 
   const btnAnular = document.getElementById("btnAnularTicket");
   if (btnAnular) {
-    btnAnular.style.display = !isFromTPV && v.estado === "completada" ? "" : "none";
+    btnAnular.style.display =
+      !isFromTPV && v.estado === "completada" ? "" : "none";
     btnAnular.onclick = () => abrirModalAnulacionTicket(v.numero_ticket);
   }
 
@@ -1474,7 +1930,8 @@ function mostrarTicket(v, isFromTPV = true) {
 
   const isFactura = v.tipo_cliente === "empresa";
   const el_tkTipoDoc = document.getElementById("tkTipoDoc");
-  if (el_tkTipoDoc) el_tkTipoDoc.textContent = isFactura ? "FACTURA" : "TICKET DE VENTA";
+  if (el_tkTipoDoc)
+    el_tkTipoDoc.textContent = isFactura ? "FACTURA" : "TICKET DE VENTA";
 
   const ticketWrapper = document.getElementById("ticketContenido");
   if (ticketWrapper) {
@@ -1491,9 +1948,15 @@ function mostrarTicket(v, isFromTPV = true) {
   if (isFactura && v.nombre_cliente) {
     if (clienteSection) clienteSection.classList.add("d-none");
     if (labelClienteMeta) labelClienteMeta.classList.remove("d-none");
-    if (clienteMeta) { clienteMeta.classList.remove("d-none"); clienteMeta.textContent = v.nombre_cliente || "—"; }
+    if (clienteMeta) {
+      clienteMeta.classList.remove("d-none");
+      clienteMeta.textContent = v.nombre_cliente || "—";
+    }
     if (labelNifMeta) labelNifMeta.classList.remove("d-none");
-    if (nifMeta) { nifMeta.classList.remove("d-none"); nifMeta.textContent = v.nif_cliente || "—"; }
+    if (nifMeta) {
+      nifMeta.classList.remove("d-none");
+      nifMeta.textContent = v.nif_cliente || "—";
+    }
   } else {
     if (clienteSection) clienteSection.classList.add("d-none");
     if (labelClienteMeta) labelClienteMeta.classList.add("d-none");
@@ -1503,16 +1966,20 @@ function mostrarTicket(v, isFromTPV = true) {
   }
 
   const el_tkNumero = document.getElementById("tkNumero");
-  if (el_tkNumero) el_tkNumero.textContent = "#" + String(v.numero_ticket).padStart(4, "0");
+  if (el_tkNumero)
+    el_tkNumero.textContent = "#" + String(v.numero_ticket).padStart(4, "0");
   const el_tkFecha = document.getElementById("tkFecha");
   if (el_tkFecha) el_tkFecha.textContent = fechaStr;
   const el_tkMetodo = document.getElementById("tkMetodo");
-  if (el_tkMetodo) el_tkMetodo.textContent = v.metodo_pago.charAt(0).toUpperCase() + v.metodo_pago.slice(1);
+  if (el_tkMetodo)
+    el_tkMetodo.textContent =
+      v.metodo_pago.charAt(0).toUpperCase() + v.metodo_pago.slice(1);
 
   const tkCajero = document.getElementById("tkCajero");
   if (tkCajero) {
     if (v.nombre_cajero) tkCajero.textContent = v.nombre_cajero;
-    else if (typeof CAJERO_NOMBRE !== "undefined" && CAJERO_NOMBRE) tkCajero.textContent = CAJERO_NOMBRE;
+    else if (typeof CAJERO_NOMBRE !== "undefined" && CAJERO_NOMBRE)
+      tkCajero.textContent = CAJERO_NOMBRE;
     else tkCajero.textContent = "—";
   }
 
@@ -1529,11 +1996,16 @@ function mostrarTicket(v, isFromTPV = true) {
 
         let serialDisplay = "";
         if (l.numeros_serie) {
-          serialDisplay = String(l.numeros_serie).split(",").map((s) => s.trim()).filter(Boolean).join(", ");
+          serialDisplay = String(l.numeros_serie)
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
+            .join(", ");
         } else if (l.numero_serie) {
           try {
             const parsed = JSON.parse(l.numero_serie);
-            if (Array.isArray(parsed)) serialDisplay = parsed.filter(Boolean).join(", ");
+            if (Array.isArray(parsed))
+              serialDisplay = parsed.filter(Boolean).join(", ");
           } catch (e) {
             serialDisplay = l.numero_serie;
           }
@@ -1560,13 +2032,15 @@ function mostrarTicket(v, isFromTPV = true) {
               ${serialDisplay ? `<div style="margin-top:4px; font-size:11px; color:var(--text-muted);"><i class="fa-solid fa-barcode"></i> N.º serie: ${serialDisplay}</div>` : ""}
               ${l.devuelta && l.motivo_devolucion ? `<div style="margin-top:4px; font-size:11px; color:var(--red); font-style:italic;"><i class="fa-solid fa-circle-info"></i> Motivo: ${l.motivo_devolucion}</div>` : ""}
             </div>
-            ${!isFromTPV && !l.devuelta && v.estado === "completada"
-              ? `<div style="padding-left:12px; display:flex; align-items:center;">
+            ${
+              !isFromTPV && !l.devuelta && v.estado === "completada"
+                ? `<div style="padding-left:12px; display:flex; align-items:center;">
                   <button onclick="abrirModalDevolucion(${l.id}, ${v.numero_ticket})" title="Devolver este producto" class="btn-icon text-red">
                     <i class="fa-solid fa-arrow-rotate-left"></i>
                   </button>
                 </div>`
-              : ""}
+                : ""
+            }
           </div>
         `;
       })
@@ -1587,8 +2061,10 @@ function mostrarTicket(v, isFromTPV = true) {
       tkEfectivoRow.classList.remove("d-none");
       const el_tkEntregado = document.getElementById("tkEntregado");
       const el_tkCambio = document.getElementById("tkCambio");
-      if (el_tkEntregado) el_tkEntregado.textContent = fmt2(v.efectivo_recibido);
-      if (el_tkCambio) el_tkCambio.textContent = fmt2(v.efectivo_recibido - v.total);
+      if (el_tkEntregado)
+        el_tkEntregado.textContent = fmt2(v.efectivo_recibido);
+      if (el_tkCambio)
+        el_tkCambio.textContent = fmt2(v.efectivo_recibido - v.total);
     } else {
       tkEfectivoRow.classList.add("d-none");
     }
@@ -1601,7 +2077,8 @@ function mostrarTicket(v, isFromTPV = true) {
       const el_tkFinanEntidad = document.getElementById("tkFinanEntidad");
       const el_tkFinanPlazo = document.getElementById("tkFinanPlazo");
       const el_tkFinanCuota = document.getElementById("tkFinanCuota");
-      if (el_tkFinanEntidad) el_tkFinanEntidad.textContent = v.nombre_financiera;
+      if (el_tkFinanEntidad)
+        el_tkFinanEntidad.textContent = v.nombre_financiera;
       if (el_tkFinanPlazo) el_tkFinanPlazo.textContent = v.meses + " meses";
       if (el_tkFinanCuota) el_tkFinanCuota.textContent = fmt2(v.cuota_mensual);
     } else {
@@ -1611,12 +2088,30 @@ function mostrarTicket(v, isFromTPV = true) {
 
   const descRow = document.getElementById("tkDescRow");
   if (descRow) {
-    if (parseFloat(v.descuento_pct) > 0) {
+    const discountAmt = parseFloat(v.descuento_amt || 0);
+    const discountPctVal = parseFloat(v.descuento_pct || 0);
+    if (discountAmt > 0 || discountPctVal > 0) {
       descRow.classList.remove("d-none");
       const el_tkDescLabel = document.getElementById("tkDescLabel");
       const el_tkDescAmt = document.getElementById("tkDescAmt");
-      if (el_tkDescLabel) el_tkDescLabel.textContent = `Descuento (${v.descuento_pct}%)`;
-      if (el_tkDescAmt) el_tkDescAmt.textContent = "−" + fmt2(v.descuento_amt);
+      if (el_tkDescLabel) {
+        if (v.descuento_label) {
+          el_tkDescLabel.textContent = `Descuento (${v.descuento_label})`;
+        } else if (discountPctVal > 0) {
+          el_tkDescLabel.textContent = `Descuento (${discountPctVal}%)`;
+        } else {
+          el_tkDescLabel.textContent = "Descuento";
+        }
+      }
+      if (el_tkDescAmt) {
+        el_tkDescAmt.textContent =
+          "−" +
+          fmt2(
+            discountAmt > 0
+              ? discountAmt
+              : (parseFloat(v.subtotal) * discountPctVal) / 100,
+          );
+      }
     } else {
       descRow.classList.add("d-none");
     }
@@ -1627,7 +2122,9 @@ function mostrarTicket(v, isFromTPV = true) {
 
 async function imprimirTicket() {
   if (!currentTicketNum) {
-    showToast("<i class='fa-solid fa-circle-xmark'></i> No hay ticket cargado para imprimir");
+    showToast(
+      "<i class='fa-solid fa-circle-xmark'></i> No hay ticket cargado para imprimir",
+    );
     return;
   }
   window.open(`./api/imprimirTicket.php?id=${currentTicketNum}`, "_blank");
@@ -1669,12 +2166,19 @@ async function enviarTicketEmail() {
     const resp = await fetch("./api/enviarVentaEmail.php", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ numTicket: currentTicketNum, destinatario: email, tipo: "ticket" }),
+      body: JSON.stringify({
+        numTicket: currentTicketNum,
+        destinatario: email,
+        tipo: "ticket",
+      }),
     });
     const data = await resp.json();
 
     if (data.ok) {
-      showToast("<i class='fa-solid fa-circle-check'></i> Ticket enviado con éxito a: " + email);
+      showToast(
+        "<i class='fa-solid fa-circle-check'></i> Ticket enviado con éxito a: " +
+          email,
+      );
       const emailInput = document.getElementById("tkEmailInput");
       if (emailInput) emailInput.value = "";
     } else {
@@ -1682,7 +2186,10 @@ async function enviarTicketEmail() {
     }
   } catch (err) {
     console.error(err);
-    showToast("<i class='fa-solid fa-circle-xmark'></i> " + (err.message || "Error al enviar"));
+    showToast(
+      "<i class='fa-solid fa-circle-xmark'></i> " +
+        (err.message || "Error al enviar"),
+    );
   } finally {
     if (btn) {
       btn.disabled = false;
@@ -1747,15 +2254,19 @@ function previewImageTPV(input, mode) {
 // ── Admin ──────────────────────────────────────────────────────────────────────
 function requireAdmin() {
   if (!isAdmin) {
-    showToast("<i class='fa-solid fa-triangle-exclamation'></i> Acceso restringido a administradores");
+    showToast(
+      "<i class='fa-solid fa-triangle-exclamation'></i> Acceso restringido a administradores",
+    );
     return false;
   }
   return true;
 }
 
 function addVariantToUI(mode, label = null, value = null) {
-  const l = label || document.getElementById(mode + "NuevaVarianteLabel").value.trim();
-  const v = value || document.getElementById(mode + "NuevaVarianteValue").value.trim();
+  const l =
+    label || document.getElementById(mode + "NuevaVarianteLabel").value.trim();
+  const v =
+    value || document.getElementById(mode + "NuevaVarianteValue").value.trim();
   if (!l || !v) return;
 
   const container = document.getElementById(mode + "VariantesContainer");
@@ -1782,7 +2293,9 @@ function getVariantsFromUI(mode) {
   if (!container) return null;
   const pills = container.querySelectorAll("div");
   const variants = [];
-  pills.forEach((p) => { variants.push({ label: p.dataset.label, valor: p.dataset.value }); });
+  pills.forEach((p) => {
+    variants.push({ label: p.dataset.label, valor: p.dataset.value });
+  });
   return variants.length > 0 ? variants : null;
 }
 
@@ -1795,7 +2308,8 @@ function abrirModalNuevoProducto() {
   document.getElementById("addPrice").value = "";
   document.getElementById("addEmoji").value = "📦";
   document.getElementById("addCat").value = "audio";
-  document.getElementById("addImgPreview").innerHTML = '<i class="fa-solid fa-image"></i>';
+  document.getElementById("addImgPreview").innerHTML =
+    '<i class="fa-solid fa-image"></i>';
   document.getElementById("addVariantesContainer").innerHTML = "";
   document.querySelectorAll(".form-error").forEach((el) => (el.innerText = ""));
   document.getElementById("addModal").classList.add("visible");
@@ -1836,7 +2350,9 @@ async function guardarNuevoProducto() {
     if (!data.ok) {
       if (data.aErrores) {
         for (const [key, msg] of Object.entries(data.aErrores)) {
-          const errEl = document.getElementById("err-add" + key.charAt(0).toUpperCase() + key.slice(1));
+          const errEl = document.getElementById(
+            "err-add" + key.charAt(0).toUpperCase() + key.slice(1),
+          );
           if (errEl && msg) errEl.innerText = msg;
         }
         return;
@@ -1847,7 +2363,9 @@ async function guardarNuevoProducto() {
     PRODUCTS.push(data.producto);
     document.getElementById("addModal").classList.remove("visible");
     renderProducts();
-    showToast("<i class='fa-solid fa-circle-check'></i> Producto añadido correctamente");
+    showToast(
+      "<i class='fa-solid fa-circle-check'></i> Producto añadido correctamente",
+    );
   } catch (err) {
     showToast("<i class='fa-solid fa-circle-xmark'></i> " + err.message);
   }
@@ -1877,13 +2395,16 @@ function editProduct(e, id) {
   container.innerHTML = "";
   if (p.variantes) {
     try {
-      const vars = typeof p.variantes === "string" ? JSON.parse(p.variantes) : p.variantes;
+      const vars =
+        typeof p.variantes === "string" ? JSON.parse(p.variantes) : p.variantes;
       if (Array.isArray(vars)) {
         vars.forEach((v) => addVariantToUI("edit", v.label, v.valor));
       } else {
         for (const [l, v] of Object.entries(vars)) addVariantToUI("edit", l, v);
       }
-    } catch (e) { console.error("Error parsing variantes", e); }
+    } catch (e) {
+      console.error("Error parsing variantes", e);
+    }
   }
 
   document.querySelectorAll(".form-error").forEach((el) => (el.innerText = ""));
@@ -1893,13 +2414,16 @@ function editProduct(e, id) {
 async function saveEdit() {
   document.querySelectorAll(".form-error").forEach((el) => (el.innerText = ""));
   try {
-    alert("🔧 DEBUG v6: saveEdit ejecutado. Si ves este mensaje, el JS actualizado está activo.");
+    alert(
+      "🔧 DEBUG v6: saveEdit ejecutado. Si ves este mensaje, el JS actualizado está activo.",
+    );
     const id = parseInt(document.getElementById("editId")?.value);
     const name = document.getElementById("editName")?.value.trim();
     const codigo = document.getElementById("editSku")?.value.trim();
     const price = parseFloat(document.getElementById("editPrice")?.value);
     const iva = parseFloat(document.getElementById("editIva")?.value) || 21;
-    const mesesGarantia = parseInt(document.getElementById("editMesesGarantia")?.value) || 24;
+    const mesesGarantia =
+      parseInt(document.getElementById("editMesesGarantia")?.value) || 24;
     const icono = document.getElementById("editEmoji")?.value.trim();
 
     const pOrig = PRODUCTS.find((x) => x.id === id);
@@ -1931,7 +2455,9 @@ async function saveEdit() {
         const msgs = Object.values(data.aErrores).filter(Boolean);
         showToast("❌ Errores de validación: " + msgs.join(" / "));
         for (const [key, msg] of Object.entries(data.aErrores)) {
-          const errEl = document.getElementById("err-edit" + key.charAt(0).toUpperCase() + key.slice(1));
+          const errEl = document.getElementById(
+            "err-edit" + key.charAt(0).toUpperCase() + key.slice(1),
+          );
           if (errEl && msg) errEl.innerText = msg;
         }
         return;
@@ -1952,7 +2478,9 @@ async function saveEdit() {
     document.getElementById("editModal").classList.remove("visible");
     renderProducts();
     const d = data._debug || {};
-    showToast(`✅ Enviado IVA=${d.enviado_iva} → BD=${d.bd_iva} | Meses=${d.enviado_meses} → BD=${d.bd_meses}`);
+    showToast(
+      `✅ Enviado IVA=${d.enviado_iva} → BD=${d.bd_iva} | Meses=${d.enviado_meses} → BD=${d.bd_meses}`,
+    );
   } catch (err) {
     showToast("<i class='fa-solid fa-circle-xmark'></i> " + err.message);
   }
@@ -1973,11 +2501,19 @@ function deleteProduct(e, id) {
       const data = await resp.json();
       if (!data.ok) throw new Error(data.error);
 
-      PRODUCTS.splice(PRODUCTS.findIndex((x) => x.id === id), 1);
-      if (cart[id]) { delete cart[id]; renderCart(); }
+      PRODUCTS.splice(
+        PRODUCTS.findIndex((x) => x.id === id),
+        1,
+      );
+      if (cart[id]) {
+        delete cart[id];
+        renderCart();
+      }
       document.getElementById("deleteModal").classList.remove("visible");
       renderProducts();
-      showToast("<i class='fa-solid fa-trash-can'></i> Producto eliminado de la BD");
+      showToast(
+        "<i class='fa-solid fa-trash-can'></i> Producto eliminado de la BD",
+      );
     } catch (err) {
       showToast("<i class='fa-solid fa-circle-xmark'></i> " + err.message);
     }
@@ -1988,23 +2524,33 @@ function deleteProduct(e, id) {
 function abrirModalDevolucion(idLinea, numTicket) {
   const modal = document.getElementById("returnModal");
   if (!modal) {
-    console.error("No se encontró el modal de devolución (returnModal) en esta vista.");
-    showToast("<i class='fa-solid fa-circle-xmark'></i> No se puede abrir el modal de devolución en esta pantalla.");
+    console.error(
+      "No se encontró el modal de devolución (returnModal) en esta vista.",
+    );
+    showToast(
+      "<i class='fa-solid fa-circle-xmark'></i> No se puede abrir el modal de devolución en esta pantalla.",
+    );
     return;
   }
   modal.classList.add("visible");
-  document.getElementById("confirmReturnBtn").onclick = () => confirmarDevolucion(idLinea, numTicket);
+  document.getElementById("confirmReturnBtn").onclick = () =>
+    confirmarDevolucion(idLinea, numTicket);
 }
 
 function abrirModalAnulacionTicket(numTicket) {
   const modal = document.getElementById("returnModal");
   if (!modal) {
-    console.error("No se encontró el modal de devolución (returnModal) en esta vista.");
-    showToast("<i class='fa-solid fa-circle-xmark'></i> No se puede abrir el modal de anulación en esta pantalla.");
+    console.error(
+      "No se encontró el modal de devolución (returnModal) en esta vista.",
+    );
+    showToast(
+      "<i class='fa-solid fa-circle-xmark'></i> No se puede abrir el modal de anulación en esta pantalla.",
+    );
     return;
   }
   modal.classList.add("visible");
-  document.getElementById("confirmReturnBtn").onclick = () => confirmarAnulacionTicket(numTicket);
+  document.getElementById("confirmReturnBtn").onclick = () =>
+    confirmarAnulacionTicket(numTicket);
 }
 
 async function confirmarDevolucion(idLinea, numTicket) {
@@ -2016,10 +2562,15 @@ async function confirmarDevolucion(idLinea, numTicket) {
     const resp = await fetch("./api/gestionDevolucion.php", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ accion: "devolverLinea", idLinea, motivo: finalMotivo }),
+      body: JSON.stringify({
+        accion: "devolverLinea",
+        idLinea,
+        motivo: finalMotivo,
+      }),
     });
     const data = await resp.json();
-    if (!data.ok) throw new Error(data.error || "No se pudo realizar la devolución");
+    if (!data.ok)
+      throw new Error(data.error || "No se pudo realizar la devolución");
 
     document.getElementById("returnModal").classList.remove("visible");
     showToast("✅ Producto devuelto correctamente");
@@ -2046,12 +2597,15 @@ async function toggleBaja(e, id) {
     const p = PRODUCTS.find((x) => x.id === id);
     p.inactive = !data.activo;
 
-    if (p.inactive && cart[id]) { delete cart[id]; renderCart(); }
+    if (p.inactive && cart[id]) {
+      delete cart[id];
+      renderCart();
+    }
     renderProducts();
     showToast(
       p.inactive
         ? "<i class='fa-solid fa-pause'></i> Producto dado de baja"
-        : "<i class='fa-solid fa-play'></i> Producto reactivado"
+        : "<i class='fa-solid fa-play'></i> Producto reactivado",
     );
   } catch (err) {
     showToast("❌ " + err.message);
@@ -2114,8 +2668,17 @@ function tick() {
   const dateEl = document.getElementById("datestr");
   const now = new Date();
 
-  if (clockEl) clockEl.textContent = now.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
-  if (dateEl) dateEl.textContent = now.toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" });
+  if (clockEl)
+    clockEl.textContent = now.toLocaleTimeString("es-ES", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  if (dateEl)
+    dateEl.textContent = now.toLocaleDateString("es-ES", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
 }
 tick();
 setInterval(tick, 1000);
@@ -2148,7 +2711,9 @@ if (productsGrid) {
     catTabs.addEventListener("click", (e) => {
       const tab = e.target.closest(".cat-tab");
       if (!tab) return;
-      document.querySelectorAll(".cat-tab").forEach((t) => t.classList.remove("active"));
+      document
+        .querySelectorAll(".cat-tab")
+        .forEach((t) => t.classList.remove("active"));
       tab.classList.add("active");
       activeCat = tab.dataset.cat;
       renderProducts();

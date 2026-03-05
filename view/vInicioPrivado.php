@@ -24,6 +24,25 @@
 
         <!-- ADVANCED FILTERS PANEL -->
         <div id="advancedFilters" class="advanced-filters-panel d-none bg-surface p-16 br-12 border-2 mb-10 shadow-sm">
+            <?php
+            // Extraer todos los atributos únicos usados en los productos activos para generar los filtros
+            $atributosDisponibles = [];
+            if (isset($avInicioPrivado['productos'])) {
+                foreach ($avInicioPrivado['productos'] as $prod) {
+                    if ($prod['activo'] && !empty($prod['atributos'])) {
+                        $attrArr = json_decode($prod['atributos'], true);
+                        if (is_array($attrArr)) {
+                            foreach ($attrArr as $attr) {
+                                if (!in_array($attr, $atributosDisponibles)) {
+                                    $atributosDisponibles[] = $attr;
+                                }
+                            }
+                        }
+                    }
+                }
+                sort($atributosDisponibles);
+            }
+            ?>
             <div class="grid-4 gap-12 ai-end">
                 <div class="form-group mb-0">
                     <label class="form-label fs-11 tt-uppercase opacity-70">Precio Mín (€)</label>
@@ -52,22 +71,40 @@
                         <option value="stock-desc">Stock (Mayor a Menor)</option>
                     </select>
                 </div>
+
+                <?php if (!empty($atributosDisponibles)): ?>
+                    <div style="grid-column: span 4;">
+                        <label class="form-label fs-11 tt-uppercase opacity-70 mb-8"><i class="fa-solid fa-tags"></i> Etiquetas Adicionales</label>
+                        <div class="attr-tabs" id="attrTabs" style="display:flex; flex-wrap:wrap; gap:8px;">
+                            <?php foreach ($atributosDisponibles as $attr): ?>
+                                <button class="attr-tab cat-tab d-inline-flex ai-center gap-6"
+                                    data-attr="<?php echo htmlspecialchars($attr); ?>"
+                                    style="font-size: 11px; padding: 6px 14px;">
+                                    <i class="fa-solid fa-tag" style="opacity: 0.5;"></i> <?php echo htmlspecialchars($attr); ?>
+                                </button>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                <?php endif; ?>
             </div>
         </div>
 
 
         <div class="cat-tabs" id="catTabs">
             <button class="cat-tab active" data-cat="all">Todo</button>
-            <button class="cat-tab" data-cat="audio">Audio</button>
-            <button class="cat-tab" data-cat="movil">Móvil</button>
-            <button class="cat-tab" data-cat="gaming">Gaming</button>
-            <button class="cat-tab" data-cat="informatica">Informática</button>
-            <button class="cat-tab" data-cat="cables">Cables y Cargadores</button>
-            <button class="cat-tab" data-cat="foto">Foto y Video</button>
+            <?php foreach ($avInicioPrivado['categorias'] as $c): ?>
+                <button class="cat-tab" data-cat="<?php echo htmlspecialchars($c['codigo']); ?>">
+                    <?php echo htmlspecialchars($c['nombre']); ?>
+                </button>
+            <?php endforeach; ?>
             <button class="cat-tab d-inline-flex ai-center gap-6 text-red border-red-light bg-red-light" data-cat="baja">
                 <i class="fa-solid fa-arrow-trend-down"></i> De Baja
             </button>
         </div>
+
+
+
+
 
         <div class="products-grid" id="productsGrid"></div>
     </div>
@@ -194,8 +231,9 @@
                     id="btnFinanciacion"
                     data-method="financiado"
                     onclick="selectPayment(this)">
-                    <i class="fa-solid fa-calendar-check"></i>
-                    Financiación
+                    <i class="fa-solid fa-calendar-check" id="finanLockIcon"></i>
+                    <span id="finanBtnLabel">Financiación</span>
+                    <span id="finanMinBadge" class="finan-badge" style="display: block; font-size: 8px; margin-top: 2px;"></span>
                 </button>
             </div>
 
@@ -345,14 +383,12 @@
             <div class="form-group">
                 <label class="form-label">Categoría</label>
                 <select id="addCat" class="form-input">
-                    <option value="audio">Audio</option>
-                    <option value="movil">Móvil</option>
-                    <option value="gaming">Gaming</option>
-                    <option value="informatica">Informática</option>
-                    <option value="cables">Cables y Cargadores</option>
-                    <option value="foto">Foto y Video</option>
+                    <?php foreach ($avInicioPrivado['categorias'] as $c): ?>
+                        <option value="<?php echo htmlspecialchars($c['codigo']); ?>"><?php echo htmlspecialchars($c['nombre']); ?></option>
+                    <?php endforeach; ?>
                 </select>
             </div>
+
         </div>
         <button class="btn-save mt-4 full-width" onclick="guardarNuevoProducto()">
             Crear producto
@@ -499,7 +535,8 @@
         <div id="variantsOptionsContainer" class="d-flex flex-column gap-16 py-10">
             <!-- Dinámico: Atributos y sus valores seleccionables -->
         </div>
-        <div class="modal-footer full-width mt-12">
+        <!-- Ocultamos el footer ya que los botones añaden directamente -->
+        <div class="modal-footer full-width mt-12 d-none">
             <button id="confirmVariantsBtn" class="btn-save py-12 full-width">Añadir al carrito</button>
         </div>
     </div>

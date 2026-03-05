@@ -47,17 +47,25 @@ foreach ($oProductos as $oProducto) {
         "icono" => $icono,
         "cat" => $oProducto->getCategoria(),
         "stock" => (int)$oProducto->getStockActual(),
+
         "inactive" => !$oProducto->getActivo(),
-        "variantes" => $oProducto->getVariantes()
+        "activo" => $oProducto->getActivo(),
+        "variantes" => $oProducto->getVariantes(),
+        "atributos" => $oProducto->getAtributos()
     ];
 }
 
-// Cargar promociones activas para el TPV
+// Cargar categorías dinámicas
+require_once 'model/CategoriaPDO.php';
+$listaCategorias = CategoriaPDO::listarTodas();
+
+// Cargar promociones activas
 require_once 'model/PromocionPDO.php';
 $aPromos = PromocionPDO::listarActivas();
 
 // Preparación de los datos del usuario para la vista
 $avInicioPrivado = [
+
     "nombre_completo" => $_SESSION['usuarioActualTPV']->getNombre(),
     "username" => $_SESSION['usuarioActualTPV']->getLogin(),
     "password" => $_SESSION['usuarioActualTPV']->getPassword(),
@@ -66,7 +74,9 @@ $avInicioPrivado = [
     "productos" => $aProductos,
     "promos"   => $aPromos,
     "cajaAbierta" => (bool)$turnoCaja,
+    "categorias" => $listaCategorias,
 ];
+
 $_SESSION['arrayDatosusuarioActualTPV'] = $avInicioPrivado;
 // Carga la vista layout principal
 require_once $view["layout"];

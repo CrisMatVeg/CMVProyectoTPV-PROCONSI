@@ -28,7 +28,10 @@
                 <i class="fa-solid fa-file-import"></i> Importar
             </button>
             <input type="file" id="importFileInput" accept=".csv,.json" class="d-none" onchange="importarProductos(this)">
-            <!-- Nuevo Producto -->
+            <!-- Gestión de Categorías -->
+            <button onclick="abrirModalGestionCategorias()" class="btn-filter">
+                <i class="fa-solid fa-tags"></i> Categorías
+            </button>
             <button onclick="abrirModalProducto()" class="btn-add">
                 <i class="fa-solid fa-plus"></i> Nuevo Producto
             </button>
@@ -45,14 +48,11 @@
             <input type="number" id="filterPriceMin" placeholder="Precio Min" class="form-input w-100 fs-12">
             <input type="number" id="filterPriceMax" placeholder="Precio Max" class="form-input w-100 fs-12">
         </div>
-        <select id="filterCat" class="filter-input p-10 br-8">
+        <select id="filterCat" class="filter-input p-10 br-8" onchange="applyFilters()">
             <option value="all">Todas las categorías</option>
-            <option value="audio">Audio</option>
-            <option value="movil">Móvil</option>
-            <option value="gaming">Gaming</option>
-            <option value="informatica">Informática</option>
-            <option value="cables">Cables</option>
-            <option value="foto">Foto</option>
+            <?php foreach ($avProductos['categorias'] as $c): ?>
+                <option value="<?php echo htmlspecialchars($c['codigo']); ?>"><?php echo htmlspecialchars($c['nombre']); ?></option>
+            <?php endforeach; ?>
         </select>
         <select id="filterEstado" class="filter-input p-10 br-8">
             <option value="all">Todos los estados</option>
@@ -107,6 +107,19 @@
                             <span class="cat-pill">
                                 <?php echo htmlspecialchars($p['categoria']); ?>
                             </span>
+                            <?php
+                            $atributosStr = $p['atributos'] ?? null;
+                            if ($atributosStr) {
+                                $atributosArr = json_decode($atributosStr, true);
+                                if (is_array($atributosArr) && count($atributosArr) > 0) {
+                                    echo '<div class="mt-4 d-flex flex-wrap gap-4">';
+                                    foreach ($atributosArr as $attr) {
+                                        echo '<span class="px-8 py-2 br-4 fs-10 bg-accent-soft text-accent border border-accent">' . htmlspecialchars($attr) . '</span>';
+                                    }
+                                    echo '</div>';
+                                }
+                            }
+                            ?>
                         </td>
                         <td class="text-right font-bold font-mono <?php echo $p['stock'] <= 5 ? 'text-red' : ''; ?>">
                             <?php echo $p['stock']; ?>
@@ -132,6 +145,9 @@
                                 </button>
                                 <button onclick="toggleEstadoProducto(<?php echo $p['id']; ?>)" title="<?php echo $p['activo'] ? 'Dar de baja' : 'Activar'; ?>" class="btn-icon <?php echo $p['activo'] ? 'text-red' : 'text-green'; ?>">
                                     <i class="fa-solid fa-<?php echo $p['activo'] ? 'arrow-down' : 'arrow-up'; ?>"></i>
+                                </button>
+                                <button onclick="abrirModalEntradaStock(<?php echo $p['id']; ?>, '<?php echo addslashes(htmlspecialchars($p['nombre'])); ?>', <?php echo (int)$p['stock']; ?>, <?php echo (float)$p['precio_coste']; ?>)" title="Entrada de Stock" class="btn-icon text-accent">
+                                    <i class="fa-solid fa-warehouse"></i>
                                 </button>
                                 <button onclick="eliminarProducto(<?php echo $p['id']; ?>, '<?php echo addslashes(htmlspecialchars($p['nombre'])); ?>')" title="Eliminar" class="btn-icon text-red" style="opacity:0.7;">
                                     <i class="fa-solid fa-trash"></i>
@@ -183,6 +199,158 @@
         </div>
     </div>
 </div>
+
+<!-- ── Modal: Entrada de Stock ─────────────────────────────────────────── -->
+<div id="modalEntradaStock" class="modal-overlay-bg" style="display:none;" onclick="if(event.target===this)cerrarModalEntradaStock()">
+    <div class="modal-content" style="max-width:440px; padding: 0; overflow: hidden;">
+        <div class="modal-header p-20 bg-surface2 border-bottom">
+            <h2 class="m-0 fs-18"><i class="fa-solid fa-warehouse"></i> Entrada de Stock</h2>
+            <button onclick="cerrarModalEntradaStock()" class="btn-close-modal">&times;</button>
+        </div>
+        <div class="modal-body p-24">
+            <div class="d-flex flex-column gap-16">
+                <div style="background:var(--surface2);border-radius:8px;padding:12px 16px;">
+                    <div style="font-weight:700;font-size:15px;" id="esNombreProducto">—</div>
+                    <div style="display:flex;gap:24px;margin-top:8px;font-size:13px;color:var(--text-muted);">
+                        <span>Stock actual: <strong id="esStockActual" style="color:var(--text);">—</strong></span>
+                        <span>CMP actual: <strong id="esCmpActual" style="color:var(--text);">—</strong> €</span>
+                    </div>
+                </div>
+
+                <input type="hidden" id="esIdProducto">
+
+                <div>
+                    <label class="form-label">Cantidad a añadir *</label>
+                    <input type="number" id="esCantidad" class="form-input" min="1" step="1" placeholder="Ej: 10" oninput="calcularNuevoCMP()">
+                    <span class="form-error" id="err-esCantidad"></span>
+                </div>
+
+                <div>
+                    <label class="form-label">Precio de coste por unidad (€) *</label>
+                    <input type="number" id="esPrecioCoste" class="form-input" min="0" step="0.01" placeholder="Ej: 45.50" oninput="calcularNuevoCMP()">
+                    <span class="form-error" id="err-esPrecioCoste"></span>
+                </div>
+
+                <div id="esCmpPreview" style="display:none;background:var(--surface2);border-radius:8px;padding:12px 16px;font-size:13px;border-left:3px solid var(--accent);">
+                    <i class="fa-solid fa-calculator"></i>
+                    Nuevo CMP: <strong id="esCmpNuevo" style="color:var(--accent);">—</strong> €
+                    &nbsp;·&nbsp; Nuevo stock: <strong id="esStockNuevo">—</strong> uds.
+                </div>
+
+                <div>
+                    <label class="form-label">Notas</label>
+                    <input type="text" id="esNotas" class="form-input" placeholder="Nº albarán, proveedor...">
+                </div>
+            </div>
+
+            <div class="modal-footer pt-16 mt-24 border-top d-flex">
+                <button type="button" class="btn-cancel" onclick="cerrarModalEntradaStock()">Cancelar</button>
+                <div class="flex-1"></div>
+                <button type="button" class="btn-save w-auto px-24" id="btnGuardarEntrada" onclick="guardarEntradaStock()">
+                    <i class="fa-solid fa-arrow-up-from-bracket"></i> Registrar Entrada
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function() {
+        let _esStockActual = 0;
+        let _esCmpActual = 0;
+
+        window.abrirModalEntradaStock = function(id, nombre, stock, cmp) {
+            _esStockActual = parseFloat(stock) || 0;
+            _esCmpActual = parseFloat(cmp) || 0;
+            document.getElementById('esIdProducto').value = id;
+            document.getElementById('esNombreProducto').textContent = nombre;
+            document.getElementById('esStockActual').textContent = _esStockActual;
+            document.getElementById('esCmpActual').textContent = _esCmpActual.toFixed(2).replace('.', ',');
+            document.getElementById('esCantidad').value = '';
+            document.getElementById('esPrecioCoste').value = '';
+            document.getElementById('esNotas').value = '';
+            document.getElementById('esCmpPreview').style.display = 'none';
+            document.getElementById('err-esCantidad').textContent = '';
+            document.getElementById('err-esPrecioCoste').textContent = '';
+            document.getElementById('modalEntradaStock').style.display = 'flex';
+        };
+
+        window.cerrarModalEntradaStock = function() {
+            document.getElementById('modalEntradaStock').style.display = 'none';
+        };
+
+        window.calcularNuevoCMP = function() {
+            const qty = parseInt(document.getElementById('esCantidad').value) || 0;
+            const cost = parseFloat(document.getElementById('esPrecioCoste').value) || 0;
+            const prev = document.getElementById('esCmpPreview');
+            if (qty <= 0) {
+                prev.style.display = 'none';
+                return;
+            }
+            const stockNuevo = _esStockActual + qty;
+            const cmpNuevo = (_esStockActual * _esCmpActual + qty * cost) / stockNuevo;
+            document.getElementById('esCmpNuevo').textContent = cmpNuevo.toFixed(2).replace('.', ',');
+            document.getElementById('esStockNuevo').textContent = stockNuevo;
+            prev.style.display = 'block';
+        };
+
+        window.guardarEntradaStock = async function() {
+            const id = document.getElementById('esIdProducto').value;
+            const cantidad = parseInt(document.getElementById('esCantidad').value);
+            const precioCoste = parseFloat(document.getElementById('esPrecioCoste').value);
+            const notas = document.getElementById('esNotas').value.trim();
+
+            let ok = true;
+            document.getElementById('err-esCantidad').textContent = '';
+            document.getElementById('err-esPrecioCoste').textContent = '';
+
+            if (!cantidad || cantidad < 1) {
+                document.getElementById('err-esCantidad').textContent = 'Introduce una cantidad válida (mín. 1)';
+                ok = false;
+            }
+            if (isNaN(precioCoste) || precioCoste < 0) {
+                document.getElementById('err-esPrecioCoste').textContent = 'Introduce un precio de coste válido';
+                ok = false;
+            }
+            if (!ok) return;
+
+            const btn = document.getElementById('btnGuardarEntrada');
+            btn.disabled = true;
+            btn.textContent = 'Guardando…';
+
+            try {
+                const resp = await fetch('./api/entradaStock.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        id_producto: id,
+                        cantidad,
+                        precio_coste: precioCoste,
+                        notas
+                    }),
+                });
+                const data = await resp.json();
+                if (data.ok) {
+                    cerrarModalEntradaStock();
+                    if (typeof showToast === 'function') {
+                        showToast('<i class="fa-solid fa-circle-check"></i> ' + data.msg);
+                    }
+                    setTimeout(() => location.reload(), 1400);
+                } else {
+                    if (typeof showToast === 'function') showToast('<i class="fa-solid fa-circle-xmark"></i> ' + data.error);
+                    else alert(data.error);
+                }
+            } catch (e) {
+                alert('Error de conexión: ' + e.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-arrow-up-from-bracket"></i> Registrar Entrada';
+            }
+        };
+    })();
+</script>
 <!-- MODAL AÑADIR/EDITAR PRODUCTO -->
 <div id="modalProducto" class="modal-overlay-bg">
     <div class="modal-content" style="max-width: 800px; padding: 0; overflow: hidden;">
@@ -228,12 +396,9 @@
                         <div class="form-group mb-0">
                             <label class="form-label">Categoría</label>
                             <select id="prodCat" class="form-input">
-                                <option value="audio">Audio</option>
-                                <option value="movil">Móvil</option>
-                                <option value="gaming">Gaming</option>
-                                <option value="informatica">Informática</option>
-                                <option value="cables">Cables</option>
-                                <option value="foto">Foto</option>
+                                <?php foreach ($avProductos['categorias'] as $c): ?>
+                                    <option value="<?php echo htmlspecialchars($c['codigo']); ?>"><?php echo htmlspecialchars($c['nombre']); ?></option>
+                                <?php endforeach; ?>
                             </select>
                         </div>
                     </div>
@@ -247,7 +412,9 @@
 
             <div class="d-grid grid-3 gap-16 mb-24 p-16 bg-surface2 br-12 border-2">
                 <div class="form-group mb-0">
-                    <label class="form-label fs-11 tt-uppercase">Coste (€)</label>
+                    <label class="form-label fs-11 tt-uppercase d-flex ai-center gap-4">
+                        Coste (€) <i class="fa-solid fa-circle-info text-muted" title="Para cambiarlo en productos existentes, usa el botón de Entrada de Stock"></i>
+                    </label>
                     <input type="text" id="prodPrecioCoste" placeholder="0.00" class="form-input text-right font-mono">
                     <span class="form-error" id="err-precio_coste"></span>
                 </div>
@@ -271,7 +438,9 @@
 
             <div class="d-grid grid-3 gap-16 mb-24">
                 <div class="form-group mb-0">
-                    <label class="form-label fs-11 tt-uppercase">Stock Actual</label>
+                    <label class="form-label fs-11 tt-uppercase d-flex ai-center gap-4">
+                        Stock Actual <i class="fa-solid fa-circle-info text-muted" title="Para cambiarlo en productos existentes, usa el botón de Entrada de Stock"></i>
+                    </label>
                     <input type="text" id="prodStock" placeholder="0" class="form-input text-center font-bold">
                     <span class="form-error" id="err-stock_actual"></span>
                 </div>
@@ -303,6 +472,23 @@
                     </button>
                 </div>
                 <input type="hidden" id="prodVariantes">
+            </div>
+
+            <!-- Atributos / Etiquetas -->
+            <div id="sectionAtributos" class="p-16 border-2 br-12 mb-24">
+                <label class="form-label mb-12 d-flex ai-center gap-8">
+                    <i class="fa-solid fa-bookmark text-muted"></i> Atributos Extras (Etiquetas, Ej: Navidad, Oferta)
+                </label>
+                <div id="atributosContainer" class="d-flex flex-wrap gap-8 mb-12">
+                    <!-- JS filler -->
+                </div>
+                <div class="d-grid grid-1-100 gap-8" style="grid-template-columns: 1fr auto;">
+                    <input type="text" id="nuevoAtributoValue" placeholder="Nuevo Atributo..." class="form-input fs-12">
+                    <button type="button" onclick="añadirAtributoUI()" class="btn-save w-auto p-0-12 h-40">
+                        <i class="fa-solid fa-plus"></i>
+                    </button>
+                </div>
+                <input type="hidden" id="prodAtributos">
             </div>
 
             <!-- Sección de Números de Serie -->
@@ -364,6 +550,12 @@
             document.getElementById('prodStock').value = producto.stock;
             document.getElementById('prodStockMin').value = producto.stock_minimo || '0';
 
+            // Deshabilitar edición manual de coste y stock (gestionado por Entradas)
+            document.getElementById('prodPrecioCoste').readOnly = true;
+            document.getElementById('prodStock').readOnly = true;
+            document.getElementById('prodPrecioCoste').style.opacity = '0.7';
+            document.getElementById('prodStock').style.opacity = '0.7';
+
             // Cargar Variantes
             const container = document.getElementById('variantesContainer');
             container.innerHTML = '';
@@ -380,6 +572,21 @@
                     syncVariantes();
                 } catch (e) {
                     console.error("Error parsing variantes", e);
+                }
+            }
+
+            // Cargar Atributos
+            const attrContainer = document.getElementById('atributosContainer');
+            attrContainer.innerHTML = '';
+            if (producto.atributos) {
+                try {
+                    const attrs = typeof producto.atributos === 'string' ? JSON.parse(producto.atributos) : producto.atributos;
+                    if (Array.isArray(attrs)) {
+                        attrs.forEach(v => añadirAtributoUI(v));
+                    }
+                    syncAtributos();
+                } catch (e) {
+                    console.error("Error parsing atributos", e);
                 }
             }
 
@@ -401,6 +608,15 @@
             document.getElementById('sectionNS').classList.add('d-none');
             document.getElementById('variantesContainer').innerHTML = '';
             document.getElementById('prodVariantes').value = '';
+
+            document.getElementById('atributosContainer').innerHTML = '';
+            document.getElementById('prodAtributos').value = '';
+
+            // Habilitar campos si es producto nuevo
+            document.getElementById('prodPrecioCoste').readOnly = false;
+            document.getElementById('prodStock').readOnly = false;
+            document.getElementById('prodPrecioCoste').style.opacity = '1';
+            document.getElementById('prodStock').style.opacity = '1';
 
             // Nuevo producto: usar IVA general vigente como valor por defecto
             const selIva = document.getElementById('prodIvaTipo');
@@ -447,7 +663,56 @@
                 variantes[label].push(value);
             }
         });
-        document.getElementById('prodVariantes').value = JSON.stringify(variantes);
+        document.getElementById('prodVariantes').value = Object.keys(variantes).length ? JSON.stringify(variantes) : '';
+    }
+
+    function añadirAtributoUI(value = null) {
+        const v = value || document.getElementById('nuevoAtributoValue').value.trim();
+
+        if (!v) return;
+
+        const container = document.getElementById('atributosContainer');
+        const pill = document.createElement('div');
+        pill.className = 'cat-tab d-flex ai-center gap-8 p-4-12 fs-12 bg-accent-soft text-accent border border-accent';
+        pill.dataset.value = v;
+        pill.innerHTML = `
+        <span>${v}</span>
+        <i class="fa-solid fa-xmark cursor-pointer opacity-70 hover-opacity-100" onclick="this.parentElement.remove(); syncAtributos();"></i>
+        `;
+        container.appendChild(pill);
+
+        if (!value) {
+            document.getElementById('nuevoAtributoValue').value = '';
+            syncAtributos();
+        }
+    }
+
+    function syncAtributos() {
+        const pills = document.querySelectorAll('#atributosContainer > div');
+        const atributos = [];
+        pills.forEach(p => {
+            const value = p.dataset.value;
+            if (!atributos.includes(value)) {
+                atributos.push(value);
+            }
+        });
+        document.getElementById('prodAtributos').value = atributos.length ? JSON.stringify(atributos) : '';
+    }
+
+    function cargarNS(idProd) {
+        // TODO: Implementar la carga de números de serie
+        // Por ahora, solo actualizamos el texto de ejemplo
+        const nsList = document.getElementById('nsList');
+        if (idProd) {
+            nsList.innerText = `Cargando números de serie para producto ${idProd}...`;
+            // Aquí iría la llamada a la API para obtener los NS
+        } else {
+            nsList.innerText = 'No hay números de serie asociados.';
+        }
+    }
+
+    function abrirModalNS() {
+        alert('Funcionalidad de gestión de números de serie no implementada aún.');
     }
 
     function previewImage(input) {
@@ -497,6 +762,7 @@
             stock_minimo: document.getElementById('prodStockMin').value,
             requiere_serial: 0, // ── CORRECCIÓN: campo obligatorio para ProductoPDO
             variantes: document.getElementById('prodVariantes').value || null, // ── CORRECCIÓN: campo obligatorio para ProductoPDO
+            atributos: document.getElementById('prodAtributos').value || null,
             codigo_iva: codigoIva,
         };
 
@@ -880,4 +1146,123 @@
             notif.style.opacity = '0';
         }, 3500);
     }
+
+    // --- GESTIÓN DE CATEGORÍAS ---
+    function abrirModalGestionCategorias() {
+        document.getElementById('modalCategorias').style.display = 'flex';
+    }
+
+    function cerrarModalCategorias() {
+        document.getElementById('modalCategorias').style.display = 'none';
+        location.reload(); // Recargar para ver cambios en los selects
+    }
+
+    async function añadirCategoria() {
+        const nombre = document.getElementById('newCatNombre').value.trim();
+        const codigo = document.getElementById('newCatCodigo').value.trim();
+
+        if (!nombre || !codigo) {
+            alert('Nombre y código son obligatorios');
+            return;
+        }
+
+        try {
+            const resp = await fetch('api/gestionCategoria.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    accion: 'añadir',
+                    nombre,
+                    codigo
+                })
+            });
+            const r = await resp.json();
+            if (r.ok) {
+                document.getElementById('newCatNombre').value = '';
+                document.getElementById('newCatCodigo').value = '';
+                location.reload();
+            } else {
+                alert('Error: ' + (r.error || 'No se pudo añadir'));
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    async function eliminarCategoria(id, nombre) {
+        if (!confirm(`¿Seguro que deseas eliminar la categoría "${nombre}"? \nLos productos asignados a ella no se borrarán, pero su categoría dejará de estar disponible.`)) return;
+
+        try {
+            const resp = await fetch('api/gestionCategoria.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    accion: 'eliminar',
+                    id
+                })
+            });
+            const r = await resp.json();
+            if (r.ok) {
+                location.reload();
+            } else {
+                alert('Error: ' + (r.error || 'No se pudo eliminar'));
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }
 </script>
+
+<!-- MODAL GESTIÓN CATEGORÍAS -->
+<div id="modalCategorias" class="modal-overlay-bg" style="z-index: 1200;">
+    <div class="modal-content" style="max-width: 500px; padding: 0; overflow: hidden;">
+        <div class="modal-header p-20 bg-surface2 border-bottom">
+            <h2 class="m-0 fs-18">Gestionar Categorías</h2>
+            <button onclick="cerrarModalCategorias()" class="btn-close-modal">&times;</button>
+        </div>
+        <div class="p-24">
+            <div class="d-grid grid-1-1 gap-8 mb-20 p-16 bg-surface2 br-12 border-2">
+                <div class="form-group mb-0">
+                    <label class="form-label fs-11">Nombre</label>
+                    <input type="text" id="newCatNombre" placeholder="Ej: Audio" class="form-input h-40">
+                </div>
+                <div class="form-group mb-0">
+                    <label class="form-label fs-11">Código (valor interno)</label>
+                    <input type="text" id="newCatCodigo" placeholder="ej: audio" class="form-input h-40">
+                </div>
+                <button onclick="añadirCategoria()" class="btn-save w-full mt-12 grid-col-span-2">
+                    <i class="fa-solid fa-plus"></i> Añadir Categoría
+                </button>
+            </div>
+
+            <div class="table-container" style="max-height: 300px; overflow-y: auto;">
+                <table class="w-100 fs-13">
+                    <thead>
+                        <tr>
+                            <th class="text-left py-12 pl-12">Categoría</th>
+                            <th class="text-left py-12">Código</th>
+                            <th class="text-center py-12">Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($avProductos['categorias'] as $c): ?>
+                            <tr class="border-bottom">
+                                <td class="py-12 pl-12 font-bold"><?php echo htmlspecialchars($c['nombre']); ?></td>
+                                <td class="py-12 text-muted"><?php echo htmlspecialchars($c['codigo']); ?></td>
+                                <td class="py-12 text-center">
+                                    <button onclick="eliminarCategoria(<?php echo $c['id']; ?>, '<?php echo addslashes(htmlspecialchars($c['nombre'])); ?>')" class="btn-icon text-red">
+                                        <i class="fa-solid fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

@@ -64,6 +64,7 @@ $avAnalitica = [
     'kpis' => VentaPDO::obtenerKPIs($fechaDesde, $fechaHasta),
     'porCategoria' => VentaPDO::obtenerVentasPorCategoria($fechaDesde, $fechaHasta),
     'topProductos' => VentaPDO::obtenerTopProductos($fechaDesde, $fechaHasta, 10),
+    'rankingProductos' => VentaPDO::obtenerRankingCompletoProductos($fechaDesde, $fechaHasta),
     'margenes' => VentaPDO::obtenerMargenesDetallados($fechaDesde, $fechaHasta),
     'desgloseIva' => VentaPDO::obtenerDesgloseIVA($fechaDesde, $fechaHasta),
     'filtros' => [
