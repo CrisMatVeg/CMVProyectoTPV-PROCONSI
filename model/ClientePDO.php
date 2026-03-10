@@ -41,10 +41,11 @@ class ClientePDO
     public static function crear(array $d): int
     {
         $sql = "INSERT INTO clientes
-                (tipo, nombre, apellidos, nif, email, telefono, direccion, cp, poblacion, provincia, es_socio, notas)
-                VALUES (:tipo, :nombre, :apellidos, :nif, :email, :tel, :dir, :cp, :pob, :prov, :socio, :notas)";
+                (tipo, rol, nombre, apellidos, nif, email, telefono, direccion, cp, poblacion, provincia, notas)
+                VALUES (:tipo, :rol, :nombre, :apellidos, :nif, :email, :tel, :dir, :cp, :pob, :prov, :notas)";
         DBPDO::ejecutarConsulta($sql, [
             ':tipo'      => in_array($d['tipo'] ?? 'particular', ['particular', 'empresa'], true) ? $d['tipo'] : 'particular',
+            ':rol'       => $d['rol'] ?? 'general',
             ':nombre'    => mb_substr(trim($d['nombre'] ?? ''), 0, 100),
             ':apellidos' => mb_substr(trim($d['apellidos'] ?? ''), 0, 150),
             ':nif'       => $d['nif'] ?? null,
@@ -54,7 +55,6 @@ class ClientePDO
             ':cp'        => $d['cp'] ?? null,
             ':pob'       => $d['poblacion'] ?? null,
             ':prov'      => $d['provincia'] ?? null,
-            ':socio'     => !empty($d['es_socio']) ? 1 : 0,
             ':notas'     => $d['notas'] ?? null,
         ]);
 
@@ -67,6 +67,7 @@ class ClientePDO
     {
         $sql = "UPDATE clientes
                 SET tipo = :tipo,
+                    rol = :rol,
                     nombre = :nombre,
                     apellidos = :apellidos,
                     nif = :nif,
@@ -76,12 +77,12 @@ class ClientePDO
                     cp = :cp,
                     poblacion = :pob,
                     provincia = :prov,
-                    es_socio = :socio,
                     notas = :notas
                 WHERE id = :id";
         DBPDO::ejecutarConsulta($sql, [
             ':id'        => $id,
             ':tipo'      => in_array($d['tipo'] ?? 'particular', ['particular', 'empresa'], true) ? $d['tipo'] : 'particular',
+            ':rol'       => $d['rol'] ?? 'general',
             ':nombre'    => mb_substr(trim($d['nombre'] ?? ''), 0, 100),
             ':apellidos' => mb_substr(trim($d['apellidos'] ?? ''), 0, 150),
             ':nif'       => $d['nif'] ?? null,
@@ -91,7 +92,6 @@ class ClientePDO
             ':cp'        => $d['cp'] ?? null,
             ':pob'       => $d['poblacion'] ?? null,
             ':prov'      => $d['provincia'] ?? null,
-            ':socio'     => !empty($d['es_socio']) ? 1 : 0,
             ':notas'     => $d['notas'] ?? null,
         ]);
     }
@@ -104,11 +104,22 @@ class ClientePDO
         );
     }
 
-    public static function listarSocios(): array
+    public static function listarPorRol(string $rol): array
     {
         $q = DBPDO::ejecutarConsulta(
-            "SELECT * FROM clientes WHERE es_socio = 1 AND (fecha_baja IS NULL) ORDER BY nombre, apellidos"
+            "SELECT * FROM clientes WHERE rol = :rol AND fecha_baja IS NULL ORDER BY nombre, apellidos",
+            [':rol' => $rol]
         );
         return $q->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public static function listarSocios(): array
+    {
+        return self::listarPorRol('socio');
+    }
+
+    public static function listarMayoristas(): array
+    {
+        return self::listarPorRol('mayorista');
     }
 }

@@ -15,7 +15,9 @@ if ($_SESSION['usuarioActualTPV']->getRol() == "admin") {
 
 // Estado de caja (turno actual) y posible apertura desde el TPV
 require_once 'model/CajaTurnoPDO.php';
+require_once 'model/TarifaPrecioPDO.php';
 $turnoCaja = CajaTurnoPDO::obtenerTurnoAbierto();
+$ultimoFondoSugerido = CajaTurnoPDO::obtenerUltimoFondoSugerido();
 
 if (isset($_POST['abrirCaja']) && !$turnoCaja) {
     $fondoInicial = max(0, (float)($_POST['fondoInicial'] ?? 0));
@@ -43,7 +45,6 @@ foreach ($oProductos as $oProducto) {
         "precio_coste" => (float)$oProducto->getPrecioCoste(),
         "stock_minimo" => (int)$oProducto->getStockMinimo(),
         "meses_garantia" => (int)$oProducto->getMesesGarantia(),
-        "requiere_serial" => (int)$oProducto->getRequiereSerial(),
         "icono" => $icono,
         "cat" => $oProducto->getCategoria(),
         "stock" => (int)$oProducto->getStockActual(),
@@ -74,6 +75,8 @@ $avInicioPrivado = [
     "productos" => $aProductos,
     "promos"   => $aPromos,
     "cajaAbierta" => (bool)$turnoCaja,
+    "idTurno"     => $turnoCaja ? $turnoCaja['id'] : null,
+    "fondoSugerido" => $ultimoFondoSugerido,
     "categorias" => $listaCategorias,
 ];
 

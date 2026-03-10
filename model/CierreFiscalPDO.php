@@ -2,7 +2,7 @@
 
 /**
  * Clase: CierreFiscalPDO
- * Gestiona los informes de cierre de caja (Reporte Z).
+ * Gestiona los informes de cierre de caja.
  */
 require_once 'DBPDO.php';
 

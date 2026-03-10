@@ -150,6 +150,7 @@ try {
     if ($clienteIdParaVenta) {
         $datos['idCliente'] = $clienteIdParaVenta;
     }
+    $datos['idTurno'] = (int)$turnoActual['id'];
     $numTicket = VentaPDO::guardarVenta($datos, $idUsuario);
 
     // Obtener la venta completa para devolver al frontend

@@ -2,30 +2,36 @@
 <div class="main-full p-24">
 
     <!-- CABECERA DE SECCIÓN -->
-    <div class="section-header container">
+    <div class="section-header container-wider flex-wrap gap-16">
         <div class="section-title">
             <h1>Historial TPV</h1>
             <p>Auditoría de ventas y reportes de cierre de caja.</p>
         </div>
-        <div class="cat-tabs mt-10">
-            <a href="index.php?verCierres=0" class="cat-tab <?php echo !$avHistorial['verCierres'] ? 'active' : ''; ?>" style="text-decoration: none;">
-                <i class="fa-solid fa-receipt"></i> Ventas
-            </a>
-            <a href="index.php?verCierres=1" class="cat-tab <?php echo $avHistorial['verCierres'] ? 'active' : ''; ?>" style="text-decoration: none;">
-                <i class="fa-solid fa-file-invoice-dollar"></i> Cierres (Reporte Z)
-            </a>
+
+        <div class="d-flex ai-center gap-16 flex-wrap">
+            <div class="cat-tabs m-0">
+                <a href="index.php?verCierres=0" class="cat-tab <?php echo !$avHistorial['verCierres'] ? 'active' : ''; ?>" style="text-decoration: none;">
+                    <i class="fa-solid fa-receipt"></i> Ventas
+                </a>
+                <a href="index.php?verCierres=1" class="cat-tab <?php echo $avHistorial['verCierres'] ? 'active' : ''; ?>" style="text-decoration: none;">
+                    <i class="fa-solid fa-file-invoice-dollar"></i> Cierres (Z)
+                </a>
+            </div>
+
+            <div class="vr" style="height: 30px; width: 1px; background: var(--border); opacity: 0.5;"></div>
+
+            <form method="post" class="m-0">
+                <button type="submit" name="volver" class="btn-icon w-auto h-40 gap-8 fs-14 px-16 shadow-sm" style="background: var(--surface); border: 1px solid var(--border);">
+                    <i class="fa-solid fa-arrow-left"></i> Volver
+                </button>
+            </form>
         </div>
-        <form method="post">
-            <button type="submit" name="volver" class="btn-icon w-auto h-auto gap-8 fs-14 p-10-20">
-                <i class="fa-solid fa-house"></i> Dashboard
-            </button>
-        </form>
     </div>
 
     <?php if (!$avHistorial['verCierres']): ?>
 
         <!-- PANEL DE FILTROS -->
-        <div class="filters-panel container">
+        <div class="filters-panel container-wider">
             <form method="get" action="index.php" class="filters-form" novalidate>
                 <div class="filter-group">
                     <label>Desde</label>
@@ -41,6 +47,11 @@
                         <span class="form-error"><?php echo $avHistorial['aErrores']['fechaHasta']; ?></span>
                     <?php } ?>
                 </div>
+                <div class="filter-group w-120">
+                    <label>Nº Ticket</label>
+                    <input type="number" name="numeroTicket" value="<?php echo $avHistorial['filtros']['ticket']; ?>" class="filter-input" placeholder="Ej: 1001">
+                </div>
+
                 <div class="filter-group w-200">
                     <label>Cajero</label>
                     <select name="idCajero" class="filter-input">
@@ -111,6 +122,10 @@
                                     <span class="status-pill" style="background: #efecff; color: #6c5ce7; border-color: #6c5ce7;">
                                         <i class="fa-solid fa-calendar-check"></i> Financiado
                                     </span>
+                                <?php elseif ($v['metodo_pago'] === 'a_cuenta'): ?>
+                                    <span class="status-pill" style="background: var(--surface2); color: var(--accent); border-color: var(--accent);">
+                                        <i class="fa-solid fa-file-invoice-dollar"></i> A cuenta
+                                    </span>
                                 <?php else: ?>
                                     <span class="status-pill status-cash">
                                         <i class="fa-solid fa-money-bill-1-wave"></i> Efectivo
@@ -126,10 +141,20 @@
                             <td class="text-right font-bold font-mono">
                                 <?php echo number_format($v['total'], 2, ',', '.'); ?> €
                             </td>
-                            <td class="text-center">
+                            <td class="text-center" id="status-venta-<?php echo $v['numero_ticket']; ?>">
                                 <?php if ($v['estado'] === 'completada'): ?>
                                     <span class="status-pill status-active" title="Venta finalizada">
                                         <i class="fa-solid fa-check"></i>
+                                    </span>
+                                <?php elseif ($v['estado'] === 'pendiente_pago'): ?>
+                                    <?php
+                                    $vencida = (!empty($v['fecha_limite_pago']) && strtotime($v['fecha_limite_pago']) < strtotime(date('Y-m-d')));
+                                    $pendiente = (float)$v['total'] - (float)$v['pagado_a_cuenta'];
+                                    ?>
+                                    <span class="status-pill <?php echo $vencida ? 'status-overdue' : 'status-pending'; ?>"
+                                        title="<?php echo $vencida ? 'PAGO VENCIDO' : 'Pendiente de cobro'; ?> (Deuda: <?php echo number_format($pendiente, 2, ',', '.'); ?>€)">
+                                        <i class="fa-solid <?php echo $vencida ? 'fa-triangle-exclamation' : 'fa-clock'; ?>"></i>
+                                        <?php echo $vencida ? 'VENCIDA' : 'PENDIENTE'; ?>
                                     </span>
                                 <?php elseif ($v['estado'] === 'devuelta'): ?>
                                     <span class="status-pill" style="background: var(--red-light); color: var(--red); border-color: var(--red);" title="Venta devuelta">
@@ -219,7 +244,7 @@
                             </td>
                             <td>
                                 <div class="d-flex gap-8 jc-center">
-                                    <button title="Ver Reporte Z Completo" class="btn-icon" onclick='verReporteZ(<?php echo json_encode($c); ?>)'>
+                                    <button title="Ver Informe de Cierre Completo" class="btn-icon" onclick='verReporteZ(<?php echo json_encode($c); ?>)'>
                                         <i class="fa-solid fa-print"></i>
                                     </button>
                                 </div>
@@ -233,110 +258,126 @@
 
 </div>
 
-<!-- MODAL REPORTE Z -->
+<!-- MODAL INFORME DE CIERRE -->
 <div id="modalReporteZ" class="modal-overlay-bg">
-    <div class="modal-content" style="max-width: 450px; padding: 0; overflow: hidden;">
-        <div class="modal-header p-20 bg-surface2 border-bottom">
-            <h2 class="m-0 fs-18">Detalle Reporte Z</h2>
-            <button onclick="cerrarModalZ()" class="btn-close-modal">&times;</button>
+    <div class="modal-content shadow-2xl" style="max-width: 500px; padding: 0; overflow: visible; border-radius: 20px;">
+        <div class="modal-header p-24 bg-surface2 border-bottom" style="border-radius: 20px 20px 0 0;">
+            <div class="d-flex ai-center gap-12">
+                <div class="w-40 h-40 br-10 bg-surface2 text-accent d-flex ai-center jc-center shadow-sm">
+                    <i class="fa-solid fa-file-invoice-dollar fs-20"></i>
+                </div>
+                <div>
+                    <h2 class="m-0 fs-18 font-bold">Resumen de Cierre de Caja</h2>
+                    <p class="m-0 fs-12 text-muted">Auditoría de arqueo</p>
+                </div>
+            </div>
+            <button onclick="cerrarModalZ()" class="btn-close-modal" style="top: 24px; right: 24px;">&times;</button>
         </div>
-        <div class="p-24 bg-white" id="printZ">
-            <div class="text-center mb-24">
-                <div class="fs-24 font-bold tt-uppercase letter-spacing-2">Reporte Z</div>
-                <div class="text-muted fs-12 mt-4" id="z-header-info"></div>
+        <div class="p-32 bg-white printable-area" id="printZ">
+            <div class="text-center mb-32">
+                <div class="fs-12 tt-uppercase letter-spacing-2 text-accent font-bold mb-4">Certificado de Cierre de Caja</div>
+                <div class="fs-32 font-bold" id="z-id" style="color: var(--text);"></div>
+                <div class="text-muted fs-11 mt-8" id="z-header-info"></div>
             </div>
 
-            <div class="d-flex flex-column gap-16 border-2 br-12 p-20 mb-20">
-                <div class="d-flex jc-between border-bottom pb-8">
-                    <span class="text-muted">ID Cierre:</span>
-                    <span class="font-mono font-bold" id="z-id"></span>
+            <div class="bg-surface2 br-16 border-2 p-24 mb-24 d-flex flex-column gap-16">
+                <div class="d-flex jc-between ai-center border-bottom pb-12">
+                    <span class="text-muted fs-13">Período de Ventas:</span>
+                    <span class="font-mono fs-12 font-bold" id="z-rango"></span>
                 </div>
-                <div class="d-flex jc-between border-bottom pb-8">
-                    <span class="text-muted">Rango de ventas:</span>
-                    <span class="font-mono fs-12" id="z-rango"></span>
+                <div class="d-flex jc-between ai-center border-bottom pb-12">
+                    <span class="text-muted fs-13">Operaciones (Tickets):</span>
+                    <span class="font-mono font-bold" id="z-tickets"></span>
                 </div>
-                <div class="d-flex jc-between border-bottom pb-8">
-                    <span class="text-muted">Tickets incluidos:</span>
-                    <span class="font-mono" id="z-tickets"></span>
+                <div class="d-flex jc-between ai-center border-bottom pb-12">
+                    <span class="text-muted fs-13 text-red">Deuda en Caja (Diferencia):</span>
+                    <span class="font-mono font-bold text-red" id="z-deuda"></span>
                 </div>
-                <div class="d-flex jc-between border-bottom pb-8">
-                    <span class="text-muted">Deuda generada:</span>
-                    <span class="font-mono text-red" id="z-deuda"></span>
+
+                <div class="grid-2 gap-16 mt-8">
+                    <div class="p-12 br-12 border bg-white shadow-sm">
+                        <div class="fs-10 text-muted tt-uppercase font-bold mb-4">Efectivo</div>
+                        <div class="font-mono font-bold text-green fs-16" id="z-efectivo"></div>
+                    </div>
+                    <div class="p-12 br-12 border bg-white shadow-sm">
+                        <div class="fs-10 text-muted tt-uppercase font-bold mb-4">Tarjeta</div>
+                        <div class="font-mono font-bold text-blue fs-16" id="z-tarjeta"></div>
+                    </div>
+                    <div class="p-12 br-12 border bg-white shadow-sm">
+                        <div class="fs-10 text-muted tt-uppercase font-bold mb-4">Bizum</div>
+                        <div class="font-mono font-bold text-accent fs-16" id="z-bizum"></div>
+                    </div>
+                    <div class="p-12 br-12 border bg-white shadow-sm">
+                        <div class="fs-10 text-muted tt-uppercase font-bold mb-4">Financiado</div>
+                        <div class="font-mono font-bold fs-16" style="color: #6c5ce7;" id="z-financiacion"></div>
+                    </div>
                 </div>
-                <div class="d-flex jc-between border-bottom pb-8">
-                    <span class="text-muted">Efectivo:</span>
-                    <span class="font-mono font-bold text-green" id="z-efectivo"></span>
-                </div>
-                <div class="d-flex jc-between border-bottom pb-8">
-                    <span class="text-muted">Tarjeta:</span>
-                    <span class="font-mono font-bold text-blue" id="z-tarjeta"></span>
-                </div>
-                <div class="d-flex jc-between border-bottom pb-8">
-                    <span class="text-muted">Bizum:</span>
-                    <span class="font-mono font-bold text-accent" id="z-bizum"></span>
-                </div>
-                <div class="d-flex jc-between border-bottom pb-8">
-                    <span class="text-muted">Financiación:</span>
-                    <span class="font-mono font-bold" style="color: #6c5ce7;" id="z-financiacion"></span>
-                </div>
-                <div class="d-flex jc-between pt-8">
-                    <span class="fs-18 font-bold">Total Arqueo:</span>
-                    <span class="fs-18 font-bold font-mono text-accent" id="z-total"></span>
+
+                <div class="d-flex jc-between ai-center pt-16 border-top mt-8">
+                    <span class="fs-20 font-bold">Total Arqueo:</span>
+                    <span class="fs-24 font-bold font-mono text-accent" id="z-total"></span>
                 </div>
             </div>
 
-            <div class="mt-20">
-                <div class="summary-label mb-8">Retiradas de efectivo del turno</div>
-                <table class="data-table mb-12 fs-12">
-                    <thead>
-                        <tr>
-                            <th>Fecha/Hora</th>
-                            <th>Usuario</th>
-                            <th class="text-right">Importe</th>
-                            <th>Concepto</th>
-                        </tr>
-                    </thead>
-                    <tbody id="z-retiros-body">
-                        <tr>
-                            <td colspan="4" class="text-muted fs-12">Sin retiradas registradas.</td>
-                        </tr>
-                    </tbody>
-                </table>
+            <div class="mt-24">
+                <h4 class="fs-12 tt-uppercase text-muted font-bold mb-12 border-bottom pb-8">Movimientos de Efectivo</h4>
+                <div class="table-container p-0 border-0">
+                    <table class="data-table mb-12 fs-11">
+                        <thead>
+                            <tr>
+                                <th>Hora</th>
+                                <th>Usuario</th>
+                                <th class="text-right">Importe</th>
+                                <th>Concepto</th>
+                            </tr>
+                        </thead>
+                        <tbody id="z-retiros-body"></tbody>
+                    </table>
+                </div>
             </div>
 
-            <div class="mt-12">
-                <div class="summary-label mb-8">Deudas de caja asociadas</div>
-                <table class="data-table fs-12">
-                    <thead>
-                        <tr>
-                            <th>Fecha</th>
-                            <th>Usuario</th>
-                            <th class="text-right">Importe</th>
-                            <th>Concepto</th>
-                        </tr>
-                    </thead>
-                    <tbody id="z-deudas-body">
-                        <tr>
-                            <td colspan="4" class="text-muted fs-12">Sin deudas registradas.</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <div class="text-center mt-32">
-                <div class="fs-11 text-muted">Cierre Fiscal Autorizado</div>
-                <div class="fs-10 text-muted mt-2">ElectroBazar TPV - Sistema de Gestión v2.0</div>
+            <div class="text-center mt-40 pt-20 border-top">
+                <div class="fs-11 text-muted">Cierre Fiscal Autorizado - Copia de Auditoría</div>
+                <div class="fs-10 text-muted mt-4">ElectroBazar TPV - Cloud v2.1</div>
             </div>
         </div>
-        <div class="modal-footer p-20 border-top bg-surface2">
-            <button onclick="window.print()" class="btn-filter w-auto gap-8 px-24">
-                <i class="fa-solid fa-print"></i> Imprimir Reporte
-            </button>
+        <div class="modal-footer p-24 border-top bg-surface2 no-print" style="border-radius: 0 0 20px 20px;">
             <div class="flex-1"></div>
-            <button onclick="cerrarModalZ()" class="btn-cancel">Cerrar</button>
+            <button onclick="cerrarModalZ()" class="btn-cancel px-32 h-44 shadow-sm">Cerrar Detalle</button>
         </div>
     </div>
 </div>
+
+</div>
+
+<style>
+    .status-pending {
+        background: #fff8e1;
+        color: #ffa000;
+        border-color: #ffa000;
+    }
+
+    .status-overdue {
+        background: #ffebee;
+        color: #d32f2f;
+        border-color: #d32f2f;
+        animation: pulse-red 2s infinite;
+    }
+
+    @keyframes pulse-red {
+        0% {
+            box-shadow: 0 0 0 0 rgba(211, 47, 47, 0.4);
+        }
+
+        70% {
+            box-shadow: 0 0 0 10px rgba(211, 47, 47, 0);
+        }
+
+        100% {
+            box-shadow: 0 0 0 0 rgba(211, 47, 47, 0);
+        }
+    }
+</style>
 
 <script>
     async function verTicket(id) {
@@ -356,7 +397,7 @@
     }
 
     function verReporteZ(data) {
-        document.getElementById('z-id').innerText = '#Z-' + String(data.id).padStart(3, '0');
+        document.getElementById('z-id').innerText = '#Cierre-' + String(data.id).padStart(3, '0');
         document.getElementById('z-header-info').innerHTML = `Fecha: ${data.fecha}<br>Responsable: ${data.nombre_usuario || 'Sistema'}`;
 
         const fmt = (num) => new Intl.NumberFormat('de-DE', {

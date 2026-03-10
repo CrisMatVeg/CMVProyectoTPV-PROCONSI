@@ -11,7 +11,7 @@ let ticketNum = 1001;
 let activeCat = "all";
 let activeAttr = null;
 let searchTerm = "";
-let minPrice = 0;
+let minPrice = -Infinity;
 let maxPrice = 999999;
 let stockFilter = "all";
 let sortOrder = "name-asc";
@@ -23,6 +23,91 @@ const SOCIO_DISCOUNT = 5;
 let financingAccepted = false;
 let currentPromo = null;
 const PROMOS = typeof DB_PROMOS !== "undefined" ? DB_PROMOS : [];
+const TARIFAS = typeof DB_TARIFAS !== "undefined" ? DB_TARIFAS : [];
+
+// ── Motor de Precios Dinámicos ────────────────────────────────────────────────
+function getEffectivePrice(p, socio = null) {
+  let finalPrice = parseFloat(p.price);
+  const ahora = new Date();
+  const horaActual =
+    ahora.getHours().toString().padStart(2, "0") +
+    ":" +
+    ahora.getMinutes().toString().padStart(2, "0") +
+    ":" +
+    ahora.getSeconds().toString().padStart(2, "0");
+
+  // Filtrar tarifas validas
+  const activas = TARIFAS.filter((t) => {
+    // 0. Programación Temporal Avanzada
+    const fechaActual = ahora.toISOString().split("T")[0];
+    const diaActual = ahora.getDay(); // 0 (Dom) - 6 (Sáb)
+
+    // Check Start Date
+    if (t.fecha_aplicacion && fechaActual < t.fecha_aplicacion) return false;
+    // Check End Date
+    if (t.fecha_fin && fechaActual > t.fecha_fin) return false;
+    // Check Days of Week
+    if (t.dias_semana) {
+      const diasPermitidos = t.dias_semana.split(",").map(Number);
+      if (!diasPermitidos.includes(diaActual)) return false;
+    }
+
+    // 1. Scope de producto
+    if (t.scope === "categoria" && p.cat !== t.categoria) return false;
+    if (t.scope === "productos") {
+      try {
+        const ids = JSON.parse(t.producto_ids) || [];
+        if (!ids.includes(parseInt(p.id))) return false;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    // 2. Horario
+    if (t.hora_inicio && horaActual < t.hora_inicio) return false;
+    if (t.hora_fin && horaActual > t.hora_fin) return false;
+
+    // 3. Segmentación Cliente
+    if (t.es_solo_socios && (!socio || parseInt(socio.es_socio) !== 1))
+      return false;
+    if (
+      t.id_cliente &&
+      (!socio || parseInt(socio.id) !== parseInt(t.id_cliente))
+    )
+      return false;
+    if (t.tipo_cliente !== "todos") {
+      if (!socio || socio.tipo !== t.tipo_cliente) {
+        // Caso especial mayorista (es un flag, no un tipo ENUM en la DB original, pero lo mapeamos)
+        if (
+          t.tipo_cliente === "mayorista" &&
+          (!socio || parseInt(socio.es_mayorista) !== 1)
+        )
+          return false;
+        if (
+          t.tipo_cliente !== "mayorista" &&
+          (!socio || socio.tipo !== t.tipo_cliente)
+        )
+          return false;
+      }
+    }
+
+    return true;
+  });
+
+  // Aplicar por prioridad
+  activas.sort((a, b) => b.prioridad - a.prioridad);
+
+  activas.forEach((t) => {
+    const val = parseFloat(t.valor);
+    if (t.tipo === "percent") {
+      finalPrice *= 1 + val / 100;
+    } else {
+      finalPrice += val;
+    }
+  });
+
+  return Math.max(0, finalPrice);
+}
 
 // ── Estado de venta pospuesta ──────────────────────────────────────────────────
 let postponedSale = JSON.parse(sessionStorage.getItem("postponedSale")) || null;
@@ -148,7 +233,7 @@ function renderProducts() {
   let filtered = PRODUCTS.filter((p) => {
     let matchesCat = false;
     if (activeCat === "all") {
-      matchesCat = true;
+      matchesCat = true; // Show all products (active and inactive)
     } else if (activeCat === "baja") {
       matchesCat = p.inactive;
     } else {
@@ -162,7 +247,10 @@ function renderProducts() {
       p.codigo.toLowerCase().includes(searchTerm.toLowerCase());
     if (!matchesSearch) return false;
 
-    const matchesPrice = p.price >= minPrice && p.price <= maxPrice;
+    const matchesPrice =
+      maxPrice === 999999
+        ? true // No user-set filter, show all
+        : p.price >= minPrice && p.price <= maxPrice;
     if (!matchesPrice) return false;
 
     let matchesStock = true;
@@ -256,7 +344,7 @@ function renderProducts() {
             } catch (e) {}
             return "";
           })()}
-          <div class="product-icon">
+          <div class="product-icon" style="background: white; border-radius: 8px;">
               ${
                 p.icono && p.icono.startsWith("data:image")
                   ? `<img src="${p.icono}" class="prod-img-tpv" alt="${p.name}">`
@@ -268,7 +356,15 @@ function renderProducts() {
               <div class="product-sku">${p.codigo}</div>
               <div class="product-stock" style="font-size:11px; color:${p.stock <= 5 ? "var(--red)" : "var(--text-muted)"}; font-weight:600;">Stock: ${p.stock}</div>
           </div>
-          <div class="product-price" style="margin-top:auto">${fmt(p.price)}</div>
+          <div class="product-price" style="margin-top:auto">
+            ${(() => {
+              const eff = getEffectivePrice(p, socioActual);
+              if (Math.abs(eff - p.price) > 0.01) {
+                return `<span style="text-decoration:line-through; font-size:0.8em; opacity:0.6; margin-right:4px;">${fmt(p.price)}</span> ${fmt(eff)}`;
+              }
+              return fmt(p.price);
+            })()}
+          </div>
           <div class="product-admin-bar">
               <button class="admin-action edit" onclick="editProduct(event,${p.id})"><i class="fa-solid fa-pen-to-square"></i> Editar</button>
               <button class="admin-action delete" onclick="deleteProduct(event,${p.id})"><i class="fa-solid fa-trash"></i> Borrar</button>
@@ -285,12 +381,9 @@ function renderProducts() {
 function handleCardClick(e, id, el) {
   if (e.target.closest(".product-admin-bar")) return;
   const p = PRODUCTS.find((x) => x.id === id);
-  if (p && p.inactive) return;
-  if (p && p.stock <= 0) {
-    showToast('<i class="fa-solid fa-circle-xmark"></i> Producto agotado');
-    return;
-  }
+  if (!p || p.inactive) return;
 
+  // Parse variantes
   let vars = p.variantes;
   if (typeof vars === "string") {
     try {
@@ -303,85 +396,127 @@ function handleCardClick(e, id, el) {
   const hasVariants =
     vars &&
     ((Array.isArray(vars) && vars.length > 0) ||
-      (typeof vars === "object" && Object.keys(vars).length > 0));
+      (typeof vars === "object" &&
+        vars !== null &&
+        Object.keys(vars).length > 0));
 
   if (hasVariants) {
+    // Product has variant config — open picker (which will show physical variants from DB)
     p.variantes_obj = vars;
     showVariantPicker(p, el);
   } else {
+    // No variants — check stock then add directly
+    if (p.stock <= 0) {
+      showToast('<i class="fa-solid fa-circle-xmark"></i> Producto agotado');
+      return;
+    }
     addToCart(id, el);
   }
 }
 
-function showVariantPicker(p, el) {
+async function showVariantPicker(p, el) {
   const modal = document.getElementById("variantsModal");
   const container = document.getElementById("variantsOptionsContainer");
   if (!modal || !container) return;
 
-  container.innerHTML = "";
-
-  let options = [];
-  const vars = p.variantes_obj || p.variantes;
-
-  if (Array.isArray(vars)) {
-    options = vars.map((v) => {
-      if (typeof v === "string") return { nombre: v, label: "" };
-      return { nombre: v.valor || v.nombre || "Opción", label: v.label || "" };
-    });
-  } else if (vars && typeof vars === "object") {
-    // Si es un objeto tipo {"Color": ["Rojo", "Azul"], "Talla": ["M", "L"]}
-    // Por ahora, para simplificar y que sea funcional, mostramos todos los valores como opciones individuales
-    Object.entries(vars).forEach(([k, v]) => {
-      if (Array.isArray(v)) {
-        v.forEach((val) => {
-          options.push({ nombre: val, label: k });
-        });
-      } else {
-        options.push({
-          nombre: v && typeof v !== "object" ? String(v) : k,
-          label: k,
-        });
-      }
-    });
-  }
+  container.innerHTML =
+    '<div class="p-24 text-center"><i class="fa-solid fa-spinner fa-spin fs-24"></i><p class="mt-8">Cargando opciones...</p></div>';
+  modal.classList.add("visible");
 
   const titleEl = document.getElementById("variantsModalTitle");
   if (titleEl) titleEl.textContent = `Opciones de ${p.name}`;
 
-  options.forEach((opt) => {
-    const btn = document.createElement("button");
-    btn.className = "variant-btn";
+  try {
+    const resp = await fetch(
+      `api/gestionVariante.php?accion=listar&id_producto=${p.id}`,
+    );
+    const data = await resp.json();
 
-    const displayName = opt.nombre;
-    const labelInfo = opt.label
-      ? `<span class="variant-label">${opt.label}</span>`
-      : "";
+    if (data.ok && data.lista.length > 0) {
+      container.innerHTML = "";
+      let anyShown = false;
+      data.lista.forEach((v) => {
+        if (parseInt(v.activo) === 0) return;
+        anyShown = true;
 
-    btn.innerHTML = `
-      <i class="fa-solid fa-tag"></i>
-      ${labelInfo}
-      <span class="variant-name">${displayName}</span>
-    `;
+        const btn = document.createElement("button");
+        btn.className = "variant-card-btn";
+        if (v.stock_actual <= 0) {
+          btn.disabled = true;
+        }
 
-    btn.onclick = () => {
-      addToCart(p.id, el, displayName);
-      modal.classList.remove("visible");
-    };
-    container.appendChild(btn);
-  });
+        const isLowStock = v.stock_actual > 0 && v.stock_actual <= 5;
+        const priceToDisplay = v.precio_venta
+          ? parseFloat(v.precio_venta)
+          : p.price;
 
-  modal.classList.add("visible");
+        btn.innerHTML = `
+          <div class="v-stock-badge ${isLowStock ? "low-stock" : ""}">
+            ${v.stock_actual > 0 ? "Stock: " + v.stock_actual : "Agotado"}
+          </div>
+          <span class="v-name">${v.nombre}</span>
+          <span class="v-sku">${v.sku}</span>
+          <span class="v-price-tag">${fmt(priceToDisplay)}</span>
+        `;
+
+        btn.onclick = () => {
+          addToCart(
+            p.id,
+            el,
+            v.nombre,
+            v.id,
+            v.precio_venta ? parseFloat(v.precio_venta) : null,
+            v.stock_actual,
+          );
+          modal.classList.remove("visible");
+        };
+        container.appendChild(btn);
+      });
+
+      if (!anyShown) {
+        // All variants are inactive — allow direct add
+        container.innerHTML = `
+          <div class="p-24 text-center d-flex flex-column ai-center gap-16 w-100">
+            <div class="text-muted fs-14">Todas las variantes de este producto están desactivadas actualmente.</div>
+            <button class="btn-save py-14 full-width" style="max-width: 300px" onclick="addToCart(${p.id}, null); document.getElementById('variantsModal').classList.remove('visible');">
+              <i class="fa-solid fa-cart-plus mr-8"></i> Añadir base al carrito
+            </button>
+          </div>`;
+      }
+    } else {
+      // No physical DB variants — allow direct add to cart
+      container.innerHTML = `
+        <div class="p-16 text-center d-flex flex-column ai-center gap-12">
+          <div class="text-muted fs-13">Este producto no tiene variantes de stock individual configuradas.</div>
+          <button class="btn-save py-12 full-width" onclick="addToCart(${p.id}, null); document.getElementById('variantsModal').classList.remove('visible');">
+            <i class="fa-solid fa-cart-plus"></i> Añadir al carrito
+          </button>
+        </div>`;
+    }
+  } catch (e) {
+    console.error(e);
+    container.innerHTML =
+      '<div class="p-24 text-center text-red">Error al cargar opciones.</div>';
+  }
 }
 
 // ── Carrito ────────────────────────────────────────────────────────────────────
-function addToCart(id, el, variantName = null) {
+function addToCart(
+  id,
+  el,
+  variantName = null,
+  variantId = null,
+  variantPrice = null,
+  variantStock = null,
+) {
   const p = PRODUCTS.find((x) => x.id === id);
   if (!p) return;
 
-  const cartKey = variantName ? `${id}-${variantName}` : id;
+  const cartKey = variantId ? `${id}-v${variantId}` : id;
+  const currentStock = variantId !== null ? variantStock : p.stock;
 
   if (cart[cartKey]) {
-    if (cart[cartKey].qty >= p.stock) {
+    if (cart[cartKey].qty >= currentStock) {
       showToast(
         '<i class="fa-solid fa-circle-exclamation"></i> No hay más stock disponible',
       );
@@ -389,24 +524,23 @@ function addToCart(id, el, variantName = null) {
     }
     cart[cartKey].qty++;
   } else {
-    if (p.stock <= 0) return;
+    if (currentStock <= 0) return;
 
     const finalItem = { ...p };
-    if (variantName) {
-      // No modificamos el name aquí para que renderCart lo maneje por separado
+    if (variantId) {
       finalItem.variant = variantName;
-      if (
-        p.variantes &&
-        typeof p.variantes === "object" &&
-        !Array.isArray(p.variantes) &&
-        p.variantes[variantName]
-      ) {
-        const vVal = p.variantes[variantName];
-        if (typeof vVal === "number") finalItem.price = vVal;
-      }
+      finalItem.variant_id = variantId;
+      if (variantPrice !== null) finalItem.price = variantPrice;
     }
 
-    cart[cartKey] = { ...finalItem, qty: 1 };
+    const priceToApply = getEffectivePrice(finalItem, socioActual);
+
+    cart[cartKey] = {
+      ...finalItem,
+      qty: 1,
+      price: priceToApply,
+      maxStock: currentStock,
+    };
     cart[cartKey].iva = parseFloat(p.iva || 21);
     cart[cartKey].serials = [];
     cart[cartKey].cartKey = cartKey;
@@ -422,7 +556,9 @@ function changeQty(cartKey, delta) {
   const item = cart[cartKey];
   const p = PRODUCTS.find((x) => x.id === item.id);
 
-  if (delta > 0 && item.qty >= p.stock) {
+  const limit = item.maxStock !== undefined ? item.maxStock : p.stock;
+
+  if (delta > 0 && item.qty >= limit) {
     showToast(
       '<i class="fa-solid fa-circle-exclamation"></i> Límite de stock alcanzado',
     );
@@ -726,6 +862,17 @@ function updateTotals(initialSubtotal) {
 
   document.getElementById("chargeBtn").disabled = subtotal === 0;
 
+  // Factura obligatoria si total >= 400€
+  const toggleFactura = document.getElementById("facturaToggle");
+  if (toggleFactura) {
+    if (total >= 400) {
+      toggleFactura.checked = true;
+      toggleFactura.disabled = true;
+    } else {
+      toggleFactura.disabled = false;
+    }
+  }
+
   // Financiación
   if (selectedPayment === "financiado") {
     financingAccepted = false;
@@ -773,8 +920,11 @@ function updateTotals(initialSubtotal) {
         finanMinBadge.textContent = `Mín. ${fmt(FINANCING_MIN_AMOUNT)}`;
         finanMinBadge.classList.remove("finan-badge-available");
       }
-      if (finanBtnLabel) finanBtnLabel.textContent = "Financiación";
     }
+  }
+
+  if (selectedPayment === "a_cuenta") {
+    validarACuenta();
   }
 }
 
@@ -799,21 +949,19 @@ function selectPayment(el) {
   financingAccepted = false;
 
   const finInfo = document.getElementById("finInfoPanel");
+  const aCuentaInfo = document.getElementById("aCuentaGestion");
+
+  // Reset panels
+  if (finInfo) finInfo.classList.add("d-none");
+  if (aCuentaInfo) aCuentaInfo.classList.add("d-none");
 
   if (selectedPayment === "financiado") {
-    // Mostrar panel de financiación
-    if (finInfo) {
-      finInfo.classList.remove("d-none");
-      finInfo.style.display = "flex";
-    }
+    if (finInfo) finInfo.classList.remove("d-none");
     cargarFinancieras();
     updateFinancingInfo();
-  } else {
-    // Ocultar panel de financiación para cualquier otro método
-    if (finInfo) {
-      finInfo.classList.add("d-none");
-      finInfo.style.display = "none";
-    }
+  } else if (selectedPayment === "a_cuenta") {
+    if (aCuentaInfo) aCuentaInfo.classList.remove("d-none");
+    validarACuenta();
   }
 }
 
@@ -1298,10 +1446,19 @@ let ULTIMOS_CLIENTES_BUSCADOS = [];
 
 function processPayment() {
   tipoClienteActual = "particular";
-  document.getElementById("empresaDatos").style.display = "none";
+  document.getElementById("empresaDatos").classList.add("d-none");
   document.getElementById("empresaNombre").value = "";
   document.getElementById("empresaNif").value = "";
   document.getElementById("efectivoRecibido").value = "";
+
+  const aCuentaPagado = document.getElementById("aCuentaPagado");
+  const aCuentaFecha = document.getElementById("aCuentaFechaLimite");
+  if (aCuentaPagado) aCuentaPagado.value = "0.00";
+  if (aCuentaFecha) {
+    const nextMonth = new Date();
+    nextMonth.setMonth(nextMonth.getMonth() + 1);
+    aCuentaFecha.value = nextMonth.toISOString().split("T")[0];
+  }
 
   const cambioEl = document.getElementById("efectivoCambio");
   cambioEl.textContent = "0,00 €";
@@ -1310,10 +1467,10 @@ function processPayment() {
 
   const efectivoGestion = document.getElementById("efectivoGestion");
   if (selectedPayment === "efectivo") {
-    efectivoGestion.style.display = "flex";
+    efectivoGestion.classList.remove("d-none");
     setTimeout(() => document.getElementById("efectivoRecibido").focus(), 100);
   } else {
-    efectivoGestion.style.display = "none";
+    efectivoGestion.classList.add("d-none");
   }
 
   const btnP = document.getElementById("btnParticular");
@@ -1324,20 +1481,28 @@ function processPayment() {
   if (btnS) btnS.classList.remove("selected-type");
 
   socioActual = null;
-  document.getElementById("socioBusqueda").style.display = "none";
-  document.getElementById("socioRegistro").style.display = "none";
+  document.getElementById("socioBusqueda").classList.add("d-none");
+  document.getElementById("socioRegistro").classList.add("d-none");
   document.getElementById("socioInfo").innerText = "";
   clienteSeleccionado = null;
 
   const gen = document.getElementById("clienteBusquedaGenerica");
   if (gen) {
-    gen.style.display = "none";
+    gen.classList.add("d-none");
     const res = document.getElementById("clienteResultados");
     if (res) res.innerHTML = "";
+    const btnAdd = document.getElementById("btnAddCliente");
+    if (btnAdd) btnAdd.classList.add("d-none");
   }
+  const reg = document.getElementById("clienteRegistro");
+  if (reg) reg.classList.add("d-none");
 
   document.querySelectorAll(".form-error").forEach((el) => (el.innerText = ""));
   document.getElementById("clienteModal").classList.add("visible");
+  // Al confirmar un socio/cliente, refrescamos los precios de los productos en el catálogo
+  // para que se vean las tarifas aplicadas a ese cliente específico o tipo de cliente.
+  renderProducts();
+  renderCart(); // Por si cambiamos el cliente a mitad de pedido
 }
 
 function cerrarModalCliente() {
@@ -1355,28 +1520,32 @@ function seleccionarTipoCliente(tipo) {
   btnE.classList.remove("selected-type");
   if (btnS) btnS.classList.remove("selected-type");
 
-  document.getElementById("empresaDatos").style.display = "none";
-  document.getElementById("socioBusqueda").style.display = "none";
-  document.getElementById("socioRegistro").style.display = "none";
+  document.getElementById("empresaDatos").classList.add("d-none");
+  document.getElementById("socioBusqueda").classList.add("d-none");
+  document.getElementById("socioRegistro").classList.add("d-none");
 
   const gen = document.getElementById("clienteBusquedaGenerica");
-  if (gen) gen.style.display = "none";
+  if (gen) gen.classList.add("d-none");
+  const reg = document.getElementById("clienteRegistro");
+  if (reg) reg.classList.add("d-none");
+  const btnAdd = document.getElementById("btnAddCliente");
+  if (btnAdd) btnAdd.classList.add("d-none");
   clienteSeleccionado = null;
 
   if (tipo === "particular") {
     btnP.classList.add("selected-type");
     socioActual = null;
-    if (gen) gen.style.display = "flex";
+    if (gen) gen.classList.remove("d-none");
   } else if (tipo === "socio") {
     if (btnS) btnS.classList.add("selected-type");
-    document.getElementById("socioBusqueda").style.display = "flex";
+    document.getElementById("socioBusqueda").classList.remove("d-none");
     setTimeout(() => document.getElementById("socioSearch").focus(), 100);
   } else {
     btnE.classList.add("selected-type");
-    document.getElementById("empresaDatos").style.display = "flex";
+    document.getElementById("empresaDatos").classList.remove("d-none");
     setTimeout(() => document.getElementById("empresaNombre").focus(), 100);
     socioActual = null;
-    if (gen) gen.style.display = "flex";
+    if (gen) gen.classList.remove("d-none");
   }
 
   const subtotal = Object.values(cart).reduce((a, b) => a + b.price * b.qty, 0);
@@ -1395,25 +1564,162 @@ async function buscarSocio() {
   try {
     const resp = await fetch("api/gestionCliente.php", {
       method: "POST",
-      body: JSON.stringify({ accion: "buscar", nif: term }),
+      body: JSON.stringify({
+        accion: "buscar",
+        nif: term,
+      }),
     });
     const r = await resp.json();
     if (r.ok) {
       socioActual = r.cliente;
-      info.innerHTML = `<i class="fa-solid fa-check-circle"></i> ${r.cliente.nombre} (${r.cliente.nif})`;
+      info.innerHTML = `<i class="fa-solid fa-check-circle text-green"></i> ${r.cliente.nombre} (${r.cliente.nif})`;
       showToast("Socio identificado");
-      const subtotal = Object.values(cart).reduce(
-        (a, b) => a + b.price * b.qty,
-        0,
-      );
-      updateTotals(subtotal);
+      renderCart(); // Re-render to show discounts if any
     } else {
-      info.innerText = "Socio no encontrado.";
+      info.innerHTML = `<span class="text-red">Socio no encontrado.</span>`;
       btnAdd.classList.remove("d-none");
       socioActual = null;
     }
   } catch (e) {
     console.error(e);
+    info.innerText = "Error en la búsqueda.";
+  }
+}
+
+function mostrarRegistroSocio() {
+  document.getElementById("socioBusqueda").classList.add("d-none");
+  document.getElementById("socioRegistro").classList.remove("d-none");
+  // Pre-rellenar NIF si se buscó antes
+  const searchNif = document.getElementById("socioSearch").value.trim();
+  if (searchNif) document.getElementById("newSocioNif").value = searchNif;
+}
+
+function cancelarRegistroSocio() {
+  document.getElementById("socioRegistro").classList.add("d-none");
+  document.getElementById("socioBusqueda").classList.remove("d-none");
+}
+
+async function guardarNuevoSocio() {
+  const nombre = document.getElementById("newSocioNombre").value.trim();
+  const nif = document.getElementById("newSocioNif").value.trim();
+
+  if (!nombre || !nif) {
+    alert("Nombre y NIF son obligatorios");
+    return;
+  }
+
+  try {
+    const resp = await fetch("api/gestionCliente.php", {
+      method: "POST",
+      body: JSON.stringify({
+        accion: "registrar",
+        nombre,
+        nif,
+        es_socio: 1,
+      }),
+    });
+    const r = await resp.json();
+    if (r.ok) {
+      showToast("Socio registrado y seleccionado");
+      socioActual = {
+        id: r.id,
+        nombre,
+        nif,
+        es_socio: true,
+      };
+      // Volver a la vista de búsqueda pero mostrando el éxito
+      cancelarRegistroSocio();
+      document.getElementById("socioInfo").innerHTML =
+        `<i class="fa-solid fa-check-circle text-green"></i> ${nombre} (NUEVO)`;
+      document.getElementById("btnAddSocio").classList.add("d-none");
+      renderCart();
+    } else {
+      alert("Error al registrar: " + r.error);
+    }
+  } catch (e) {
+    console.error(e);
+    alert("Error de conexión");
+  }
+}
+
+function mostrarRegistroCliente() {
+  document.getElementById("clienteBusquedaGenerica").classList.add("d-none");
+  document.getElementById("clienteRegistro").classList.remove("d-none");
+  const searchTxt = document.getElementById("clienteSearch").value.trim();
+  if (searchTxt) {
+    // Si parece un NIF (letra al final o principio y números), lo ponemos en NIF
+    if (/^[0-9XYZ]/.test(searchTxt)) {
+      document.getElementById("newClienteNif").value = searchTxt;
+    } else {
+      document.getElementById("newClienteNombre").value = searchTxt;
+    }
+  }
+  const tit = document.getElementById("clienteRegistroTitulo");
+  if (tit)
+    tit.innerText =
+      "Nuevo " +
+      (tipoClienteActual === "empresa"
+        ? "Cliente Empresa"
+        : "Cliente Particular");
+}
+
+function cancelarRegistroCliente() {
+  document.getElementById("clienteRegistro").classList.add("d-none");
+  document.getElementById("clienteBusquedaGenerica").classList.remove("d-none");
+}
+
+async function guardarNuevoCliente() {
+  const nombre = document.getElementById("newClienteNombre").value.trim();
+  const nif = document.getElementById("newClienteNif").value.trim();
+  const tipo = tipoClienteActual; // particular o empresa
+
+  if (!nombre) {
+    alert("El nombre es obligatorio");
+    return;
+  }
+
+  try {
+    const resp = await fetch("api/gestionCliente.php", {
+      method: "POST",
+      body: JSON.stringify({
+        accion: "registrar",
+        nombre,
+        nif,
+        tipo,
+        es_socio: 0,
+      }),
+    });
+    const r = await resp.json();
+    if (r.ok) {
+      showToast("Cliente registrado y seleccionado");
+      const clientObj = {
+        id: r.id,
+        nombre,
+        nif,
+        tipo,
+        es_socio: false,
+      };
+      clienteSeleccionado = clientObj;
+
+      if (tipo === "empresa") {
+        document.getElementById("empresaNombre").value = nombre;
+        document.getElementById("empresaNif").value = nif;
+      }
+
+      cancelarRegistroCliente();
+      const resEl = document.getElementById("clienteResultados");
+      if (resEl)
+        resEl.innerHTML = `<i class="fa-solid fa-check-circle text-green"></i> ${nombre} (NUEVO)`;
+      const btnAdd = document.getElementById("btnAddCliente");
+      if (btnAdd) btnAdd.classList.add("d-none");
+
+      renderCart();
+    } else {
+      alert("Error al registrar: " + r.error);
+    }
+  } catch (e) {
+    console.error(e);
+    alert("Error de conexión");
   }
 }
 
@@ -1451,8 +1757,12 @@ async function buscarClienteGuardado() {
     ULTIMOS_CLIENTES_BUSCADOS = lista;
     if (!lista.length) {
       if (resEl) resEl.innerText = "Sin resultados para ese término.";
+      const btnAdd = document.getElementById("btnAddCliente");
+      if (btnAdd) btnAdd.classList.remove("d-none");
       return;
     }
+    const btnAdd = document.getElementById("btnAddCliente");
+    if (btnAdd) btnAdd.classList.add("d-none");
     if (!resEl) return;
     resEl.innerHTML = lista
       .map((c, idx) => {
@@ -1490,51 +1800,12 @@ function seleccionarClienteGuardado(idx) {
     const nombreCompleto =
       (c.nombre || "") + (c.apellidos ? " " + c.apellidos : "");
     const nifTxt = c.nif ? ` (${c.nif})` : "";
-    resEl.innerHTML = `<i class="fa-solid fa-check-circle"></i> ${nombreCompleto}${nifTxt}`;
+    resEl.innerHTML = `<i class="fa-solid fa-check-circle text-success"></i> ${nombreCompleto}${nifTxt}`;
   }
 
   showToast("Cliente seleccionado");
-}
-
-function mostrarRegistroSocio() {
-  document.getElementById("socioBusqueda").style.display = "none";
-  document.getElementById("socioRegistro").style.display = "flex";
-  document.getElementById("newSocioNif").value =
-    document.getElementById("socioSearch").value;
-}
-
-function cancelarRegistroSocio() {
-  document.getElementById("socioRegistro").style.display = "none";
-  document.getElementById("socioBusqueda").style.display = "flex";
-}
-
-async function guardarNuevoSocio() {
-  const nombre = document.getElementById("newSocioNombre").value.trim();
-  const nif = document.getElementById("newSocioNif").value.trim();
-  if (!nombre || !nif) return;
-
-  try {
-    const resp = await fetch("api/gestionCliente.php", {
-      method: "POST",
-      body: JSON.stringify({ accion: "registrar", nombre, nif }),
-    });
-    const r = await resp.json();
-    if (r.ok) {
-      socioActual = { id: r.id, nombre, nif, es_socio: true };
-      document.getElementById("socioRegistro").style.display = "none";
-      document.getElementById("socioBusqueda").style.display = "flex";
-      document.getElementById("socioInfo").innerHTML =
-        `<i class="fa-solid fa-check-circle"></i> ${nombre} (${nif})`;
-      const subtotal = Object.values(cart).reduce(
-        (a, b) => a + b.price * b.qty,
-        0,
-      );
-      updateTotals(subtotal);
-      showToast("Socio registrado y aplicado");
-    }
-  } catch (e) {
-    console.error(e);
-  }
+  validarACuenta();
+  renderCart(); // Por si el cliente tiene tarifas especiales o es socio
 }
 
 function calcularCambio() {
@@ -1569,68 +1840,40 @@ function calcularCambio() {
 
 async function confirmarCliente() {
   const items = Object.values(cart);
-  const itemsWithSerial = items.filter(
-    (it) => it.requiere_serial && it.qty > 0,
-  );
 
-  if (itemsWithSerial.length > 0) {
-    cerrarModalCliente();
-    pedirNumerosSerie(itemsWithSerial);
-    return;
+  if (selectedPayment === "a_cuenta") {
+    const clienteId =
+      tipoClienteActual === "socio"
+        ? socioActual
+          ? socioActual.id
+          : null
+        : clienteSeleccionado
+          ? clienteSeleccionado.id
+          : null;
+
+    if (!clienteId && tipoClienteActual !== "empresa") {
+      const alerta = document.getElementById("aCuentaAlertaCliente");
+      if (alerta) {
+        alerta.classList.remove("d-none");
+        alerta.style.display = "flex"; // Ensure it shows if d-none is weak
+      }
+      showToast(
+        "⚠️ Para cobros a cuenta es obligatorio seleccionar un cliente o socio",
+      );
+      return;
+    } else {
+      // Hide alert if client IS selected
+      const alerta = document.getElementById("aCuentaAlertaCliente");
+      if (alerta) alerta.classList.add("d-none");
+    }
   }
 
   ejecutarCobroFinal();
 }
 
-function pedirNumerosSerie(items) {
-  const modal = document.getElementById("serialModal");
-  const container = document.getElementById("serialInputsContainer");
-  container.innerHTML = "";
-
-  items.forEach((item) => {
-    for (let i = 0; i < item.qty; i++) {
-      const div = document.createElement("div");
-      div.className = "form-group";
-      div.innerHTML = `
-        <label class="fs-11 font-bold tt-uppercase text-muted">${item.name} (${i + 1}/${item.qty})</label>
-        <input type="text" class="form-input font-mono serial-input"
-               data-id="${item.id}" data-idx="${i}"
-               placeholder="Introduce el nº de serie..." required />
-      `;
-      container.appendChild(div);
-    }
-  });
-
-  modal.classList.add("visible");
-
-  document.getElementById("confirmSerialBtn").onclick = () => {
-    const inputs = container.querySelectorAll(".serial-input");
-    let allOk = true;
-
-    inputs.forEach((input) => {
-      const val = input.value.trim();
-      if (!val) {
-        input.style.borderColor = "var(--red)";
-        allOk = false;
-      } else {
-        const id = parseInt(input.dataset.id);
-        const item = cart[id];
-        item.serials = item.serials || [];
-        item.serials[parseInt(input.dataset.idx)] = val;
-      }
-    });
-
-    if (allOk) {
-      modal.classList.remove("visible");
-      abrirModalPago();
-    } else {
-      showToast("⚠️ Debes introducir todos los números de serie");
-    }
-  };
-}
-
 function abrirModalPago() {
   document.getElementById("clienteModal").classList.add("visible");
+  validarACuenta();
 }
 
 async function ejecutarCobroFinal() {
@@ -1754,6 +1997,23 @@ async function ejecutarCobroFinal() {
         ? clienteSeleccionado.id
         : null;
 
+  const facturaActiva =
+    document.getElementById("facturaToggle") &&
+    document.getElementById("facturaToggle").checked;
+  if (facturaActiva && tipoClienteActual === "particular") {
+    const nombreCli =
+      document.getElementById("newClienteNombre")?.value ||
+      (clienteSeleccionado ? clienteSeleccionado.nombre : null);
+    if (!clienteId && !nombreCli) {
+      showToast(
+        "⚠ Factura obligatoria (>400€ o manual). Selecciona o registra un cliente.",
+      );
+      btn.disabled = false;
+      btn.textContent = "Cobrar";
+      return;
+    }
+  }
+
   if (selectedPayment === "financiado" && !financingAccepted) {
     showToast("⚠ Debes aceptar o rechazar la financiación antes de proceder");
     btn.disabled = false;
@@ -1780,6 +2040,7 @@ async function ejecutarCobroFinal() {
             ? clienteSeleccionado.nif
             : null,
     idCliente: clienteId,
+    esFactura: facturaActiva ? 1 : 0,
     metodoPago: selectedPayment,
     subtotal,
     total: totalFinal,
@@ -1789,6 +2050,7 @@ async function ejecutarCobroFinal() {
     lineas: items.map((it) => ({
       id: it.id,
       name: it.variant ? `${it.name} (${it.variant})` : it.name,
+      id_variante: it.variant_id || null,
       codigo: it.codigo,
       price: it.price,
       qty: it.qty,
@@ -1798,6 +2060,14 @@ async function ejecutarCobroFinal() {
       recibido:
         parseFloat(document.getElementById("efectivoRecibido").value) || 0,
     },
+    pagadoACuenta:
+      selectedPayment === "a_cuenta"
+        ? parseFloat(document.getElementById("aCuentaPagado").value) || 0
+        : 0,
+    fechaLimitePago:
+      selectedPayment === "a_cuenta"
+        ? document.getElementById("aCuentaFechaLimite").value
+        : null,
   };
 
   if (selectedPayment === "financiado") {
@@ -1868,6 +2138,53 @@ async function ejecutarCobroFinal() {
   }
 }
 
+function validarACuenta() {
+  const pagado =
+    parseFloat(document.getElementById("aCuentaPagado").value) || 0;
+  const fecha = document.getElementById("aCuentaFechaLimite").value;
+  const errFecha = document.getElementById("err-aCuentaFecha");
+  const btn = document.getElementById("confirmarClienteBtn");
+  const alerta = document.getElementById("aCuentaAlertaCliente");
+
+  if (errFecha) errFecha.innerText = "";
+  if (alerta) {
+    alerta.classList.add("d-none");
+    alerta.style.display = ""; // Remove any inline style
+  }
+
+  const total = parseFloat(
+    document.getElementById("totalAmt").textContent.replace(",", "."),
+  );
+
+  btn.disabled = false;
+
+  if (selectedPayment === "a_cuenta") {
+    const clienteId =
+      tipoClienteActual === "socio"
+        ? socioActual
+          ? socioActual.id
+          : null
+        : clienteSeleccionado
+          ? clienteSeleccionado.id
+          : null;
+
+    if (!clienteId && tipoClienteActual !== "empresa") {
+      if (alerta) alerta.classList.remove("d-none");
+      btn.disabled = true;
+    }
+
+    if (!fecha) {
+      if (errFecha) errFecha.innerText = "La fecha límite es obligatoria";
+      btn.disabled = true;
+    }
+
+    if (pagado >= total) {
+      // Si va a pagar todo ahora, mejor que use efectivo/tarjeta
+      // pero no lo bloqueamos, simplemente avisamos si acaso
+    }
+  }
+}
+
 async function cargarVenta(ticketNum) {
   const resp = await fetch("./api/obtenerVenta.php", {
     method: "POST",
@@ -1894,20 +2211,24 @@ window.cargarVenta = cargarVenta;
 function mostrarTicket(v, isFromTPV = true) {
   if (!v) return;
   currentTicketNum = v.numero_ticket;
+  window.currentVentaId = v.id;
+  window.currentVentaPendiente =
+    parseFloat(v.total) - parseFloat(v.pagado_a_cuenta || 0);
 
   const emailSection = document.getElementById("ticketEmailSection");
   const btnPrint = document.querySelector('button[onclick="imprimirTicket()"]');
   const btnNuevaVenta = document.getElementById("btnNuevaVenta");
 
-  if (emailSection) emailSection.style.display = isFromTPV ? "" : "none";
-  if (btnPrint) btnPrint.style.display = isFromTPV ? "" : "none";
+  if (emailSection) emailSection.style.display = ""; // Always show email section
+  if (btnPrint) btnPrint.style.display = ""; // Always show print button
   if (btnNuevaVenta) btnNuevaVenta.style.display = isFromTPV ? "" : "none";
 
   const btnAnular = document.getElementById("btnAnularTicket");
   if (btnAnular) {
     btnAnular.style.display =
       !isFromTPV && v.estado === "completada" ? "" : "none";
-    btnAnular.onclick = () => abrirModalAnulacionTicket(v.numero_ticket);
+    btnAnular.onclick = () =>
+      abrirModalAnulacionTicket(v.numero_ticket, v.fecha, v.id_cliente);
   }
 
   const emailInput = document.getElementById("tkEmailInput");
@@ -1928,7 +2249,7 @@ function mostrarTicket(v, isFromTPV = true) {
     " " +
     date.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
 
-  const isFactura = v.tipo_cliente === "empresa";
+  const isFactura = v.tipo_cliente === "empresa" || v.es_factura == 1;
   const el_tkTipoDoc = document.getElementById("tkTipoDoc");
   if (el_tkTipoDoc)
     el_tkTipoDoc.textContent = isFactura ? "FACTURA" : "TICKET DE VENTA";
@@ -1994,23 +2315,6 @@ function mostrarTicket(v, isFromTPV = true) {
         const isExpired = gDate < new Date();
         const gStr = gDate.toLocaleDateString("es-ES");
 
-        let serialDisplay = "";
-        if (l.numeros_serie) {
-          serialDisplay = String(l.numeros_serie)
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean)
-            .join(", ");
-        } else if (l.numero_serie) {
-          try {
-            const parsed = JSON.parse(l.numero_serie);
-            if (Array.isArray(parsed))
-              serialDisplay = parsed.filter(Boolean).join(", ");
-          } catch (e) {
-            serialDisplay = l.numero_serie;
-          }
-        }
-
         return `
           <div style="display:flex; justify-content:space-between; padding: 10px 0; border-bottom: 1px solid var(--surface2); ${l.devuelta ? "opacity:0.6; background:rgba(192,57,43,0.05);" : ""}">
             <div style="flex:1">
@@ -2029,13 +2333,12 @@ function mostrarTicket(v, isFromTPV = true) {
                 </span>
                 ${l.devuelta ? `<span class="fs-10 px-6 py-2 br-4" style="background:var(--red); color:white; font-weight:700;">DEVUELTO</span>` : ""}
               </div>
-              ${serialDisplay ? `<div style="margin-top:4px; font-size:11px; color:var(--text-muted);"><i class="fa-solid fa-barcode"></i> N.º serie: ${serialDisplay}</div>` : ""}
               ${l.devuelta && l.motivo_devolucion ? `<div style="margin-top:4px; font-size:11px; color:var(--red); font-style:italic;"><i class="fa-solid fa-circle-info"></i> Motivo: ${l.motivo_devolucion}</div>` : ""}
             </div>
             ${
               !isFromTPV && !l.devuelta && v.estado === "completada"
                 ? `<div style="padding-left:12px; display:flex; align-items:center;">
-                  <button onclick="abrirModalDevolucion(${l.id}, ${v.numero_ticket})" title="Devolver este producto" class="btn-icon text-red">
+                  <button onclick="abrirModalDevolucion(${l.id}, ${v.numero_ticket}, '${v.fecha}', ${v.id_cliente || "null"}, ${l.meses_garantia || 24})" title="Devolver este producto" class="btn-icon text-red">
                     <i class="fa-solid fa-arrow-rotate-left"></i>
                   </button>
                 </div>`
@@ -2086,6 +2389,60 @@ function mostrarTicket(v, isFromTPV = true) {
     }
   }
 
+  // --- NUEVO: MOSTRAR PAGOS PARCIALES ---
+  const tkPagosSection = document.getElementById("tkPagosSection");
+  if (tkPagosSection) {
+    const tkPagosLista = document.getElementById("tkPagosLista");
+    const tkAbonarParteContainer = document.getElementById(
+      "tkAbonarParteContainer",
+    );
+
+    // Si hay pagos o es a_cuenta (incluso sin pagos), mostramos la sección
+    if (
+      (v.pagos && v.pagos.length > 0) ||
+      v.metodo_pago === "a_cuenta" ||
+      v.estado === "pendiente_pago"
+    ) {
+      tkPagosSection.classList.remove("d-none");
+
+      if (tkPagosLista) {
+        if (!v.pagos || v.pagos.length === 0) {
+          tkPagosLista.innerHTML =
+            '<div class="text-muted fs-11">No hay abonos registrados aún.</div>';
+        } else {
+          tkPagosLista.innerHTML = v.pagos
+            .map((p) => {
+              const fStr = new Date(p.fecha).toLocaleString("es-ES", {
+                dateStyle: "short",
+                timeStyle: "short",
+              });
+              const mtd =
+                p.metodo_pago.charAt(0).toUpperCase() + p.metodo_pago.slice(1);
+              return `
+              <div style="display: flex; justify-content: space-between; font-size: 11px; border-bottom: 1px solid rgba(0,0,0,0.05); padding-bottom: 2px;">
+                <span><span class="text-muted">${fStr}</span> · ${mtd} ${p.nombre_usuario ? "(" + p.nombre_usuario + ")" : ""}</span>
+                <span class="font-mono text-success fw-bold">+${fmt2(p.importe)}</span>
+              </div>
+            `;
+            })
+            .join("");
+        }
+      }
+
+      if (tkAbonarParteContainer) {
+        if (v.estado === "pendiente_pago") {
+          tkAbonarParteContainer.classList.remove("d-none");
+        } else {
+          tkAbonarParteContainer.classList.add("d-none");
+        }
+      }
+    } else {
+      tkPagosSection.classList.add("d-none");
+    }
+  }
+
+  // Duplicated block removed
+
   const descRow = document.getElementById("tkDescRow");
   if (descRow) {
     const discountAmt = parseFloat(v.descuento_amt || 0);
@@ -2130,13 +2487,46 @@ async function imprimirTicket() {
   window.open(`./api/imprimirTicket.php?id=${currentTicketNum}`, "_blank");
 }
 
-function descargarPDFTicket() {
+async function descargarPDFTicket() {
   if (!currentTicketNum) {
     showToast("<i class='fa-solid fa-circle-xmark'></i> No hay ticket cargado");
     return;
   }
-  window.location.href = `./api/generarPDFTicket.php?id=${currentTicketNum}`;
-  showToast("<i class='fa-solid fa-file-pdf'></i> Descargando PDF...");
+
+  showToast(
+    "<i class='fa-solid fa-spinner fa-spin'></i> Preparando PDF...",
+    "info",
+  );
+
+  try {
+    // Obtenemos el HTML procesado
+    const resp = await fetch(
+      `./api/generarPDFTicket.php?id=${currentTicketNum}`,
+    );
+    const html = await resp.text();
+
+    const opt = {
+      margin: 10,
+      filename: `ElectronBazar_Ticket_${currentTicketNum}.pdf`,
+      image: { type: "jpeg", quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+    };
+
+    // Generamos y descargamos
+    html2pdf().set(opt).from(html).save();
+
+    showToast(
+      "<i class='fa-solid fa-circle-check'></i> PDF descargado correctamente",
+      "success",
+    );
+  } catch (e) {
+    console.error("Error al generar PDF:", e);
+    showToast(
+      "<i class='fa-solid fa-circle-xmark'></i> Error al generar el PDF",
+      "error",
+    );
+  }
 }
 
 async function enviarTicketEmail() {
@@ -2211,31 +2601,142 @@ async function devolverLinea(idLinea, numTicket) {
   abrirModalDevolucion(idLinea, numTicket);
 }
 
-async function devolverTicket(numTicket) {
-  abrirModalAnulacionTicket(numTicket);
+async function devolverTicket(numTicket, fechaVenta, idCliente) {
+  abrirModalAnulacionTicket(numTicket, fechaVenta, idCliente);
 }
 
 async function confirmarAnulacionTicket(numTicket) {
   const motivoBase = document.getElementById("returnReason").value;
   const nota = document.getElementById("returnNote").value.trim();
+  const metodoReembolso =
+    document.querySelector('input[name="metodoReembolso"]:checked')?.value ||
+    "efectivo";
   const motivo = nota ? `${motivoBase}: ${nota}` : motivoBase;
 
   try {
     const resp = await fetch("api/gestionDevolucion.php", {
       method: "POST",
-      body: JSON.stringify({ accion: "devolverTicket", numTicket, motivo }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        accion: "devolverTicket",
+        numTicket,
+        motivo,
+        metodoReembolso,
+      }),
     });
     const r = await resp.json();
     if (r.ok) {
       document.getElementById("returnModal").classList.remove("visible");
-      showToast("Ticket devuelto y stock restaurado");
+      showToast(
+        "<i class='fa-solid fa-check'></i> Ticket completado devuelto correctamente",
+      );
       const v = await cargarVenta(numTicket);
       mostrarTicket(v, false);
+      if (typeof updateVentaStatusUI === "function")
+        updateVentaStatusUI(numTicket, v.status || v.estado);
     } else {
       throw new Error(r.error || "No se pudo anular el ticket");
     }
   } catch (e) {
-    showToast("Error: " + e.message);
+    showToast("<i class='fa-solid fa-circle-xmark'></i> Error: " + e.message);
+  }
+}
+
+function abrirModalAbonoParcial() {
+  const modal = document.getElementById("abonoParcialModal");
+  if (!modal) return;
+  const inputImporte = document.getElementById("abonoImporte");
+  if (inputImporte) inputImporte.value = "";
+  const selectMetodo = document.getElementById("abonoMetodo");
+  if (selectMetodo) selectMetodo.value = "efectivo";
+
+  modal.classList.add("visible");
+  if (inputImporte) setTimeout(() => inputImporte.focus(), 100);
+}
+
+async function procesarAbonoParcial() {
+  const btn = document.querySelector("#abonoParcialModal .btn-save");
+  const importeInput = document.getElementById("abonoImporte").value.trim();
+  const importe = parseFloat(importeInput);
+  const metodo = document.getElementById("abonoMetodo").value;
+
+  if (!window.currentVentaId) {
+    showToast("⚠️ No se pudo identificar la venta actual.");
+    return;
+  }
+
+  if (isNaN(importe) || importe <= 0) {
+    showToast("⚠️ Introduce un importe válido mayor que 0.");
+    return;
+  }
+
+  if (
+    window.currentVentaPendiente !== undefined &&
+    importe > window.currentVentaPendiente
+  ) {
+    showToast(
+      "⚠️ El importe introducido (" +
+        importe.toFixed(2) +
+        "€) supera la cantidad pendiente (" +
+        window.currentVentaPendiente.toFixed(2) +
+        "€).",
+    );
+    return;
+  }
+
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML =
+      '<i class="fa-solid fa-spinner fa-spin"></i> Registrando...';
+  }
+
+  try {
+    const resp = await fetch("./api/liquidarVenta.php", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        idVenta: window.currentVentaId,
+        importe: importe,
+        metodo: metodo,
+      }),
+    });
+
+    const data = await resp.json();
+    if (data.ok) {
+      document.getElementById("abonoParcialModal").classList.remove("visible");
+      showToast("✅ Abono registrado correctamente");
+      // Recargar ticket actual para ver el pago reflejado
+      verTicket(currentTicketNum);
+    } else {
+      throw new Error(data.error || "Error al registrar el abono");
+    }
+  } catch (err) {
+    console.error(err);
+    showToast("❌ " + err.message);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerText = "Registrar Abono";
+    }
+  }
+}
+
+function updateVentaStatusUI(numTicket, nuevoEstado) {
+  const el = document.getElementById("status-venta-" + numTicket);
+  if (!el) return;
+
+  if (nuevoEstado === "devuelta") {
+    el.innerHTML = `
+      <span class="status-pill" style="background: var(--red-light); color: var(--red); border-color: var(--red);" title="Venta devuelta">
+        <i class="fa-solid fa-rotate-left"></i> Devuelta
+      </span>
+    `;
+  } else if (nuevoEstado === "anulada") {
+    el.innerHTML = `
+      <span class="status-pill" style="background: var(--surface2); color: var(--text-muted);" title="Venta anulada">
+        <i class="fa-solid fa-ban"></i> Anulada
+      </span>
+    `;
   }
 }
 
@@ -2338,7 +2839,6 @@ async function guardarNuevoProducto() {
         stock_actual: 0,
         stock_minimo: 0,
         meses_garantia: 24,
-        requiere_serial: document.getElementById("addSerial").checked ? 1 : 0,
         icono,
         categoria: cat,
         descripcion: "",
@@ -2381,7 +2881,6 @@ function editProduct(e, id) {
   document.getElementById("editPrice").value = p.price;
   document.getElementById("editIva").value = p.iva || 21;
   document.getElementById("editMesesGarantia").value = p.meses_garantia || 24;
-  document.getElementById("editSerial").checked = !!p.requiere_serial;
   document.getElementById("editEmoji").value = p.icono;
 
   const preview = document.getElementById("editImgPreview");
@@ -2392,31 +2891,43 @@ function editProduct(e, id) {
   }
 
   const container = document.getElementById("editVariantesContainer");
-  container.innerHTML = "";
-  if (p.variantes) {
-    try {
-      const vars =
-        typeof p.variantes === "string" ? JSON.parse(p.variantes) : p.variantes;
-      if (Array.isArray(vars)) {
-        vars.forEach((v) => addVariantToUI("edit", v.label, v.valor));
-      } else {
-        for (const [l, v] of Object.entries(vars)) addVariantToUI("edit", l, v);
+  if (container) {
+    container.innerHTML = "";
+    if (p.variantes) {
+      try {
+        const vars =
+          typeof p.variantes === "string"
+            ? JSON.parse(p.variantes)
+            : p.variantes;
+        if (Array.isArray(vars)) {
+          vars.forEach((v) => addVariantToUI("edit", v.label, v.valor));
+        } else {
+          for (const [l, v] of Object.entries(vars))
+            addVariantToUI("edit", l, v);
+        }
+      } catch (e) {
+        console.error("Error parsing variantes", e);
       }
-    } catch (e) {
-      console.error("Error parsing variantes", e);
     }
   }
 
   document.querySelectorAll(".form-error").forEach((el) => (el.innerText = ""));
   document.getElementById("editModal").classList.add("visible");
+
+  // Cargar variantes físicas si el producto las tiene
+  if (p.atributos) {
+    if (typeof cargarVariantesFisicasTPV === "function") {
+      cargarVariantesFisicasTPV(id);
+    }
+  } else {
+    const section = document.getElementById("sectionVariantesFisicasEdit");
+    if (section) section.classList.add("d-none");
+  }
 }
 
 async function saveEdit() {
   document.querySelectorAll(".form-error").forEach((el) => (el.innerText = ""));
   try {
-    alert(
-      "🔧 DEBUG v6: saveEdit ejecutado. Si ves este mensaje, el JS actualizado está activo.",
-    );
     const id = parseInt(document.getElementById("editId")?.value);
     const name = document.getElementById("editName")?.value.trim();
     const codigo = document.getElementById("editSku")?.value.trim();
@@ -2441,7 +2952,6 @@ async function saveEdit() {
         stock_actual: pOrig.stock || 0,
         stock_minimo: pOrig.stock_minimo || 0,
         meses_garantia: mesesGarantia,
-        requiere_serial: document.getElementById("editSerial").checked ? 1 : 0,
         icono,
         categoria: pOrig.cat,
         descripcion: pOrig.descripcion || "",
@@ -2471,7 +2981,6 @@ async function saveEdit() {
     p.price = price;
     p.iva = iva;
     p.meses_garantia = mesesGarantia;
-    p.requiere_serial = document.getElementById("editSerial").checked ? 1 : 0;
     p.icono = icono || p.icono;
     p.variantes = getVariantsFromUI("edit");
 
@@ -2521,34 +3030,148 @@ function deleteProduct(e, id) {
   document.getElementById("deleteModal").classList.add("visible");
 }
 
-function abrirModalDevolucion(idLinea, numTicket) {
+function abrirModalDevolucion(
+  idLinea,
+  numTicket,
+  fechaVenta,
+  idCliente,
+  mesesGarantia,
+) {
   const modal = document.getElementById("returnModal");
-  if (!modal) {
-    console.error(
-      "No se encontró el modal de devolución (returnModal) en esta vista.",
-    );
-    showToast(
-      "<i class='fa-solid fa-circle-xmark'></i> No se puede abrir el modal de devolución en esta pantalla.",
-    );
-    return;
-  }
+  if (!modal) return;
+
   modal.classList.add("visible");
+
+  // 1. Resetear UI y estados
+  const subtitle = document.getElementById("returnModalSubtitle");
+  const stCommercial = document.getElementById("statusCommercial");
+  const txtCommercial = document.getElementById("textCommercial");
+  const stWarranty = document.getElementById("statusWarranty");
+  const txtWarranty = document.getElementById("textWarranty");
+  const optCash = document.getElementById("optCash");
+  const optBalance = document.getElementById("optBalance");
+  const optExchange = document.getElementById("optExchange");
+
+  // Limpiar clases previas
+  [stCommercial, stWarranty].forEach((el) =>
+    el.classList.remove("status-ok", "status-warn", "status-err"),
+  );
+  [optCash, optBalance, optExchange].forEach((el) => {
+    el.classList.remove("disabled");
+    el.querySelector("input").disabled = false;
+  });
+
+  // 2. Calcular plazos
+  const dateVenta = new Date(fechaVenta.replace(" ", "T"));
+  const ahora = new Date();
+  const diffTime = Math.abs(ahora - dateVenta);
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  const diffMonths =
+    (ahora.getFullYear() - dateVenta.getFullYear()) * 12 +
+    (ahora.getMonth() - dateVenta.getMonth());
+
+  // Plazo comercial (30 días)
+  if (diffDays <= 15) {
+    stCommercial.classList.add("status-ok");
+    txtCommercial.innerText = `${diffDays} días transcurridos (Plazo OK)`;
+  } else if (diffDays <= 30) {
+    stCommercial.classList.add("status-warn");
+    txtCommercial.innerText = `${diffDays} días (Límite 30 días)`;
+  } else {
+    stCommercial.classList.add("status-err");
+    txtCommercial.innerText = `Excedido (${diffDays} días)`;
+    // Deshabilitar reembolsos
+    optCash.classList.add("disabled");
+    optCash.querySelector("input").disabled = true;
+    optBalance.classList.add("disabled");
+    optBalance.querySelector("input").disabled = true;
+  }
+
+  // Plazo garantía
+  if (diffMonths < mesesGarantia) {
+    stWarranty.classList.add("status-ok");
+    txtWarranty.innerText = `Hasta ${mesesGarantia} meses (OK)`;
+  } else {
+    stWarranty.classList.add("status-err");
+    txtWarranty.innerText = `Garantía agotada`;
+    optExchange.classList.add("disabled");
+    optExchange.querySelector("input").disabled = true;
+  }
+
+  // Ya no restringimos "Vale / Cupón" a clientes registrados
+  // La validación anterior ha sido eliminada.
+
+  // Auto-seleccionar primera opción válida
+  const availableInput = modal.querySelector(
+    'input[name="metodoReembolso"]:not(:disabled)',
+  );
+  if (availableInput) availableInput.checked = true;
+
+  subtitle.innerText = `Venta del ${dateVenta.toLocaleDateString()}`;
+
   document.getElementById("confirmReturnBtn").onclick = () =>
     confirmarDevolucion(idLinea, numTicket);
 }
 
-function abrirModalAnulacionTicket(numTicket) {
+function abrirModalAnulacionTicket(numTicket, fechaVenta, idCliente) {
   const modal = document.getElementById("returnModal");
-  if (!modal) {
-    console.error(
-      "No se encontró el modal de devolución (returnModal) en esta vista.",
-    );
-    showToast(
-      "<i class='fa-solid fa-circle-xmark'></i> No se puede abrir el modal de anulación en esta pantalla.",
-    );
-    return;
-  }
+  if (!modal) return;
+
   modal.classList.add("visible");
+
+  // 1. Resetear UI (usamos la misma lógica que en líneas individuales pero adaptada)
+  const subtitle = document.getElementById("returnModalSubtitle");
+  const stCommercial = document.getElementById("statusCommercial");
+  const txtCommercial = document.getElementById("textCommercial");
+  const stWarranty = document.getElementById("statusWarranty");
+  const txtWarranty = document.getElementById("textWarranty");
+  const optCash = document.getElementById("optCash");
+  const optBalance = document.getElementById("optBalance");
+  const optExchange = document.getElementById("optExchange");
+
+  [stCommercial, stWarranty].forEach((el) =>
+    el.classList.remove("status-ok", "status-warn", "status-err"),
+  );
+  [optCash, optBalance, optExchange].forEach((el) => {
+    el.classList.remove("disabled");
+    el.querySelector("input").disabled = false;
+  });
+
+  // La anulación de ticket COMPLETO es siempre por reembolso (comercial)
+  const dateVenta = new Date(fechaVenta.replace(" ", "T"));
+  const ahora = new Date();
+  const diffDays = Math.floor(
+    Math.abs(ahora - dateVenta) / (1000 * 60 * 60 * 24),
+  );
+
+  if (diffDays <= 30) {
+    stCommercial.classList.add(diffDays <= 15 ? "status-ok" : "status-warn");
+    txtCommercial.innerText = `${diffDays} días (Plazo Comercial OK)`;
+  } else {
+    stCommercial.classList.add("status-err");
+    txtCommercial.innerText = `Excedido (${diffDays} días)`;
+    [optCash, optBalance].forEach((el) => {
+      el.classList.add("disabled");
+      el.querySelector("input").disabled = true;
+    });
+  }
+
+  // Deshabilitar "reemplazo" para ticket completo (es una anulación, no un cambio de garantía 1:1)
+  optExchange.classList.add("disabled");
+  optExchange.querySelector("input").disabled = true;
+  stWarranty.style.opacity = "0.3";
+  txtWarranty.innerText = "No aplica en anulación total";
+
+  // Ya no restringimos "Vale / Cupón" a clientes registrados
+  // La validación anterior ha sido eliminada.
+
+  const availableInput = modal.querySelector(
+    'input[name="metodoReembolso"]:not(:disabled)',
+  );
+  if (availableInput) availableInput.checked = true;
+
+  subtitle.innerText = `Anulación Ticket #${String(numTicket).padStart(4, "0")}`;
+
   document.getElementById("confirmReturnBtn").onclick = () =>
     confirmarAnulacionTicket(numTicket);
 }
@@ -2556,6 +3179,9 @@ function abrirModalAnulacionTicket(numTicket) {
 async function confirmarDevolucion(idLinea, numTicket) {
   const motivo = document.getElementById("returnReason").value;
   const nota = document.getElementById("returnNote").value.trim();
+  const metodoReembolso =
+    document.querySelector('input[name="metodoReembolso"]:checked')?.value ||
+    "efectivo";
   const finalMotivo = nota ? `${motivo}: ${nota}` : motivo;
 
   try {
@@ -2566,6 +3192,7 @@ async function confirmarDevolucion(idLinea, numTicket) {
         accion: "devolverLinea",
         idLinea,
         motivo: finalMotivo,
+        metodoReembolso,
       }),
     });
     const data = await resp.json();
@@ -2573,11 +3200,18 @@ async function confirmarDevolucion(idLinea, numTicket) {
       throw new Error(data.error || "No se pudo realizar la devolución");
 
     document.getElementById("returnModal").classList.remove("visible");
-    showToast("✅ Producto devuelto correctamente");
+    showToast(
+      "<i class='fa-solid fa-check'></i> Devolución procesada correctamente",
+    );
     const ventaActualizada = await cargarVenta(numTicket);
     mostrarTicket(ventaActualizada, false);
+    if (typeof updateVentaStatusUI === "function")
+      updateVentaStatusUI(
+        numTicket,
+        ventaActualizada.status || ventaActualizada.estado,
+      );
   } catch (err) {
-    showToast("❌ No se pudo procesar la devolución: " + err.message);
+    showToast("<i class='fa-solid fa-circle-xmark'></i> " + err.message);
   }
 }
 

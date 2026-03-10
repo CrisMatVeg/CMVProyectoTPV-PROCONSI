@@ -165,14 +165,13 @@
     <!-- CABECERA -->
     <div class="header">
       <div>
-        <h1>ElectroBazar</h1>
+        <h1>{{EMPRESA_NOMBRE}}</h1>
         <h2>Electrónica · Tecnología · Accesorios</h2>
         <div style="margin-top: 6px; line-height: 1.7; font-size: 13px">
-          CIF: B-12345678<br />
-          Calle Mercado, 14, Local 3<br />
-          28005 Madrid, España<br />
-          Tel: +34 910 111 222<br />
-          info@electrobazar.es
+          CIF: {{EMPRESA_NIF}}<br />
+          {{EMPRESA_DIRECCION}}<br />
+          Tel: {{EMPRESA_TELEFONO}}<br />
+          {{EMPRESA_EMAIL}}
         </div>
       </div>
       <div style="text-align: right">
@@ -194,11 +193,10 @@
       <div>
         <div class="block-title">Datos del emisor</div>
         <div class="block-body">
-          <strong>ElectroBazar S.L.</strong><br />
-          CIF: B-12345678<br />
-          Calle Mercado, 14, Local 3<br />
-          28005 Madrid, España<br />
-          info@electrobazar.es
+          <strong>{{EMPRESA_RAZON_SOCIAL}}</strong><br />
+          CIF: {{EMPRESA_NIF}}<br />
+          {{EMPRESA_DIRECCION}}<br />
+          {{EMPRESA_EMAIL}}
         </div>
       </div>
       <div>
@@ -253,10 +251,10 @@
         <div class="block-title">Datos bancarios</div>
         <div class="block-body" style="line-height: 1.9">
           <strong>Banco:</strong> Banco Sabadell<br />
-          <strong>Titular:</strong> ElectroBazar S.L.<br />
+          <strong>Titular:</strong> {{EMPRESA_RAZON_SOCIAL}}<br />
           <strong>IBAN:</strong> ES76 0081 0248 6000 0011 2233<br />
           <strong>BIC/SWIFT:</strong> BSABESBB<br />
-          <strong>Referencia:</strong> FAC-2025-0001
+          <strong>Referencia:</strong> {{FACTURA_NUM}}
         </div>
       </div>
       <div>
@@ -272,8 +270,8 @@
 
     <!-- PIE -->
     <div class="footer">
-      ElectroBazar S.L. · CIF B-12345678 · Reg. Mercantil de Madrid, Tomo 5678,
-      Folio 90 · Calle Mercado, 14 — 28005 Madrid · www.electrobazar.es
+      {{EMPRESA_RAZON_SOCIAL}} · CIF: {{EMPRESA_NIF}} · {{EMPRESA_REGISTRO}} ·
+      {{EMPRESA_DIRECCION}} · {{EMPRESA_WEB}}
     </div>
   </body>
 </html>

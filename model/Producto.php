@@ -23,28 +23,34 @@ class Producto
     private $variantes;
     private $atributos;
     private $activo;
-    private $requiere_serial;
     private $codigo_iva;
+    private $es_pack;
+    private $precio_proveedor;
+    private $aplica_re;
+    private $id_proveedor;
 
-    public function __construct($id, $referencia, $nombre, $descripcion, $precio_coste, $precio_venta, $iva, $stock_actual, $stock_minimo, $meses_garantia, $icono, $categoria, $variantes, $atributos, $activo, $requiere_serial = 0, $codigo_iva = 'GENERAL')
+    public function __construct($id, $referencia, $nombre, $descripcion, $precio_coste, $precio_venta, $iva, $stock_actual, $stock_minimo, $meses_garantia, $icono, $categoria, $variantes, $atributos, $activo, $codigo_iva = 'GENERAL', $es_pack = 0, $precio_proveedor = 0, $aplica_re = 0, $id_proveedor = null)
     {
         $this->id = $id;
         $this->referencia = $referencia;
         $this->nombre = $nombre;
         $this->descripcion = $descripcion;
-        $this->precio_coste = $precio_coste;
-        $this->precio_venta = $precio_venta;
-        $this->iva = $iva;
-        $this->stock_actual = $stock_actual;
-        $this->stock_minimo = $stock_minimo;
-        $this->meses_garantia = $meses_garantia;
+        $this->precio_coste = (float)$precio_coste;
+        $this->precio_venta = (float)$precio_venta;
+        $this->iva = (float)$iva;
+        $this->stock_actual = (int)$stock_actual;
+        $this->stock_minimo = (int)$stock_minimo;
+        $this->meses_garantia = (int)$meses_garantia;
         $this->icono = $icono;
         $this->categoria = $categoria;
         $this->variantes = $variantes;
         $this->atributos = $atributos;
         $this->activo = $activo;
-        $this->requiere_serial = $requiere_serial;
         $this->codigo_iva = $codigo_iva;
+        $this->es_pack = (int)$es_pack;
+        $this->precio_proveedor = (float)$precio_proveedor;
+        $this->aplica_re = (int)$aplica_re;
+        $this->id_proveedor = $id_proveedor;
     }
 
     // Getters
@@ -108,12 +114,30 @@ class Producto
     {
         return $this->activo;
     }
-    public function getRequiereSerial()
-    {
-        return $this->requiere_serial;
-    }
     public function getCodigoIva()
     {
         return $this->codigo_iva;
+    }
+    public function getEsPack()
+    {
+        return $this->es_pack;
+    }
+    public function getPrecioProveedor()
+    {
+        return $this->precio_proveedor;
+    }
+    public function getAplicaRE()
+    {
+        return $this->aplica_re;
+    }
+
+    public function getIdProveedor()
+    {
+        return $this->id_proveedor;
+    }
+
+    public function isPack(): bool
+    {
+        return (bool)$this->es_pack;
     }
 }

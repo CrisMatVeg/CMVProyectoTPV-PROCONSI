@@ -75,16 +75,22 @@ foreach ($oProductos as $oProd) {
         'codigo_iva'     => $oProd->getCodigoIva(),
         'variantes'      => $oProd->getVariantes(),
         'atributos'      => $oProd->getAtributos(),
+        'es_pack'        => $oProd->getEsPack(),
+        'id_proveedor'   => $oProd->getIdProveedor(),
+        'componentes_pack' => $oProd->getEsPack() ? ProductoPDO::obtenerComponentesPack($oProd->getId()) : []
     ];
 }
+
 
 // Obtener tipos de IVA y el general vigente para usarlo en la UI
 require_once 'model/TipoIVAPDO.php';
 require_once 'model/CategoriaPDO.php';
+require_once 'model/ProveedorPDO.php';
 $tipoGeneral = TipoIVAPDO::obtenerVigentePorCodigo('GENERAL', date('Y-m-d'));
 $ivaGeneralActual = $tipoGeneral['porcentaje'] ?? 21.00;
 $tiposIva = TipoIVAPDO::listarTodos();
 $listaCategorias = CategoriaPDO::listarTodas();
+$listaProveedores = ProveedorPDO::listarTodos(true); // Solo activos
 
 $avProductos = [
     'productos'  => $listaProductos,
@@ -92,7 +98,15 @@ $avProductos = [
     'ivaGeneral' => $ivaGeneralActual,
     'tipos_iva'  => $tiposIva,
     'categorias' => $listaCategorias,
+    'proveedores' => array_map(function ($p) {
+        return [
+            'id' => $p->getId(),
+            'nombre' => $p->getNombre(),
+            'aplica_re' => $p->getAplicaRe()
+        ];
+    }, $listaProveedores)
 ];
+
 
 
 require_once $view['layout'];

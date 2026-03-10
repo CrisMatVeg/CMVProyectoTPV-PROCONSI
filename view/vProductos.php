@@ -2,38 +2,68 @@
 ?>
 <div class="main-full p-24">
 
-    <!-- CABECERA DE SECCIÓN -->
     <div class="section-header container-wider">
         <div class="section-title">
-            <h1>Gestión de Productos</h1>
-            <p>Administra el catálogo de productos, precios y categorías.</p>
+            <h1>Catálogo</h1>
+            <p>Administra tus productos estándar y packs de venta combinados.</p>
         </div>
-        <div class="d-flex gap-12 ai-center">
-            <!-- Botón Exportar con dropdown -->
-            <div class="ie-dropdown-wrap" id="exportDropdownWrap">
-                <button class="btn-ie btn-ie-export" onclick="toggleExportDropdown()">
-                    <i class="fa-solid fa-file-export"></i> Exportar <i class="fa-solid fa-chevron-down fs-10"></i>
+        <div class="d-flex gap-12 ai-center flex-wrap">
+            <a href="index.php?irDashboard=1" class="btn-back">
+                <i class="fa-solid fa-arrow-left"></i> Volver
+            </a>
+
+            <div class="tabs-nav mr-12">
+                <button class="tab-btn active" onclick="switchTab('productos')" id="btnTabProductos">
+                    <i class="fa-solid fa-box-open"></i>Productos
                 </button>
-                <div class="ie-dropdown" id="exportDropdown">
-                    <a href="api/exportarProductos.php?format=csv" class="ie-dropdown-item">
-                        <i class="fa-solid fa-file-csv text-green"></i> CSV (Excel)
-                    </a>
-                    <a href="api/exportarProductos.php?format=json" class="ie-dropdown-item">
-                        <i class="fa-solid fa-file-code text-accent"></i> JSON
-                    </a>
-                </div>
+                <button class="tab-btn" onclick="switchTab('packs')" id="btnTabPacks">
+                    <i class="fa-solid fa-boxes-stacked"></i>Packs
+                </button>
             </div>
-            <!-- Botón Importar -->
-            <button class="btn-ie btn-ie-import" onclick="document.getElementById('importFileInput').click()">
-                <i class="fa-solid fa-file-import"></i> Importar
-            </button>
-            <input type="file" id="importFileInput" accept=".csv,.json" class="d-none" onchange="importarProductos(this)">
-            <!-- Gestión de Categorías -->
-            <button onclick="abrirModalGestionCategorias()" class="btn-filter">
-                <i class="fa-solid fa-tags"></i> Categorías
-            </button>
-            <button onclick="abrirModalProducto()" class="btn-add">
+
+            <div class="d-flex gap-8 ai-center bg-surface2 p-4 br-12 border">
+                <!-- Botón Exportar -->
+                <div class="ie-dropdown-wrap" id="exportDropdownWrap">
+                    <button class="btn-filter" onclick="toggleExportDropdown()" style="border:none; background:transparent;">
+                        <i class="fa-solid fa-file-export"></i> Exportar
+                    </button>
+                    <div class="ie-dropdown" id="exportDropdown">
+                        <a href="api/exportarProductos.php?format=csv" class="ie-dropdown-item">
+                            <i class="fa-solid fa-file-csv text-green"></i> CSV (Excel)
+                        </a>
+                        <a href="api/exportarProductos.php?format=json" class="ie-dropdown-item">
+                            <i class="fa-solid fa-file-code text-accent"></i> JSON
+                        </a>
+                    </div>
+                </div>
+
+                <div class="vr mx-4" style="height: 20px; width: 1px; background: var(--border); opacity: 0.5;"></div>
+
+                <button class="btn-filter" onclick="document.getElementById('importFileInput').click()" style="border:none; background:transparent;">
+                    <i class="fa-solid fa-file-import"></i> Importar
+                </button>
+                <input type="file" id="importFileInput" accept=".csv,.json" class="d-none" onchange="importarProductos(this)">
+
+                <div class="vr mx-4" style="height: 20px; width: 1px; background: var(--border); opacity: 0.5;"></div>
+
+                <button onclick="abrirModalGestionCategorias()" class="btn-filter" style="border:none; background:transparent;">
+                    <i class="fa-solid fa-tags"></i> Categorías
+                </button>
+
+                <div class="vr mx-4" style="height: 20px; width: 1px; background: var(--border); opacity: 0.5;"></div>
+
+                <button onclick="generarPedidoAutomatico()" class="btn-filter" id="btnPedidoAuto" style="border:none; background:transparent; color: var(--accent);">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Pedido Auto
+                </button>
+            </div>
+
+            <div class="flex-1"></div>
+
+            <button onclick="abrirModalProducto()" class="btn-save h-44 px-20 shadow-sm" id="btnNuevoProducto">
                 <i class="fa-solid fa-plus"></i> Nuevo Producto
+            </button>
+            <button onclick="abrirModalPack()" class="btn-save h-44 px-20 shadow-sm d-none" id="btnNuevoPack">
+                <i class="fa-solid fa-plus"></i> Nuevo Pack
             </button>
         </div>
     </div>
@@ -44,7 +74,7 @@
             <i class="fa-solid fa-magnifying-glass search-icon"></i>
             <input type="text" id="prodSearch" placeholder="Buscar por nombre o SKU..." class="search-input">
         </div>
-        <div class="d-flex gap-8">
+        <div class="d-flex gap-8" id="filtersPrecios">
             <input type="number" id="filterPriceMin" placeholder="Precio Min" class="form-input w-100 fs-12">
             <input type="number" id="filterPriceMax" placeholder="Precio Max" class="form-input w-100 fs-12">
         </div>
@@ -54,22 +84,16 @@
                 <option value="<?php echo htmlspecialchars($c['codigo']); ?>"><?php echo htmlspecialchars($c['nombre']); ?></option>
             <?php endforeach; ?>
         </select>
-        <select id="filterEstado" class="filter-input p-10 br-8">
+        <select id="filterEstado" class="filter-input p-10 br-8" onchange="applyFilters()">
             <option value="all">Todos los estados</option>
             <option value="1">Activos</option>
             <option value="0">Inactivos</option>
-        </select>
-        <select id="sortOrder" class="filter-input p-10 br-8">
-            <option value="none">Ordenar por...</option>
-            <option value="price-asc">Precio: Menor a Mayor</option>
-            <option value="price-desc">Precio: Mayor a Menor</option>
-            <option value="stock-asc">Stock: Menor a Mayor</option>
-            <option value="stock-desc">Stock: Mayor a Menor</option>
+            <option value="bajo_stock">Bajo Stock</option>
         </select>
     </div>
 
-    <!-- TABLA DE PRODUCTOS -->
-    <div class="table-container container-wider">
+    <!-- TABLA DE PRODUCTOS (PESTAÑA 1) -->
+    <div class="table-container container-wider tab-content active" id="tabContentProductos">
         <table class="data-table">
             <thead>
                 <tr>
@@ -85,13 +109,14 @@
                 </tr>
             </thead>
             <tbody id="productsTableBody">
-                <?php foreach ($avProductos['productos'] as $p): ?>
-                    <tr class="product-row"
+                <?php foreach ($avProductos['productos'] as $p): if (!empty($p['es_pack'])) continue; ?>
+                    <tr class="product-row row-tipo-producto"
                         data-nombre="<?php echo strtolower(htmlspecialchars($p['nombre'])); ?>"
                         data-codigo="<?php echo strtolower(htmlspecialchars($p['codigo'])); ?>"
                         data-categoria="<?php echo $p['categoria']; ?>"
                         data-precio="<?php echo $p['precio']; ?>"
                         data-stock="<?php echo $p['stock']; ?>"
+                        data-stock-minimo="<?php echo $p['stock_minimo']; ?>"
                         data-activo="<?php echo $p['activo'] ? '1' : '0'; ?>">
                         <td class="font-mono text-muted"><?php echo $p['id']; ?></td>
                         <td class="text-center">
@@ -121,8 +146,20 @@
                             }
                             ?>
                         </td>
-                        <td class="text-right font-bold font-mono <?php echo $p['stock'] <= 5 ? 'text-red' : ''; ?>">
-                            <?php echo $p['stock']; ?>
+                        <td class="text-right font-bold font-mono">
+                            <?php
+                            $stock = (int)$p['stock'];
+                            $stockMin = (int)$p['stock_minimo'];
+                            $esCritico = ($stock <= $stockMin);
+                            ?>
+                            <div class="d-flex flex-column ai-end">
+                                <span class="<?php echo $esCritico ? 'text-red bg-red-soft px-4 br-4' : ''; ?>">
+                                    <?php echo $stock; ?>
+                                </span>
+                                <?php if ($esCritico): ?>
+                                    <span class="fs-9 tt-uppercase text-red font-bold">Mín: <?php echo $stockMin; ?></span>
+                                <?php endif; ?>
+                            </div>
                         </td>
                         <td class="text-right font-bold font-mono">
                             <?php echo number_format($p['precio'], 2, ',', '.'); ?> €
@@ -140,14 +177,14 @@
                         </td>
                         <td class="text-center">
                             <div class="d-flex jc-center gap-8 pr-20">
+                                <button onclick="abrirModalHistorial(<?php echo $p['id']; ?>, '<?php echo addslashes(htmlspecialchars($p['nombre'])); ?>')" title="Historial Stock" class="btn-icon text-accent">
+                                    <i class="fa-solid fa-clock-rotate-left"></i>
+                                </button>
                                 <button onclick='abrirModalProducto(<?php echo json_encode($p); ?>)' title="Editar" class="btn-icon">
                                     <i class="fa-solid fa-pen"></i>
                                 </button>
                                 <button onclick="toggleEstadoProducto(<?php echo $p['id']; ?>)" title="<?php echo $p['activo'] ? 'Dar de baja' : 'Activar'; ?>" class="btn-icon <?php echo $p['activo'] ? 'text-red' : 'text-green'; ?>">
                                     <i class="fa-solid fa-<?php echo $p['activo'] ? 'arrow-down' : 'arrow-up'; ?>"></i>
-                                </button>
-                                <button onclick="abrirModalEntradaStock(<?php echo $p['id']; ?>, '<?php echo addslashes(htmlspecialchars($p['nombre'])); ?>', <?php echo (int)$p['stock']; ?>, <?php echo (float)$p['precio_coste']; ?>)" title="Entrada de Stock" class="btn-icon text-accent">
-                                    <i class="fa-solid fa-warehouse"></i>
                                 </button>
                                 <button onclick="eliminarProducto(<?php echo $p['id']; ?>, '<?php echo addslashes(htmlspecialchars($p['nombre'])); ?>')" title="Eliminar" class="btn-icon text-red" style="opacity:0.7;">
                                     <i class="fa-solid fa-trash"></i>
@@ -168,197 +205,113 @@
         </table>
     </div>
 
-</div>
-
-<!-- MODAL NÚMEROS DE SERIE -->
-<div id="modalNS" class="modal-overlay-bg" style="z-index: 1100;">
-    <div class="modal-content" style="max-width: 500px; padding: 0; overflow: hidden;">
-        <div class="modal-header p-20 bg-surface2 border-bottom">
-            <h2 class="m-0 fs-18">Números de Serie</h2>
-            <button onclick="cerrarModalNS()" class="btn-close-modal">&times;</button>
-        </div>
-        <div class="p-24">
-            <div class="d-flex gap-8 mb-16">
-                <input type="text" id="nuevoNS" placeholder="Escribe un S/N..." class="form-input flex-1">
-                <button onclick="añadirNS()" class="btn-save w-auto">Añadir</button>
-            </div>
-            <div class="table-container" style="max-height: 300px; overflow-y: auto;">
-                <table class="w-100 fs-13">
-                    <thead>
-                        <tr>
-                            <th class="text-left">Número de Serie</th>
-                            <th class="text-center">Estado</th>
-                            <th class="text-center">Acción</th>
-                        </tr>
-                    </thead>
-                    <tbody id="listaNSTablaBody">
-                        <!-- JS filler -->
-                    </tbody>
-                </table>
-            </div>
-        </div>
+    <!-- TABLA DE PACKS (PESTAÑA 2) -->
+    <div class="table-container container-wider tab-content d-none" id="tabContentPacks">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th class="w-60 pl-20">ID</th>
+                    <th class="w-80 text-center">Icono</th>
+                    <th>Nombre del Pack</th>
+                    <th>Referencia</th>
+                    <th>Componentes</th>
+                    <th class="text-right">Precio Venta</th>
+                    <th class="text-center">Estado</th>
+                    <th class="text-center pr-20">Acciones</th>
+                </tr>
+            </thead>
+            <tbody id="packsTableBody">
+                <?php foreach ($avProductos['productos'] as $p): if (empty($p['es_pack'])) continue; ?>
+                    <tr class="product-row row-tipo-pack"
+                        data-nombre="<?php echo strtolower(htmlspecialchars($p['nombre'])); ?>"
+                        data-codigo="<?php echo strtolower(htmlspecialchars($p['codigo'])); ?>"
+                        data-categoria="<?php echo $p['categoria']; ?>"
+                        data-precio="<?php echo $p['precio']; ?>"
+                        data-activo="<?php echo $p['activo'] ? '1' : '0'; ?>">
+                        <td class="font-mono text-muted"><?php echo $p['id']; ?></td>
+                        <td class="text-center">
+                            <?php if (strpos($p['icono'], 'data:image') === 0): ?>
+                                <img src="<?php echo $p['icono']; ?>" class="prod-img-fixed" alt="Icono">
+                            <?php else: ?>
+                                <span class="fs-24"><?php echo $p['icono']; ?></span>
+                            <?php endif; ?>
+                        </td>
+                        <td class="font-bold">
+                            <?php echo htmlspecialchars($p['nombre']); ?>
+                            <span class="ml-8 px-6 py-2 br-4 fs-10 bg-accent-soft text-accent border border-accent">PACK</span>
+                        </td>
+                        <td class="text-muted"><?php echo htmlspecialchars($p['codigo']); ?></td>
+                        <td class="fs-12 text-muted">
+                            <?php
+                            if (!empty($p['componentes_pack']) && is_array($p['componentes_pack'])) {
+                                $comps = [];
+                                foreach ($p['componentes_pack'] as $c) {
+                                    $comps[] = "{$c['cantidad']}x " . htmlspecialchars($c['nombre']);
+                                }
+                                echo implode('<br>', $comps);
+                            } else {
+                                echo '<em>Sin componentes</em>';
+                            }
+                            ?>
+                        </td>
+                        <td class="text-right font-bold font-mono text-accent">
+                            <?php echo number_format($p['precio'], 2, ',', '.'); ?> €
+                        </td>
+                        <td class="text-center">
+                            <?php if ($p['activo']): ?>
+                                <span class="status-pill status-active">
+                                    <i class="fa-solid fa-circle-check"></i> Activo
+                                </span>
+                            <?php else: ?>
+                                <span class="status-pill status-inactive">
+                                    <i class="fa-solid fa-circle-xmark"></i> Inactivo
+                                </span>
+                            <?php endif; ?>
+                        </td>
+                        <td class="text-center">
+                            <div class="d-flex jc-center gap-8 pr-20">
+                                <button onclick='abrirModalPack(<?php echo json_encode($p); ?>)' title="Editar Pack" class="btn-icon">
+                                    <i class="fa-solid fa-pen"></i>
+                                </button>
+                                <button onclick="toggleEstadoProducto(<?php echo $p['id']; ?>)" title="<?php echo $p['activo'] ? 'Dar de baja' : 'Activar'; ?>" class="btn-icon <?php echo $p['activo'] ? 'text-red' : 'text-green'; ?>">
+                                    <i class="fa-solid fa-<?php echo $p['activo'] ? 'arrow-down' : 'arrow-up'; ?>"></i>
+                                </button>
+                                <button onclick="eliminarProducto(<?php echo $p['id']; ?>, '<?php echo addslashes(htmlspecialchars($p['nombre'])); ?>')" title="Eliminar Pack" class="btn-icon text-red" style="opacity:0.7;">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+                <tr id="noResultsPacks" class="d-none">
+                    <td colspan="8">
+                        <div class="empty-state">
+                            <i class="fa-solid fa-boxes-stacked"></i>
+                            No se han encontrado packs con los filtros seleccionados.
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
     </div>
+
 </div>
 
-<!-- ── Modal: Entrada de Stock ─────────────────────────────────────────── -->
-<div id="modalEntradaStock" class="modal-overlay-bg" style="display:none;" onclick="if(event.target===this)cerrarModalEntradaStock()">
-    <div class="modal-content" style="max-width:440px; padding: 0; overflow: hidden;">
-        <div class="modal-header p-20 bg-surface2 border-bottom">
-            <h2 class="m-0 fs-18"><i class="fa-solid fa-warehouse"></i> Entrada de Stock</h2>
-            <button onclick="cerrarModalEntradaStock()" class="btn-close-modal">&times;</button>
-        </div>
-        <div class="modal-body p-24">
-            <div class="d-flex flex-column gap-16">
-                <div style="background:var(--surface2);border-radius:8px;padding:12px 16px;">
-                    <div style="font-weight:700;font-size:15px;" id="esNombreProducto">—</div>
-                    <div style="display:flex;gap:24px;margin-top:8px;font-size:13px;color:var(--text-muted);">
-                        <span>Stock actual: <strong id="esStockActual" style="color:var(--text);">—</strong></span>
-                        <span>CMP actual: <strong id="esCmpActual" style="color:var(--text);">—</strong> €</span>
-                    </div>
-                </div>
 
-                <input type="hidden" id="esIdProducto">
-
-                <div>
-                    <label class="form-label">Cantidad a añadir *</label>
-                    <input type="number" id="esCantidad" class="form-input" min="1" step="1" placeholder="Ej: 10" oninput="calcularNuevoCMP()">
-                    <span class="form-error" id="err-esCantidad"></span>
-                </div>
-
-                <div>
-                    <label class="form-label">Precio de coste por unidad (€) *</label>
-                    <input type="number" id="esPrecioCoste" class="form-input" min="0" step="0.01" placeholder="Ej: 45.50" oninput="calcularNuevoCMP()">
-                    <span class="form-error" id="err-esPrecioCoste"></span>
-                </div>
-
-                <div id="esCmpPreview" style="display:none;background:var(--surface2);border-radius:8px;padding:12px 16px;font-size:13px;border-left:3px solid var(--accent);">
-                    <i class="fa-solid fa-calculator"></i>
-                    Nuevo CMP: <strong id="esCmpNuevo" style="color:var(--accent);">—</strong> €
-                    &nbsp;·&nbsp; Nuevo stock: <strong id="esStockNuevo">—</strong> uds.
-                </div>
-
-                <div>
-                    <label class="form-label">Notas</label>
-                    <input type="text" id="esNotas" class="form-input" placeholder="Nº albarán, proveedor...">
-                </div>
-            </div>
-
-            <div class="modal-footer pt-16 mt-24 border-top d-flex">
-                <button type="button" class="btn-cancel" onclick="cerrarModalEntradaStock()">Cancelar</button>
-                <div class="flex-1"></div>
-                <button type="button" class="btn-save w-auto px-24" id="btnGuardarEntrada" onclick="guardarEntradaStock()">
-                    <i class="fa-solid fa-arrow-up-from-bracket"></i> Registrar Entrada
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
 
 <script>
-    (function() {
-        let _esStockActual = 0;
-        let _esCmpActual = 0;
 
-        window.abrirModalEntradaStock = function(id, nombre, stock, cmp) {
-            _esStockActual = parseFloat(stock) || 0;
-            _esCmpActual = parseFloat(cmp) || 0;
-            document.getElementById('esIdProducto').value = id;
-            document.getElementById('esNombreProducto').textContent = nombre;
-            document.getElementById('esStockActual').textContent = _esStockActual;
-            document.getElementById('esCmpActual').textContent = _esCmpActual.toFixed(2).replace('.', ',');
-            document.getElementById('esCantidad').value = '';
-            document.getElementById('esPrecioCoste').value = '';
-            document.getElementById('esNotas').value = '';
-            document.getElementById('esCmpPreview').style.display = 'none';
-            document.getElementById('err-esCantidad').textContent = '';
-            document.getElementById('err-esPrecioCoste').textContent = '';
-            document.getElementById('modalEntradaStock').style.display = 'flex';
-        };
-
-        window.cerrarModalEntradaStock = function() {
-            document.getElementById('modalEntradaStock').style.display = 'none';
-        };
-
-        window.calcularNuevoCMP = function() {
-            const qty = parseInt(document.getElementById('esCantidad').value) || 0;
-            const cost = parseFloat(document.getElementById('esPrecioCoste').value) || 0;
-            const prev = document.getElementById('esCmpPreview');
-            if (qty <= 0) {
-                prev.style.display = 'none';
-                return;
-            }
-            const stockNuevo = _esStockActual + qty;
-            const cmpNuevo = (_esStockActual * _esCmpActual + qty * cost) / stockNuevo;
-            document.getElementById('esCmpNuevo').textContent = cmpNuevo.toFixed(2).replace('.', ',');
-            document.getElementById('esStockNuevo').textContent = stockNuevo;
-            prev.style.display = 'block';
-        };
-
-        window.guardarEntradaStock = async function() {
-            const id = document.getElementById('esIdProducto').value;
-            const cantidad = parseInt(document.getElementById('esCantidad').value);
-            const precioCoste = parseFloat(document.getElementById('esPrecioCoste').value);
-            const notas = document.getElementById('esNotas').value.trim();
-
-            let ok = true;
-            document.getElementById('err-esCantidad').textContent = '';
-            document.getElementById('err-esPrecioCoste').textContent = '';
-
-            if (!cantidad || cantidad < 1) {
-                document.getElementById('err-esCantidad').textContent = 'Introduce una cantidad válida (mín. 1)';
-                ok = false;
-            }
-            if (isNaN(precioCoste) || precioCoste < 0) {
-                document.getElementById('err-esPrecioCoste').textContent = 'Introduce un precio de coste válido';
-                ok = false;
-            }
-            if (!ok) return;
-
-            const btn = document.getElementById('btnGuardarEntrada');
-            btn.disabled = true;
-            btn.textContent = 'Guardando…';
-
-            try {
-                const resp = await fetch('./api/entradaStock.php', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        id_producto: id,
-                        cantidad,
-                        precio_coste: precioCoste,
-                        notas
-                    }),
-                });
-                const data = await resp.json();
-                if (data.ok) {
-                    cerrarModalEntradaStock();
-                    if (typeof showToast === 'function') {
-                        showToast('<i class="fa-solid fa-circle-check"></i> ' + data.msg);
-                    }
-                    setTimeout(() => location.reload(), 1400);
-                } else {
-                    if (typeof showToast === 'function') showToast('<i class="fa-solid fa-circle-xmark"></i> ' + data.error);
-                    else alert(data.error);
-                }
-            } catch (e) {
-                alert('Error de conexión: ' + e.message);
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fa-solid fa-arrow-up-from-bracket"></i> Registrar Entrada';
-            }
-        };
-    })();
 </script>
+
+
 <!-- MODAL AÑADIR/EDITAR PRODUCTO -->
 <div id="modalProducto" class="modal-overlay-bg">
     <div class="modal-content" style="max-width: 800px; padding: 0; overflow: hidden;">
-        <div class="modal-header p-20 bg-surface2 border-bottom">
-            <h2 id="modalTitle" class="m-0 fs-18">Nuevo Producto</h2>
+        <div class="modal-header">
+            <h2 id="modalTitle">Nuevo Producto</h2>
             <button onclick="cerrarModalProducto()" class="btn-close-modal">&times;</button>
         </div>
-        <form id="formProducto" class="modal-body p-24">
+        <form id="formProducto" class="modal-body">
             <input type="hidden" id="prodId">
 
             <div class="d-grid grid-1-3 gap-24 mb-24">
@@ -367,7 +320,7 @@
                     <div class="form-group mb-0">
                         <label class="form-label">Imagen del Producto</label>
                         <div class="d-flex flex-column ai-center gap-12 p-16 bg-surface2 br-12 border-2">
-                            <div id="imgPreview" class="prod-img-preview m-0" style="width: 120px; height: 120px; background: var(--bg-body);">
+                            <div id="imgPreview" class="prod-img-preview m-0" style="width: 120px; height: 120px;">
                                 <i class="fa-solid fa-image fs-32 opacity-20"></i>
                             </div>
                             <input type="file" id="prodFile" accept="image/*" class="d-none" onchange="previewImage(this)">
@@ -410,31 +363,56 @@
                 <textarea id="prodDesc" placeholder="Detalles técnicos y descripción comercial..." class="form-input" rows="2"></textarea>
             </div>
 
-            <div class="d-grid grid-3 gap-16 mb-24 p-16 bg-surface2 br-12 border-2">
+            <div class="d-grid gap-16 mb-24 p-16 bg-surface2 br-12 border-2" style="grid-template-columns: 1fr 1fr;">
                 <div class="form-group mb-0">
-                    <label class="form-label fs-11 tt-uppercase d-flex ai-center gap-4">
-                        Coste (€) <i class="fa-solid fa-circle-info text-muted" title="Para cambiarlo en productos existentes, usa el botón de Entrada de Stock"></i>
-                    </label>
-                    <input type="text" id="prodPrecioCoste" placeholder="0.00" class="form-input text-right font-mono">
-                    <span class="form-error" id="err-precio_coste"></span>
-                </div>
-                <div class="form-group mb-0">
-                    <label class="form-label fs-11 tt-uppercase">Venta (€)</label>
-                    <input type="text" id="prodPrecioVenta" placeholder="0.00" class="form-input text-right font-bold font-mono text-accent">
-                    <span class="form-error" id="err-precio_venta"></span>
-                </div>
-                <div class="form-group mb-0">
-                    <label class="form-label fs-11 tt-uppercase">IVA (%)</label>
-                    <select id="prodIvaTipo" class="form-input">
-                        <?php foreach ($avProductos['tipos_iva'] as $t): ?>
-                            <option value="<?php echo htmlspecialchars($t['codigo']); ?>">
-                                <?php echo htmlspecialchars($t['codigo'] . ' - ' . $t['porcentaje'] . '%'); ?>
+                    <label class="form-label fs-11 tt-uppercase">Proveedor</label>
+                    <select id="prodProveedor" class="form-input" onchange="seleccionarProveedor(this)">
+                        <option value="">-- Sin Proveedor --</option>
+                        <?php foreach ($avProductos['proveedores'] as $p): ?>
+                            <option value="<?php echo $p['id']; ?>" data-re="<?php echo $p['aplica_re']; ?>">
+                                <?php echo htmlspecialchars($p['nombre']); ?>
                             </option>
                         <?php endforeach; ?>
                     </select>
-                    <span class="form-error" id="err-iva"></span>
+                </div>
+                <div class="form-group mb-0">
+                    <label class="form-label fs-11 tt-uppercase">Precio Proveedor (€)</label>
+                    <input type="text" id="prodPrecioProveedor" placeholder="0.00" class="form-input text-right font-mono" oninput="calcularCosteAutomatico()">
+                    <span class="form-error" id="err-precio_proveedor"></span>
                 </div>
             </div>
+
+            <div class="d-grid gap-16 mb-24 p-16 bg-surface2 br-12 border-2" style="grid-template-columns: 1fr;">
+                <div class="form-group mb-0">
+                    <label class="form-label fs-11 tt-uppercase">Tipo IVA</label>
+                    <select id="prodIvaTipo" class="form-input" onchange="calcularCosteAutomatico()">
+                        <?php foreach ($avProductos['tipos_iva'] as $t): ?>
+                            <option value="<?php echo htmlspecialchars($t['codigo']); ?>"
+                                data-porcentaje="<?php echo $t['porcentaje']; ?>"
+                                data-re="<?php echo $t['recargo_equivalencia'] ?? 0; ?>">
+                                <?php echo htmlspecialchars($t['nombre'] . ' (' . (float)$t['porcentaje'] . '%)'); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+            </div>
+
+
+            <div class="d-grid grid-2 gap-16 mb-24">
+                <div class="form-group mb-0">
+                    <label class="form-label fs-11 tt-uppercase d-flex ai-center gap-4">
+                        PVP Coste (Calculado €) <i class="fa-solid fa-calculator text-muted"></i>
+                    </label>
+                    <input type="text" id="prodPrecioCoste" placeholder="0.00" class="form-input text-right font-mono bg-disabled" readonly>
+                    <span class="form-error" id="err-precio_coste"></span>
+                </div>
+                <div class="form-group mb-0">
+                    <label class="form-label fs-11 tt-uppercase">PVP Venta (€)</label>
+                    <input type="text" id="prodPrecioVenta" placeholder="0.00" class="form-input text-right font-bold font-mono text-accent">
+                    <span class="form-error" id="err-precio_venta"></span>
+                </div>
+            </div>
+
 
             <div class="d-grid grid-3 gap-16 mb-24">
                 <div class="form-group mb-0">
@@ -455,6 +433,8 @@
                     <span class="form-error" id="err-meses_garantia"></span>
                 </div>
             </div>
+
+            <!-- (Eliminado: Componentes del Pack, ahora están en el modal exclusivo modalPack) -->
 
             <!-- Variantes -->
             <div id="sectionVariantes" class="p-16 border-2 br-12 mb-24">
@@ -491,21 +471,32 @@
                 <input type="hidden" id="prodAtributos">
             </div>
 
-            <!-- Sección de Números de Serie -->
-            <div id="sectionNS" class="d-none mb-24">
-                <div class="d-flex jc-space-between ai-center p-12 bg-blue-light br-8 border-2 border-blue">
-                    <div class="d-flex ai-center gap-12">
-                        <i class="fa-solid fa-barcode text-accent"></i>
-                        <div>
-                            <div class="fs-13 font-bold">Números de Serie</div>
-                            <div id="nsList" class="fs-11 text-muted"></div>
-                        </div>
-                    </div>
-                    <button type="button" onclick="abrirModalNS()" class="btn-filter fs-11 h-32 px-12">Gestionar</button>
+            <!-- Gestión de Variantes Físicas (Stock individual) -->
+            <div id="sectionVariantesFisicas" class="p-16 border-2 br-12 mb-24 d-none">
+                <label class="form-label mb-12 d-flex ai-center gap-8">
+                    <i class="fa-solid fa-boxes-stacked text-muted"></i> Gestión de Variantes Físicas (Stock Individual)
+                </label>
+                <div class="table-container" style="max-height: 250px; overflow-y: auto; background: var(--bg-body);">
+                    <table class="w-100 fs-12">
+                        <thead>
+                            <tr style="background: var(--surface2);">
+                                <th class="p-8 text-left">Variante</th>
+                                <th class="p-8 text-left">SKU</th>
+                                <th class="p-8 text-center" style="width: 80px;">Stock</th>
+                                <th class="p-8 text-right" style="width: 100px;">Precio (€)</th>
+                                <th class="p-8 text-center" style="width: 60px;">Activa</th>
+                                <th class="p-8 text-center" style="width: 40px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="listaVariantesBody">
+                            <!-- JS filler -->
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
-            <div class="modal-footer pt-16 border-top">
+
+            <div class="modal-footer">
                 <button type="button" onclick="cerrarModalProducto()" class="btn-cancel">Cancelar</button>
                 <div class="flex-1"></div>
                 <button type="submit" id="btnGuardarProd" class="btn-save w-auto px-32">Guardar Producto</button>
@@ -514,18 +505,281 @@
     </div>
 </div>
 
+<!-- MODAL AÑADIR/EDITAR PACK -->
+<div id="modalPack" class="modal-overlay-bg d-none">
+    <div class="modal-content" style="max-width: 1000px; padding: 0; overflow: hidden;">
+        <div class="modal-header">
+            <h2 id="modalPackTitle">Nuevo Pack de Venta</h2>
+            <button type="button" onclick="cerrarModalPack()" class="btn-close-modal">&times;</button>
+        </div>
+        <form id="formPack" class="modal-body">
+            <input type="hidden" id="packId">
+
+            <div class="d-grid grid-1-3 gap-24 mb-24">
+                <!-- Columna Izquierda: Imagen y Meta -->
+                <div class="d-flex flex-column gap-16">
+                    <div class="form-group mb-0">
+                        <label class="form-label">Imagen del Pack</label>
+                        <div class="d-flex flex-column ai-center gap-12 p-16 bg-surface2 br-12 border-2">
+                            <div id="imgPreviewPack" class="prod-img-preview m-0" style="width: 120px; height: 120px;">
+                                <i class="fa-solid fa-boxes-stacked fs-32 opacity-20"></i>
+                            </div>
+                            <input type="file" id="packFile" accept="image/*" class="d-none" onchange="previewImagePack(this)">
+                            <button type="button" onclick="document.getElementById('packFile').click()" class="btn-filter w-auto h-auto p-10-16 fs-12 gap-8">
+                                <i class="fa-solid fa-upload"></i> Subir
+                            </button>
+                            <input type="hidden" id="packIcono">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Columna Derecha: Datos Principales -->
+                <div class="d-flex flex-column gap-16">
+                    <div class="form-group mb-0">
+                        <label class="form-label">Nombre del Pack</label>
+                        <input type="text" id="packNombre" placeholder="Ej: Pack Ahorro Invierno" class="form-input" required>
+                    </div>
+
+                    <div class="d-grid grid-2 gap-16">
+                        <div class="form-group mb-0">
+                            <label class="form-label">Referencia (Opcional)</label>
+                            <input type="text" id="packCodigo" placeholder="PACK-INV-001" class="form-input font-mono">
+                        </div>
+                        <div class="form-group mb-0">
+                            <label class="form-label">Categoría</label>
+                            <select id="packCat" class="form-input">
+                                <?php foreach ($avProductos['categorias'] as $c): ?>
+                                    <option value="<?php echo htmlspecialchars($c['codigo']); ?>"><?php echo htmlspecialchars($c['nombre']); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="d-grid grid-2 gap-16">
+                        <div class="form-group mb-0">
+                            <label class="form-label fs-11 tt-uppercase">Precio Venta Pack (€)</label>
+                            <input type="text" id="packPrecioVenta" placeholder="0.00" class="form-input text-right font-bold font-mono text-accent" required>
+                        </div>
+                        <div class="form-group mb-0">
+                            <label class="form-label fs-11 tt-uppercase">IVA (%)</label>
+                            <select id="packIvaTipo" class="form-input">
+                                <?php foreach ($avProductos['tipos_iva'] as $t): ?>
+                                    <option value="<?php echo htmlspecialchars($t['codigo']); ?>">
+                                        <?php echo htmlspecialchars($t['codigo'] . ' - ' . $t['porcentaje'] . '%'); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Componentes del Pack -->
+            <div class="p-20 border-2 border-accent br-12 mb-24 bg-surface1 col-span-1-3 pack-components-section" style="width: 100%; box-sizing: border-box; grid-column: 1 / -1;">
+
+                <label class="form-label mb-12 d-flex ai-center gap-8 text-accent font-bold">
+                    <i class="fa-solid fa-boxes-packing"></i> Componentes Físicos del Pack
+                </label>
+                <div class="fs-12 text-muted mb-24">
+                    Añade los productos que componen este pack. Al vender el pack, el TPV descontará automáticamente el stock especificado de cada uno de los productos que lo conforman.
+                </div>
+
+                <div class="d-flex mb-24" style="width: 100%;">
+                    <div class="pack-search-container" style="width: 100%; position: relative;">
+                        <i class="fa-solid fa-magnifying-glass pack-search-icon" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted); z-index: 10;"></i>
+                        <input type="text" id="packSearchInput" class="form-input border-accent pl-40" style="width: 100%; padding-left: 40px !important;" placeholder="Buscar producto por nombre o ref..." autocomplete="off" oninput="buscarProductoParaPack(this.value)">
+                        <div id="packSearchResults" class="search-results-dropdown" style="display:none; position: absolute; width: 100%; left: 0; top: 100%; z-index: 1000; background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-lg); border-radius: 8px; max-height: 300px; overflow-y: auto;"></div>
+                    </div>
+                </div>
+
+
+                <div class="table-container mt-12" style="max-height: 250px; overflow-y: auto; background: var(--bg-body);">
+                    <table class="full-width fs-12 pack-components-table">
+                        <thead>
+                            <tr style="background: var(--surface2);">
+                                <th class="p-8 text-left">SKU</th>
+                                <th class="p-8 text-left">Producto</th>
+                                <th class="p-8 text-center" style="width: 80px;">Cant.</th>
+                                <th class="p-8 text-center" style="width: 40px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="listaComponentesBody">
+                            <!-- JS filler -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" onclick="cerrarModalPack()" class="btn-cancel">Cancelar</button>
+                <div class="flex-1"></div>
+                <button type="submit" id="btnGuardarPack" class="btn-save w-auto px-32" style="background: var(--accent); color: white;">Guardar Pack</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL HISTORIAL STOCK -->
+<style>
+    #modalHistorialStock .modal-content {
+        max-width: 900px !important;
+        width: 90% !important;
+        background: var(--surface) !important;
+        color: var(--text);
+    }
+
+    #modalHistorialStock .historial-table-wrapper {
+        width: 100%;
+        overflow-x: auto;
+    }
+
+    #modalHistorialStock .stock-log-table {
+        width: 100% !important;
+        border-collapse: collapse !important;
+        table-layout: fixed !important;
+        display: table !important;
+        margin: 0 !important;
+    }
+
+    #modalHistorialStock .stock-log-table thead {
+        display: table-header-group !important;
+    }
+
+    #modalHistorialStock .stock-log-table tbody {
+        display: table-row-group !important;
+    }
+
+    #modalHistorialStock .stock-log-table tr {
+        display: table-row !important;
+    }
+
+    #modalHistorialStock .stock-log-table th,
+    #modalHistorialStock .stock-log-table td {
+        display: table-cell !important;
+        padding: 16px 20px !important;
+        border-bottom: 1px solid var(--border) !important;
+        text-align: left;
+        vertical-align: middle;
+    }
+
+    #modalHistorialStock .stock-log-table thead th {
+        background: var(--surface2) !important;
+        color: var(--text-muted) !important;
+        font-size: 11px !important;
+        text-transform: uppercase !important;
+        font-weight: bold !important;
+        position: sticky;
+        top: 0;
+        z-index: 20;
+    }
+
+    #modalHistorialStock .empty-log-container {
+        padding: 80px 40px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        width: 100%;
+        color: var(--text-muted);
+    }
+
+    #modalHistorialStock .empty-log-icon {
+        font-size: 56px;
+        margin-bottom: 24px;
+        opacity: 0.15;
+    }
+</style>
+<div id="modalHistorialStock" class="modal-overlay-bg d-none">
+    <div class="modal-content printable-area" style="padding: 0; overflow: visible; border: none; border-radius: 20px; box-shadow: 0 30px 60px rgba(0,0,0,0.4); background: var(--surface);">
+        <div class="modal-header" style="background: linear-gradient(135deg, var(--surface) 0%, var(--surface2) 100%); padding: 32px; border-bottom: 1px solid var(--border); position: relative;">
+            <div class="d-flex ai-center gap-20">
+                <div class="bg-accent-soft p-16 br-16 text-accent" style="box-shadow: 0 8px 16px rgba(var(--accent-rgb), 0.1);">
+                    <i class="fa-solid fa-clock-rotate-left fs-28"></i>
+                </div>
+                <div>
+                    <h2 id="historialTitle" class="m-0 fs-24 font-bold mb-4">Historial de Stock</h2>
+                    <div id="historialSubtitle" class="fs-14 opacity-70"></div>
+                </div>
+            </div>
+            <button type="button" onclick="cerrarModalHistorial()" class="btn-close-modal" style="position: absolute; top: 32px; right: 32px; background: var(--surface2); width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--border); transition: all 0.2s;">&times;</button>
+        </div>
+
+        <div class="modal-body" style="padding: 0; background: var(--surface); min-height: 400px;">
+            <div class="table-container" style="max-height: 550px; overflow-y: auto; border-radius: 0;">
+                <table class="stock-log-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 180px;">Fecha y Hora</th>
+                            <th style="width: 160px;">Operación</th>
+                            <th style="width: 110px;" class="text-center">Variación</th>
+                            <th style="width: 150px;">Responsable</th>
+                            <th style="width: auto;">Observaciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historialTableBody" class="fs-13">
+                        <!-- JS filler -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="modal-footer" style="padding: 24px 32px; background: var(--surface); border-top: 1px solid var(--border); display: flex; align-items: center;">
+            <button type="button" onclick="cerrarModalHistorial()" class="btn-cancel" style="border: 1px solid var(--border); padding: 12px 24px; border-radius: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                <i class="fa-solid fa-xmark"></i> Cerrar
+            </button>
+        </div>
+    </div>
+</div>
+
 <script>
     // IVA general vigente, calculado en el backend (para que se actualice automáticamente si cambia en tipos_iva)
     const IVA_GENERAL_ACTUAL = <?php echo json_encode($avProductos['ivaGeneral'] ?? 21.00); ?>;
     const TIPOS_IVA = <?php echo json_encode($avProductos['tipos_iva'] ?? []); ?>;
+    const TODOS_LOS_PRODUCTOS = <?php echo json_encode($avProductos['productos'] ?? []); ?>;
+    let componentesPackActivos = [];
+
     /** 
      * Lógica de gestión de productos (JS integrado por ahora)
      */
+
+    function calcularCosteAutomatico() {
+        const inputProveedor = document.getElementById('prodPrecioProveedor');
+        const selIva = document.getElementById('prodIvaTipo');
+        const selProv = document.getElementById('prodProveedor');
+        const inputCoste = document.getElementById('prodPrecioCoste');
+
+        if (!inputProveedor || !selIva || !selProv || !inputCoste) return;
+
+        const precioProv = parseFloat(inputProveedor.value.replace(',', '.')) || 0;
+        const optIva = selIva.options[selIva.selectedIndex];
+        const ivaPerc = parseFloat(optIva.dataset.porcentaje) || 0;
+
+        const optProv = selProv.options[selProv.selectedIndex];
+        const appliesRE = optProv && parseInt(optProv.dataset.re) === 1;
+        const rePerc = appliesRE ? (parseFloat(optIva.dataset.re) || 0) : 0;
+
+        const totalFactor = 1 + (ivaPerc / 100) + (rePerc / 100);
+        const costeFinal = (precioProv * totalFactor).toFixed(2);
+
+        inputCoste.value = costeFinal;
+    }
+
+    function seleccionarProveedor(select) {
+        calcularCosteAutomatico();
+    }
+
+    // --- FUNCIONES GLOBALES DE MODALES ---
 
     function abrirModalProducto(producto = null) {
         const modal = document.getElementById('modalProducto');
         const title = document.getElementById('modalTitle');
         const form = document.getElementById('formProducto');
+
+        // Cerrar cualquier otro modal-overlay antes de abrir este
+        document.querySelectorAll('.modal-overlay-bg').forEach(m => {
+            m.style.display = 'none';
+        });
 
         // Limpiar errores previos
         document.querySelectorAll('.form-error').forEach(el => el.innerText = '');
@@ -538,17 +792,20 @@
             document.getElementById('prodNombre').value = producto.nombre;
             document.getElementById('prodDesc').value = producto.descripcion || '';
             document.getElementById('prodCat').value = producto.categoria;
+            document.getElementById('prodProveedor').value = producto.id_proveedor || '';
+            document.getElementById('prodGarantia').value = producto.meses_garantia || '24';
 
             // Seleccionar el tipo de IVA actual del producto en el select
             const selIva = document.getElementById('prodIvaTipo');
             if (selIva) {
                 selIva.value = producto.codigo_iva || 'GENERAL';
             }
-            document.getElementById('prodGarantia').value = producto.meses_garantia || '24';
+            document.getElementById('prodPrecioProveedor').value = producto.precio_proveedor || '0.00';
             document.getElementById('prodPrecioCoste').value = producto.precio_coste || '0.00';
             document.getElementById('prodPrecioVenta').value = producto.precio || '0.00';
             document.getElementById('prodStock').value = producto.stock;
             document.getElementById('prodStockMin').value = producto.stock_minimo || '0';
+
 
             // Deshabilitar edición manual de coste y stock (gestionado por Entradas)
             document.getElementById('prodPrecioCoste').readOnly = true;
@@ -590,8 +847,8 @@
                 }
             }
 
-            document.getElementById('sectionNS').classList.remove('d-none');
-            cargarNS(producto.id);
+
+            cargarVariantesFisicas(producto.id);
 
             // Mostrar preview
             const preview = document.getElementById('imgPreview');
@@ -604,19 +861,23 @@
             title.innerText = 'Nuevo Producto';
             form.reset();
             document.getElementById('prodId').value = '';
+            document.getElementById('prodProveedor').value = '';
             document.getElementById('imgPreview').innerHTML = '<i class="fa-solid fa-image"></i>';
-            document.getElementById('sectionNS').classList.add('d-none');
-            document.getElementById('variantesContainer').innerHTML = '';
-            document.getElementById('prodVariantes').value = '';
 
+
+            document.getElementById('sectionVariantesFisicas').classList.add('d-none');
+            document.getElementById('variantesContainer').innerHTML = '';
             document.getElementById('atributosContainer').innerHTML = '';
             document.getElementById('prodAtributos').value = '';
+            document.getElementById('prodVariantes').value = '';
 
             // Habilitar campos si es producto nuevo
-            document.getElementById('prodPrecioCoste').readOnly = false;
+            document.getElementById('prodPrecioProveedor').value = '0.00';
+            document.getElementById('prodPrecioCoste').readOnly = true;
             document.getElementById('prodStock').readOnly = false;
-            document.getElementById('prodPrecioCoste').style.opacity = '1';
+            document.getElementById('prodPrecioCoste').style.opacity = '0.7';
             document.getElementById('prodStock').style.opacity = '1';
+
 
             // Nuevo producto: usar IVA general vigente como valor por defecto
             const selIva = document.getElementById('prodIvaTipo');
@@ -625,6 +886,104 @@
 
         modal.style.display = 'flex';
     }
+
+    function cerrarModalProducto() {
+        document.getElementById('modalProducto').style.display = 'none';
+        document.querySelectorAll('.form-error').forEach(el => el.innerText = '');
+    }
+
+    function abrirModalPack(pack = null) {
+        const modal = document.getElementById('modalPack');
+        const title = document.getElementById('modalPackTitle');
+        const form = document.getElementById('formPack');
+
+        if (!modal || !title || !form) return;
+
+        // Cerrar cualquier otro modal-overlay antes de abrir este
+        document.querySelectorAll('.modal-overlay-bg').forEach(m => {
+            m.style.display = 'none';
+        });
+
+        form.reset();
+        document.querySelectorAll('.form-error').forEach(e => e.textContent = '');
+        componentesPackActivos = [];
+
+        if (pack) {
+            title.textContent = 'Editar Pack: ' + pack.nombre;
+            document.getElementById('packId').value = pack.id;
+            document.getElementById('packNombre').value = pack.nombre;
+            document.getElementById('packCodigo').value = pack.codigo || '';
+            document.getElementById('packPrecioVenta').value = pack.precio;
+            document.getElementById('packCat').value = pack.categoria;
+            document.getElementById('packIcono').value = pack.icono || '';
+
+            // Cargar componentes guardados
+            componentesPackActivos = pack.componentes_pack ? [...pack.componentes_pack] : [];
+
+            // Buscar IVA actual del producto
+            let codigoIva = 'GENERAL';
+            for (const [key, t] of Object.entries(TIPOS_IVA)) {
+                if (parseFloat(t.porcentaje) === parseFloat(pack.iva_aplicado)) {
+                    codigoIva = key;
+                    break;
+                }
+            }
+            if (document.getElementById('packIvaTipo')) {
+                document.getElementById('packIvaTipo').value = codigoIva;
+            }
+
+            // Preview imagen
+            const preview = document.getElementById('imgPreviewPack');
+            if (pack.icono && pack.icono.startsWith('data:image')) {
+                preview.innerHTML = `<img src="${pack.icono}" style="width:100%; height:100%; object-fit:contain; border-radius:8px;">`;
+            } else {
+                preview.innerHTML = `<span class="fs-24">${pack.icono || '<i class="fa-solid fa-boxes-stacked"></i>'}</span>`;
+            }
+        } else {
+            title.textContent = 'Nuevo Pack de Venta';
+            document.getElementById('packId').value = '';
+            document.getElementById('packIcono').value = '';
+            document.getElementById('imgPreviewPack').innerHTML = `<i class="fa-solid fa-boxes-stacked fs-32 opacity-20"></i>`;
+
+            const selIva = document.getElementById('packIvaTipo');
+            if (selIva) selIva.value = 'GENERAL';
+        }
+
+        renderComponentesPack();
+        modal.classList.remove('d-none');
+        modal.style.display = 'flex';
+    }
+
+    function cerrarModalPack() {
+        const modal = document.getElementById('modalPack');
+        if (modal) {
+            modal.classList.add('d-none');
+            modal.style.display = 'none';
+        }
+    }
+
+    function abrirModalGestionCategorias() {
+        const modal = document.getElementById('modalCategorias');
+        if (!modal) return;
+
+        // Cerrar cualquier otro modal-overlay antes de abrir este
+        document.querySelectorAll('.modal-overlay-bg').forEach(m => {
+            m.style.display = 'none';
+        });
+
+        modal.classList.remove('d-none');
+        modal.style.display = 'flex';
+    }
+
+    function cerrarModalCategorias() {
+        const modal = document.getElementById('modalCategorias');
+        if (modal) modal.style.display = 'none';
+        location.reload();
+    }
+
+
+
+
 
     function añadirVarianteUI(label = null, value = null) {
         const l = label || document.getElementById('nuevaVarianteLabel').value.trim();
@@ -699,21 +1058,9 @@
         document.getElementById('prodAtributos').value = atributos.length ? JSON.stringify(atributos) : '';
     }
 
-    function cargarNS(idProd) {
-        // TODO: Implementar la carga de números de serie
-        // Por ahora, solo actualizamos el texto de ejemplo
-        const nsList = document.getElementById('nsList');
-        if (idProd) {
-            nsList.innerText = `Cargando números de serie para producto ${idProd}...`;
-            // Aquí iría la llamada a la API para obtener los NS
-        } else {
-            nsList.innerText = 'No hay números de serie asociados.';
-        }
-    }
 
-    function abrirModalNS() {
-        alert('Funcionalidad de gestión de números de serie no implementada aún.');
-    }
+
+
 
     function previewImage(input) {
         if (input.files && input.files[0]) {
@@ -726,9 +1073,62 @@
         }
     }
 
-    function cerrarModalProducto() {
-        document.getElementById('modalProducto').style.display = 'none';
-        document.querySelectorAll('.form-error').forEach(el => el.innerText = '');
+
+
+    async function cargarVariantesFisicas(idProd) {
+        const container = document.getElementById('sectionVariantesFisicas');
+        const body = document.getElementById('listaVariantesBody');
+        body.innerHTML = '<tr><td colspan="6" class="p-12 text-center text-muted">Cargando variantes...</td></tr>';
+
+        try {
+            const resp = await fetch(`api/gestionVariante.php?accion=listar&id_producto=${idProd}`);
+            const data = await resp.json();
+
+            if (data.ok && data.lista.length > 0) {
+                container.classList.remove('d-none');
+                body.innerHTML = '';
+                data.lista.forEach(v => {
+                    const tr = document.createElement('tr');
+                    tr.className = 'border-bottom-1';
+                    tr.innerHTML = `
+                        <td class="p-8">${v.nombre}</td>
+                        <td class="p-8"><input type="text" class="form-input fs-11 p-4 w-100 var-sku" value="${v.sku}" data-id="${v.id}"></td>
+                        <td class="p-8"><input type="number" class="form-input fs-11 p-4 w-100 text-center var-stock" value="${v.stock_actual}" data-id="${v.id}" oninput="sincronizarStockTotal()"></td>
+                        <td class="p-8"><input type="number" class="form-input fs-11 p-4 w-100 text-right var-precio" value="${v.precio_venta || ''}" placeholder="Base" step="0.01" data-id="${v.id}"></td>
+                        <td class="p-8 text-center"><input type="checkbox" class="var-activo" ${parseInt(v.activo) ? 'checked' : ''} data-id="${v.id}"></td>
+                        <td class="p-8 text-center"></td>
+                    `;
+                    body.appendChild(tr);
+                });
+                sincronizarStockTotal();
+            } else {
+                container.classList.add('d-none');
+            }
+        } catch (e) {
+            console.error(e);
+            body.innerHTML = '<tr><td colspan="6" class="p-12 text-center text-red">Error al cargar variantes</td></tr>';
+        }
+    }
+
+    function sincronizarStockTotal() {
+        const stocks = document.querySelectorAll('.var-stock');
+        let total = 0;
+        let tieneVariantes = false;
+        stocks.forEach(s => {
+            total += parseInt(s.value || 0);
+            tieneVariantes = true;
+        });
+
+        if (tieneVariantes) {
+            const inputStock = document.getElementById('prodStock');
+            inputStock.value = total;
+            inputStock.readOnly = true;
+            inputStock.style.opacity = '0.7';
+            inputStock.title = "El stock total se calcula sumando las variantes";
+        } else {
+            document.getElementById('prodStock').readOnly = false;
+            document.getElementById('prodStock').style.opacity = '1';
+        }
     }
 
     document.getElementById('formProducto').onsubmit = async (e) => {
@@ -745,6 +1145,22 @@
         const tipoIva = TIPOS_IVA.find(t => t.codigo === codigoIva);
         const ivaValor = tipoIva ? tipoIva.porcentaje : IVA_GENERAL_ACTUAL;
 
+        // Recoger variantes físicas si existen
+        const listaVariantes = [];
+        const filasVariantes = document.querySelectorAll('#listaVariantesBody tr');
+        filasVariantes.forEach(tr => {
+            const inSku = tr.querySelector('.var-sku');
+            if (!inSku) return;
+
+            listaVariantes.push({
+                id: inSku.dataset.id,
+                sku: inSku.value.trim(),
+                stock_actual: tr.querySelector('.var-stock').value,
+                precio_venta: tr.querySelector('.var-precio').value,
+                activo: tr.querySelector('.var-activo').checked ? 1 : 0
+            });
+        });
+
         // ── Objeto datos completo con todos los campos requeridos ──
         const datos = {
             accion: id ? 'editar' : 'añadir',
@@ -760,10 +1176,18 @@
             precio_venta: document.getElementById('prodPrecioVenta').value,
             stock_actual: document.getElementById('prodStock').value,
             stock_minimo: document.getElementById('prodStockMin').value,
-            requiere_serial: 0, // ── CORRECCIÓN: campo obligatorio para ProductoPDO
-            variantes: document.getElementById('prodVariantes').value || null, // ── CORRECCIÓN: campo obligatorio para ProductoPDO
+            requiere_serial: 0,
+            variantes: document.getElementById('prodVariantes').value || null,
             atributos: document.getElementById('prodAtributos').value || null,
             codigo_iva: codigoIva,
+            precio_proveedor: document.getElementById('prodPrecioProveedor').value,
+            id_proveedor: document.getElementById('prodProveedor').value || null,
+            aplica_re: document.getElementById('prodAplicaRE').checked ? 1 : 0,
+            es_pack: 0,
+
+            componentes_pack: null,
+
+            variantes_fisicas: listaVariantes.length > 0 ? listaVariantes : null
         };
 
         try {
@@ -784,6 +1208,7 @@
                     const map = {
                         'referencia': 'err-referencia',
                         'nombre': 'err-nombre',
+                        'precio_proveedor': 'err-precio_proveedor',
                         'precio_coste': 'err-precio_coste',
                         'precio_venta': 'err-precio_venta',
                         'iva': 'err-iva',
@@ -791,6 +1216,7 @@
                         'stock_minimo': 'err-stock_minimo',
                         'meses_garantia': 'err-meses_garantia'
                     };
+
                     for (const [key, msg] of Object.entries(r.aErrores)) {
                         const errId = map[key] || ('err-' + key);
                         const errEl = document.getElementById(errId);
@@ -958,14 +1384,9 @@
         tbody.appendChild(noRes);
     }
 
-    // NS Logic
-    function abrirModalNS() {
-        document.getElementById('modalNS').style.display = 'flex';
-    }
 
-    function cerrarModalNS() {
-        document.getElementById('modalNS').style.display = 'none';
-    }
+
+
 
     async function cargarNS(idProd) {
         const listDiv = document.getElementById('nsList');
@@ -1064,10 +1485,251 @@
         }
     }
 
+    // --- TABS LOGIC ---
+    function switchTab(tabId) {
+        // Pestañas
+        const btnProd = document.getElementById('btnTabProductos');
+        const btnPacks = document.getElementById('btnTabPacks');
+        const contentProd = document.getElementById('tabContentProductos');
+        const contentPacks = document.getElementById('tabContentPacks');
+
+        // Botones de acción y filtros
+        const btnNuevoProd = document.getElementById('btnNuevoProducto');
+        const btnNuevoPack = document.getElementById('btnNuevoPack');
+        const filtersPrecios = document.getElementById('filtersPrecios');
+
+        if (tabId === 'productos') {
+            btnProd.classList.add('active');
+            btnPacks.classList.remove('active');
+
+            contentProd.classList.add('active');
+            contentProd.classList.remove('d-none');
+            contentPacks.classList.add('d-none');
+            contentPacks.classList.remove('active');
+
+            btnNuevoProd.classList.remove('d-none');
+            btnNuevoPack.classList.add('d-none');
+            filtersPrecios.classList.remove('d-none');
+        } else {
+            btnPacks.classList.add('active');
+            btnProd.classList.remove('active');
+
+            contentPacks.classList.add('active');
+            contentPacks.classList.remove('d-none');
+            contentProd.classList.add('d-none');
+            contentProd.classList.remove('active');
+
+            btnNuevoPack.classList.remove('d-none');
+            btnNuevoProd.classList.add('d-none');
+            filtersPrecios.classList.add('d-none');
+        }
+    }
+
+    // --- PACKS LOGIC ---
+
+
+
+
+    function previewImagePack(input) {
+        if (input.files && input.files[0]) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('packIcono').value = e.target.result;
+                document.getElementById('imgPreviewPack').innerHTML = `<img src="${e.target.result}" style="width:100%; height:100%; object-fit:contain; border-radius:8px;">`;
+            }
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+
+
+    function buscarProductoParaPack(query) {
+        const resCont = document.getElementById('packSearchResults');
+        query = query.trim().toLowerCase();
+        if (query.length < 2) {
+            resCont.style.display = 'none';
+            return;
+        }
+
+        const idEnEdicion = parseInt(document.getElementById('packId').value) || 0;
+        const yaAñadidos = componentesPackActivos.map(c => parseInt(c.id_producto || c.id));
+
+        const filtrados = TODOS_LOS_PRODUCTOS.filter(p => {
+            if (p.id === idEnEdicion) return false; // Not itself
+            if (p.es_pack) return false; // Pack of packs not supported yet
+            if (yaAñadidos.includes(p.id)) return false; // Already added
+
+            return p.nombre.toLowerCase().includes(query) || (p.codigo && p.codigo.toLowerCase().includes(query));
+        }).slice(0, 8); // top 8
+
+        resCont.innerHTML = '';
+        if (filtrados.length === 0) {
+            resCont.innerHTML = '<div class="p-16 text-muted fs-12 text-center"><i class="fa-solid fa-circle-info mr-8"></i> No hay coincidencias</div>';
+        } else {
+            filtrados.forEach(p => {
+                const div = document.createElement('div');
+                div.className = 'search-result-item';
+                div.innerHTML = `
+                    <div class="d-flex ai-center gap-12 full-width">
+                        <div class="result-icon"><i class="fa-solid fa-box fs-14"></i></div>
+                        <div class="flex-1 overflow-hidden">
+                            <div class="result-title text-ellipsis">${p.nombre}</div>
+                            <div class="result-meta font-mono">${p.codigo || 'S/R'}</div>
+                        </div>
+                        <div class="result-price">${(parseFloat(p.precio)).toFixed(2)}€</div>
+                    </div>
+                `;
+                div.onclick = () => {
+                    añadirComponente(p);
+                    document.getElementById('packSearchInput').value = '';
+                    resCont.style.display = 'none';
+                };
+                resCont.appendChild(div);
+            });
+        }
+        resCont.style.display = 'block';
+    }
+
+    // Hide search results when click outside
+    document.addEventListener('click', (e) => {
+        if (e.target.id !== 'packSearchInput') {
+            const sr = document.getElementById('packSearchResults');
+            if (sr) sr.style.display = 'none';
+        }
+    });
+
+    function añadirComponente(prod) {
+        componentesPackActivos.push({
+            id_producto: prod.id,
+            id: prod.id, // For compatibility
+            nombre: prod.nombre,
+            referencia: prod.codigo,
+            cantidad: 1
+        });
+        renderComponentesPack();
+    }
+
+    function removerComponentePack(id) {
+        componentesPackActivos = componentesPackActivos.filter(c => c.id_producto != id && c.id != id);
+        renderComponentesPack();
+    }
+
+    function actualizarCantidadComponente(id, input) {
+        let val = parseInt(input.value) || 1;
+        if (val < 1) val = 1;
+        input.value = val;
+
+        const c = componentesPackActivos.find(c => c.id_producto == id || c.id == id);
+        if (c) c.cantidad = val;
+    }
+
+    function renderComponentesPack() {
+        const body = document.getElementById('listaComponentesBody');
+        body.innerHTML = '';
+
+        if (componentesPackActivos.length === 0) {
+            body.innerHTML = `
+                <tr>
+                    <td colspan="4" class="p-32 text-center text-muted">
+                        <div class="opacity-40 mb-12"><i class="fa-solid fa-boxes-stacked fs-32"></i></div>
+                        <div class="fs-13 font-bold">Aún no hay componentes</div>
+                        <div class="fs-11">Usa el buscador superior para añadir productos al pack</div>
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        componentesPackActivos.forEach(c => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="p-8 text-muted font-mono">${c.referencia || ''}</td>
+                <td class="p-8 font-bold">${c.nombre || ''}</td>
+                <td class="p-8 text-center" style="width: 80px;">
+                    <input type="number" min="1" class="form-input text-center p-4 fs-12 full-width input-qty-mini" value="${c.cantidad}" onchange="actualizarCantidadComponente(${c.id_producto || c.id}, this)">
+                </td>
+                <td class="p-8 text-center">
+                    <button type="button" class="btn-icon text-red" onclick="removerComponentePack(${c.id_producto || c.id})">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </td>
+            `;
+            body.appendChild(tr);
+        });
+    }
+
     document.getElementById('prodSearch').addEventListener('input', applyFilters);
     document.getElementById('filterCat').addEventListener('change', applyFilters);
     document.getElementById('filterEstado').addEventListener('change', applyFilters);
-    document.getElementById('sortOrder').addEventListener('change', applySort);
+
+    // Guardar Pack Form Submit Listener
+    document.getElementById('formPack').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        if (componentesPackActivos.length === 0) {
+            alert("Un pack debe tener al menos un componente.");
+            return;
+        }
+
+        const btn = document.getElementById('btnGuardarPack');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Guardando...';
+
+        const id = document.getElementById('packId').value || null;
+        const codIva = document.getElementById('packIvaTipo').value;
+        const listaIvas = Array.isArray(TIPOS_IVA) ? TIPOS_IVA : Object.values(TIPOS_IVA);
+        const tipoIva = listaIvas.find(t => t.codigo === codIva);
+        const ivaPerc = tipoIva ? tipoIva.porcentaje : 21.00;
+
+        const payload = {
+            accion: id ? 'editar' : 'añadir',
+            id: id,
+            nombre: document.getElementById('packNombre').value,
+            referencia: document.getElementById('packCodigo').value.trim() || null,
+            icono: document.getElementById('packIcono').value || '',
+            categoria: document.getElementById('packCat').value,
+            precio_coste: 0,
+            precio_venta: document.getElementById('packPrecioVenta').value,
+            iva: ivaPerc,
+            codigo_iva: codIva,
+            stock_actual: 0,
+            stock_minimo: 0,
+            meses_garantia: 24,
+            descripcion: 'Pack de productos',
+            es_pack: 1,
+            componentes_pack: componentesPackActivos
+        };
+
+        try {
+            const resp = await fetch('api/gestionProducto.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+            const data = await resp.json();
+
+            if (data.ok) {
+                cerrarModalPack();
+                location.reload();
+            } else {
+                let msg = data.error || 'Error desconocido';
+                if (data.aErrores) {
+                    const errorList = Object.entries(data.aErrores)
+                        .filter(([k, v]) => v !== null && v !== '')
+                        .map(([k, v]) => `- ${k}: ${v}`)
+                        .join('\n');
+                    if (errorList) msg += '\n\nDetalles:\n' + errorList;
+                }
+                alert('Error al guardar el pack:\n' + msg);
+            }
+        } catch (err) {
+            alert('Error de conexión al servidor al guardar el pack.');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = 'Guardar Pack';
+        }
+    });
 
     // ── IMPORT / EXPORT ────────────────────────────────────────────────────────
     function toggleExportDropdown() {
@@ -1148,14 +1810,9 @@
     }
 
     // --- GESTIÓN DE CATEGORÍAS ---
-    function abrirModalGestionCategorias() {
-        document.getElementById('modalCategorias').style.display = 'flex';
-    }
 
-    function cerrarModalCategorias() {
-        document.getElementById('modalCategorias').style.display = 'none';
-        location.reload(); // Recargar para ver cambios en los selects
-    }
+
+
 
     async function añadirCategoria() {
         const nombre = document.getElementById('newCatNombre').value.trim();
@@ -1215,10 +1872,191 @@
             console.error(e);
         }
     }
+
+    // --- HISTORIAL DE STOCK ---
+    async function abrirModalHistorial(id, nombre) {
+        const modal = document.getElementById('modalHistorialStock');
+        const title = document.getElementById('historialTitle');
+        const subtitle = document.getElementById('historialSubtitle');
+        const body = document.getElementById('historialTableBody');
+
+        title.innerText = "Historial: " + nombre;
+        subtitle.innerText = "Cargando movimientos...";
+        body.innerHTML = '<tr><td colspan="5" class="text-center p-24 opacity-50">Consultando base de datos...</td></tr>';
+
+        modal.classList.remove('d-none');
+        modal.style.display = 'flex';
+
+        try {
+            const resp = await fetch(`api/obtenerHistorialStock.php?id=${id}`);
+            const data = await resp.json();
+
+            if (data.ok) {
+                subtitle.innerText = `${data.historial.length} movimientos registrados`;
+                if (data.historial.length === 0) {
+                    body.innerHTML = `
+                        <tr>
+                            <td colspan="5">
+                                <div class="empty-log-container">
+                                    <div class="empty-log-icon"><i class="fa-solid fa-ghost"></i></div>
+                                    <div class="fs-18 font-bold mb-8" style="color: var(--text);">Sin movimientos</div>
+                                    <div class="fs-14 opacity-60">No hay registros de cambios de stock para este producto.</div>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                } else {
+                    body.innerHTML = data.historial.map(m => `
+                        <tr class="hover-bg-surface2 transition">
+                            <td class="font-mono fs-12">
+                                <span class="text-muted">${new Date(m.fecha).toLocaleDateString()}</span><br>
+                                <span class="font-bold">${new Date(m.fecha).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                            </td>
+                            <td>
+                                <div class="d-flex ai-center gap-10">
+                                    <div class="p-8 br-8 ${getTipoMovClase(m.tipo_movimiento)} d-flex ai-center jc-center" style="width:32px; height:32px; flex-shrink:0;">
+                                        <i class="fa-solid ${getTipoMovIcono(m.tipo_movimiento)} fs-13"></i>
+                                    </div>
+                                    <span class="tt-uppercase font-bold fs-10" style="letter-spacing: 0.05em;">${m.tipo_movimiento}</span>
+                                </div>
+                            </td>
+                            <td class="text-center">
+                                <div class="p-6-10 br-10 font-mono font-bold fs-14 ${m.cantidad > 0 ? 'bg-green-soft text-green' : 'text-red bg-red-soft'}">
+                                    ${m.cantidad > 0 ? '+' : ''}${m.cantidad}
+                                </div>
+                            </td>
+                            <td>
+                                <div class="d-flex ai-center gap-10">
+                                    <div class="bg-surface2 br-circle d-flex ai-center jc-center fs-10 font-bold" style="width:28px; height:28px; border:1px solid var(--border); flex-shrink:0;">
+                                        ${(m.nombre_usuario || 'S').charAt(0).toUpperCase()}
+                                    </div>
+                                    <span class="opacity-90 fs-12">${m.nombre_usuario || 'Sistema'}</span>
+                                </div>
+                            </td>
+                            <td class="fs-12 italic opacity-70">${m.notas || '<span class="opacity-30">Sin notas</span>'}</td>
+                        </tr>
+                    `).join('');
+                }
+            } else {
+                body.innerHTML = `<tr><td colspan="5" class="text-center p-48 text-red font-bold">Error: ${data.error}</td></tr>`;
+            }
+        } catch (e) {
+            body.innerHTML = '<tr><td colspan="5" class="text-center p-24 text-red">Error de red</td></tr>';
+        }
+    }
+
+    function getTipoMovClase(tipo) {
+        switch (tipo) {
+            case 'inicial':
+                return 'bg-accent-soft text-accent';
+            case 'compra':
+                return 'bg-green-soft text-green';
+            case 'venta':
+                return 'bg-red-soft text-red';
+            case 'devolucion':
+                return 'bg-yellow-soft text-yellow';
+            case 'ajuste':
+                return 'bg-surface2 text-muted';
+            default:
+                return 'bg-surface2 text-muted';
+        }
+    }
+
+    function getTipoMovIcono(tipo) {
+        switch (tipo) {
+            case 'inicial':
+                return 'fa-star';
+            case 'compra':
+                return 'fa-truck-ramp-box';
+            case 'venta':
+                return 'fa-hand-holding-dollar';
+            case 'devolucion':
+                return 'fa-rotate-left';
+            case 'ajuste':
+                return 'fa-wrench';
+            default:
+                return 'fa-circle-info';
+        }
+    }
+
+    function cerrarModalHistorial() {
+        document.getElementById('modalHistorialStock').style.display = 'none';
+    }
+
+
+    // --- PEDIDO AUTOMÁTICO ---
+    async function generarPedidoAutomatico() {
+        if (!confirm("Se generarán pedidos de compra (albaranes pendientes) para todos los productos que estén por debajo de su stock mínimo. \n\n¿Deseas continuar?")) return;
+
+        showNotification("<i class='fa-solid fa-spinner fa-spin'></i> Calculando pedido...", 'info');
+
+        try {
+            const resp = await fetch('api/generarPedidoAuto.php');
+            const data = await resp.json();
+
+            if (data.ok) {
+                if (data.pedidos > 0) {
+                    showNotification(` < i class = 'fa-solid fa-circle-check' > < /i> ${data.mensaje}`, 'success');
+                    setTimeout(() => {
+                        if (confirm("¿Deseas ir a la sección de compras para revisar los pedidos generados?")) {
+                            location.href = 'index.php?irAlbaranes=1'; // Asumiendo que esta es la página de albaranes de compra
+                        }
+                    }, 2000);
+                } else {
+                    showNotification("<i class='fa-solid fa-circle-info'></i> " + data.mensaje, 'info');
+                }
+            } else {
+                showNotification("<i class='fa-solid fa-circle-xmark'></i> Error: " + data.error, 'error');
+            }
+        } catch (e) {
+            showNotification("<i class='fa-solid fa-circle-xmark'></i> Error de conexión", 'error');
+        }
+    }
+
+    // Actualizar applyFilters para el filtro Bajo Stock
+    const applyFiltersOriginal = window.applyFilters;
+    window.applyFilters = function() {
+        const query = document.getElementById('prodSearch').value.toLowerCase();
+        const cat = document.getElementById('filterCat').value;
+        const estado = document.getElementById('filterEstado').value;
+        const pMin = parseFloat(document.getElementById('filterPriceMin').value) || 0;
+        const pMax = parseFloat(document.getElementById('filterPriceMax').value) || 9999999;
+
+        const rows = document.querySelectorAll('.product-row');
+        let visibles = 0;
+
+        rows.forEach(row => {
+            const nombre = row.dataset.nombre || '';
+            const codigo = row.dataset.codigo || '';
+            const categoria = row.dataset.categoria || '';
+            const precio = parseFloat(row.dataset.price || row.dataset.precio) || 0;
+            const activo = row.dataset.activo || '1';
+            const stock = parseInt(row.dataset.stock) || 0;
+            const stockMin = parseInt(row.dataset.stockMinimo) || 0;
+
+            let match = true;
+
+            if (query && !nombre.includes(query) && !codigo.includes(query)) match = false;
+            if (cat !== 'all' && categoria !== cat) match = false;
+
+            if (estado === 'bajo_stock') {
+                if (stock > stockMin) match = false;
+            } else if (estado !== 'all' && activo !== estado) match = false;
+
+            if (precio < pMin || precio > pMax) match = false;
+
+            row.style.display = match ? 'table-row' : 'none';
+            if (match) visibles++;
+        });
+
+        // Toggle empty states
+        const noRes = document.getElementById('noResults');
+        if (noRes) noRes.classList.toggle('d-none', visibles > 0 || document.getElementById('btnTabPacks').classList.contains('active'));
+    };
 </script>
 
 <!-- MODAL GESTIÓN CATEGORÍAS -->
-<div id="modalCategorias" class="modal-overlay-bg" style="z-index: 1200;">
+<div id="modalCategorias" class="modal-overlay-bg">
     <div class="modal-content" style="max-width: 500px; padding: 0; overflow: hidden;">
         <div class="modal-header p-20 bg-surface2 border-bottom">
             <h2 class="m-0 fs-18">Gestionar Categorías</h2>

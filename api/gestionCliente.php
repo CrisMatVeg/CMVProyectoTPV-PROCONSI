@@ -1,4 +1,5 @@
 <?php
+
 /**
  * API: gestionCliente.php
  * - Desde TPV: buscar / registrar socio rápido (acciones "buscar" / "registrar")
@@ -39,7 +40,7 @@ try {
                     'id'       => (int)$cli['id'],
                     'nombre'   => $cli['nombre'],
                     'nif'      => $cli['nif'],
-                    'es_socio' => (int)$cli['es_socio'] === 1,
+                    'rol'      => $cli['rol'] ?? 'general',
                 ],
             ]);
         } else {
@@ -51,26 +52,30 @@ try {
     if ($accion === 'registrar') {
         $nombre = trim($input['nombre'] ?? '');
         $nif    = trim($input['nif'] ?? '');
+        $tipo   = $input['tipo'] ?? 'particular';
+        $rol    = $input['rol'] ?? 'general';
+
         if ($nombre === '' || $nif === '') {
-            throw new Exception('Nombre y NIF son obligatorios para registrar un socio');
+            throw new Exception('Nombre y NIF son obligatorios para registrar un cliente');
         }
 
-        // Si ya existe un cliente con ese NIF lo reutilizamos y lo marcamos como socio
+        // Si ya existe un cliente con ese NIF lo reutilizamos y actualizamos datos básicos
         $cli = ClientePDO::obtenerPorNif($nif);
         if ($cli) {
             $cli['nombre']   = $nombre;
-            $cli['es_socio'] = 1;
+            $cli['tipo']     = $tipo;
+            $cli['rol']      = $rol;
             ClientePDO::actualizar((int)$cli['id'], $cli);
             $nuevoId = (int)$cli['id'];
         } else {
             $nuevoId = ClientePDO::crear([
-                'tipo'      => 'particular',
+                'tipo'      => $tipo,
+                'rol'       => $rol,
                 'nombre'    => $nombre,
                 'apellidos' => '',
                 'nif'       => $nif,
                 'email'     => null,
                 'telefono'  => null,
-                'es_socio'  => 1,
             ]);
         }
 
@@ -85,12 +90,12 @@ try {
         }
         $tipoFiltro = $input['tipo'] ?? null;
 
-        $sql = "SELECT id, tipo, nombre, apellidos, nif, es_socio 
+        $sql = "SELECT id, tipo, rol, nombre, apellidos, nif 
                 FROM clientes 
-                WHERE (fecha_baja IS NULL OR fecha_baja IS NULL)";
+                WHERE (fecha_baja IS NULL)";
         $params = [];
 
-        if (in_array($tipoFiltro, ['particular','empresa'], true)) {
+        if (in_array($tipoFiltro, ['particular', 'empresa'], true)) {
             $sql .= " AND tipo = :tipo";
             $params[':tipo'] = $tipoFiltro;
         }
@@ -114,6 +119,26 @@ try {
         exit;
     }
 
+    if ($accion === 'historial') {
+        $id = isset($input['id']) ? (int)$input['id'] : null;
+        if (!$id) throw new Exception('ID obligatorio para el historial');
+
+        require_once __DIR__ . '/../model/VentaPDO.php';
+        $ventas = VentaPDO::obtenerVentasPorCliente($id);
+
+        // Enhance with detailed payment history if needed, but basic info is enough for the overview table.
+        echo json_encode(['ok' => true, 'ventas' => $ventas]);
+        exit;
+    }
+
+    if ($accion === 'eliminar') {
+        $id = isset($input['id']) ? (int)$input['id'] : null;
+        if (!$id) throw new Exception('ID obligatorio para eliminar');
+        ClientePDO::marcarBaja($id);
+        echo json_encode(['ok' => true]);
+        exit;
+    }
+
     $id   = isset($input['id']) && $input['id'] !== '' ? (int)$input['id'] : null;
     $tipo = $input['tipo'] ?? 'particular';
     $nombre = trim($input['nombre'] ?? '');
@@ -124,6 +149,7 @@ try {
 
     $data = [
         'tipo'      => $tipo,
+        'rol'       => $input['rol'] ?? 'general',
         'nombre'    => $nombre,
         'apellidos' => $input['apellidos'] ?? '',
         'nif'       => $input['nif'] ?? null,
@@ -133,7 +159,6 @@ try {
         'cp'        => $input['cp'] ?? null,
         'poblacion' => $input['poblacion'] ?? null,
         'provincia' => $input['provincia'] ?? null,
-        'es_socio'  => !empty($input['es_socio']) ? 1 : 0,
         'notas'     => $input['notas'] ?? null,
     ];
 

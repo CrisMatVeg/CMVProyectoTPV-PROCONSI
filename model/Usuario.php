@@ -74,7 +74,7 @@ class Usuario
         if ($this->rol === 'admin') return true;
 
         if (!isset($_SESSION['permisos_usuario'])) {
-            require_once 'model/RolPDO.php';
+            require_once __DIR__ . '/RolPDO.php';
             $_SESSION['permisos_usuario'] = RolPDO::obtenerPermisosRol($this->idRol);
         }
 
@@ -89,6 +89,10 @@ class Usuario
     public function setRol($rol)
     {
         $this->rol = $rol;
+    }
+    public function setNombreCompleto($nombre)
+    {
+        $this->nombre = $nombre;
     }
     public function setIdRol($id)
     {

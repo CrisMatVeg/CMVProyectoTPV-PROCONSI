@@ -71,9 +71,13 @@ if (!function_exists('calcularResumenCaja')) {
 }
 
 // 2. Obtener datos base
-$ventasHoy = VentaPDO::obtenerVentasHoy();
-$resumen = calcularResumenCaja($ventasHoy);
 $turnoActual = CajaTurnoPDO::obtenerTurnoAbierto();
+if ($turnoActual) {
+    $ventasHoy = VentaPDO::obtenerVentasPorTurno((int)$turnoActual['id']);
+} else {
+    $ventasHoy = VentaPDO::obtenerVentasHoy();
+}
+$resumen = calcularResumenCaja($ventasHoy);
 
 // 3. Procesar acciones de apertura y retiradas
 if (isset($_POST['abrirCaja']) && !$turnoActual) {
@@ -101,40 +105,13 @@ $fondoInicial = $turnoActual ? (float)$turnoActual['fondo_inicial'] : 0.0;
 $totalRetirado = $turnoActual ? (float)$turnoActual['total_retirado'] : 0.0;
 $esperadoEfectivoTurno = max(0, $fondoInicial + $resumen['totalEfectivo'] - $totalRetirado);
 
-// 5. Procesar Cierre Definitivo
-if (isset($_POST['doCierre'])) {
-    $totalEfectivo = (float)($resumen['totalEfectivo'] ?? 0);
-    $totalTarjeta  = (float)($resumen['totalTarjeta'] ?? 0);
-    $totalBizum    = (float)($resumen['totalBizum'] ?? 0);
-    $totalFinan    = (float)($resumen['totalFinanciado'] ?? 0);
-    $totalGeneral  = (float)($resumen['totalBruto'] ?? 0);
-
-    // Registrar el cierre fiscal
-    $idZ = CierreFiscalPDO::realizarCierre(
-        $_SESSION['usuarioActualTPV']->getId(),
-        $totalEfectivo,
-        $totalTarjeta,
-        $totalBizum,
-        $totalFinan,
-        $totalGeneral
-    );
-
-    // Registrar deuda si hay descuadre negativo
-    $realEfectivoForm = max(0, (float)($_POST['realEfectivo'] ?? 0));
-    $diferencia = $realEfectivoForm - $esperadoEfectivoTurno;
-
-    if ($diferencia < -0.009) {
-        CajaDeudaPDO::crearDeuda(
-            $idZ,
-            $_SESSION['usuarioActualTPV']->getId(),
-            abs($diferencia),
-            'Faltante de caja detectado en cierre'
-        );
-    }
-
-    // Cerrar turno de caja
+// 5. Procesar CIERRES
+// A. Cierre de Turno (Solo el turno actual)
+if (isset($_POST['doCierreTurno'])) {
     if ($turnoActual) {
+        $realEfectivoForm = max(0, (float)($_POST['realEfectivo'] ?? 0));
         $fondoSiguiente = max(0, (float)($_POST['fondoSiguiente'] ?? 0));
+
         CajaTurnoPDO::cerrarTurno(
             (int)$turnoActual['id'],
             $_SESSION['usuarioActualTPV']->getId(),
@@ -142,9 +119,49 @@ if (isset($_POST['doCierre'])) {
             $fondoSiguiente
         );
         $turnoActual = null;
+        $mensajeExito = "Turno de caja cerrado correctamente.";
     }
+}
 
-    $mensajeExito = "Cierre de caja registrado correctamente. Reporte Z generado.";
+// B. Cierre de Caja (Cierre definitivo de la jornada fiscal)
+if (isset($_POST['doCierreZ'])) {
+    $resumenZ = CierreFiscalPDO::obtenerResumenParaCierre();
+
+    if ($resumenZ['total_general'] > 0 || $turnoActual) {
+        $totalEfectivo = (float)($resumenZ['total_efectivo'] ?? 0);
+        $totalTarjeta  = (float)($resumenZ['total_tarjeta'] ?? 0);
+        $totalBizum    = (float)($resumenZ['total_bizum'] ?? 0);
+        $totalFinan    = (float)($resumenZ['total_financiado'] ?? 0);
+        $totalGeneral  = (float)($resumenZ['total_general'] ?? 0);
+
+        // Registrar el cierre fiscal
+        $idZ = CierreFiscalPDO::realizarCierre(
+            $_SESSION['usuarioActualTPV']->getId(),
+            $totalEfectivo,
+            $totalTarjeta,
+            $totalBizum,
+            $totalFinan,
+            $totalGeneral
+        );
+
+        // Si hay un turno abierto, también lo cerramos
+        if ($turnoActual) {
+            $realEfectivoForm = max(0, (float)($_POST['realEfectivo'] ?? 0));
+            $fondoSiguiente = max(0, (float)($_POST['fondoSiguiente'] ?? 0));
+
+            CajaTurnoPDO::cerrarTurno(
+                (int)$turnoActual['id'],
+                $_SESSION['usuarioActualTPV']->getId(),
+                $realEfectivoForm,
+                $fondoSiguiente
+            );
+            $turnoActual = null;
+        }
+
+        $mensajeExito = "Cierre de caja realizado correctamente. Jornada fiscal concluida.";
+    } else {
+        $mensajeError = "No hay ventas pendientes de cierre de caja.";
+    }
 }
 
 $esAdmin = $_SESSION['usuarioActualTPV']->getRol() === 'admin';

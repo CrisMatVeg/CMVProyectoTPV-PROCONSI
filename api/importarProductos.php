@@ -61,10 +61,9 @@ if ($ext === 'json') {
             'stock_minimo'    => $row[8] ?? 0,
             'meses_garantia'  => $row[9] ?? 24,
             'activo'          => $row[10] ?? 1,
-            'requiere_serial' => $row[11] ?? 0,
-            'codigo_iva'      => $row[12] ?? 'GENERAL',
-            'variantes'       => $row[13] ?? null,  // JSON string
-            'icono'           => $row[14] ?? '',    // data:image/...;base64,... o emoji
+            'codigo_iva'      => $row[11] ?? 'GENERAL',
+            'variantes'       => $row[12] ?? null,  // JSON string
+            'icono'           => $row[13] ?? '',    // data:image/...;base64,... o emoji
         ];
     }
     fclose($fh);

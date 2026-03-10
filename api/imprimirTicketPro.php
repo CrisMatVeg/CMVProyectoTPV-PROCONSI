@@ -22,13 +22,8 @@ try {
     $venta = VentaPDO::obtenerVentaPorTicket($numTicket);
     if (!$venta) throw new Exception('Venta no encontrada');
 
-    $empresa = [
-        'nombre' => 'ElectroBazar',
-        'direccion' => 'C/ Tecnología 24, 28001 Madrid',
-        'nif' => 'B87654321',
-        'telefono' => '+34 91 123 45 67',
-        'email' => 'info@electrobazar.es'
-    ];
+    require_once __DIR__ . '/../model/ConfiguracionPDO.php';
+    $appConfig = ConfiguracionPDO::obtenerConfiguracion();
 
     $numeroStr = str_pad($venta['numero_ticket'], 4, '0', STR_PAD_LEFT);
     $fechaStr = date("d/m/Y H:i", strtotime($venta['fecha']));
@@ -69,7 +64,17 @@ try {
             '{{DESCUENTO_AMT}}' => $fmt2($venta['descuento_amt']),
             '{{IVA_AMT}}' => $fmt2($venta['iva_amt']),
             '{{TOTAL}}' => $fmt2($venta['total']),
-            '{{DISPLAY_DESCUENTO}}' => (float)$venta['descuento_amt'] > 0 ? '' : 'display:none;'
+            '{{DISPLAY_DESCUENTO}}' => (float)$venta['descuento_amt'] > 0 ? '' : 'display:none;',
+            '{{EMPRESA_NOMBRE}}' => htmlspecialchars($appConfig['empresa_nombre'] ?? ''),
+            '{{EMPRESA_RAZON_SOCIAL}}' => htmlspecialchars($appConfig['empresa_razon_social'] ?? ''),
+            '{{EMPRESA_NIF}}' => htmlspecialchars($appConfig['empresa_nif'] ?? ''),
+            '{{EMPRESA_DIRECCION}}' => htmlspecialchars($appConfig['empresa_direccion'] ?? ''),
+            '{{EMPRESA_TELEFONO}}' => htmlspecialchars($appConfig['empresa_telefono'] ?? ''),
+            '{{EMPRESA_EMAIL}}' => htmlspecialchars($appConfig['empresa_email'] ?? ''),
+            '{{EMPRESA_WEB}}' => htmlspecialchars($appConfig['empresa_web'] ?? ''),
+            '{{EMPRESA_REGISTRO}}' => htmlspecialchars($appConfig['empresa_registro'] ?? ''),
+            '{{TICKET_PIE_PAGINA}}' => htmlspecialchars($appConfig['ticket_pie_pagina'] ?? ''),
+            '{{TICKET_POLITICA}}' => htmlspecialchars($appConfig['ticket_politica'] ?? '')
         ];
     } else {
         $lineasHTML = "";
@@ -100,7 +105,17 @@ try {
             '{{DISPLAY_EFECTIVO}}' => ($venta['metodo_pago'] === 'efectivo') ? '' : 'display:none;',
             '{{PAGO_DETALLE}}' => ($venta['metodo_pago'] === 'financiado' && !empty($venta['financiacion']))
                 ? "FINANCIACIÓN: " . $venta['financiacion']['nombre_financiera'] . " (" . $venta['financiacion']['meses'] . " cuotas de " . $fmt2($venta['financiacion']['cuota_mensual']) . ")"
-                : ""
+                : "",
+            '{{EMPRESA_NOMBRE}}' => htmlspecialchars($appConfig['empresa_nombre'] ?? ''),
+            '{{EMPRESA_RAZON_SOCIAL}}' => htmlspecialchars($appConfig['empresa_razon_social'] ?? ''),
+            '{{EMPRESA_NIF}}' => htmlspecialchars($appConfig['empresa_nif'] ?? ''),
+            '{{EMPRESA_DIRECCION}}' => htmlspecialchars($appConfig['empresa_direccion'] ?? ''),
+            '{{EMPRESA_TELEFONO}}' => htmlspecialchars($appConfig['empresa_telefono'] ?? ''),
+            '{{EMPRESA_EMAIL}}' => htmlspecialchars($appConfig['empresa_email'] ?? ''),
+            '{{EMPRESA_WEB}}' => htmlspecialchars($appConfig['empresa_web'] ?? ''),
+            '{{EMPRESA_REGISTRO}}' => htmlspecialchars($appConfig['empresa_registro'] ?? ''),
+            '{{TICKET_PIE_PAGINA}}' => htmlspecialchars($appConfig['ticket_pie_pagina'] ?? ''),
+            '{{TICKET_POLITICA}}' => htmlspecialchars($appConfig['ticket_politica'] ?? '')
         ];
     }
 

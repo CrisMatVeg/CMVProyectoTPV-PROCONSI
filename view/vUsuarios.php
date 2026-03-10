@@ -106,7 +106,7 @@
 
     <!-- MODAL AÑADIR USUARIO -->
     <div class="modal-overlay <?php echo $showModal ? 'visible' : ''; ?>" id="modalAddUser">
-        <div class="modal modal-content w-400 gap-20">
+        <div class="modal modal-content w-modal-md gap-20">
             <div class="modal-header">
                 <h2 class="modal-title fs-18">Nuevo Empleado</h2>
                 <button onclick="document.getElementById('modalAddUser').classList.remove('visible')" class="btn-close-modal">×</button>

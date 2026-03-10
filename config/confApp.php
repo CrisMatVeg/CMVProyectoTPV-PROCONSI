@@ -7,6 +7,7 @@ require_once './model/ProductoPDO.php';
 require_once './model/Venta.php';
 require_once './model/VentaPDO.php';
 require_once './model/ClientePDO.php';
+require_once './model/RolPDO.php';
 $controller = [
     "inicioPublico" => "controller/cInicioPublico.php",
     "Login" => "controller/cLogin.php",
@@ -14,6 +15,7 @@ $controller = [
     "cierreCaja" => "controller/cCierreCaja.php",
     "Dashboard" => "controller/cDashboard.php",
     "Usuarios" => "controller/cUsuarios.php",
+    "Roles" => "controller/cRoles.php",
     "Clientes" => "controller/cClientes.php",
     // "Detalle" => "controller/cDetalle.php",
     // "MiCuenta" => "controller/cMiCuenta.php",
@@ -29,10 +31,13 @@ $controller = [
     "Historial" => "controller/cHistorial.php",
     "MiPerfil" => "controller/cMiPerfil.php",
     "Analitica" => "controller/cAnalitica.php",
+    "Proveedores" => "controller/cProveedores.php",
+    "Compras" => "controller/cCompras.php",
     // "REST" => "controller/cREST.php",
     // "DetallesNasa" => "controller/cDetallesNasa.php",
     // "DetallesDog" => "controller/cDetallesDog.php",
-    // "MtoDepartamentos" => "controller/cMtoDepartamentos.php",
+    "MtoDepartamentos" => "controller/cMtoDepartamentos.php",
+    "Configuracion" => "controller/cConfiguracion.php",
     // "MtoUsuarios" => "controller/cMtoUsuarios.php",
     // "MtoUsuariosAPI" => "controller/cMtoUsuariosAPI.php",
     // "ConsultarDepartamentos" => "controller/cConsultarDepartamentos.php",
@@ -49,6 +54,7 @@ $view = [
     "cierreCaja" => "view/vCierreCaja.php",
     "Dashboard" => "view/vDashboard.php",
     "Usuarios" => "view/vUsuarios.php",
+    "Roles" => "view/vRoles.php",
     "Clientes" => "view/vClientes.php",
     "layout" => "view/layout.php",
     "Login" => "view/vLogin.php",
@@ -66,10 +72,13 @@ $view = [
     "Historial" => "view/vHistorial.php",
     "MiPerfil" => "view/vMiPerfil.php",
     "Analitica" => "view/vAnalitica.php",
+    "Proveedores" => "view/vProveedores.php",
+    "Compras" => "view/vCompras.php",
     // "REST" => "view/vREST.php",
     // "DetallesNasa" => "view/vDetallesNasa.php",
     // "DetallesDog" => "view/vDetallesDog.php",
-    // "MtoDepartamentos" => "view/vMtoDepartamentos.php",
+    "MtoDepartamentos" => "view/vMtoDepartamentos.php",
+    "Configuracion" => "view/vConfiguracion.php",
     // "MtoUsuarios" => "view/vMtoUsuarios.php",
     // "MtoUsuariosAPI" => "view/vMtoUsuariosAPI.php",
     // "ConsultarDepartamentos" => "view/vConsultarDepartamentos.php",

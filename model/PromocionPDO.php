@@ -14,7 +14,7 @@ class PromocionPDO
      */
     public static function listarTodas(): array
     {
-        $sql = "SELECT * FROM promociones ORDER BY activo DESC, codigo ASC";
+        $sql = "SELECT * FROM promociones ORDER BY prioridad DESC, id DESC";
         $q = DBPDO::ejecutarConsulta($sql);
         return $q->fetchAll(PDO::FETCH_ASSOC);
     }
@@ -25,13 +25,14 @@ class PromocionPDO
      */
     public static function listarActivas(): array
     {
-        $hoy = date('Y-m-d');
+        $ahora = date('Y-m-d H:i:s');
         $sql = "SELECT * 
                 FROM promociones
                 WHERE activo = 1
-                  AND (fecha_inicio IS NULL OR fecha_inicio <= :hoy)
-                  AND (fecha_fin IS NULL OR fecha_fin >= :hoy)";
-        $q = DBPDO::ejecutarConsulta($sql, [':hoy' => $hoy]);
+                  AND (fecha_inicio IS NULL OR fecha_inicio <= :ahora)
+                  AND (fecha_fin IS NULL OR fecha_fin >= :ahora)
+                ORDER BY prioridad DESC, id DESC";
+        $q = DBPDO::ejecutarConsulta($sql, [':ahora' => $ahora]);
         $rows = $q->fetchAll(PDO::FETCH_ASSOC);
 
         $out = [];
@@ -48,6 +49,7 @@ class PromocionPDO
                 'categoria_code' => $r['categoria_code'] ?? null,
                 'label'          => $r['descripcion'],
                 'solo_socios'    => (int)$r['solo_socios'] === 1,
+                'prioridad'      => (int)$r['prioridad'],
             ];
         }
         return $out;
@@ -63,8 +65,8 @@ class PromocionPDO
     public static function añadir(array $datos): void
     {
         $sql = "INSERT INTO promociones
-                (codigo, descripcion, tipo, valor, min_subtotal, bundle_buy_qty, bundle_pay_qty, id_producto, categoria_code, activo, solo_socios, fecha_inicio, fecha_fin)
-                VALUES (:codigo, :descripcion, :tipo, :valor, :min_subtotal, :bundle_buy_qty, :bundle_pay_qty, :id_producto, :categoria_code, :activo, :solo_socios, :fecha_inicio, :fecha_fin)";
+                (codigo, descripcion, tipo, valor, min_subtotal, bundle_buy_qty, bundle_pay_qty, id_producto, categoria_code, activo, solo_socios, fecha_inicio, fecha_fin, prioridad)
+                VALUES (:codigo, :descripcion, :tipo, :valor, :min_subtotal, :bundle_buy_qty, :bundle_pay_qty, :id_producto, :categoria_code, :activo, :solo_socios, :fecha_inicio, :fecha_fin, :prioridad)";
         DBPDO::ejecutarConsulta($sql, [
             ':codigo'          => !empty(trim($datos['codigo'] ?? '')) ? mb_substr(trim($datos['codigo']), 0, 50) : null,
             ':descripcion'     => mb_substr(trim($datos['descripcion']), 0, 255),
@@ -77,8 +79,9 @@ class PromocionPDO
             ':categoria_code'  => $datos['categoria_code'] ?? null, // Changed from id_categoria
             ':activo'          => !empty($datos['activo']) ? 1 : 0,
             ':solo_socios'     => !empty($datos['solo_socios']) ? 1 : 0,
-            ':fecha_inicio'    => $datos['fecha_inicio'] ?: null,
-            ':fecha_fin'       => $datos['fecha_fin'] ?: null,
+            ':fecha_inicio'    => !empty($datos['fecha_inicio']) ? $datos['fecha_inicio'] : null,
+            ':fecha_fin'       => !empty($datos['fecha_fin']) ? $datos['fecha_fin'] : null,
+            ':prioridad'       => (int)($datos['prioridad'] ?? 0),
         ]);
     }
 
@@ -97,7 +100,8 @@ class PromocionPDO
                     activo = :activo,
                     solo_socios = :solo_socios,
                     fecha_inicio = :fecha_inicio,
-                    fecha_fin = :fecha_fin
+                    fecha_fin = :fecha_fin,
+                    prioridad = :prioridad
                 WHERE id = :id";
         DBPDO::ejecutarConsulta($sql, [
             ':codigo'          => !empty(trim($datos['codigo'] ?? '')) ? mb_substr(trim($datos['codigo']), 0, 50) : null,
@@ -108,11 +112,12 @@ class PromocionPDO
             ':bundle_buy_qty'  => isset($datos['bundle_buy_qty']) ? (int)$datos['bundle_buy_qty'] : null,
             ':bundle_pay_qty'  => isset($datos['bundle_pay_qty']) ? (int)$datos['bundle_pay_qty'] : null,
             ':id_producto'     => isset($datos['id_producto']) ? (int)$datos['id_producto'] : null,
-            ':categoria_code'  => $datos['categoria_code'] ?? null, // Changed from id_categoria
+            ':categoria_code'  => $datos['categoria_code'] ?? null,
             ':activo'          => !empty($datos['activo']) ? 1 : 0,
             ':solo_socios'     => !empty($datos['solo_socios']) ? 1 : 0,
-            ':fecha_inicio'    => $datos['fecha_inicio'] ?: null,
-            ':fecha_fin'       => $datos['fecha_fin'] ?: null,
+            ':fecha_inicio'    => !empty($datos['fecha_inicio']) ? $datos['fecha_inicio'] : null,
+            ':fecha_fin'       => !empty($datos['fecha_fin']) ? $datos['fecha_fin'] : null,
+            ':prioridad'       => (int)($datos['prioridad'] ?? 0),
             ':id'              => $id,
         ]);
     }
@@ -133,5 +138,17 @@ class PromocionPDO
             [':a' => $nuevo, ':id' => $id]
         );
         return (bool)$nuevo;
+    }
+
+    public static function actualizarOrden(array $ids): void
+    {
+        $total = count($ids);
+        foreach ($ids as $index => $id) {
+            $prioridad = $total - $index;
+            DBPDO::ejecutarConsulta(
+                "UPDATE promociones SET prioridad = :p WHERE id = :id",
+                [':p' => $prioridad, ':id' => (int)$id]
+            );
+        }
     }
 }

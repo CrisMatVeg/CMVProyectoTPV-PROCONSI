@@ -121,11 +121,11 @@
     <div class="ticket">
       <!-- CABECERA -->
       <div class="center">
-        <div class="logo">ElectroBazar</div>
+        <div class="logo">{{EMPRESA_NOMBRE}}</div>
         <div class="small">Electrónica · Tecnología · Accesorios</div>
         <div class="small" style="margin-top: 4px">
-          Calle Mercado, 14 · 28005 Madrid<br />
-          Tel: 910 111 222 · CIF: B-12345678
+          {{EMPRESA_DIRECCION}}<br />
+          Tel: {{EMPRESA_TELEFONO}} · CIF: {{EMPRESA_NIF}}
         </div>
       </div>
 
@@ -211,13 +211,11 @@
 
       <!-- PIE -->
       <div class="center small" style="margin-bottom: 8px; line-height: 1.8">
-        Factura simplificada según RD 1619/2012<br />
-        Cambios y devoluciones: 30 días con ticket<br />
-        Conserve este ticket como justificante<br />
-        <strong>¡Gracias por su compra!</strong>
+        {{TICKET_POLITICA}}<br />
+        <strong>{{TICKET_PIE_PAGINA}}</strong>
       </div>
 
-      <div class="center small">www.electrobazar.es</div>
+      <div class="center small">{{EMPRESA_WEB}}</div>
     </div>
   </body>
 </html>

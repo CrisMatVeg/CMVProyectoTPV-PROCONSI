@@ -1,6 +1,6 @@
 <div class="main-full p-24">
     <!-- CABECERA DE SECCIÓN -->
-    <div class="section-header container">
+    <div class="section-header container-wider">
         <div class="section-title">
             <div class="d-flex ai-center gap-12 mb-4">
                 <i class="fa-solid fa-chart-line text-accent fs-32"></i>
@@ -15,9 +15,9 @@
         </form>
     </div>
 
-    <div class="container mb-32">
+    <div class="container-wider mb-32">
         <div class="filters-panel p-24 bg-surface br-20 border-2">
-            <form method="get" action="index.php" class="d-flex ai-end gap-24" novalidate>
+            <form method="get" action="index.php" class="d-flex ai-center gap-24" novalidate>
                 <input type="hidden" name="Analitica" value="">
                 <div class="filter-group flex-1">
                     <label class="fs-12 font-bold mb-8 d-block text-muted tt-uppercase">Fecha Inicial</label>
@@ -37,7 +37,7 @@
     </div>
 
     <!-- KPI CARDS -->
-    <div class="container d-grid grid-3 gap-24 mb-32">
+    <div class="container-wider d-grid grid-3 gap-24 mb-32">
         <div class="kpi-card p-24 bg-white br-20 shadow-sm border-2 d-flex ai-center gap-20">
             <div class="kpi-icon w-64 h-64 br-16 bg-blue-light d-flex jc-center ai-center text-blue fs-24">
                 <i class="fa-solid fa-receipt"></i>
@@ -70,7 +70,7 @@
         </div>
     </div>
 
-    <div class="container d-flex flex-column gap-24">
+    <div class="container-wider d-flex flex-column gap-24">
         <div class="d-grid grid-2-1 gap-24 ai-start">
             <!-- TOP PRODUCTOS -->
             <div class="card p-0 br-20 bg-white shadow-sm border-2 overflow-hidden" style="min-height: 400px;">

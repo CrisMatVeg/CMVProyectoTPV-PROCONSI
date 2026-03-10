@@ -47,7 +47,8 @@ if (isset($_REQUEST['guardarCambios'])) {
             $id = $_SESSION['usuarioActualTPV']->getId();
 
             // Actualizamos nombre siempre
-            DBPDO::ejecutarConsulta("UPDATE usuarios SET nombre_completo = :nom WHERE id = :id", [':nom' => $nombre, ':id' => $id]);
+            DBPDO::ejecutarConsulta("UPDATE usuarios SET nombre = :nom WHERE id = :id", [':nom' => $nombre, ':id' => $id]);
+
 
             // Si hay password, la actualizamos
             if (!empty($pass1)) {

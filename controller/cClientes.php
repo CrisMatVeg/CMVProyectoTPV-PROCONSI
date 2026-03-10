@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Controlador: cClientes
  * Pantalla de administración de clientes y socios.
@@ -45,10 +46,11 @@ if (isset($_REQUEST['volver']) || isset($_REQUEST['irDashboard'])) {
 }
 
 require_once 'model/ClientePDO.php';
+require_once 'model/RolClientePDO.php';
 
 $avClientes = [
     'lista' => ClientePDO::listarTodos(),
+    'roles' => RolClientePDO::listarRoles(),
 ];
 
 require_once $view['layout'];
-

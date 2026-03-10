@@ -17,6 +17,22 @@ class DBPDO
 {
 
     /**
+     * Devuelve una conexión PDO activa para poder gestionar transacciones
+     *
+     * @return PDO
+     */
+    public static function getPDO()
+    {
+        $conexion = new PDO(DSN, USERNAME, PASSWORD);
+        $conexion->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+        date_default_timezone_set('Europe/Madrid');
+        $conexion->exec("SET time_zone = '+01:00'");
+
+        return $conexion;
+    }
+
+    /**
      * Ejecuta una consulta SQL y devuelve el PDOStatement.
      * No realiza fetch ni interpreta resultados.
      *

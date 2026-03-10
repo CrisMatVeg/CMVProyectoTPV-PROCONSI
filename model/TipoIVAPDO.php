@@ -43,16 +43,20 @@ class TipoIVAPDO
     public static function añadir(array $d): void
     {
         $sql = "INSERT INTO tipos_iva
-                (codigo, nombre, porcentaje, fecha_inicio, fecha_fin, activo)
-                VALUES (:codigo, :nombre, :porcentaje, :inicio, :fin, :activo)";
+                (codigo, nombre, porcentaje, recargo_equivalencia, fecha_inicio, fecha_fin, activo)
+                VALUES (:codigo, :nombre, :porcentaje, :re, :inicio, :fin, :activo)";
         DBPDO::ejecutarConsulta($sql, [
             ':codigo'     => mb_substr(trim($d['codigo']), 0, 20),
             ':nombre'     => mb_substr(trim($d['nombre']), 0, 50),
             ':porcentaje' => (float)$d['porcentaje'],
+            ':re'         => (float)($d['recargo_equivalencia'] ?? 0),
             ':inicio'     => $d['fecha_inicio'],
             ':fin'        => $d['fecha_fin'] ?: null,
             ':activo'     => !empty($d['activo']) ? 1 : 0,
         ]);
+
+        require_once __DIR__ . '/ProductoPDO.php';
+        ProductoPDO::recalcularPreciosCosteGlobal();
     }
 
     public static function editar(int $id, array $d): void
@@ -61,6 +65,7 @@ class TipoIVAPDO
                     codigo = :codigo,
                     nombre = :nombre,
                     porcentaje = :porcentaje,
+                    recargo_equivalencia = :re,
                     fecha_inicio = :inicio,
                     fecha_fin = :fin,
                     activo = :activo
@@ -69,12 +74,17 @@ class TipoIVAPDO
             ':codigo'     => mb_substr(trim($d['codigo']), 0, 20),
             ':nombre'     => mb_substr(trim($d['nombre']), 0, 50),
             ':porcentaje' => (float)$d['porcentaje'],
+            ':re'         => (float)($d['recargo_equivalencia'] ?? 0),
             ':inicio'     => $d['fecha_inicio'],
             ':fin'        => $d['fecha_fin'] ?: null,
             ':activo'     => !empty($d['activo']) ? 1 : 0,
             ':id'         => $id,
         ]);
+
+        require_once __DIR__ . '/ProductoPDO.php';
+        ProductoPDO::recalcularPreciosCosteGlobal();
     }
+
 
     public static function eliminar(int $id): void
     {

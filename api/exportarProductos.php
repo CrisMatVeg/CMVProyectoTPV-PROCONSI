@@ -41,7 +41,6 @@ if ($format === 'json') {
             'stock_minimo'    => (int) $p->getStockMinimo(),
             'meses_garantia'  => (int) $p->getMesesGarantia(),
             'activo'          => (int) $p->getActivo(),
-            'requiere_serial' => (int) $p->getRequiereSerial(),
             'codigo_iva'      => $p->getCodigoIva(),
             'variantes'       => $p->getVariantes(), // null o JSON string
             'icono'           => $icono,             // data:image/...;base64,... o emoji
@@ -74,7 +73,6 @@ fputcsv($output, [
     'Stock Mínimo',
     'Garantía (meses)',
     'Activo (1/0)',
-    'Requiere Serial (1/0)',
     'Código IVA',
     'Variantes (JSON)',
     'Foto (base64)',
@@ -98,7 +96,6 @@ foreach ($productos as $p) {
         $p->getStockMinimo(),
         $p->getMesesGarantia(),
         $p->getActivo() ? '1' : '0',
-        $p->getRequiereSerial() ? '1' : '0',
         $p->getCodigoIva(),
         $p->getVariantes() ?? '',  // JSON string o vacío
         $icono ?? '',              // data:image/...;base64,... o emoji o vacío

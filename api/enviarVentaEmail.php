@@ -10,6 +10,7 @@ try {
     require_once __DIR__ . '/../config/confDBPDO.php';
     require_once __DIR__ . '/../model/DBPDO.php';
     require_once __DIR__ . '/../model/VentaPDO.php';
+    require_once __DIR__ . '/../model/ConfiguracionPDO.php';
 
     session_start();
     if (!isset($_SESSION['usuarioActualTPV'])) {
@@ -44,10 +45,11 @@ try {
         exit;
     }
 
+    $appConfig = ConfiguracionPDO::obtenerConfiguracion();
     $adjuntarPDF = !empty($input['adjuntarPDF']);
 
     // Generar HTML del ticket
-    $htmlTicket = generarHTMLTicket($venta, $tipo);
+    $htmlTicket = generarHTMLTicket($venta, $tipo, $appConfig);
 
     // Intentar enviar con PHPMailer
     $enviado = false;
@@ -77,6 +79,10 @@ try {
             // Recipients
             $mail->setFrom('noreply@electrobazar.es', 'ElectroBazar');
             $mail->addAddress($destinatario);
+
+            // Asunto
+            $empresaNombre = $appConfig['empresa_nombre'] ?? 'ElectroBazar';
+            $asunto = ($tipo === 'factura') ? "Tu Factura de $empresaNombre" : "Tu Ticket de Compra de $empresaNombre";
 
             // Content
             $mail->isHTML(true);
@@ -133,7 +139,7 @@ try {
 /**
  * Genera HTML del ticket para email
  */
-function generarHTMLTicket($venta, $tipo = 'ticket')
+function generarHTMLTicket($venta, $tipo = 'ticket', $appConfig = [])
 {
     $esFactura = $tipo === 'factura' || $venta['tipo_cliente'] === 'empresa';
     $templatePath = $esFactura ? __DIR__ . '/../factura-electrobazar.html' : __DIR__ . '/../ticket-electrobazar.html';
@@ -152,11 +158,9 @@ function generarHTMLTicket($venta, $tipo = 'ticket')
         $lineasHTML = "";
         foreach ($venta['lineas'] as $l) {
             $desc = htmlspecialchars($l['nombre_producto'] ?? $l['codigo_producto']);
-            $detalle = "";
-            if (!empty($l['numeros_serie'])) $detalle .= "SN: " . htmlspecialchars($l['numeros_serie']);
 
             $lineasHTML .= "<tr>
-                <td>$desc" . ($detalle ? "<span class='small'>$detalle</span>" : "") . "</td>
+                <td>$desc</td>
                 <td style='text-align:center;'>" . (int)$l['cantidad'] . "</td>
                 <td>" . $fmt2($l['precio_unitario']) . "</td>
                 <td>" . ((float)$venta['descuento_pct'] > 0 ? (float)$venta['descuento_pct'] . '%' : '—') . "</td>
@@ -179,7 +183,17 @@ function generarHTMLTicket($venta, $tipo = 'ticket')
             '{{DESCUENTO_AMT}}' => $fmt2($venta['descuento_amt']),
             '{{IVA_AMT}}' => $fmt2($venta['iva_amt']),
             '{{TOTAL}}' => $fmt2($venta['total']),
-            '{{DISPLAY_DESCUENTO}}' => (float)$venta['descuento_amt'] > 0 ? '' : 'display:none;'
+            '{{DISPLAY_DESCUENTO}}' => (float)$venta['descuento_amt'] > 0 ? '' : 'display:none;',
+            '{{EMPRESA_NOMBRE}}' => htmlspecialchars($appConfig['empresa_nombre'] ?? ''),
+            '{{EMPRESA_RAZON_SOCIAL}}' => htmlspecialchars($appConfig['empresa_razon_social'] ?? ''),
+            '{{EMPRESA_NIF}}' => htmlspecialchars($appConfig['empresa_nif'] ?? ''),
+            '{{EMPRESA_DIRECCION}}' => htmlspecialchars($appConfig['empresa_direccion'] ?? ''),
+            '{{EMPRESA_TELEFONO}}' => htmlspecialchars($appConfig['empresa_telefono'] ?? ''),
+            '{{EMPRESA_EMAIL}}' => htmlspecialchars($appConfig['empresa_email'] ?? ''),
+            '{{EMPRESA_WEB}}' => htmlspecialchars($appConfig['empresa_web'] ?? ''),
+            '{{EMPRESA_REGISTRO}}' => htmlspecialchars($appConfig['empresa_registro'] ?? ''),
+            '{{TICKET_PIE_PAGINA}}' => htmlspecialchars($appConfig['ticket_pie_pagina'] ?? ''),
+            '{{TICKET_POLITICA}}' => htmlspecialchars($appConfig['ticket_politica'] ?? '')
         ];
     } else {
         $lineasHTML = "";
@@ -205,7 +219,17 @@ function generarHTMLTicket($venta, $tipo = 'ticket')
             '{{BASE_IMPONIBLE}}' => $fmt2($venta['base_imponible']),
             '{{DISPLAY_DESCUENTO}}' => (float)$venta['descuento_amt'] > 0 ? '' : 'display:none;',
             '{{DISPLAY_EFECTIVO}}' => ($venta['metodo_pago'] === 'efectivo') ? '' : 'display:none;',
-            '{{PAGO_DETALLE}}' => ''
+            '{{PAGO_DETALLE}}' => '',
+            '{{EMPRESA_NOMBRE}}' => htmlspecialchars($appConfig['empresa_nombre'] ?? ''),
+            '{{EMPRESA_RAZON_SOCIAL}}' => htmlspecialchars($appConfig['empresa_razon_social'] ?? ''),
+            '{{EMPRESA_NIF}}' => htmlspecialchars($appConfig['empresa_nif'] ?? ''),
+            '{{EMPRESA_DIRECCION}}' => htmlspecialchars($appConfig['empresa_direccion'] ?? ''),
+            '{{EMPRESA_TELEFONO}}' => htmlspecialchars($appConfig['empresa_telefono'] ?? ''),
+            '{{EMPRESA_EMAIL}}' => htmlspecialchars($appConfig['empresa_email'] ?? ''),
+            '{{EMPRESA_WEB}}' => htmlspecialchars($appConfig['empresa_web'] ?? ''),
+            '{{EMPRESA_REGISTRO}}' => htmlspecialchars($appConfig['empresa_registro'] ?? ''),
+            '{{TICKET_PIE_PAGINA}}' => htmlspecialchars($appConfig['ticket_pie_pagina'] ?? ''),
+            '{{TICKET_POLITICA}}' => htmlspecialchars($appConfig['ticket_politica'] ?? '')
         ];
     }
 

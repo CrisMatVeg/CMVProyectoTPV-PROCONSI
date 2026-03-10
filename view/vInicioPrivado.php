@@ -14,12 +14,6 @@
             <button onclick="toggleAdvancedFilters()" class="btn-filter-toggle p-10 br-10 bg-surface border-2 cursor-pointer transition-all" title="Filtros avanzados">
                 <i class="fa-solid fa-filter"></i>
             </button>
-            <?php if ($avInicioPrivado['esAdmin']): ?>
-                <button onclick="abrirModalNuevoProducto()" class="btn-add p-7-14 fs-13">
-                    <i class="fa-solid fa-plus"></i>
-                    Nuevo producto
-                </button>
-            <?php endif; ?>
         </div>
 
         <!-- ADVANCED FILTERS PANEL -->
@@ -108,6 +102,81 @@
 
         <div class="products-grid" id="productsGrid"></div>
     </div>
+
+    <script>
+        const DB_TARIFAS = <?php echo json_encode(TarifaPrecioPDO::listarActivas()); ?>;
+
+        async function cargarVariantesFisicasTPV(idProd) {
+            const section = document.getElementById('sectionVariantesFisicasEdit');
+            const body = document.getElementById('listaVariantesBodyEdit');
+            if (!section || !body) return;
+
+            body.innerHTML = '<tr><td colspan="5" class="text-center p-10 opacity-50">Cargando...</td></tr>';
+
+            try {
+                const resp = await fetch(`api/gestionVariante.php?accion=listar&id_producto=${idProd}`);
+                const data = await resp.json();
+
+                if (data.ok && data.lista.length > 0) {
+                    section.classList.remove('d-none');
+                    body.innerHTML = '';
+                    data.lista.forEach(v => {
+                        const tr = document.createElement('tr');
+                        tr.className = 'border-bottom-1';
+                        tr.innerHTML = `
+                        <td class="py-6">${v.nombre}</td>
+                        <td class="py-6"><input type="text" class="form-input fs-10 p-2 w-100 var-sku" value="${v.sku}"></td>
+                        <td class="py-6"><input type="number" class="form-input fs-10 p-2 w-100 text-center var-stock" value="${v.stock_actual}"></td>
+                        <td class="py-6"><input type="number" class="form-input fs-10 p-2 w-100 text-right var-precio" value="${v.precio_venta || ''}" placeholder="Base" step="0.01"></td>
+                        <td class="py-6 text-center text-accent"><i class="fa-solid fa-floppy-disk cursor-pointer hover-scale" onclick="guardarCambiosVarianteTPV(${v.id}, this)"></i></td>
+                    `;
+                        body.appendChild(tr);
+                    });
+                } else {
+                    section.classList.add('d-none');
+                }
+            } catch (e) {
+                console.error(e);
+                body.innerHTML = '<tr><td colspan="5" class="text-center p-10 text-red">Error</td></tr>';
+            }
+        }
+
+        async function guardarCambiosVarianteTPV(id, icon) {
+            const row = icon.closest('tr');
+            const sku = row.querySelector('.var-sku').value;
+            const stock = row.querySelector('.var-stock').value;
+            const precio = row.querySelector('.var-precio').value;
+
+            icon.className = "fa-solid fa-spinner fa-spin";
+            try {
+                const resp = await fetch('api/gestionVariante.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        accion: 'editar',
+                        id,
+                        sku,
+                        stock_actual: stock,
+                        precio_venta: precio,
+                        activo: 1
+                    })
+                });
+                const r = await resp.json();
+                if (r.ok) {
+                    icon.className = "fa-solid fa-check text-green";
+                    setTimeout(() => icon.className = "fa-solid fa-floppy-disk cursor-pointer hover-scale", 2000);
+                    if (typeof showToast === 'function') showToast("Variante actualizada");
+                } else {
+                    alert("Error: " + r.error);
+                    icon.className = "fa-solid fa-floppy-disk cursor-pointer hover-scale";
+                }
+            } catch (e) {
+                icon.className = "fa-solid fa-floppy-disk cursor-pointer hover-scale";
+            }
+        }
+    </script>
 
     <!-- ORDER PANEL -->
     <div class="order-panel">
@@ -228,6 +297,14 @@
                 </button>
                 <button
                     class="pay-btn"
+                    data-method="a_cuenta"
+                    id="btnACuenta"
+                    onclick="selectPayment(this)">
+                    <i class="fa-solid fa-file-invoice-dollar"></i>
+                    A cuenta
+                </button>
+                <button
+                    class="pay-btn"
                     id="btnFinanciacion"
                     data-method="financiado"
                     onclick="selectPayment(this)">
@@ -318,69 +395,78 @@
                     <input id="editMesesGarantia" class="form-input font-mono text-right" type="number" min="0" max="120" step="1" placeholder="24" />
                 </div>
             </div>
-            <div class="form-group mb-0">
-                <label class="d-flex ai-center gap-8 cursor-pointer fs-13">
-                    <input type="checkbox" id="editSerial" class="w-16 h-16" />
-                    <span>Requiere controlar Número de Serie en la venta</span>
-                </label>
-            </div>
-        </div>
-        <button class="btn-save mt-4 full-width" onclick="saveEdit()">
-            Guardar cambios
-        </button>
-    </div>
-</div>
 
-<!-- ADD MODAL -->
-<div class="modal-overlay" id="addModal">
-    <div class="modal modal-content gap-14 ai-stretch">
-        <div class="modal-header mb-0">
-            <div class="modal-title fs-16">Nuevo producto</div>
-            <button onclick="document.getElementById('addModal').classList.remove('visible')" class="btn-close-modal">×</button>
-        </div>
-        <div class="form-grid">
-            <div class="form-group">
-                <label class="form-label">Imagen / Icono</label>
-                <div class="d-flex ai-center gap-12">
-                    <div id="addImgPreview" class="prod-img-preview" style="width: 80px; height: 80px; flex-shrink: 0;">
-                        <i class="fa-solid fa-image"></i>
-                    </div>
-                    <div class="flex-1">
-                        <input type="file" id="addFile" accept="image/*" class="d-none" onchange="previewImageTPV(this, 'add')">
-                        <button type="button" onclick="document.getElementById('addFile').click()" class="btn-icon w-auto h-auto p-12-20 fs-13 gap-8 full-width">
-                            <i class="fa-solid fa-upload"></i> Subir Imagen
-                        </button>
-                        <input type="hidden" id="addEmoji" />
-                    </div>
-                </div>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Nombre</label>
-                <input id="addName" class="form-input" placeholder="Nombre completo" />
-                <span class="form-error" id="err-addNombre"></span>
-            </div>
-            <div class="form-group-wrap grid-3">
-                <div class="form-group">
-                    <label class="form-label">Referencia (SKU)</label>
-                    <input id="addSku" class="form-input font-mono" placeholder="PRO-001" />
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Precio (€)</label>
-                    <input id="addPrice" class="form-input font-mono text-right" type="text" placeholder="0.00" />
-                    <span class="form-error" id="err-addPrecio"></span>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">IVA (%)</label>
-                    <input id="addIva" class="form-input font-mono text-right" type="text" value="21" />
-                </div>
-            </div>
-            <div class="form-group">
-                <label class="d-flex ai-center gap-8 cursor-pointer fs-13">
-                    <input type="checkbox" id="addSerial" class="w-16 h-16" />
-                    <span>Requiere controlar Número de Serie en la venta</span>
+            <!-- Variantes Físicas (Stock Individual) -->
+            <div id="sectionVariantesFisicasEdit" class="p-16 border-2 br-12 mb-12 d-none" style="background: var(--surface2);">
+                <label class="form-label mb-8 d-flex ai-center gap-8">
+                    <i class="fa-solid fa-boxes-stacked text-muted"></i> Variantes Físicas (Stock Individual)
                 </label>
+                <div class="table-container" style="max-height: 200px; overflow-y: auto;">
+                    <table class="w-100 fs-11">
+                        <thead>
+                            <tr style="position: sticky; top: 0; background: var(--surface2); z-index: 1;">
+                                <th class="text-left py-4">Opción</th>
+                                <th class="text-left py-4">SKU</th>
+                                <th class="text-center py-4" style="width: 60px;">Stock</th>
+                                <th class="text-right py-4" style="width: 80px;">Precio</th>
+                                <th class="text-center py-4" style="width: 40px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="listaVariantesBodyEdit"></tbody>
+                    </table>
+                </div>
             </div>
-            <div class="form-group">
+
+            <button class="btn-save mt-4 full-width" onclick="saveEdit()">
+                Guardar cambios
+            </button>
+        </div>
+    </div>
+
+    <!-- ADD MODAL -->
+    <div class="modal-overlay" id="addModal">
+        <div class="modal modal-content gap-14 ai-stretch">
+            <div class="modal-header mb-0">
+                <div class="modal-title fs-16">Nuevo producto</div>
+                <button onclick="document.getElementById('addModal').classList.remove('visible')" class="btn-close-modal">×</button>
+            </div>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label class="form-label">Imagen / Icono</label>
+                    <div class="d-flex ai-center gap-12">
+                        <div id="addImgPreview" class="prod-img-preview" style="width: 80px; height: 80px; flex-shrink: 0;">
+                            <i class="fa-solid fa-image"></i>
+                        </div>
+                        <div class="flex-1">
+                            <input type="file" id="addFile" accept="image/*" class="d-none" onchange="previewImageTPV(this, 'add')">
+                            <button type="button" onclick="document.getElementById('addFile').click()" class="btn-icon w-auto h-auto p-12-20 fs-13 gap-8 full-width">
+                                <i class="fa-solid fa-upload"></i> Subir Imagen
+                            </button>
+                            <input type="hidden" id="addEmoji" />
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Nombre</label>
+                    <input id="addName" class="form-input" placeholder="Nombre completo" />
+                    <span class="form-error" id="err-addNombre"></span>
+                </div>
+                <div class="form-group-wrap grid-3">
+                    <div class="form-group">
+                        <label class="form-label">Referencia (SKU)</label>
+                        <input id="addSku" class="form-input font-mono" placeholder="PRO-001" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Precio (€)</label>
+                        <input id="addPrice" class="form-input font-mono text-right" type="text" placeholder="0.00" />
+                        <span class="form-error" id="err-addPrecio"></span>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">IVA (%)</label>
+                        <input id="addIva" class="form-input font-mono text-right" type="text" value="21" />
+                    </div>
+                </div>
+
                 <label class="form-label">Categoría</label>
                 <select id="addCat" class="form-input">
                     <?php foreach ($avInicioPrivado['categorias'] as $c): ?>
@@ -429,7 +515,7 @@
             <input type="hidden" name="irTPV" value="1">
             <div class="form-group">
                 <label class="form-label fs-13">Fondo inicial (€)</label>
-                <input type="number" step="0.01" min="0" name="fondoInicial" class="form-input font-mono fs-16 text-right" placeholder="0.00" required>
+                <input type="number" step="0.01" min="0" name="fondoInicial" class="form-input font-mono fs-16 text-right" placeholder="0.00" value="<?= number_format($avInicioPrivado['fondoSugerido'], 2, '.', '') ?>" required>
             </div>
             <div class="modal-footer full-width">
                 <button type="submit" name="abrirCaja" class="btn-save w-auto px-32">
@@ -442,7 +528,7 @@
 
 <!-- MODAL 1: TIPO DE CLIENTE (aparece al pulsar Cobrar) -->
 <div class="modal-overlay" id="clienteModal">
-    <div class="modal modal-content gap-18 ai-stretch w-360">
+    <div class="modal modal-content gap-18 ai-stretch w-modal-md">
         <div class="modal-title text-center fs-18">¿Tipo de cliente?</div>
         <div class="grid-3 gap-12 mb-12">
             <button id="btnParticular" onclick="seleccionarTipoCliente('particular')"
@@ -471,6 +557,18 @@
                 </button>
             </div>
             <div id="clienteResultados" class="fs-12 mt-4 text-accent font-bold"></div>
+            <button id="btnAddCliente" onclick="mostrarRegistroCliente()" class="cat-tab p-4-8 fs-11 d-none">+ Registrar nuevo cliente</button>
+        </div>
+
+        <!-- Registro de Cliente General (Particular / Empresa) -->
+        <div id="clienteRegistro" class="d-none flex-column gap-8 p-12 bg-surface2 br-8 border-2 mb-8">
+            <div id="clienteRegistroTitulo" class="form-label fs-12 font-bold">Nuevo Cliente</div>
+            <input id="newClienteNombre" class="form-input fs-12" placeholder="Nombre completo / Razón Social" />
+            <input id="newClienteNif" class="form-input fs-12 font-mono" placeholder="NIF / CIF" />
+            <div class="d-flex gap-8">
+                <button onclick="cancelarRegistroCliente()" class="btn-cancel fs-11 p-4">Cancelar</button>
+                <button onclick="guardarNuevoCliente()" class="btn-save fs-11 p-4">Guardar y Usar</button>
+            </div>
         </div>
 
         <!-- Buscador de Socio -->
@@ -518,6 +616,23 @@
                 <span id="efectivoCambio" class="font-bold font-mono fs-16 text-accent">0,00 €</span>
             </div>
         </div>
+        <!-- Gestión de A Cuenta -->
+        <div id="aCuentaGestion" class="d-none flex-column gap-8 p-12 bg-surface2 br-8 border-2">
+            <div class="form-label">Pago a cuenta (Crédito)</div>
+            <div class="form-group">
+                <label class="fs-13 font-bold">Entrega inicial (€)</label>
+                <input id="aCuentaPagado" type="number" step="0.01" class="form-input font-mono fs-16 text-right" value="0.00" oninput="validarACuenta()" />
+            </div>
+            <div class="form-group">
+                <label class="fs-13 font-bold">Fecha límite de pago</label>
+                <input id="aCuentaFechaLimite" type="date" class="form-input font-mono fs-16" onchange="validarACuenta()" />
+                <span class="form-error" id="err-aCuentaFecha"></span>
+            </div>
+            <div id="aCuentaAlertaCliente" class="d-none jc-space-between ai-center mt-4 p-8 bg-red-light br-6 text-red font-bold">
+                <i class="fa-solid fa-circle-exclamation"></i>
+                <span class="fs-12">DEBES SELECCIONAR UN CLIENTE</span>
+            </div>
+        </div>
         <div class="modal-footer">
             <button onclick="cerrarModalCliente()" class="btn-cancel">Cancelar</button>
             <button id="confirmarClienteBtn" onclick="confirmarCliente()" class="btn-save">Cobrar</button>
@@ -527,7 +642,7 @@
 
 <!-- MODAL: SELECCIÓN DE VARIANTES -->
 <div class="modal-overlay" id="variantsModal">
-    <div class="modal modal-content gap-16 ai-stretch w-400">
+    <div class="modal modal-content gap-16 ai-stretch w-modal-md">
         <div class="modal-header mb-0">
             <div class="modal-title fs-16" id="variantsModalTitle">Seleccionar opciones</div>
             <button onclick="document.getElementById('variantsModal').classList.remove('visible')" class="btn-close-modal">×</button>
@@ -542,26 +657,10 @@
     </div>
 </div>
 
-<!-- MODAL: NÚMERO DE SERIE -->
-<div class="modal-overlay" id="serialModal">
-    <div class="modal modal-content gap-16 ai-stretch w-400">
-        <div class="modal-icon text-accent bg-blue-light">
-            <i class="fa-solid fa-barcode"></i>
-        </div>
-        <div class="modal-title text-center">Control de Números de Serie</div>
-        <div class="modal-sub">Este producto requiere registrar un número de serie para continuar.</div>
-        <div id="serialInputsContainer" class="d-flex flex-column gap-12 max-h-300 overflow-y-auto pr-8">
-            <!-- Dinámico -->
-        </div>
-        <div class="modal-footer full-width mt-12">
-            <button id="confirmSerialBtn" class="btn-save py-12">Confirmar y Continuar</button>
-        </div>
-    </div>
-</div>
 
 <!-- MODAL: SELECCIÓN DE FINANCIACIÓN -->
 <div class="modal-overlay" id="financiacionModal">
-    <div class="modal modal-content gap-20 ai-stretch w-600">
+    <div class="modal modal-content gap-20 ai-stretch w-modal-lg">
         <div class="modal-header">
             <div class="modal-title d-flex ai-center gap-10">
                 <i class="fa-solid fa-piggy-bank text-accent"></i>

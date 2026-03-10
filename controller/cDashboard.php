@@ -7,6 +7,8 @@
  */
 
 // Navegación Global handled by index.php
+require_once 'model/CajaTurnoPDO.php';
+$turnoCaja = CajaTurnoPDO::obtenerTurnoAbierto();
 
 if (isset($_REQUEST['irUsuarios'])) {
     $_SESSION['paginaEnCurso'] = 'Usuarios';
@@ -76,6 +78,8 @@ if ($_SESSION['usuarioActualTPV']->getRol() === 'admin') {
     $avDashboard['metodos'] = VentaPDO::obtenerVentasPorMetodo($desde, $hasta);
     $avDashboard['cajeros'] = VentaPDO::obtenerVentasPorCajero($desde, $hasta);
     $avDashboard['productos_count'] = count(ProductoPDO::listarProductos(false));
+    $avDashboard['bajo_stock_count'] = ProductoPDO::contarBajoStock();
+    $avDashboard['cajaAbierta'] = (bool)$turnoCaja;
 }
 
 // Cargamos la vista de dashboard

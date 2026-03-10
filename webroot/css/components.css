@@ -42,7 +42,7 @@
 .dashboard-card {
   width: 100%;
   max-width: 90vw;
-  padding: 40px;
+  padding: 24px;
   display: flex;
   flex-direction: column;
   gap: 30px;
@@ -135,20 +135,19 @@
 
 .dashboard-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
 }
 
-/* En pantallas muy anchas, reorganizar a 3 columnas para que entren más botones sin tanto scroll vertical */
 @media (min-width: 1400px) {
   .dashboard-grid {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
   }
 }
 
 .dashboard-btn {
   width: 100%;
-  height: 180px;
+  height: 190px;
   border-radius: 16px;
   border: 2px solid var(--border);
   background: var(--surface);
@@ -158,7 +157,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 15px;
+  gap: 8px;
   font-family: inherit;
 }
 
@@ -168,18 +167,18 @@
 }
 
 .dashboard-btn i {
-  font-size: 40px;
+  font-size: 28px;
   color: var(--accent);
 }
 
 .dashboard-btn .btn-title {
   font-weight: 700;
-  font-size: 16px;
+  font-size: 14px;
   color: var(--text);
 }
 
 .dashboard-btn .btn-desc {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-muted);
   text-align: center;
   padding: 0 10px;
@@ -187,7 +186,7 @@
 
 .dashboard-btn-locked {
   width: 100%;
-  height: 180px;
+  height: 190px;
   border-radius: 16px;
   border: 2px dashed var(--border);
   background: var(--surface2);
@@ -195,19 +194,19 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 15px;
+  gap: 8px;
   opacity: 0.6;
   cursor: not-allowed;
 }
 
 .dashboard-btn-locked i {
-  font-size: 40px;
+  font-size: 28px;
   color: var(--text-muted);
 }
 
 .dashboard-btn-locked .btn-title {
   font-weight: 700;
-  font-size: 16px;
+  font-size: 14px;
   color: var(--text-muted);
 }
 
@@ -564,6 +563,183 @@
   color: var(--green);
 }
 
+/* TABS PARA PRODUCTOS / PACKS */
+.tabs-nav {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  margin-right: auto;
+}
+
+.tab-btn {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 20px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  color: var(--text-muted);
+  gap: 10px;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.tab-btn i {
+  font-size: 14px;
+  opacity: 0.7;
+}
+
+.tab-btn.active {
+  background: var(--surface);
+  color: var(--accent) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--border);
+}
+
+.tab-btn.active i {
+  opacity: 1;
+}
+
+.tab-btn:not(.active):hover {
+  background: rgba(255, 255, 255, 0.5);
+  color: var(--text);
+}
+
+/* SEARCH & RESULTS DROPDOWN */
+.pl-36 {
+  padding-left: 36px !important;
+}
+
+.pack-search-container {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.pack-search-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 5;
+  color: var(--text-muted);
+  font-size: 14px;
+  pointer-events: none;
+}
+
+.search-results-dropdown {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0;
+  width: 100%;
+  background: var(--surface);
+  border: 2px solid var(--accent);
+  border-radius: 12px;
+  box-shadow: var(--shadow-xl);
+  z-index: 1100;
+  max-height: 280px;
+  overflow-y: auto;
+  animation: slideDownFade 0.2s ease-out;
+}
+
+.search-result-item {
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border-bottom: 1px solid var(--border);
+}
+
+.search-result-item:last-child {
+  border-bottom: none;
+}
+
+.search-result-item:hover {
+  background: var(--blue-light);
+}
+
+.result-icon {
+  width: 32px;
+  height: 32px;
+  background: var(--surface2);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+}
+
+.result-title {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.result-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.result-price {
+  font-weight: 800;
+  color: var(--accent);
+  font-size: 14px;
+}
+
+.text-ellipsis {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* COMPONENTS TABLE STYLES */
+.pack-components-table tr {
+  transition: background 0.2s;
+}
+
+.pack-components-table tr:hover {
+  background: var(--surface2);
+}
+
+.pack-components-table td {
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.pack-components-table thead th {
+  background: var(--surface2);
+  color: var(--text-muted);
+  font-weight: 800;
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+}
+
+.input-qty-mini {
+  height: 28px !important;
+  padding: 0 8px !important;
+  border-radius: 6px !important;
+  font-weight: 700 !important;
+  background: var(--surface) !important;
+  border: 1.5px solid var(--border) !important;
+  transition: all 0.2s !important;
+}
+
+.input-qty-mini:focus {
+  border-color: var(--accent) !important;
+  background: white !important;
+  box-shadow: 0 0 0 3px rgba(26, 47, 191, 0.1) !important;
+}
+
 /* ALIGNMENTS & FONTS */
 .text-right {
   text-align: right !important;
@@ -850,9 +1026,16 @@
   margin-top: 4px !important;
 }
 
+.fs-11 {
+  font-size: 11px !important;
+}
+.fs-12 {
+  font-size: 12px !important;
+}
 .fs-13 {
   font-size: 13px !important;
 }
+
 .fs-14 {
   font-size: 14px !important;
 }
@@ -1219,7 +1402,7 @@
   font-size: 13px;
   font-weight: 600;
   margin-bottom: 8px;
-  color: var(--text-muted);
+  color: var(--text-muted) !important;
 }
 
 .form-input {
@@ -1228,6 +1411,7 @@
   border-radius: 10px;
   border: 2px solid var(--border);
   background: var(--surface2);
+  color: var(--text) !important;
   font-family: inherit;
   font-size: 14px;
   outline: none;
@@ -1253,6 +1437,7 @@
   border-radius: 12px;
   border: 1.5px solid var(--border);
   background: var(--surface);
+  color: var(--text) !important;
   font-weight: 600;
   cursor: pointer;
   font-family: inherit;
@@ -1625,4 +1810,39 @@ body[data-page="inicioPrivado"] .modal-footer .btn-save {
   padding: 16px 24px;
   border-top: 1px solid var(--border);
   margin-top: 0;
+}
+
+/* Asegurar que los modales de Packs y Categorías se comportan igual y aparezcan encima */
+#modalPack,
+#modalCategorias {
+  z-index: 12000 !important;
+}
+
+#modalPack .modal-content {
+  max-height: 95vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  width: 1000px;
+  max-width: 95vw;
+}
+
+#modalPack .modal-body {
+  overflow-y: visible;
+  overflow-x: hidden;
+  padding: 24px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  display: block;
+}
+
+.pack-components-section {
+  width: 100%;
+  margin: 0 auto;
+  display: block;
+  box-sizing: border-box;
+}
+
+#modalCategorias .modal-content {
+  width: 500px;
 }

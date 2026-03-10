@@ -1,5 +1,6 @@
 <?php // Vista de Promociones 
 ?>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <script>
     // Helpers para evitar TypeErrors si algún elemento no existe
     const setVal = (id, val) => {
@@ -58,6 +59,8 @@
             setVal('promoPayQty', promo.bundle_pay_qty || '');
             setVal('promoProducto', promo.id_producto || '');
             setVal('promoCategoria', promo.categoria_code || '');
+            setVal('promoFechaInicio', promo.fecha_inicio ? promo.fecha_inicio.replace(' ', 'T') : '');
+            setVal('promoFechaFin', promo.fecha_fin ? promo.fecha_fin.replace(' ', 'T') : '');
             setChecked('promoSoloSocios', parseInt(promo.solo_socios));
             setChecked('promoActiva', parseInt(promo.activo));
         } else {
@@ -72,6 +75,8 @@
             setVal('promoPayQty', '');
             setVal('promoProducto', '');
             setVal('promoCategoria', '');
+            setVal('promoFechaInicio', '');
+            setVal('promoFechaFin', '');
             setChecked('promoSoloSocios', false);
             setChecked('promoActiva', true);
         }
@@ -101,6 +106,8 @@
             bundle_pay_qty: document.getElementById('promoPayQty')?.value || '',
             id_producto: document.getElementById('promoProducto')?.value || '',
             categoria_code: document.getElementById('promoCategoria')?.value || '',
+            fecha_inicio: document.getElementById('promoFechaInicio')?.value || null,
+            fecha_fin: document.getElementById('promoFechaFin')?.value || null,
             solo_socios: document.getElementById('promoSoloSocios')?.checked ? 1 : 0,
             activo: document.getElementById('promoActiva')?.checked ? 1 : 0,
         };
@@ -176,7 +183,58 @@
             console.error(e);
         }
     };
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const el = document.getElementById('promosTableBody');
+        if (!el) return;
+
+        Sortable.create(el, {
+            animation: 150,
+            handle: '.drag-handle',
+            ghostClass: 'sortable-ghost',
+            onEnd: async function() {
+                const ids = Array.from(el.querySelectorAll('tr[data-id]')).map(tr => tr.dataset.id);
+                try {
+                    const resp = await fetch('api/gestionPromocion.php', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            accion: 'reordenar',
+                            ids
+                        }),
+                    });
+                    const r = await resp.json();
+                    if (!r.ok) {
+                        alert('Error al guardar el nuevo orden: ' + (r.error || 'Desconocido'));
+                        location.reload();
+                    }
+                } catch (e) {
+                    console.error(e);
+                    alert('Error de conexión al reordenar');
+                    location.reload();
+                }
+            }
+        });
+    });
 </script>
+<style>
+    .drag-handle {
+        cursor: grab;
+        color: var(--text-muted);
+        padding-right: 12px;
+    }
+
+    .drag-handle:active {
+        cursor: grabbing;
+    }
+
+    .sortable-ghost {
+        opacity: 0.4;
+        background: var(--surface2) !important;
+    }
+</style>
 
 
 <div class="main-full p-24">
@@ -189,11 +247,9 @@
             <button onclick="window.abrirModalPromo()" class="btn-add">
                 <i class="fa-solid fa-plus"></i> Nueva Promoción
             </button>
-            <form method="post">
-                <button type="submit" name="volver" class="btn-back">
-                    <i class="fa-solid fa-arrow-left"></i> Volver
-                </button>
-            </form>
+            <a href="index.php?irDashboard=1" class="btn-back">
+                <i class="fa-solid fa-arrow-left"></i> Volver
+            </a>
         </div>
     </div>
 
@@ -201,7 +257,8 @@
         <table class="data-table">
             <thead>
                 <tr>
-                    <th class="pl-20">Código</th>
+                    <th class="pl-20" style="width: 40px;"></th>
+                    <th>Código</th>
                     <th>Descripción</th>
                     <th class="text-center">Tipo</th>
                     <th>Configuración</th>
@@ -214,7 +271,10 @@
             <tbody id="promosTableBody">
                 <?php foreach ($avPromos['lista'] as $p): ?>
                     <tr data-id="<?php echo $p['id']; ?>">
-                        <td class="pl-20 font-mono"><?php echo htmlspecialchars($p['codigo'] ?? ''); ?></td>
+                        <td class="pl-20">
+                            <i class="fa-solid fa-grip-vertical drag-handle"></i>
+                        </td>
+                        <td class="font-mono"><?php echo htmlspecialchars($p['codigo'] ?? ''); ?></td>
                         <td><?php echo htmlspecialchars($p['descripcion'] ?? ''); ?></td>
                         <td class="text-center">
                             <?php
@@ -310,7 +370,7 @@
 
 <!-- MODAL NUEVA/EDITAR PROMO -->
 <div class="modal-overlay" id="promoModal">
-    <div class="modal modal-content gap-16 ai-stretch w-500">
+    <div class="modal modal-content gap-16 ai-stretch w-modal-lg">
         <div class="modal-header mb-0">
             <h2 id="promoModalTitle" class="m-0 fs-18">Nueva promoción</h2>
             <button onclick="cerrarModalPromo()" class="btn-close-modal">&times;</button>
@@ -386,6 +446,17 @@
                 <p class="fs-10 text-muted mt-8">Si se deja vacío, la promoción se aplica a todo el carrito.</p>
             </div>
 
+            <div class="d-grid grid-2 gap-16">
+                <div class="form-group">
+                    <label class="form-label">Fecha y Hora Inicio</label>
+                    <input type="datetime-local" id="promoFechaInicio" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Fecha y Hora Fin</label>
+                    <input type="datetime-local" id="promoFechaFin" class="form-input">
+                </div>
+            </div>
+
             <div class="d-grid grid-2 gap-16 mt-16">
                 <label class="d-flex ai-center gap-8 cursor-pointer fs-13">
                     <input type="checkbox" id="promoSoloSocios">
@@ -400,7 +471,6 @@
         <div class="modal-footer pt-0 border-top-0">
             <button onclick="window.cerrarModalPromo()" class="btn-cancel">Cancelar</button>
             <button onclick="window.guardarPromo()" class="btn-save w-auto px-24">Guardar promoción</button>
-
         </div>
     </div>
 </div>

@@ -1,0 +1,42 @@
+# IDEs y Editores
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+*.sublime-project
+*.sublime-workspace
+
+# Dependencias
+/vendor/
+node_modules/
+
+# Temporales y Caché
+/tmp/*
+!/tmp/.gitkeep
+/cache/*
+!/cache/.gitkeep
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Sistema Operativo
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Archivos de volcado y backups (scriptsDB se mantiene ya que son las migraciones)
+*.bak
+*.sql.gz
+/db_backups/
+/backup/
+
+# Configuración sensible local (opcional)
+# config/confDBPDO.php
+.env

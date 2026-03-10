@@ -12,39 +12,68 @@
 
         <?php if ($_SESSION['usuarioActualTPV']->getRol() === 'admin' && $avDashboard['kpis']): ?>
             <!-- KPI CARDS (Only for Admin) -->
-            <div class="d-grid grid-4 gap-16 mb-32">
-                <div class="kpi-card p-20 bg-blue-light br-16 border-2 border-blue d-flex flex-column">
+            <div class="d-grid gap-16 mb-32" style="grid-template-columns: repeat(5, 1fr);">
+                <div class="kpi-card p-16 bg-blue-light br-16 border-2 border-blue d-flex flex-column">
                     <div class="fs-12 text-muted tt-uppercase font-bold mb-8">Ventas Totales</div>
                     <div class="fs-24 font-mono font-bold text-accent"><?php echo number_format($avDashboard['kpis']['total_ventas'] ?? 0, 2, ',', '.'); ?> €</div>
                     <div class="fs-11 text-muted mt-4">Últimos 7 días</div>
                 </div>
-                <div class="kpi-card p-20 bg-green-light br-16 border-2 border-green d-flex flex-column">
+                <div class="kpi-card p-16 bg-green-light br-16 border-2 border-green d-flex flex-column">
                     <div class="fs-12 text-muted tt-uppercase font-bold mb-8">Margen Estimado</div>
                     <div class="fs-24 font-mono font-bold text-green"><?php echo number_format($avDashboard['kpis']['margen_estimado'] ?? 0, 2, ',', '.'); ?> €</div>
                     <div class="fs-11 text-muted mt-4">Beneficio bruto aprox.</div>
                 </div>
-                <div class="kpi-card p-20 bg-surface2 br-16 border-2 d-flex flex-column">
+                <div class="kpi-card p-16 bg-surface2 br-16 border-2 d-flex flex-column">
                     <div class="fs-12 text-muted tt-uppercase font-bold mb-8">Operaciones</div>
                     <div class="fs-24 font-mono font-bold"><?php echo $avDashboard['kpis']['total_tickets'] ?? 0; ?></div>
                     <div class="fs-11 text-muted mt-4">Tickets realizados</div>
                 </div>
-                <div class="kpi-card p-20 bg-surface2 br-16 border-2 d-flex flex-column">
+                <div class="kpi-card p-16 bg-surface2 br-16 border-2 d-flex flex-column">
                     <div class="fs-12 text-muted tt-uppercase font-bold mb-8">Catálogo</div>
                     <div class="fs-24 font-mono font-bold"><?php echo $avDashboard['productos_count']; ?></div>
                     <div class="fs-11 text-muted mt-4">Productos activos</div>
                 </div>
+                <div class="kpi-card p-16 <?php echo ($avDashboard['bajo_stock_count'] > 0) ? 'bg-red-light border-red' : 'bg-surface2'; ?> br-16 border-2 d-flex flex-column clickable" onclick="irAProductosBajoStock()">
+                    <div class="fs-12 text-muted tt-uppercase font-bold mb-8">Bajo Stock</div>
+                    <div class="fs-24 font-mono font-bold <?php echo ($avDashboard['bajo_stock_count'] > 0) ? 'text-red' : ''; ?>"><?php echo $avDashboard['bajo_stock_count']; ?></div>
+                    <div class="fs-11 text-muted mt-4">Requieren reposición</div>
+                </div>
             </div>
+            <script>
+                function irAProductosBajoStock() {
+                    // Redirigir a productos con un parámetro para filtrar por bajo stock? 
+                    // Por ahora solo redirigimos, y el usuario puede usar el filtro manual que añadí.
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = 'index.php';
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = 'irProductos';
+                    input.value = '1';
+                    form.appendChild(input);
+                    document.body.appendChild(form);
+                    form.submit();
+                }
+            </script>
         <?php endif; ?>
 
         <div class="d-grid grid-1-360 gap-16">
             <div class="dashboard-grid no-border p-0">
                 <!-- Acceso al TPV -->
                 <form method="post">
-                    <button type="submit" name="irTPV" class="dashboard-btn">
-                        <i class="fa-solid fa-cart-shopping"></i>
-                        <span class="btn-title">Ventas TPV</span>
-                        <span class="btn-desc">Acceder al panel de ventas y cobro</span>
-                    </button>
+                    <?php if (isset($avDashboard['cajaAbierta']) && $avDashboard['cajaAbierta']): ?>
+                        <button type="submit" name="irTPV" class="dashboard-btn">
+                            <i class="fa-solid fa-cart-shopping"></i>
+                            <span class="btn-title">Ventas TPV</span>
+                            <span class="btn-desc">Acceder al panel de ventas y cobro</span>
+                        </button>
+                    <?php else: ?>
+                        <button type="submit" name="irTPV" class="dashboard-btn" style="border-color: var(--orange); background: rgba(255,165,0,0.05);">
+                            <i class="fa-solid fa-cash-register text-orange"></i>
+                            <span class="btn-title text-orange">Abrir Caja</span>
+                            <span class="btn-desc">Iniciar turno para poder realizar ventas</span>
+                        </button>
+                    <?php endif; ?>
                 </form>
 
                 <!-- Gestión de Personal -->
@@ -72,6 +101,24 @@
                             <i class="fa-solid fa-box-archive"></i>
                             <span class="btn-title">Gestión de Productos</span>
                             <span class="btn-desc">Editar catálogo, precios e iconos</span>
+                        </button>
+                    </form>
+
+                    <!-- Compras / Entradas -->
+                    <form method="post">
+                        <button type="submit" name="irCompras" class="dashboard-btn">
+                            <i class="fa-solid fa-hand-holding-dollar"></i>
+                            <span class="btn-title">Compras y Entradas</span>
+                            <span class="btn-desc">Registrar facturas y reponer stock</span>
+                        </button>
+                    </form>
+
+                    <!-- Proveedores -->
+                    <form method="post">
+                        <button type="submit" name="irProveedores" class="dashboard-btn">
+                            <i class="fa-solid fa-truck-field"></i>
+                            <span class="btn-title">Proveedores</span>
+                            <span class="btn-desc">Gestionar listín y régimen fiscal</span>
                         </button>
                     </form>
 
@@ -111,10 +158,19 @@
                         </button>
                     </form>
 
+                    <!-- Ajustes del Sistema -->
+                    <form method="post">
+                        <button type="submit" name="irConfiguracion" class="dashboard-btn">
+                            <i class="fa-solid fa-gears"></i>
+                            <span class="btn-title">Ajustes del Sistema</span>
+                            <span class="btn-desc">Configuración global y del ticket</span>
+                        </button>
+                    </form>
+
                     <!-- Analítica -->
                     <form method="post">
                         <input type="hidden" name="Analitica" value="">
-                        <button type="submit" class="dashboard-btn" style="border-color: var(--accent);">
+                        <button type="submit" class="dashboard-btn">
                             <i class="fa-solid fa-chart-line text-accent"></i>
                             <span class="btn-title">Analítica Avanzada</span>
                             <span class="btn-desc">Reportes de ventas, categorías y márgenes</span>
@@ -131,7 +187,7 @@
 
             <?php if ($_SESSION['usuarioActualTPV']->getRol() === 'admin' && !empty($avDashboard['metodos'])): ?>
                 <!-- STATS PANEL (Right side on large screens) -->
-                <div class="stats-panel bg-surface p-20 br-16 border-2">
+                <div class="stats-panel bg-surface p-16 br-16 border-2">
                     <div class="fs-13 font-bold tt-uppercase mb-16 pb-8 border-bottom">Distribución de Cobros (7d)</div>
                     <div class="d-flex flex-column gap-12">
                         <?php foreach ($avDashboard['metodos'] as $m): ?>

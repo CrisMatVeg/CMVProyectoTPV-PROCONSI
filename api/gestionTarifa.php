@@ -1,4 +1,5 @@
 <?php
+
 /**
  * API: gestionTarifa.php
  * Alta y aplicación de tarifas de precios globales.
@@ -40,12 +41,47 @@ try {
             echo json_encode(['ok' => true]);
             break;
 
+        case 'editar':
+            $id = (int)($input['id'] ?? 0);
+            if ($id <= 0) throw new Exception('ID de tarifa inválido');
+            $err = validarTarifa($input);
+            if ($err) {
+                echo json_encode(['ok' => false, 'aErrores' => $err]);
+                break;
+            }
+            TarifaPrecioPDO::editar($id, $input);
+            echo json_encode(['ok' => true]);
+            break;
+
+        case 'eliminar':
+            $id = (int)($input['id'] ?? 0);
+            if ($id <= 0) throw new Exception('ID de tarifa inválido');
+            TarifaPrecioPDO::eliminar($id);
+            echo json_encode(['ok' => true]);
+            break;
+
+        case 'toggle':
+            $id = (int)($input['id'] ?? 0);
+            if ($id <= 0) throw new Exception('ID de tarifa inválido');
+            $activo = TarifaPrecioPDO::toggleActivo($id);
+            echo json_encode(['ok' => true, 'activo' => $activo]);
+            break;
+
         case 'aplicar':
             $id = (int)($input['id'] ?? 0);
             if ($id <= 0) {
                 throw new Exception('ID de tarifa inválido');
             }
             TarifaPrecioPDO::aplicar($id);
+            echo json_encode(['ok' => true]);
+            break;
+
+        case 'reordenar':
+            $ids = $input['ids'] ?? [];
+            if (!is_array($ids)) {
+                throw new Exception('Lista de IDs inválida');
+            }
+            TarifaPrecioPDO::actualizarOrden($ids);
             echo json_encode(['ok' => true]);
             break;
 
@@ -56,7 +92,8 @@ try {
     echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
 }
 
-function validarTarifa(array $d): array {
+function validarTarifa(array $d): array
+{
     $err = [
         'nombre' => '',
         'tipo' => '',
@@ -69,18 +106,21 @@ function validarTarifa(array $d): array {
     if (empty($d['nombre'])) {
         $err['nombre'] = 'El nombre es obligatorio';
     }
-    if (!in_array($d['tipo'] ?? '', ['percent','amount'], true)) {
+    if (!in_array($d['tipo'] ?? '', ['percent'], true)) {
         $err['tipo'] = 'Tipo no válido';
     }
     if (!isset($d['valor']) || !is_numeric($d['valor'])) {
         $err['valor'] = 'Valor inválido';
     }
+    // La fecha ya no es estrictamente obligatoria si se usa segmentación o reglas permanentes
+    /*
     if (empty($d['fecha_aplicacion'])) {
         $err['fecha_aplicacion'] = 'La fecha de aplicación es obligatoria';
     }
+    */
 
     $scope = $d['scope'] ?? 'todos';
-    if (!in_array($scope, ['todos','categoria','productos'], true)) {
+    if (!in_array($scope, ['todos', 'categoria', 'productos'], true)) {
         $scope = 'todos';
     }
     if ($scope === 'categoria' && empty($d['categoria'])) {
@@ -94,4 +134,3 @@ function validarTarifa(array $d): array {
 
     return array_filter($err, fn($v) => $v !== '');
 }
-

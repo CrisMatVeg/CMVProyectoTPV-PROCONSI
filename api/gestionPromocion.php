@@ -73,6 +73,15 @@ try {
             echo json_encode(['ok' => true, 'activo' => $activo]);
             break;
 
+        case 'reordenar':
+            $ids = $input['ids'] ?? [];
+            if (!is_array($ids)) {
+                throw new Exception('Lista de IDs inválida');
+            }
+            PromocionPDO::actualizarOrden($ids);
+            echo json_encode(['ok' => true]);
+            break;
+
         default:
             throw new Exception('Acción no válida');
     }

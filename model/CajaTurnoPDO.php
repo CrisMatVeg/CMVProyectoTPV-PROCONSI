@@ -18,6 +18,15 @@ class CajaTurnoPDO
         return $row ?: null;
     }
 
+    public static function obtenerUltimoFondoSugerido(): float
+    {
+        $q = DBPDO::ejecutarConsulta(
+            "SELECT fondo_siguiente_turno FROM caja_turnos WHERE estado = 'cerrado' ORDER BY id DESC LIMIT 1"
+        );
+        $row = $q->fetch(PDO::FETCH_ASSOC);
+        return $row ? (float)$row['fondo_siguiente_turno'] : 0.0;
+    }
+
     public static function abrirTurno(int $idUsuario, float $fondoInicial): int
     {
         if ($fondoInicial < 0) {

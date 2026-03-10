@@ -5,6 +5,7 @@
  * Gestiona las entradas de stock y el cálculo del coste medio ponderado (CMP).
  */
 require_once __DIR__ . '/DBPDO.php';
+require_once __DIR__ . '/MovimientoStockPDO.php';
 
 class EntradaStockPDO
 {
@@ -27,14 +28,19 @@ class EntradaStockPDO
         int $cantidad,
         float $precioCoste,
         ?int $idUsuario = null,
-        string $notas = ''
+        string $notas = '',
+        ?PDO $db = null
     ): array {
         // 1. Obtener stock y CMP actuales del producto
-        $q = DBPDO::ejecutarConsulta(
-            "SELECT stock_actual, precio_coste FROM productos WHERE id = :id",
-            [':id' => $idProducto]
-        );
-        $prod = $q->fetch(PDO::FETCH_ASSOC);
+        $sqlProd = "SELECT stock_actual, precio_coste FROM productos WHERE id = :id";
+        if ($db) {
+            $stmt = $db->prepare($sqlProd);
+            $stmt->execute([':id' => $idProducto]);
+            $prod = $stmt->fetch(PDO::FETCH_ASSOC);
+        } else {
+            $q = DBPDO::ejecutarConsulta($sqlProd, [':id' => $idProducto]);
+            $prod = $q->fetch(PDO::FETCH_ASSOC);
+        }
         if (!$prod) {
             throw new \RuntimeException("Producto ID {$idProducto} no encontrado.");
         }
@@ -54,28 +60,44 @@ class EntradaStockPDO
         }
 
         // 3. Actualizar el producto: stock y precio_coste (CMP)
-        DBPDO::ejecutarConsulta(
-            "UPDATE productos SET stock_actual = :stock, precio_coste = :cmp WHERE id = :id",
-            [':stock' => $stockNuevo, ':cmp' => $cmpNuevo, ':id' => $idProducto]
-        );
+        $sqlUpdate = "UPDATE productos SET stock_actual = :stock, precio_coste = :cmp WHERE id = :id";
+        $paramsUpdate = [':stock' => $stockNuevo, ':cmp' => $cmpNuevo, ':id' => $idProducto];
 
         // 4. Registrar el movimiento de entrada
-        DBPDO::ejecutarConsulta(
-            "INSERT INTO entradas_stock
+        $sqlInsert = "INSERT INTO entradas_stock
                 (id_producto, cantidad, precio_coste, cmp_anterior, cmp_resultante,
                  stock_anterior, stock_nuevo, id_usuario, notas)
-             VALUES (:prod, :qty, :coste, :cmpAnt, :cmpRes, :stkAnt, :stkNuevo, :usr, :notas)",
-            [
-                ':prod'    => $idProducto,
-                ':qty'     => $cantidad,
-                ':coste'   => round($precioCoste, 2),
-                ':cmpAnt'  => round($cmpActual, 2),
-                ':cmpRes'  => round($cmpNuevo, 2),
-                ':stkAnt'  => $stockActual,
-                ':stkNuevo' => $stockNuevo,
-                ':usr'     => $idUsuario,
-                ':notas'   => $notas ?: null,
-            ]
+             VALUES (:prod, :qty, :coste, :cmpAnt, :cmpRes, :stkAnt, :stkNuevo, :usr, :notas)";
+        $paramsInsert = [
+            ':prod'    => $idProducto,
+            ':qty'     => $cantidad,
+            ':coste'   => round($precioCoste, 2),
+            ':cmpAnt'  => round($cmpActual, 2),
+            ':cmpRes'  => round($cmpNuevo, 2),
+            ':stkAnt'  => $stockActual,
+            ':stkNuevo' => $stockNuevo,
+            ':usr'     => $idUsuario,
+            ':notas'   => $notas ?: null,
+        ];
+
+        if ($db) {
+            $stmtUpd = $db->prepare($sqlUpdate);
+            $stmtUpd->execute($paramsUpdate);
+            $stmtIns = $db->prepare($sqlInsert);
+            $stmtIns->execute($paramsInsert);
+        } else {
+            DBPDO::ejecutarConsulta($sqlUpdate, $paramsUpdate);
+            DBPDO::ejecutarConsulta($sqlInsert, $paramsInsert);
+        }
+
+        // Registrar en MovimientosStock
+        MovimientoStockPDO::registrarMovimiento(
+            $idProducto,
+            'compra',
+            $cantidad,
+            $idUsuario,
+            $notas ?: "Entrada de stock (CMP)",
+            $db
         );
 
         return [

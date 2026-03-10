@@ -1,12 +1,12 @@
 </header>
-<div class="main-full container w-600 m-0-auto pt-50">
-    
+<div class="main-full container w-700 m-0-auto pt-50">
+
     <div class="modal-content p-40">
         <div class="text-center mb-30">
             <div class="avatar w-80 h-80 fs-32 m-0-auto-15 d-flex ai-center jc-center bg-blue-light text-accent br-50">
-                <?php 
-                    $nombres = explode(" ", $avMiPerfil['usuario']->getNombreCompleto());
-                    echo strtoupper(substr($nombres[0], 0, 1) . (isset($nombres[1]) ? substr($nombres[1], 0, 1) : ""));
+                <?php
+                $nombres = explode(" ", $avMiPerfil['usuario']->getNombreCompleto());
+                echo strtoupper(substr($nombres[0], 0, 1) . (isset($nombres[1]) ? substr($nombres[1], 0, 1) : ""));
                 ?>
             </div>
             <h1 class="fs-22 m-0">Mi Perfil</h1>
