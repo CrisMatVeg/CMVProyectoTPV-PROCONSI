@@ -74,5 +74,37 @@ $avAnalitica = [
     'aErrores' => $aErrores
 ];
 
+// Rellenar días vacíos para que la gráfica represente el rango completo
+if ($fechaDesde && $fechaHasta) {
+    $margenesPad = [];
+    $currentTs = strtotime($fechaDesde);
+    $endTs = strtotime($fechaHasta);
+    
+    $margenesMap = [];
+    foreach ($avAnalitica['margenes'] as $row) {
+        $margenesMap[$row['fecha']] = $row;
+    }
+    
+    // Safety check para no exceder demasiados días
+    $maxDays = 365;
+    $days = 0;
+    while ($currentTs <= $endTs && $days < $maxDays) {
+        $dateYmd = date('Y-m-d', $currentTs);
+        if (isset($margenesMap[$dateYmd])) {
+            $margenesPad[] = $margenesMap[$dateYmd];
+        } else {
+            $margenesPad[] = [
+                'fecha' => $dateYmd,
+                'ingresos' => 0,
+                'costes' => 0,
+                'beneficio' => 0
+            ];
+        }
+        $currentTs = strtotime('+1 day', $currentTs);
+        $days++;
+    }
+    $avAnalitica['margenes'] = $margenesPad;
+}
+
 // Cargar la vista
 require_once $view['layout'];

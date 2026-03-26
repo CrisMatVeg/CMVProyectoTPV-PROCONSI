@@ -8,6 +8,7 @@ require_once './model/Venta.php';
 require_once './model/VentaPDO.php';
 require_once './model/ClientePDO.php';
 require_once './model/RolPDO.php';
+require_once './model/LogPDO.php';
 $controller = [
     "inicioPublico" => "controller/cInicioPublico.php",
     "Login" => "controller/cLogin.php",
@@ -38,15 +39,8 @@ $controller = [
     // "DetallesDog" => "controller/cDetallesDog.php",
     "MtoDepartamentos" => "controller/cMtoDepartamentos.php",
     "Configuracion" => "controller/cConfiguracion.php",
-    // "MtoUsuarios" => "controller/cMtoUsuarios.php",
-    // "MtoUsuariosAPI" => "controller/cMtoUsuariosAPI.php",
-    // "ConsultarDepartamentos" => "controller/cConsultarDepartamentos.php",
-    // "EditarDepartamento" => "controller/cEditarDepartamento.php",
-    // "AltaDepartamento" => "controller/cAltaDepartamento.php",
-    // "ConsultarUsuario" => "controller/cConsultarUsuario.php",
-    // "EditarUsuario" => "controller/cEditarUsuario.php",
-    // "EliminarUsuario" => "controller/cEliminarUsuario.php",
-    // "EliminarDepartamento" => "controller/cEliminarDepartamento.php"
+    "RecuperarPassword" => "controller/cRecuperarPassword.php",
+    "RestablecerPassword" => "controller/cRecuperarPassword.php"
 ];
 $view = [
     "inicioPublico" => "view/vInicioPublico.php",
@@ -79,13 +73,6 @@ $view = [
     // "DetallesDog" => "view/vDetallesDog.php",
     "MtoDepartamentos" => "view/vMtoDepartamentos.php",
     "Configuracion" => "view/vConfiguracion.php",
-    // "MtoUsuarios" => "view/vMtoUsuarios.php",
-    // "MtoUsuariosAPI" => "view/vMtoUsuariosAPI.php",
-    // "ConsultarDepartamentos" => "view/vConsultarDepartamentos.php",
-    // "EditarDepartamento" => "view/vEditarDepartamento.php",
-    // "AltaDepartamento" => "view/vAltaDepartamento.php",
-    // "ConsultarUsuario" => "view/vConsultarUsuario.php",
-    // "EditarUsuario" => "view/vEditarUsuario.php",
-    // "EliminarUsuario" => "view/vEliminarUsuario.php",
-    // "EliminarDepartamento" => "view/vEliminarDepartamento.php"
+    "RecuperarPassword" => "view/vRecuperarPassword.php",
+    "RestablecerPassword" => "view/vRestablecerPassword.php"
 ];

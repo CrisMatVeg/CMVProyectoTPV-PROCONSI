@@ -1,10 +1,11 @@
 <?php
+require_once __DIR__ . '/csrf_check.php';
 
 /**
  * API: rolPermisos.php
  * Devuelve las claves de permisos asignadas a un rol en formato JSON.
  */
-session_start();
+// session_start(); // csrf_check already starts session
 header('Content-Type: application/json');
 
 // Seguridad mínima (autenticado)
@@ -13,8 +14,8 @@ if (!isset($_SESSION['usuarioActualTPV'])) {
     exit;
 }
 
-require_once '../model/DBPDO.php';
-require_once '../model/RolPDO.php';
+require_once __DIR__ . '/../model/DBPDO.php';
+require_once __DIR__ . '/../model/RolPDO.php';
 
 $idRol = isset($_GET['idRol']) ? (int)$_GET['idRol'] : null;
 

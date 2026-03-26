@@ -22,10 +22,16 @@ class UsuarioPDO
     {
         if ($password != null) {
             // Usamos SHA2 de MySQL para compatibilidad con el script de creación
-            $sql = "SELECT * FROM usuarios WHERE login = :login AND password = SHA2(:password,256)";
+            $sql = "SELECT u.*, r.nombre as rol 
+                    FROM usuarios u 
+                    LEFT JOIN roles r ON u.id_rol = r.id 
+                    WHERE u.login = :login AND u.password = SHA2(:password,256)";
             $consulta = DBPDO::ejecutarConsulta($sql, [':login' => $login, ':password' => $password]);
         } else {
-            $sql = "SELECT * FROM usuarios WHERE login = :login";
+            $sql = "SELECT u.*, r.nombre as rol 
+                    FROM usuarios u 
+                    LEFT JOIN roles r ON u.id_rol = r.id 
+                    WHERE u.login = :login";
             $consulta = DBPDO::ejecutarConsulta($sql, [':login' => $login]);
         }
 
@@ -35,14 +41,23 @@ class UsuarioPDO
             return null; // No loguear si está inactivo
         }
 
+        // Normalización de rol (Legacy compatibility)
+        $rol = $objetoResultado['rol'] ?? '';
+        if (is_null($rol)) $rol = ''; 
+        if (strtolower($rol) === 'administrador') {
+            $rol = 'admin';
+        }
+
         return new Usuario(
             $objetoResultado['id'],
             $objetoResultado['nombre'],
             $objetoResultado['login'],
             $objetoResultado['password'],
-            $objetoResultado['rol'],
+            $rol,
             $objetoResultado['activo'],
-            $objetoResultado['id_rol'] ?? null
+            $objetoResultado['id_rol'] ?? null,
+            $objetoResultado['email'] ?? null,
+            $objetoResultado['idioma'] ?? 'es'
         );
     }
 
@@ -52,18 +67,29 @@ class UsuarioPDO
      */
     public static function listarUsuarios(): array
     {
-        $sql = "SELECT * FROM usuarios ORDER BY activo DESC, nombre ASC";
+        $sql = "SELECT u.*, r.nombre as rol 
+                FROM usuarios u 
+                LEFT JOIN roles r ON u.id_rol = r.id 
+                ORDER BY u.activo DESC, u.nombre ASC";
         $q = DBPDO::ejecutarConsulta($sql);
         $usuarios = [];
         while ($row = $q->fetch(PDO::FETCH_ASSOC)) {
+            // Normalización de rol (Legacy compatibility)
+            $rol = $row['rol'] ?? '';
+            if (strtolower($rol) === 'administrador') {
+                $rol = 'admin';
+            }
+
             $usuarios[] = new Usuario(
                 $row['id'],
                 $row['nombre'],
                 $row['login'],
                 $row['password'],
-                $row['rol'],
+                $rol,
                 $row['activo'],
-                $row['id_rol'] ?? null
+                $row['id_rol'] ?? null,
+                $row['email'] ?? null,
+                $row['idioma'] ?? 'es'
             );
         }
         return $usuarios;
@@ -72,18 +98,40 @@ class UsuarioPDO
     /**
      * Añade un nuevo usuario.
      */
-    public static function añadirUsuario($nombre, $login, $password, $rol, $idRol = null)
+    public static function añadirUsuario($nombre, $login, $password, $rol, $idRol = null, $email = null)
     {
-        $sql = "INSERT INTO usuarios (nombre, login, password, rol, id_rol) 
-                VALUES (:nombre, :login, SHA2(:pass,256), :rol, :idrol)";
+        $sql = "INSERT INTO usuarios (nombre, login, password, id_rol, email, idioma) 
+                VALUES (:nombre, :login, SHA2(:pass,256), :idrol, :email, 'es')";
         $params = [
             ':nombre' => $nombre,
             ':login'   => $login,
             ':pass'   => $password,
-            ':rol'    => $rol,
-            ':idrol'  => $idRol
+            ':idrol'  => $idRol,
+            ':email'  => $email
         ];
         return DBPDO::ejecutarConsulta($sql, $params);
+    }
+
+    /**
+     * Cambia el idioma del usuario.
+     */
+    public static function cambiarIdioma($id, $idioma)
+    {
+        $sql = "UPDATE usuarios SET idioma = :idioma WHERE id = :id";
+        return DBPDO::ejecutarConsulta($sql, [':id' => $id, ':idioma' => $idioma]);
+    }
+
+    /**
+     * Edita los datos básicos de un usuario.
+     */
+    public static function editarUsuario($id, $nombre, $email)
+    {
+        $sql = "UPDATE usuarios SET nombre = :nombre, email = :email WHERE id = :id";
+        return DBPDO::ejecutarConsulta($sql, [
+            ':id' => $id,
+            ':nombre' => $nombre,
+            ':email' => $email
+        ]);
     }
 
     /**
@@ -94,8 +142,8 @@ class UsuarioPDO
      */
     public static function editarRol($id, $nuevoRol, $idRol = null)
     {
-        $sql = "UPDATE usuarios SET rol = :rol, id_rol = :idrol WHERE id = :id";
-        return DBPDO::ejecutarConsulta($sql, [':rol' => $nuevoRol, ':idrol' => $idRol, ':id' => $id]);
+        $sql = "UPDATE usuarios SET id_rol = :idrol WHERE id = :id";
+        return DBPDO::ejecutarConsulta($sql, [':idrol' => $idRol, ':id' => $id]);
     }
 
     /**
@@ -110,5 +158,71 @@ class UsuarioPDO
 
         $sqlToggle = "UPDATE usuarios SET activo = :estado WHERE id = :id";
         return DBPDO::ejecutarConsulta($sqlToggle, [':id' => $id, ':estado' => $nuevoEstado]);
+    }
+
+    /**
+     * Busca un usuario por su email.
+     */
+    public static function buscarPorEmail($email)
+    {
+        $sql = "SELECT * FROM usuarios WHERE email = :email AND activo = 1";
+        $consulta = DBPDO::ejecutarConsulta($sql, [':email' => $email]);
+        $row = $consulta->fetch(PDO::FETCH_ASSOC);
+
+        if (!$row) return null;
+
+        return new Usuario(
+            $row['id'],
+            $row['nombre'],
+            $row['login'],
+            $row['password'],
+            '', // Rol no necesario aquí
+            $row['activo'],
+            $row['id_rol'],
+            $row['email']
+        );
+    }
+
+    /**
+     * Guarda un token de recuperación.
+     */
+    public static function guardarTokenRecuperacion($id, $token, $expiracion)
+    {
+        $sql = "UPDATE usuarios SET token_recuperacion = :token, token_expiracion = :exp WHERE id = :id";
+        return DBPDO::ejecutarConsulta($sql, [
+            ':id' => $id,
+            ':token' => $token,
+            ':exp' => $expiracion
+        ]);
+    }
+
+    /**
+     * Valida un token de recuperación.
+     */
+    public static function validarToken($token)
+    {
+        $sql = "SELECT id FROM usuarios 
+                WHERE token_recuperacion = :token 
+                AND token_expiracion > NOW() 
+                AND activo = 1";
+        $consulta = DBPDO::ejecutarConsulta($sql, [':token' => $token]);
+        $row = $consulta->fetch(PDO::FETCH_ASSOC);
+        return $row ? $row['id'] : null;
+    }
+
+    /**
+     * Cambia la contraseña y limpia el token.
+     */
+    public static function cambiarPassword($id, $nuevaPassword)
+    {
+        $sql = "UPDATE usuarios 
+                SET password = SHA2(:pass, 256), 
+                    token_recuperacion = NULL, 
+                    token_expiracion = NULL 
+                WHERE id = :id";
+        return DBPDO::ejecutarConsulta($sql, [
+            ':id' => $id,
+            ':pass' => $nuevaPassword
+        ]);
     }
 }

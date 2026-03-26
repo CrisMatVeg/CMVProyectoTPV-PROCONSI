@@ -18,6 +18,9 @@ if ($_SESSION['usuarioActualTPV']->getRol() !== 'admin') {
 
 require_once 'model/TarifaPrecioPDO.php';
 require_once 'model/ProductoPDO.php';
+require_once 'model/ClientePDO.php';
+require_once 'model/CategoriaPDO.php';
+require_once 'model/RolClientePDO.php';
 
 // Navegación global
 if (isset($_REQUEST['salir'])) {
@@ -46,8 +49,11 @@ if (isset($_REQUEST['volver']) || isset($_REQUEST['irDashboard'])) {
 }
 
 $avTarifas = [
-    'lista'     => TarifaPrecioPDO::listarTodas(),
-    'productos' => ProductoPDO::listarProductos(false),
+    'lista'      => TarifaPrecioPDO::listarTodas(),
+    'productos'  => ProductoPDO::listarProductos(false),
+    'clientes'   => ClientePDO::listarTodos(),
+    'categorias' => CategoriaPDO::listarTodas(),
+    'roles'      => RolClientePDO::listarRoles(),
 ];
 
 require_once $view['layout'];

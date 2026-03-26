@@ -20,6 +20,11 @@ if ($_SESSION['usuarioActualTPV']->getRol() !== 'admin') {
 }
 
 // Navegación
+if (isset($_REQUEST['irUsuarios'])) {
+    $_SESSION['paginaEnCurso'] = 'Usuarios';
+    header('Location: index.php');
+    exit;
+}
 if (isset($_REQUEST['volver']) || isset($_REQUEST['irDashboard'])) {
     $_SESSION['paginaEnCurso'] = 'Dashboard';
     header('Location: index.php');
@@ -47,6 +52,7 @@ if (isset($_REQUEST['accion'])) {
                 $idRol = RolPDO::añadirRol($nombre, $desc);
             }
 
+            error_log("GUARDANDO ROL ID: " . $idRol . " CON PERMISOS: " . print_r($permisosIds, true));
             RolPDO::asignarPermisos($idRol, $permisosIds);
             $mensajeOk = "Rol guardado correctamente.";
         } else {

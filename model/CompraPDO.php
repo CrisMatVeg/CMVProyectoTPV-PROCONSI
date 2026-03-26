@@ -84,7 +84,7 @@ class CompraPDO
         } catch (Exception $e) {
             if (isset($db)) $db->rollBack();
             error_log("Error en CompraPDO::registrarAlbaran: " . $e->getMessage());
-            return false;
+            throw $e; // Relanzar para que la API capture el mensaje real
         }
     }
 

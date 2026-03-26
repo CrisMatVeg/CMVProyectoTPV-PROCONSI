@@ -19,7 +19,7 @@
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.05);
   --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.12);
   /* ancho por defecto del panel de pedido */
-  --sidebar-width: 420px;
+  --sidebar-width: 480px;
 }
 
 /* Modos de tema (modo claro por defecto) */
@@ -123,7 +123,8 @@ body {
   flex-shrink: 0;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
   position: relative;
-  z-index: 100;
+  z-index: 200;
+  isolation: isolate;
 }
 
 .topbar-brand {
@@ -1244,7 +1245,7 @@ input[type="submit"].btn-clear {
 .grid-1-360 {
   display: grid;
   grid-template-columns: 1fr 360px;
-  align-items: stretch;
+  align-items: flex-start;
 }
 
 @media (max-width: 1100px) {
@@ -1275,7 +1276,7 @@ input[type="submit"].btn-clear {
 }
 
 .stats-panel {
-  height: 100%;
+  height: auto;
 }
 
 .pb-8 {
@@ -1456,7 +1457,6 @@ input[type="submit"].btn-clear {
   }
 }
 
-/* --- FINANCIACIÓN INTELIGENTE & RENTABILIDAD --- */
 .profit-alert {
   padding: 12px 16px;
   border-radius: 10px;
@@ -1606,11 +1606,6 @@ input[type="submit"].btn-clear {
   color: white;
 }
 
-#btnFinanciacion:disabled {
-  filter: grayscale(1);
-  opacity: 0.5;
-  cursor: not-allowed;
-}
 
 /* --- IMPORT / EXPORT BUTTONS --- */
 .btn-ie {
@@ -1750,7 +1745,6 @@ input:checked + .slider:before {
 input:focus + .slider {
   box-shadow: 0 0 1px var(--accent);
 }
-/* FINANCING INDICATOR & REDESIGNED MODAL */
 .fin-profit-indicator {
   margin: 10px 20px;
   background: var(--surface2);
@@ -1841,7 +1835,6 @@ input:focus + .slider {
   font-family: "DM Mono", monospace;
   font-size: 15px;
 }
-/* FINANCING INFO PANEL - WARNING WITH SIMPLE SELECTS */
 .fin-info-panel {
   display: flex;
   flex-direction: column;
@@ -1942,28 +1935,6 @@ input:focus + .slider {
     grid-template-rows: 1fr auto;
     overflow-y: auto;
   }
-  /* ESTADOS DEL BOTÓN DE FINANCIACIÓN */
-  .pay-btn.locked {
-    filter: grayscale(1) opacity(0.5);
-    cursor: not-allowed;
-    border-style: dashed;
-  }
-
-  .finan-badge {
-    display: block;
-    font-size: 8px;
-    margin-top: 4px;
-    background: rgba(0, 0, 0, 0.1);
-    padding: 2px 6px;
-    border-radius: 4px;
-    color: var(--text-muted);
-  }
-
-  .finan-badge-available {
-    background: var(--green-light);
-    color: var(--green);
-    font-weight: 800;
-  }
 
   .order-panel {
     width: 100%;
@@ -2028,12 +1999,6 @@ input:focus + .slider {
 
 .variant-card-btn:active:not(:disabled) {
   transform: translateY(-1px);
-}
-
-.variant-card-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  filter: grayscale(0.8);
 }
 
 .variant-card-btn .v-name {
@@ -2253,3 +2218,5 @@ input:focus + .slider {
     padding: 0 !important;
   }
 }
+
+.ticket-num { font-size: 0.85rem !important; white-space: nowrap !important; font-family: 'DM Mono', monospace; color: var(--primary); }

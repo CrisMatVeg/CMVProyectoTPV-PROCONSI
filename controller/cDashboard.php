@@ -1,4 +1,9 @@
 <?php
+if (!isset($_SESSION['usuarioActualTPV'])) {
+    $_SESSION['paginaEnCurso'] = 'Login';
+    header('Location: index.php');
+    exit;
+}
 
 /**
  * Controlador: cDashboard

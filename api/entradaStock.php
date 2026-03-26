@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/csrf_check.php';
 
 /**
  * API: entradaStock.php
@@ -14,7 +15,7 @@ try {
     require_once __DIR__ . '/../model/Usuario.php';
     require_once __DIR__ . '/../model/EntradaStockPDO.php';
 
-    session_start();
+    // session_start(); // Handled by csrf_check.php
 
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         http_response_code(405);

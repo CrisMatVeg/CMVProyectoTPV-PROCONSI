@@ -1,101 +1,69 @@
 <?php
+require_once __DIR__ . '/csrf_check.php';
 
 /**
  * API: generarPedidoAuto.php
  * Genera albaranes de compra automáticos para productos bajo stock mínimo.
  */
+
+ini_set('display_errors', 0);
+error_reporting(0);
 header('Content-Type: application/json; charset=utf-8');
 
 try {
     require_once __DIR__ . '/../config/confDBPDO.php';
     require_once __DIR__ . '/../model/DBPDO.php';
-    require_once __DIR__ . '/../model/ProductoPDO.php';
     require_once __DIR__ . '/../model/Usuario.php';
+    require_once __DIR__ . '/../model/ProductoPDO.php';
+    require_once __DIR__ . '/../model/ProveedorPDO.php';
+    require_once __DIR__ . '/../model/TipoIVAPDO.php';
 
-    session_start();
+    // session_start(); // Handled by csrf_check.php
     if (!isset($_SESSION['usuarioActualTPV']) || $_SESSION['usuarioActualTPV']->getRol() !== 'admin') {
         throw new Exception('No autorizado');
     }
 
-    $idUsuario = $_SESSION['usuarioActualTPV']->getId();
+    $sqlProd = "SELECT p.id, p.id_proveedor, p.nombre, p.referencia, p.stock_actual, p.stock_minimo, p.activo
+                FROM productos p WHERE p.es_pack = 0 AND p.activo = 1 AND p.id_proveedor IS NOT NULL AND p.stock_actual <= p.stock_minimo";
+    $stmtProd = DBPDO::ejecutarConsulta($sqlProd);
+    $bajoStock = $stmtProd->fetchAll(PDO::FETCH_ASSOC);
 
-    // 1. Buscar productos bajo stock (excluyendo packs)
-    $sql = "SELECT id, id_proveedor, nombre, stock_actual, stock_minimo 
-            FROM productos 
-            WHERE es_pack = 0 AND activo = 1 AND stock_actual <= stock_minimo";
-    $stmt = DBPDO::ejecutarConsulta($sql);
-    $bajoStock = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $omitidosInactivos = 0; $omitidosSinProveedor = 0; $validos = [];
+    foreach ($bajoStock as $p) {
+        if ($p['activo'] == 0) { $omitidosInactivos++; continue; }
+        if (empty($p['id_proveedor'])) { $omitidosSinProveedor++; continue; }
+        $validos[] = ['id' => $p['id'], 'nombre' => $p['nombre'], 'referencia' => $p['referencia'] ?? '', 'id_proveedor' => $p['id_proveedor'], 'stock_actual' => (int)$p['stock_actual'], 'stock_minimo' => (int)$p['stock_minimo']];
+    }
 
-    if (empty($bajoStock)) {
-        echo json_encode(['ok' => true, 'mensaje' => 'No hay productos bajo stock mínimo.', 'pedidos' => 0]);
+    if (empty($validos)) {
+        echo json_encode(['ok' => true, 'mensaje' => 'No se han podido generar pedidos.', 'total_bajo_stock' => count($bajoStock), 'omitidos_inactivos' => $omitidosInactivos, 'omitidos_sin_proveedor' => $omitidosSinProveedor, 'datos_pedido' => []]);
         exit;
     }
 
-    // 2. Agrupar por proveedor
     $porProveedor = [];
-    foreach ($bajoStock as $p) {
-        $provId = $p['id_proveedor'] ?: 0; // 0 para genérico/sin proveedor
+    foreach ($validos as $p) {
+        $provId = $p['id_proveedor'];
         if (!isset($porProveedor[$provId])) {
-            $porProveedor[$provId] = [];
+            $oProv = ProveedorPDO::buscarPorId($provId);
+            $porProveedor[$provId] = ['proveedor_id' => $provId, 'proveedor_nombre' => $oProv ? $oProv->getNombre() : 'Proveedor Desconocido', 'aplica_re' => $oProv ? $oProv->getAplicaRe() : false, 'productos' => []];
         }
-        $porProveedor[$provId][] = $p;
+        $prodInfo = ProductoPDO::obtenerProductoPorId($p['id']);
+        $tipoIva = TipoIVAPDO::obtenerVigentePorCodigo($prodInfo['codigo_iva'] ?? 'GENERAL', date('Y-m-d'));
+        $pctIva = (float)($tipoIva['porcentaje'] ?? 21);
+        $rePct = 0;
+        if ($pctIva >= 21) $rePct = 5.2; elseif ($pctIva >= 10) $rePct = 1.4; elseif ($pctIva >= 4) $rePct = 0.5;
+        $cantidadSugerida = max(($p['stock_minimo'] * 2), 10);
+        $costeActual = (float)($prodInfo['precio_coste'] ?? 0);
+        $precioNeto = 0;
+        if ($costeActual > 0) {
+            $pctRE = $rePct; // Siempre aplicado
+            $divisor = 1 + ($pctIva / 100) + ($pctRE / 100); $precioNeto = round($costeActual / $divisor, 4);
+        }
+        $porProveedor[$provId]['productos'][] = ['id' => $p['id'], 'nombre' => $p['nombre'] . ' (' . ($p['referencia'] ?: 'S/R') . ')', 'referencia' => $p['referencia'] ?? '', 'cantidad' => $cantidadSugerida, 'precio_coste_neto' => $precioNeto, 'iva_pct' => $pctIva, 're_pct' => $rePct];
     }
 
-    $pedidosGenerados = 0;
-    $db = DBPDO::getPDO();
-    if (!$db) throw new Exception("Error al obtener conexión PDO");
-
-    $db->beginTransaction();
-
-    foreach ($porProveedor as $provId => $productos) {
-        if ($provId === 0) continue; // Por ahora no generamos albaranes sin proveedor definido
-
-        // Crear Albarán (Estado: pendiente)
-        $sqlAlbaran = "INSERT INTO albaranes_compra (id_proveedor, fecha, estado, total) VALUES (:prov, NOW(), 'pendiente', 0)";
-        $stmtAlb = $db->prepare($sqlAlbaran);
-        $stmtAlb->execute([':prov' => $provId]);
-        $idAlbaran = $db->lastInsertId();
-
-        $totalAlbaran = 0;
-
-        foreach ($productos as $p) {
-            // Sugerir cantidad: stock_minimo * 2 o similar
-            $cantidadSugerida = ($p['stock_minimo'] * 2);
-            if ($cantidadSugerida <= 0) $cantidadSugerida = 10;
-
-            // Buscar precio de proveedor actual
-            $prodInfo = ProductoPDO::obtenerProductoPorId($p['id']);
-            $costeRef = $prodInfo['precio_proveedor'] ?: $prodInfo['precio_coste'];
-
-            $sqlLinea = "INSERT INTO lineas_compra (id_albaran, id_producto, cantidad, precio_unitario) 
-                         VALUES (:alb, :prod, :qty, :price)";
-            $stmtLin = $db->prepare($sqlLinea);
-            $stmtLin->execute([
-                ':alb'   => $idAlbaran,
-                ':prod'  => $p['id'],
-                ':qty'   => $cantidadSugerida,
-                ':price' => $costeRef
-            ]);
-
-            $totalAlbaran += ($cantidadSugerida * $costeRef);
-        }
-
-        // Actualizar total albarán
-        $stmtUpd = $db->prepare("UPDATE albaranes_compra SET total = :total WHERE id = :id");
-        $stmtUpd->execute([':total' => $totalAlbaran, ':id' => $idAlbaran]);
-
-        $pedidosGenerados++;
-    }
-
-    $db->commit();
-
-    echo json_encode([
-        'ok' => true,
-        'mensaje' => "Se han generado {$pedidosGenerados} pedidos de compra en estado pendiente.",
-        'pedidos' => $pedidosGenerados
-    ]);
+    echo json_encode(['ok' => true, 'datos_pedido' => array_values($porProveedor), 'total_bajo_stock' => count($bajoStock), 'omitidos_inactivos' => $omitidosInactivos, 'omitidos_sin_proveedor' => $omitidosSinProveedor]);
 } catch (Throwable $e) {
-    if (isset($db) && $db->inTransaction()) $db->rollBack();
     http_response_code(500);
     echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
 }

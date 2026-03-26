@@ -1,25 +1,37 @@
 <?php
+require_once __DIR__ . '/csrf_check.php';
 /**
  * API: exportarAnalitica.php
  * Genera reportes de analítica en diferentes formatos (CSV, JSON)
  */
-require_once '../config/confDBPDO.php';
-require_once '../model/DBPDO.php';
-require_once '../model/VentaPDO.php';
 
-header('Content-Type: application/json');
+ini_set('display_errors', 0);
+error_reporting(0);
 
 try {
+    require_once __DIR__ . '/../config/confDBPDO.php';
+    require_once __DIR__ . '/../model/DBPDO.php';
+    require_once __DIR__ . '/../model/Usuario.php';
+    require_once __DIR__ . '/../model/VentaPDO.php';
+
+    // session_start(); // Handled by csrf_check.php
+
+    if (!isset($_SESSION['usuarioActualTPV'])) {
+        http_response_code(401);
+        echo json_encode(['ok' => false, 'error' => 'No autorizado']);
+        exit;
+    }
+
     $action = $_POST['action'] ?? $_GET['action'] ?? 'csv';
     $fechaDesde = $_POST['fechaDesde'] ?? $_GET['fechaDesde'] ?? date('Y-m-d', strtotime('-30 days'));
     $fechaHasta = $_POST['fechaHasta'] ?? $_GET['fechaHasta'] ?? date('Y-m-d');
 
-    // Validate dates
     if (!strtotime($fechaDesde) || !strtotime($fechaHasta)) {
-        die(json_encode(['ok' => false, 'error' => 'Fechas inválidas']));
+        echo json_encode(['ok' => false, 'error' => 'Fechas inválidas']);
+        exit;
     }
 
-    // Fetch KPIs
+    // KPIs
     $sql = "SELECT 
                 COUNT(DISTINCT numero_ticket) as total_tickets,
                 SUM(total) as total_ventas,
@@ -31,7 +43,7 @@ try {
     $q = DBPDO::ejecutarConsulta($sql, [':desde' => $fechaDesde, ':hasta' => $fechaHasta]);
     $kpis = $q->fetch(PDO::FETCH_ASSOC);
 
-    // Fetch Top Products
+    // Top Products
     $sqlTop = "SELECT 
                 lv.nombre_producto,
                 lv.codigo_producto,
@@ -47,7 +59,7 @@ try {
     $qTop = DBPDO::ejecutarConsulta($sqlTop, [':desde' => $fechaDesde, ':hasta' => $fechaHasta]);
     $topProductos = $qTop->fetchAll(PDO::FETCH_ASSOC);
 
-    // Fetch IVA Breakdown
+    // IVA Breakdown
     $sqlIva = "SELECT 
                 ROUND(lv.iva_aplicado) as pct,
                 SUM(lv.total_linea / (1 + lv.iva_aplicado/100)) as base,
@@ -63,6 +75,7 @@ try {
     $desgloseIva = $qIva->fetchAll(PDO::FETCH_ASSOC);
 
     if ($action === 'json') {
+        header('Content-Type: application/json; charset=utf-8');
         echo json_encode([
             'ok' => true,
             'periodo' => ['desde' => $fechaDesde, 'hasta' => $fechaHasta],
@@ -77,7 +90,6 @@ try {
         $csv .= "Período: {$fechaDesde} a {$fechaHasta}\n";
         $csv .= "Generado: " . date('d/m/Y H:i:s') . "\n\n";
 
-        // KPIs
         $csv .= "KPIs PRINCIPALES\n";
         $csv .= "Concepto,Valor\n";
         $csv .= "Total Ventas," . number_format($kpis['total_ventas'] ?? 0, 2, '.', '') . "\n";
@@ -85,7 +97,6 @@ try {
         $csv .= "IVA Recaudado," . number_format($kpis['iva_recaudado'] ?? 0, 2, '.', '') . "\n";
         $csv .= "Número de Tickets," . ($kpis['total_tickets'] ?? 0) . "\n\n";
 
-        // Top Productos
         $csv .= "TOP 10 PRODUCTOS MÁS VENDIDOS\n";
         $csv .= "Posición,Producto,Código,Unidades,Ingresos\n";
         foreach ($topProductos as $idx => $p) {
@@ -94,12 +105,9 @@ try {
 
         $csv .= "\n";
 
-        // IVA Breakdown
         $csv .= "DESGLOSE DE IVA (FISCAL)\n";
         $csv .= "Tipo IVA,Base Imponible,Cuota IVA,Total Recaudado\n";
-        $totalBase = 0;
-        $totalCuota = 0;
-        $totalFinal = 0;
+        $totalBase = 0; $totalCuota = 0; $totalFinal = 0;
         foreach ($desgloseIva as $iva) {
             $csv .= $iva['pct'] . "%," . number_format($iva['base'], 2, '.', '') . "," . number_format($iva['cuota'], 2, '.', '') . "," . number_format($iva['total'], 2, '.', '') . "\n";
             $totalBase += $iva['base'];
@@ -115,7 +123,8 @@ try {
         exit;
     }
 
-} catch (Exception $e) {
+} catch (Throwable $e) {
+    header('Content-Type: application/json; charset=utf-8');
     http_response_code(500);
     echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
 }

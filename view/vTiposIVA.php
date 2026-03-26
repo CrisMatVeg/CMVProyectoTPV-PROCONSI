@@ -3,15 +3,15 @@
 <div class="main-full p-24">
     <div class="section-header container-wider">
         <div class="section-title">
-            <h1>Gestión de Tipos de IVA</h1>
-            <p>Configura los tipos de IVA y sus vigencias por fecha.</p>
+            <h1><?php echo L('tax_title'); ?></h1>
+            <p><?php echo L('tax_subtitle'); ?></p>
         </div>
         <div class="d-flex gap-12">
             <button onclick="abrirModalIva()" class="btn-add">
-                <i class="fa-solid fa-plus"></i> Nuevo Tipo de IVA
+                <i class="fa-solid fa-plus"></i> <?php echo L('tax_btn_add'); ?>
             </button>
             <a href="index.php?irDashboard=1" class="btn-back">
-                <i class="fa-solid fa-arrow-left"></i> Volver
+                <?php echo L('rates_btn_back'); ?>
             </a>
         </div>
     </div>
@@ -20,12 +20,12 @@
         <table class="data-table">
             <thead>
                 <tr>
-                    <th class="pl-20">Código</th>
-                    <th>Nombre</th>
-                    <th class="text-right">Porcentaje</th>
-                    <th class="text-center">Vigencia</th>
-                    <th class="text-center">Estado</th>
-                    <th class="text-center pr-20">Acciones</th>
+                    <th class="pl-20"><?php echo L('tax_th_code'); ?></th>
+                    <th><?php echo L('tax_th_name'); ?></th>
+                    <th class="text-right"><?php echo L('tax_th_percent'); ?></th>
+                    <th class="text-center"><?php echo L('tax_th_validity'); ?></th>
+                    <th class="text-center"><?php echo L('tax_th_status'); ?></th>
+                    <th class="text-center pr-20"><?php echo L('tax_th_actions'); ?></th>
                 </tr>
             </thead>
             <tbody>
@@ -39,18 +39,23 @@
                         <td class="text-center fs-12">
                             <?php
                             $fi = $t['fecha_inicio'] ? date('d/m/Y', strtotime($t['fecha_inicio'])) : '—';
-                            $ff = $t['fecha_fin'] ? date('d/m/Y', strtotime($t['fecha_fin'])) : 'Indefinido';
+                            $ff = $t['fecha_fin'] ? date('d/m/Y', strtotime($t['fecha_fin'])) : L('tax_indefinite', true);
                             ?>
                             <?php echo $fi . ' → ' . $ff; ?>
                         </td>
                         <td class="text-center">
-                            <?php if ($t['activo']): ?>
+                            <?php
+                            $esVigente = ($t['activo'] &&
+                                strtotime($t['fecha_inicio']) <= time() &&
+                                (!$t['fecha_fin'] || strtotime($t['fecha_fin']) >= strtotime('today')));
+
+                            if ($esVigente): ?>
                                 <span class="status-pill status-active">
-                                    <i class="fa-solid fa-circle-check"></i> Activo
+                                    <i class="fa-solid fa-circle-check"></i> <?php echo L('status_active'); ?>
                                 </span>
                             <?php else: ?>
                                 <span class="status-pill status-inactive">
-                                    <i class="fa-solid fa-circle-xmark"></i> Inactivo
+                                    <i class="fa-solid fa-circle-xmark"></i> <?php echo L('status_inactive'); ?>
                                 </span>
                             <?php endif; ?>
                         </td>
@@ -71,7 +76,7 @@
                         <td colspan="6">
                             <div class="empty-state">
                                 <i class="fa-solid fa-percent"></i>
-                                Aún no hay tipos de IVA configurados.
+                                <?php echo L('tax_no_taxes'); ?>
                             </div>
                         </td>
                     </tr>
@@ -83,9 +88,9 @@
 
 <!-- MODAL NUEVO/EDITAR IVA -->
 <div class="modal-overlay" id="ivaModal">
-    <div class="modal modal-content gap-16 ai-stretch w-modal-md">
+    <div class="modal modal-content gap-16 ai-stretch w-modal-md" style="max-width: 700px; border-radius: 20px; overflow: hidden;">
         <div class="modal-header mb-0">
-            <h2 id="ivaModalTitle" class="m-0 fs-18">Nuevo Tipo de IVA</h2>
+            <h2 id="ivaModalTitle" class="m-0 fs-18"><?php echo L('tax_modal_new'); ?></h2>
             <button onclick="cerrarModalIva()" class="btn-close-modal">&times;</button>
         </div>
         <form id="ivaForm" class="modal-body p-20">
@@ -93,45 +98,46 @@
 
             <div class="d-grid grid-2 gap-20">
                 <div class="form-group">
-                    <label class="form-label">Código</label>
-                    <input type="text" id="ivaCodigo" class="form-input font-mono" placeholder="GENERAL, REDUCIDO...">
+                    <label class="form-label"><?php echo L('tax_label_code'); ?></label>
+                    <input type="text" id="ivaCodigo" class="form-input font-mono" placeholder="<?php echo L('tax_code_placeholder'); ?>">
                     <span class="form-error" id="err-codigo"></span>
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label">Nombre</label>
-                    <input type="text" id="ivaNombre" class="form-input" placeholder="IVA general, IVA reducido...">
+                    <label class="form-label"><?php echo L('tax_label_name'); ?></label>
+                    <input type="text" id="ivaNombre" class="form-input" placeholder="<?php echo L('tax_name_placeholder'); ?>">
                     <span class="form-error" id="err-nombre"></span>
                 </div>
             </div>
 
             <div class="d-grid grid-3 gap-20 mt-16">
                 <div class="form-group mb-0">
-                    <label class="form-label fs-11 tt-uppercase">Porcentaje (%)</label>
+                    <label class="form-label fs-11 tt-uppercase"><?php echo L('tax_label_percent'); ?></label>
                     <input type="number" id="ivaPorcentaje" class="form-input text-right" step="0.01" min="0">
                     <span class="form-error" id="err-porcentaje"></span>
                 </div>
                 <div class="form-group mb-0">
-                    <label class="form-label fs-11 tt-uppercase">F. Inicio</label>
+                    <label class="form-label fs-11 tt-uppercase"><?php echo L('tax_label_start'); ?></label>
                     <input type="date" id="ivaFechaInicio" class="form-input">
                     <span class="form-error" id="err-fecha_inicio"></span>
                 </div>
                 <div class="form-group mb-0">
-                    <label class="form-label fs-11 tt-uppercase">F. Fin</label>
+                    <label class="form-label fs-11 tt-uppercase"><?php echo L('tax_label_end'); ?></label>
                     <input type="date" id="ivaFechaFin" class="form-input">
+                    <span class="form-error" id="err-fecha_fin"></span>
                 </div>
             </div>
 
             <div class="mt-12">
                 <label class="d-flex ai-center gap-8 cursor-pointer fs-13">
                     <input type="checkbox" id="ivaActivo" checked>
-                    <span>Activo</span>
+                    <span><?php echo L('status_active'); ?></span>
                 </label>
             </div>
         </form>
         <div class="modal-footer full-width">
-            <button onclick="cerrarModalIva()" class="btn-cancel">Cancelar</button>
-            <button onclick="guardarIva()" class="btn-save">Guardar tipo de IVA</button>
+            <button onclick="cerrarModalIva()" class="btn-cancel"><?php echo L('modal_cancel'); ?></button>
+            <button onclick="guardarIva()" class="btn-save"><?php echo L('tax_btn_save'); ?></button>
         </div>
     </div>
 </div>
@@ -147,7 +153,7 @@
         const title = document.getElementById('ivaModalTitle');
 
         if (iva) {
-            title.innerText = 'Editar Tipo de IVA';
+            title.innerText = "<?php echo L('tax_modal_edit'); ?>";
             document.getElementById('ivaId').value = iva.id;
             document.getElementById('ivaCodigo').value = iva.codigo;
             document.getElementById('ivaNombre').value = iva.nombre;
@@ -156,7 +162,7 @@
             document.getElementById('ivaFechaFin').value = iva.fecha_fin || '';
             document.getElementById('ivaActivo').checked = !!parseInt(iva.activo);
         } else {
-            title.innerText = 'Nuevo Tipo de IVA';
+            title.innerText = "<?php echo L('tax_modal_new'); ?>";
             document.getElementById('ivaId').value = '';
             document.getElementById('ivaCodigo').value = '';
             document.getElementById('ivaNombre').value = '';
@@ -188,6 +194,13 @@
             activo: document.getElementById('ivaActivo').checked ? 1 : 0,
         };
 
+        if (payload.fecha_inicio && payload.fecha_fin) {
+            if (!validarFechas(payload.fecha_inicio, payload.fecha_fin)) {
+                showCustomAlert("<?php echo L('rates_confirm_apply_title'); ?>", "<?php echo L('rates_confirm_apply_msg'); ?>", 'warning');
+                return;
+            }
+        }
+
         try {
             const resp = await fetch('api/gestionTipoIva.php', {
                 method: 'POST',
@@ -205,35 +218,44 @@
                     if (el && msg) el.innerText = msg;
                 }
             } else {
-                alert('Error: ' + (r.error || 'No se pudo guardar el tipo de IVA'));
+                showCustomAlert("<?php echo L('error'); ?>", r.error || "<?php echo L('tax_error_save'); ?>", 'error');
             }
         } catch (e) {
             console.error(e);
-            alert('Error de conexión con el servidor');
+            showCustomAlert('Error', 'Error de conexión con el servidor', 'error');
         }
     }
 
     async function eliminarIva(id) {
-        if (!id || !confirm('¿Seguro que deseas eliminar este tipo de IVA?')) return;
-        try {
-            const resp = await fetch('api/gestionTipoIva.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
+        if (!id) return;
+        showCustomConfirm(
+            "<?php echo L('tax_confirm_del_title'); ?>",
+            "<?php echo L('tax_confirm_del_msg'); ?>",
+            async () => {
+                    try {
+                        const resp = await fetch('api/gestionTipoIva.php', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                accion: 'eliminar',
+                                id
+                            }),
+                        });
+                        const r = await resp.json();
+                        if (r.ok) {
+                            location.reload();
+                        } else {
+                            showCustomAlert("<?php echo L('error'); ?>", r.error || "<?php echo L('tax_error_delete'); ?>", 'error');
+                        }
+                    } catch (e) {
+                        console.error(e);
+                        showCustomAlert("<?php echo L('error'); ?>", "<?php echo L('error_server_connection'); ?>", 'error');
+                    }
                 },
-                body: JSON.stringify({
-                    accion: 'eliminar',
-                    id
-                }),
-            });
-            const r = await resp.json();
-            if (r.ok) {
-                location.reload();
-            } else {
-                alert('Error: ' + (r.error || 'No se pudo eliminar el tipo de IVA'));
-            }
-        } catch (e) {
-            console.error(e);
-        }
+                "<?php echo L('modal_delete'); ?>",
+                'danger'
+        );
     }
 </script>

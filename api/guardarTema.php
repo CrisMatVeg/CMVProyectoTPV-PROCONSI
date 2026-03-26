@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/csrf_check.php';
 /**
  * API: guardarTema.php
  * Guarda las preferencias de tema (modo + acento) para el usuario actual.
@@ -13,7 +14,7 @@ try {
     require_once __DIR__ . '/../model/DBPDO.php';
     require_once __DIR__ . '/../model/Usuario.php';
 
-    session_start();
+    // session_start(); // Handled by csrf_check.php
     if (!isset($_SESSION['usuarioActualTPV'])) {
         http_response_code(401);
         echo json_encode(['ok' => false, 'error' => 'No autenticado']);
@@ -53,4 +54,3 @@ try {
 } catch (Throwable $e) {
     echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
 }
-

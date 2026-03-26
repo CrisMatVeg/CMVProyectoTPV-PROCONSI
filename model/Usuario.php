@@ -15,8 +15,10 @@ class Usuario
     private $rol; // Nombre del rol (legacy)
     private $idRol; // ID del nuevo sistema de roles
     private $activo;
+    private $email;
+    private $idioma;
 
-    public function __construct($id, $nombre, $login, $password, $rol, $activo, $idRol = null)
+    public function __construct($id, $nombre, $login, $password, $rol, $activo, $idRol = null, $email = null, $idioma = 'es')
     {
         $this->id = $id;
         $this->nombre = $nombre;
@@ -25,9 +27,15 @@ class Usuario
         $this->rol = $rol;
         $this->idRol = $idRol;
         $this->activo = $activo;
+        $this->email = $email;
+        $this->idioma = $idioma;
     }
 
     // Getters
+    public function getIdioma()
+    {
+        return $this->idioma;
+    }
     public function getId()
     {
         return $this->id;
@@ -64,6 +72,10 @@ class Usuario
     {
         return $this->activo;
     }
+    public function getEmail()
+    {
+        return $this->email;
+    }
 
     /**
      * Verifica si el usuario tiene un permiso específico por clave.
@@ -97,5 +109,9 @@ class Usuario
     public function setIdRol($id)
     {
         $this->idRol = $id;
+    }
+    public function setIdioma($idioma)
+    {
+        $this->idioma = $idioma;
     }
 }

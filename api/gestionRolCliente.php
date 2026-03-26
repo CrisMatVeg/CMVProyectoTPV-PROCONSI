@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/csrf_check.php';
 
 /**
  * API: gestionRolCliente.php
@@ -14,7 +15,7 @@ try {
     require_once __DIR__ . '/../model/Usuario.php';
     require_once __DIR__ . '/../model/RolClientePDO.php';
 
-    session_start();
+    // session_start(); // Handled by csrf_check.php
 
     if (!isset($_SESSION['usuarioActualTPV'])) {
         http_response_code(401);
@@ -41,7 +42,6 @@ try {
             throw new Exception("El nombre del rol no puede estar vacío");
         }
 
-        // Verificar si existe usando listarRoles
         $roles = RolClientePDO::listarRoles();
         foreach ($roles as $r) {
             if (strtolower($r['nombre']) === strtolower($nombre)) {

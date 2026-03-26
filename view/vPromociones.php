@@ -34,11 +34,11 @@
             if (fieldsBundle) fieldsBundle.classList.remove('d-none');
             if (blockPayQty) blockPayQty.classList.toggle('d-none', tipo === 'fixed_bundle');
             if (fieldsGeneral) fieldsGeneral.classList.toggle('d-none', tipo === 'bundle');
-            if (tipo === 'fixed_bundle' && labelValor) labelValor.innerText = 'Precio total del Pack (€)';
+            if (tipo === 'fixed_bundle' && labelValor) labelValor.innerText = '<?php echo L('promos_label_fixed_price'); ?>';
         } else {
             if (fieldsBundle) fieldsBundle.classList.add('d-none');
             if (fieldsGeneral) fieldsGeneral.classList.remove('d-none');
-            if (labelValor) labelValor.innerText = 'Valor del Descuento';
+            if (labelValor) labelValor.innerText = '<?php echo L('promos_label_value'); ?>';
         }
     };
 
@@ -47,8 +47,12 @@
         const modal = document.getElementById('promoModal');
         if (!modal) return;
 
+        // Reset checklists
+        document.querySelectorAll('.promo-prod-checkbox').forEach(cb => cb.checked = false);
+        if(window.updateProdCountPromo) updateProdCountPromo();
+
         if (promo) {
-            setText('promoModalTitle', 'Editar promoción');
+            setText('promoModalTitle', '<?php echo L('promos_edit_title'); ?>');
             setVal('promoId', promo.id);
             setVal('promoCodigo', promo.codigo || '');
             setVal('promoDescripcion', promo.descripcion || '');
@@ -57,14 +61,40 @@
             setVal('promoMin', promo.min_subtotal || 0);
             setVal('promoBuyQty', promo.bundle_buy_qty || '');
             setVal('promoPayQty', promo.bundle_pay_qty || '');
-            setVal('promoProducto', promo.id_producto || '');
-            setVal('promoCategoria', promo.categoria_code || '');
+            
+            // Set products
+            let pids = [];
+            if (promo.producto_ids) {
+                try {
+                    pids = JSON.parse(promo.producto_ids);
+                } catch(e) { 
+                    pids = promo.producto_ids.toString().split(',').map(Number);
+                }
+            } else if (promo.id_producto) {
+                pids = [parseInt(promo.id_producto)];
+            }
+            document.querySelectorAll('.promo-prod-checkbox').forEach(cb => {
+                cb.checked = pids.includes(parseInt(cb.value));
+            });
+            if(window.updateProdCountPromo) updateProdCountPromo();
+
+            const cats = promo.categoria_code ? promo.categoria_code.split(',') : [];
+            const selCats = document.getElementById('promoCategoria');
+            if (selCats) Array.from(selCats.options).forEach(opt => opt.selected = cats.includes(opt.value));
             setVal('promoFechaInicio', promo.fecha_inicio ? promo.fecha_inicio.replace(' ', 'T') : '');
             setVal('promoFechaFin', promo.fecha_fin ? promo.fecha_fin.replace(' ', 'T') : '');
-            setChecked('promoSoloSocios', parseInt(promo.solo_socios));
+            const roles = promo.roles_segmento ? promo.roles_segmento.split(',') : [];
+            const selRoles = document.getElementById('promoRoles');
+            if (selRoles) Array.from(selRoles.options).forEach(opt => opt.selected = roles.includes(opt.value));
+
+            const dias = promo.dias_semana ? promo.dias_semana.split(',').map(Number) : [];
+            document.querySelectorAll('.promo-dia-checkbox').forEach(cb => cb.checked = dias.includes(parseInt(cb.value)));
+
+            setVal('promoHoraInicio', promo.hora_inicio || '');
+            setVal('promoHoraFin', promo.hora_fin || '');
             setChecked('promoActiva', parseInt(promo.activo));
         } else {
-            setText('promoModalTitle', 'Nueva promoción');
+            setText('promoModalTitle', '<?php echo L('promos_new_title'); ?>');
             setVal('promoId', '');
             setVal('promoCodigo', '');
             setVal('promoDescripcion', '');
@@ -73,16 +103,49 @@
             setVal('promoMin', '');
             setVal('promoBuyQty', '');
             setVal('promoPayQty', '');
-            setVal('promoProducto', '');
             setVal('promoCategoria', '');
             setVal('promoFechaInicio', '');
             setVal('promoFechaFin', '');
-            setChecked('promoSoloSocios', false);
+            const selRoles = document.getElementById('promoRoles');
+            if (selRoles) selRoles.selectedIndex = -1;
+            document.querySelectorAll('.promo-dia-checkbox').forEach(cb => cb.checked = false);
+            setVal('promoHoraInicio', '');
+            setVal('promoHoraFin', '');
             setChecked('promoActiva', true);
         }
 
         togglePromoFields();
+        // Reset a la primera pestaña
+        const firstTab = document.querySelector('#promoModal .tab-btn[data-tab="general"]');
+        if (firstTab) switchTabPromo(firstTab, 'tab-promo-general');
+
         modal.classList.add('visible');
+    };
+
+    window.filtrarProductosPromo = function() {
+        const val = document.getElementById('promoBusquedaProd').value.toLowerCase();
+        const rows = document.querySelectorAll('.promo-product-row');
+        rows.forEach(row => {
+            const name = row.dataset.name || '';
+            row.style.display = name.includes(val) ? 'flex' : 'none';
+        });
+    };
+
+    window.updateProdCountPromo = function() {
+        const count = document.querySelectorAll('.promo-prod-checkbox:checked').length;
+        setText('promoCountSelectedProd', count + ' <?php echo L('promos_selected'); ?>');
+    };
+
+    window.unselectAllProductsPromo = function() {
+        document.querySelectorAll('.promo-prod-checkbox').forEach(cb => cb.checked = false);
+        updateProdCountPromo();
+    };
+
+    window.switchTabPromo = function(btn, tabId) {
+        document.querySelectorAll('#promoModal .tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        document.querySelectorAll('#promoModal .tab-pane').forEach(p => p.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
     };
 
     window.cerrarModalPromo = function() {
@@ -94,6 +157,8 @@
     window.guardarPromo = async function() {
         limpiarErroresPromo();
         const id = document.getElementById('promoId')?.value;
+        const selectedProducts = Array.from(document.querySelectorAll('.promo-prod-checkbox:checked')).map(cb => cb.value);
+        
         const payload = {
             accion: id ? 'editar' : 'añadir',
             id: id || null,
@@ -104,11 +169,15 @@
             min_subtotal: document.getElementById('promoMin')?.value || 0,
             bundle_buy_qty: document.getElementById('promoBuyQty')?.value || '',
             bundle_pay_qty: document.getElementById('promoPayQty')?.value || '',
-            id_producto: document.getElementById('promoProducto')?.value || '',
-            categoria_code: document.getElementById('promoCategoria')?.value || '',
+            id_producto: null, // Now using producto_ids
+            producto_ids: selectedProducts.length > 0 ? selectedProducts : null,
+            categoria_code: Array.from(document.getElementById('promoCategoria')?.selectedOptions || []).map(o => o.value).filter(v => v !== '').join(','),
             fecha_inicio: document.getElementById('promoFechaInicio')?.value || null,
             fecha_fin: document.getElementById('promoFechaFin')?.value || null,
-            solo_socios: document.getElementById('promoSoloSocios')?.checked ? 1 : 0,
+            roles_segmento: Array.from(document.getElementById('promoRoles')?.selectedOptions || []).map(o => o.value),
+            dias_semana: Array.from(document.querySelectorAll('.promo-dia-checkbox:checked')).map(cb => cb.value),
+            hora_inicio: document.getElementById('promoHoraInicio')?.value || null,
+            hora_fin: document.getElementById('promoHoraFin')?.value || null,
             activo: document.getElementById('promoActiva')?.checked ? 1 : 0,
         };
 
@@ -128,11 +197,11 @@
                     setText('err-' + field, msg);
                 }
             } else {
-                alert('Error: ' + (r.error || 'No se pudo guardar la promoción'));
+                showCustomAlert('Error', r.error || 'No se pudo guardar la promoción', 'error');
             }
         } catch (e) {
             console.error(e);
-            alert('Error de conexión con el servidor');
+            showCustomAlert('Error', 'Error de conexión con el servidor', 'error');
         }
     };
 
@@ -153,35 +222,45 @@
             if (r.ok) {
                 location.reload();
             } else {
-                alert('Error: ' + (r.error || 'No se pudo cambiar el estado'));
+                showCustomAlert('Error', r.error || 'No se pudo cambiar el estado', 'error');
             }
         } catch (e) {
             console.error(e);
+            showCustomAlert('Error', 'Error de conexión', 'error');
         }
     };
 
     window.eliminarPromo = async function(id) {
-        if (!id || !confirm('¿Seguro que deseas eliminar esta promoción?')) return;
-        try {
-            const resp = await fetch('api/gestionPromocion.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
+        if (!id) return;
+        showCustomConfirm(
+            '<?php echo L('promos_confirm_del_title'); ?>',
+            '<?php echo L('promos_confirm_del_msg'); ?>',
+            async () => {
+                    try {
+                        const resp = await fetch('api/gestionPromocion.php', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                accion: 'eliminar',
+                                id
+                            }),
+                        });
+                        const r = await resp.json();
+                        if (r.ok) {
+                            location.reload();
+                        } else {
+                            showCustomAlert('Error', r.error || 'No se pudo eliminar la promoción', 'error');
+                        }
+                    } catch (e) {
+                        console.error(e);
+                        showCustomAlert('Error', 'Error de conexión', 'error');
+                    }
                 },
-                body: JSON.stringify({
-                    accion: 'eliminar',
-                    id
-                }),
-            });
-            const r = await resp.json();
-            if (r.ok) {
-                location.reload();
-            } else {
-                alert('Error: ' + (r.error || 'No se pudo eliminar la promoción'));
-            }
-        } catch (e) {
-            console.error(e);
-        }
+                '<?php echo L('modal_delete'); ?>',
+                'danger'
+        );
     };
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -207,12 +286,12 @@
                     });
                     const r = await resp.json();
                     if (!r.ok) {
-                        alert('Error al guardar el nuevo orden: ' + (r.error || 'Desconocido'));
+                        showCustomAlert('Error', 'Error al guardar el nuevo orden: ' + (r.error || 'Desconocido'), 'error');
                         location.reload();
                     }
                 } catch (e) {
                     console.error(e);
-                    alert('Error de conexión al reordenar');
+                    showCustomAlert('Error', 'Error de conexión al reordenar', 'error');
                     location.reload();
                 }
             }
@@ -220,6 +299,7 @@
     });
 </script>
 <style>
+    /* Internal Styles for Promotions Modal */
     .drag-handle {
         cursor: grab;
         color: var(--text-muted);
@@ -234,21 +314,118 @@
         opacity: 0.4;
         background: var(--surface2) !important;
     }
+
+    /* Tabs Styles */
+    .tab-pane {
+        display: none;
+    }
+    .tab-pane.active {
+        display: block;
+    }
+
+    /* List and Selection Styles */
+    .method-option {
+        background: var(--surface);
+        border: 1.5px solid var(--border);
+        transition: all 0.2s ease;
+    }
+
+    .method-option:hover {
+        border-color: var(--accent) !important;
+        background: rgba(var(--accent-rgb), 0.03);
+    }
+
+    .method-option:has(input:checked) {
+        border-color: var(--accent) !important;
+        background: var(--blue-light) !important;
+        color: var(--accent);
+        font-weight: 600;
+    }
+
+    .promo-product-row:hover {
+        background: var(--surface2);
+    }
+
+    .promo-product-row:has(input:checked) {
+        background: var(--blue-light);
+        border-color: var(--accent);
+    }
+
+    /* Modal Spacing & Components */
+    .w-modal-lg {
+        width: 90vw !important;
+        max-width: 1000px !important;
+    }
+
+    .search-box-container .search-input-wrap {
+        height: 48px;
+    }
+
+    .checkbox-list {
+        background: var(--surface);
+        border: 1.5px solid var(--border);
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    .ls-1 {
+        letter-spacing: 0.5px;
+    }
+
+    .tt-uppercase {
+        text-transform: uppercase;
+    }
+
+    /* Fix for modal header title overlap */
+    #promoModalTitle {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        padding-right: 60px;
+    }
+
+    /* Multi-select styling */
+    select[multiple] {
+        padding: 8px;
+        background: var(--surface1);
+        border: 1.5px solid var(--border);
+        border-radius: 12px;
+        color: var(--text-main);
+        transition: border-color 0.2s;
+    }
+
+    select[multiple]:focus {
+        border-color: var(--accent);
+        outline: none;
+    }
+
+    select[multiple] option {
+        padding: 10px 14px;
+        margin-bottom: 4px;
+        border-radius: 8px;
+        cursor: pointer;
+    }
+
+    select[multiple] option:checked {
+        background: var(--accent) !important;
+        color: white;
+    }
 </style>
 
 
 <div class="main-full p-24">
     <div class="section-header container-wider">
         <div class="section-title">
-            <h1>Gestión de Descuentos y Promociones</h1>
-            <p>Configura los cupones y reglas de descuento disponibles en el TPV.</p>
+            <h1><?php echo L('promos_title'); ?></h1>
+            <p><?php echo L('promos_subtitle'); ?></p>
         </div>
         <div class="d-flex gap-12">
             <button onclick="window.abrirModalPromo()" class="btn-add">
-                <i class="fa-solid fa-plus"></i> Nueva Promoción
+                <i class="fa-solid fa-plus"></i> <?php echo L('promos_btn_add'); ?>
             </button>
             <a href="index.php?irDashboard=1" class="btn-back">
-                <i class="fa-solid fa-arrow-left"></i> Volver
+                <?php echo L('promos_btn_back'); ?>
             </a>
         </div>
     </div>
@@ -258,14 +435,14 @@
             <thead>
                 <tr>
                     <th class="pl-20" style="width: 40px;"></th>
-                    <th>Código</th>
-                    <th>Descripción</th>
-                    <th class="text-center">Tipo</th>
-                    <th>Configuración</th>
-                    <th class="text-right">Mínimo</th>
-                    <th class="text-center">Solo socios</th>
-                    <th class="text-center">Estado</th>
-                    <th class="text-center pr-20">Acciones</th>
+                    <th><?php echo L('promos_th_code'); ?></th>
+                    <th><?php echo L('promos_th_desc'); ?></th>
+                    <th class="text-center"><?php echo L('promos_th_type'); ?></th>
+                    <th><?php echo L('promos_th_config'); ?></th>
+                    <th class="text-right"><?php echo L('promos_th_min'); ?></th>
+                    <th class="text-center"><?php echo L('promos_th_members'); ?></th>
+                    <th class="text-center"><?php echo L('promos_th_status'); ?></th>
+                    <th class="text-center pr-20"><?php echo L('promos_th_actions'); ?></th>
                 </tr>
             </thead>
             <tbody id="promosTableBody">
@@ -279,22 +456,22 @@
                         <td class="text-center">
                             <?php
                             $badge = 'status-card';
-                            $label = 'Descuento';
+                            $label = L('promos_type_discount', true);
                             if ($p['tipo'] === 'percent') {
                                 $badge = 'status-card';
-                                $label = '% Total';
+                                $label = L('promos_type_percent', true);
                             }
                             if ($p['tipo'] === 'amount') {
                                 $badge = 'status-cash';
-                                $label = '€ Total';
+                                $label = L('promos_type_amount', true);
                             }
                             if ($p['tipo'] === 'bundle') {
                                 $badge = 'status-active';
-                                $label = 'Pack (2x1...)';
+                                $label = L('promos_type_bundle', true);
                             }
                             if ($p['tipo'] === 'fixed_bundle') {
                                 $badge = 'status-active';
-                                $label = 'Precio Fijo';
+                                $label = L('promos_type_fixed', true);
                             }
                             ?>
                             <span class="status-pill <?php echo $badge; ?>">
@@ -305,15 +482,22 @@
                             <?php if ($p['tipo'] === 'bundle'): ?>
                                 <strong><?php echo $p['bundle_buy_qty']; ?>x<?php echo $p['bundle_pay_qty']; ?></strong>
                             <?php elseif ($p['tipo'] === 'fixed_bundle'): ?>
-                                <strong><?php echo $p['bundle_buy_qty']; ?> por <?php echo number_format($p['valor'], 2, ',', '.'); ?> €</strong>
+                                <strong><?php echo $p['bundle_buy_qty']; ?> <?php echo L('tpv_for'); ?> <?php echo number_format($p['valor'], 2, ',', '.'); ?> €</strong>
                             <?php else: ?>
                                 <strong><?php echo $p['valor']; ?><?php echo $p['tipo'] === 'percent' ? '%' : '€'; ?></strong>
                             <?php endif; ?>
 
-                            <?php if ($p['id_producto']): ?>
-                                <div class="text-muted fs-11 mt-4">Prod ID: <?php echo $p['id_producto']; ?></div>
+                            <?php 
+                            $pids = [];
+                            if (!empty($p['producto_ids'])) {
+                                $pids = json_decode($p['producto_ids'], true) ?: [];
+                            }
+                            if (count($pids) > 1): ?>
+                                <div class="text-muted fs-11 mt-4"><i class="fa-solid fa-boxes-stacked"></i> <?php echo count($pids); ?> <?php echo L('tpv_products'); ?></div>
+                            <?php elseif (count($pids) === 1 || $p['id_producto']): ?>
+                                <div class="text-muted fs-11 mt-4"><i class="fa-solid fa-box"></i> <?php echo L('tpv_product'); ?> ID: <?php echo count($pids) === 1 ? $pids[0] : $p['id_producto']; ?></div>
                             <?php elseif ($p['categoria_code']): ?>
-                                <div class="text-muted fs-11 mt-4">Cat: <?php echo htmlspecialchars($p['categoria_code'] ?? ''); ?></div>
+                                <div class="text-muted fs-11 mt-4"><i class="fa-solid fa-tags"></i> Cat: <?php echo htmlspecialchars($p['categoria_code'] ?? ''); ?></div>
                             <?php endif; ?>
                         </td>
                         <td class="text-right font-mono">
@@ -321,35 +505,34 @@
                         </td>
                         <td class="text-center">
                             <?php if ($p['solo_socios']): ?>
-                                <span class="status-pill status-card"><i class="fa-solid fa-id-card"></i> Sí</span>
+                                <span class="status-pill status-card"><i class="fa-solid fa-id-card"></i> <?php echo L('tpv_yes'); ?></span>
                             <?php else: ?>
-                                <span class="status-pill text-muted">No</span>
+                                <span class="status-pill text-muted"><?php echo L('tpv_no'); ?></span>
                             <?php endif; ?>
                         </td>
                         <td class="text-center">
                             <?php if ($p['activo']): ?>
                                 <span class="status-pill status-active">
-                                    <i class="fa-solid fa-circle-check"></i> Activa
+                                    <i class="fa-solid fa-circle-check"></i> <?php echo L('promos_status_active'); ?>
                                 </span>
                             <?php else: ?>
                                 <span class="status-pill status-inactive">
-                                    <i class="fa-solid fa-circle-xmark"></i> Inactiva
+                                    <i class="fa-solid fa-circle-xmark"></i> <?php echo L('promos_status_inactive'); ?>
                                 </span>
                             <?php endif; ?>
                         </td>
-                        <td class="text-center">
-                            <div class="d-flex jc-center gap-8 pr-20">
-                                <button onclick="window.abrirModalPromo(<?php echo htmlspecialchars(json_encode($p), ENT_QUOTES, 'UTF-8'); ?>)" title="Editar" class="btn-icon">
+                        <td class                            <div class="d-flex jc-center gap-8 pr-20">
+                                <button onclick="window.abrirModalPromo(<?php echo htmlspecialchars(json_encode($p), ENT_QUOTES, 'UTF-8'); ?>)" title="<?php echo L('modal_edit'); ?>" class="btn-icon">
                                     <i class="fa-solid fa-pen"></i>
                                 </button>
-                                <button onclick="window.togglePromo(<?php echo $p['id']; ?>)" title="<?php echo $p['activo'] ? 'Desactivar' : 'Activar'; ?>" class="btn-icon <?php echo $p['activo'] ? 'text-red' : 'text-green'; ?>">
+                                <button onclick="window.togglePromo(<?php echo $p['id']; ?>)" title="<?php echo $p['activo'] ? L('modal_deactivate', true) : L('modal_activate', true); ?>" class="btn-icon <?php echo $p['activo'] ? 'text-red' : 'text-green'; ?>">
                                     <i class="fa-solid fa-<?php echo $p['activo'] ? 'pause' : 'play'; ?>"></i>
                                 </button>
-                                <button onclick="window.eliminarPromo(<?php echo $p['id']; ?>)" title="Eliminar" class="btn-icon btn-icon-danger">
+                                <button onclick="window.eliminarPromo(<?php echo $p['id']; ?>)" title="<?php echo L('modal_delete'); ?>" class="btn-icon btn-icon-danger">
                                     <i class="fa-solid fa-trash"></i>
                                 </button>
-
                             </div>
+         </div>
                         </td>
                     </tr>
                 <?php endforeach; ?>
@@ -358,7 +541,7 @@
                         <td colspan="8">
                             <div class="empty-state">
                                 <i class="fa-solid fa-ticket"></i>
-                                Aún no hay promociones configuradas.
+                                <?php echo L('promos_no_promos'); ?>
                             </div>
                         </td>
                     </tr>
@@ -370,107 +553,252 @@
 
 <!-- MODAL NUEVA/EDITAR PROMO -->
 <div class="modal-overlay" id="promoModal">
-    <div class="modal modal-content gap-16 ai-stretch w-modal-lg">
-        <div class="modal-header mb-0">
-            <h2 id="promoModalTitle" class="m-0 fs-18">Nueva promoción</h2>
-            <button onclick="cerrarModalPromo()" class="btn-close-modal">&times;</button>
+    <div class="modal modal-content gap-16 ai-stretch w-modal-lg" style="max-width: 1100px; border-radius: 20px; overflow: hidden; height: auto; max-height: 95vh;">
+        <div class="modal-header d-flex flex-column mb-0 p-0">
+            <div class="d-flex ai-center jc-center w-100 p-24-32" style="position: relative; padding-right: 80px;">
+                <h2 id="promoModalTitle" class="m-0 fs-20 fw-800 text-main text-center tt-uppercase ls-1"><?php echo L('promos_modal_title'); ?></h2>
+                <button type="button" onclick="cerrarModalPromo()" class="btn-close-modal fs-32" style="position: absolute; right: 24px; top: 50%; transform: translateY(-50%); background: transparent; border: none; cursor: pointer;">&times;</button>
+            </div>
+
+            <div class="modal-tabs">
+                <button type="button" class="tab-btn active" data-tab="general" onclick="switchTabPromo(this, 'tab-promo-general')">
+                    <i class="fa-solid fa-sliders"></i> <?php echo L('promos_tab_general'); ?>
+                </button>
+                <button type="button" class="tab-btn" data-tab="config" onclick="switchTabPromo(this, 'tab-promo-config')">
+                    <i class="fa-solid fa-gear"></i> <?php echo L('promos_tab_config'); ?>
+                </button>
+                <button type="button" class="tab-btn" data-tab="filtros" onclick="switchTabPromo(this, 'tab-promo-filtros')">
+                    <i class="fa-solid fa-filter"></i> <?php echo L('promos_tab_filters'); ?>
+                </button>
+                <button type="button" class="tab-btn" data-tab="programacion" onclick="switchTabPromo(this, 'tab-promo-prog')">
+                    <i class="fa-solid fa-calendar-days"></i> <?php echo L('promos_tab_prog'); ?>
+                </button>
+                <button type="button" class="tab-btn" data-tab="segmentacion" onclick="switchTabPromo(this, 'tab-promo-seg')">
+                    <i class="fa-solid fa-users"></i> <?php echo L('promos_tab_seg'); ?>
+                </button>
+            </div>
         </div>
-        <form id="promoForm" class="modal-body p-20">
+
+        <form id="promoForm" class="modal-body p-24" style="overflow-y: auto; max-height: 70vh;">
             <input type="hidden" id="promoId">
 
-            <div class="d-grid grid-2 gap-16">
-                <div class="form-group">
-                    <label class="form-label">Código <span class="text-muted fs-11" style="font-weight: normal;">(Opcional si es Automático)</span></label>
-                    <input type="text" id="promoCodigo" class="form-input font-mono" placeholder="EJ: 2X1AUDIO">
-                    <span class="form-error" id="err-codigo"></span>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Tipo de Oferta</label>
-                    <select id="promoTipo" class="form-input" onchange="togglePromoFields()">
-                        <option value="percent">% Descuento sobre Total</option>
-                        <option value="amount">Euros fijos sobre Total</option>
-                        <option value="bundle">Pack de Unidades (Ej: 2x1, 3x2...)</option>
-                        <option value="fixed_bundle">Precio Fijo x Unidades (Ej: 3 por 10€)</option>
-                    </select>
-                </div>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">Descripción para el TPV</label>
-                <input type="text" id="promoDescripcion" class="form-input" placeholder="Ej: Oferta 2x1 en Auriculares">
-                <span class="form-error" id="err-descripcion"></span>
-            </div>
-
-            <!-- Campos Dinámicos -->
-            <div id="fieldsGeneral" class="d-grid grid-2 gap-16">
-                <div class="form-group mb-0">
-                    <label class="form-label" id="labelValor">Valor del Descuento</label>
-                    <input type="number" id="promoValor" class="form-input text-right" step="0.01" min="0">
-                </div>
-                <div class="form-group mb-0">
-                    <label class="form-label">Mín. compra (€)</label>
-                    <input type="number" id="promoMin" class="form-input text-right" step="0.01" min="0">
-                </div>
-            </div>
-
-            <div id="fieldsBundle" class="d-none p-16 bg-surface2 br-12 border-2 mb-16">
-                <div class="d-grid grid-2 gap-16">
+            <!-- TAB: GENERAL -->
+            <div id="tab-promo-general" class="tab-pane active">
+                <div class="d-grid grid-2 gap-24 mb-20">
                     <div class="form-group">
-                        <label class="form-label">Cantidad a llevar (X)</label>
-                        <input type="number" id="promoBuyQty" class="form-input h-40" placeholder="Ej: 2">
+                        <label class="form-label fw-600"><?php echo L('promos_label_code'); ?></label>
+                        <div class="search-input-wrap">
+                            <i class="fa-solid fa-ticket"></i>
+                            <input type="text" id="promoCodigo" class="search-input font-mono fw-700" 
+                                style="text-transform: uppercase; letter-spacing: 1px;"
+                                placeholder="<?php echo L('promos_code_placeholder'); ?>">
+                        </div>
+                        <span class="form-error" id="err-codigo"></span>
                     </div>
-                    <div id="blockPayQty" class="form-group">
-                        <label class="form-label">Cantidad a pagar (Y)</label>
-                        <input type="number" id="promoPayQty" class="form-input h-40" placeholder="Ej: 1">
+                    <div class="form-group">
+                        <label class="form-label fw-600"><?php echo L('promos_label_status'); ?></label>
+                        <label class="d-flex ai-center gap-12 cursor-pointer p-12 bg-surface2 br-12 border hover-border-accent transition" style="height: 52px; border-radius: 10px;">
+                            <input type="checkbox" id="promoActiva" checked style="width: 20px; height: 20px;">
+                            <span class="fs-14 fw-600"><?php echo L('promos_status_help'); ?></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label fw-600"><?php echo L('promos_label_desc'); ?></label>
+                    <input type="text" id="promoDescripcion" class="form-input" placeholder="<?php echo L('promos_desc_placeholder'); ?>">
+                    <span class="form-error" id="err-descripcion"></span>
+                    <p class="fs-11 text-muted mt-8"><?php echo L('promos_desc_help'); ?></p>
+                </div>
+            </div>
+
+            <!-- TAB: CONFIGURACIÓN -->
+            <div id="tab-promo-config" class="tab-pane">
+                <div class="bg-surface2 p-20 br-12 border mb-20">
+                    <label class="form-label fs-12 tt-uppercase fw-700 mb-16 d-flex ai-center gap-8">
+                        <i class="fa-solid fa-gears text-accent"></i> <?php echo L('promos_config_rule'); ?>
+                    </label>
+                    <div class="form-group mb-0">
+                        <label class="form-label fs-11"><?php echo L('promos_config_type'); ?></label>
+                        <select id="promoTipo" class="form-input" onchange="togglePromoFields()">
+                            <option value="percent"><?php echo L('promos_opt_percent'); ?></option>
+                            <option value="amount"><?php echo L('promos_opt_amount'); ?></option>
+                            <option value="bundle"><?php echo L('promos_opt_bundle'); ?></option>
+                            <option value="fixed_bundle"><?php echo L('promos_opt_fixed'); ?></option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="fieldsGeneral" class="d-grid grid-2 gap-16 mb-20">
+                    <div class="form-group mb-0">
+                        <label class="form-label fs-11" id="labelValor"><?php echo L('promos_label_value'); ?></label>
+                        <input type="number" id="promoValor" class="form-input text-right font-mono" step="0.01" min="0">
+                    </div>
+                    <div class="form-group mb-0">
+                        <label class="form-label fs-11"><?php echo L('promos_label_min'); ?></label>
+                        <input type="number" id="promoMin" class="form-input text-right font-mono" step="0.01" min="0">
+                    </div>
+                </div>
+
+                <div id="fieldsBundle" class="d-none bg-surface1 p-20 br-12 border mb-20">
+                    <div class="d-grid grid-2 gap-24">
+                        <div class="form-group mb-0">
+                            <label class="form-label fs-11 d-flex ai-center gap-4">
+                                <i class="fa-solid fa-cart-shopping"></i> <?php echo L('promos_label_buy_qty'); ?>
+                            </label>
+                            <input type="number" id="promoBuyQty" class="form-input text-center fs-20 fw-700" placeholder="0">
+                        </div>
+                        <div id="blockPayQty" class="form-group mb-0">
+                            <label class="form-label fs-11 d-flex ai-center gap-4">
+                                <i class="fa-solid fa-receipt"></i> <?php echo L('promos_label_pay_qty'); ?>
+                            </label>
+                            <input type="number" id="promoPayQty" class="form-input text-center fs-20 fw-700" placeholder="0">
+                        </div>
+                    </div>
+                    <p class="fs-11 text-muted mt-12 italic text-center"><?php echo L('promos_bundle_help'); ?></p>
+                </div>
+            </div>
+
+            <!-- TAB: FILTROS -->
+            <div id="tab-promo-filtros" class="tab-pane">
+                <div class="alert alert-info mb-20">
+                    <i class="fa-solid fa-circle-info fs-16"></i>
+                    <div>
+                        <strong><?php echo L('promos_filter_scope'); ?></strong> <?php echo L('promos_filter_scope_help'); ?>
+                    </div>
+                </div>
+
+                <div class="d-grid grid-2 gap-24 ai-start">
+                    <div class="form-group">
+                        <label class="form-label fw-700 d-flex ai-center gap-8 mb-12">
+                            <i class="fa-solid fa-box-open text-accent"></i> <?php echo L('promos_filter_products'); ?>
+                        </label>
+                        
+                        <div class="search-box-container mb-12">
+                            <div class="search-input-wrap">
+                                <i class="fa-solid fa-magnifying-glass"></i>
+                                <input type="text" id="promoBusquedaProd" class="search-input"
+                                    placeholder="<?php echo L('promos_search_placeholder'); ?>" onkeyup="filtrarProductosPromo()">
+                            </div>
+                        </div>
+
+                        <div class="products-selection-container border br-12 overflow-hidden bg-white shadow-sm">
+                            <div class="d-flex ai-center jc-between p-12-20 border-bottom bg-surface1 gap-12">
+                                <span class="fs-12 tt-uppercase fw-800 text-accent ls-1" id="promoCountSelectedProd">0 <?php echo L('promos_selected'); ?></span>
+                                <button type="button" class="btn-clean px-12 py-6 fs-12 fw-600 transition br-8 border-0 bg-transparent text-muted hover-text-accent cp" onclick="unselectAllProductsPromo()">
+                                    <i class="fa-solid fa-eraser mr-4"></i> <?php echo L('promos_btn_clean'); ?>
+                                </button>
+                            </div>
+                            <div class="checkbox-list p-4" style="max-height: 250px; overflow-y: auto;" id="listadoProductosPromo">
+                                <?php foreach ($avPromos['productos'] as $prod): ?>
+                                    <label class="checkbox-item d-flex ai-center gap-12 p-8-12 cp hover-bg-surface2 br-8 transition promo-product-row"
+                                        data-name="<?php echo htmlspecialchars(strtolower($prod->getNombre())); ?>">
+                                        <input type="checkbox" class="promo-prod-checkbox" value="<?php echo $prod->getId(); ?>" onchange="updateProdCountPromo()">
+                                        <div class="flex-1">
+                                            <div class="fs-13 fw-600"><?php echo htmlspecialchars($prod->getNombre()); ?></div>
+                                            <div class="fs-11 text-muted"><?php echo htmlspecialchars($prod->getReferencia()); ?></div>
+                                        </div>
+                                        <div class="fs-12 font-mono fw-700 text-accent"><?php echo number_format($prod->getPrecioVenta(), 2, ',', '.'); ?> €</div>
+                                    </label>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label fw-700 d-flex ai-center gap-8 mb-12">
+                            <i class="fa-solid fa-tags text-accent"></i> <?php echo L('promos_filter_cats'); ?>
+                        </label>
+                        <select id="promoCategoria" class="form-input" multiple style="height: 338px;">
+                            <option value=""><?php echo L('promos_all_cats'); ?></option>
+                            <?php foreach ($avPromos['categorias'] as $cat): ?>
+                                <option value="<?php echo htmlspecialchars($cat['codigo']); ?>"><?php echo htmlspecialchars($cat['nombre']); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <p class="fs-11 text-muted mt-12 italic"><i class="fa-solid fa-circle-info mr-4"></i> <?php echo L('promos_multi_select_help'); ?></p>
                     </div>
                 </div>
             </div>
 
-            <div class="form-group mt-12 bg-surface2 p-16 br-12 border-2">
-                <label class="form-label"><i class="fa-solid fa-filter mr-4"></i> Aplicar a (opcional)</label>
-                <div class="d-grid grid-2 gap-16">
-                    <select id="promoProducto" class="form-input fs-12 h-40">
-                        <option value="">Cualquier Producto</option>
-                        <?php foreach ($avPromos['productos'] as $prod): ?>
-                            <option value="<?php echo $prod->getId(); ?>"><?php echo htmlspecialchars($prod->getNombre()); ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                    <select id="promoCategoria" class="form-input fs-12 h-40">
-                        <option value="">Cualquier Categoría</option>
-                        <?php foreach ($avPromos['categorias'] as $cat): ?>
-                            <option value="<?php echo htmlspecialchars($cat['codigo']); ?>"><?php echo htmlspecialchars($cat['nombre']); ?></option>
-                        <?php endforeach; ?>
-                    </select>
-
+            <!-- TAB: PROGRAMACIÓN -->
+            <div id="tab-promo-prog" class="tab-pane">
+                <div class="bg-surface2 p-20 br-12 border mb-20">
+                    <label class="form-label fs-12 tt-uppercase fw-700 mb-16 d-flex ai-center gap-8">
+                        <i class="fa-solid fa-calendar text-accent"></i> <?php echo L('promos_prog_validity'); ?>
+                    </label>
+                    <div class="d-grid grid-2 gap-16">
+                        <div class="form-group mb-0">
+                            <label class="form-label fs-11"><?php echo L('promos_prog_start'); ?></label>
+                            <input type="datetime-local" id="promoFechaInicio" class="form-input font-mono">
+                        </div>
+                        <div class="form-group mb-0">
+                            <label class="form-label fs-11"><?php echo L('promos_prog_end'); ?></label>
+                            <input type="datetime-local" id="promoFechaFin" class="form-input font-mono">
+                        </div>
+                    </div>
                 </div>
-                <p class="fs-10 text-muted mt-8">Si se deja vacío, la promoción se aplica a todo el carrito.</p>
+
+                <div class="bg-surface2 p-20 br-12 border mb-20">
+                    <label class="form-label fs-12 tt-uppercase fw-700 mb-16 d-flex ai-center gap-8">
+                        <i class="fa-solid fa-clock text-accent"></i> <?php echo L('promos_prog_days_time'); ?>
+                    </label>
+                    <div class="d-flex flex-wrap gap-12 mb-20">
+                        <?php
+                        $dias = [1 => L('tpv_day_monday', true), 2 => L('tpv_day_tuesday', true), 3 => L('tpv_day_wednesday', true), 4 => L('tpv_day_thursday', true), 5 => L('tpv_day_friday', true), 6 => L('tpv_day_saturday', true), 0 => L('tpv_day_sunday', true)];
+                        foreach ($dias as $val => $label): ?>
+                            <label class="method-option border br-8 px-12 py-8 d-flex ai-center gap-8 cp transition" style="min-width: 100px;">
+                                <input type="checkbox" class="promo-dia-checkbox" value="<?php echo $val; ?>" style="width: 16px; height: 16px;">
+                                <span class="fs-12"><?php echo $label; ?></span>
+                            </label>
+                        <?php endforeach; ?>
+                    </div>
+
+                    <div class="d-grid grid-2 gap-16 mt-16 pt-16 border-top">
+                        <div class="form-group mb-0">
+                            <label class="form-label fs-11"><?php echo L('promos_prog_h_start'); ?></label>
+                            <input type="time" id="promoHoraInicio" class="form-input">
+                        </div>
+                        <div class="form-group mb-0">
+                            <label class="form-label fs-11"><?php echo L('promos_prog_h_end'); ?></label>
+                            <input type="time" id="promoHoraFin" class="form-input">
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <div class="d-grid grid-2 gap-16">
-                <div class="form-group">
-                    <label class="form-label">Fecha y Hora Inicio</label>
-                    <input type="datetime-local" id="promoFechaInicio" class="form-input">
+            <!-- TAB: SEGMENTACIÓN -->
+            <div id="tab-promo-seg" class="tab-pane">
+                <div class="p-20 bg-surface2 br-12 border">
+                    <label class="form-label fs-12 tt-uppercase fw-700 mb-16 d-flex ai-center gap-8">
+                        <i class="fa-solid fa-user-tag text-accent"></i> <?php echo L('promos_seg_groups'); ?>
+                    </label>
+                    <div class="form-group">
+                        <label class="form-label fs-12 fw-600"><?php echo L('promos_seg_roles'); ?></label>
+                        <select id="promoRoles" class="form-input" multiple style="height: 250px;">
+                            <option value="general"><?php echo L('promos_role_general'); ?></option>
+                            <option value="socio"><?php echo L('promos_role_member'); ?></option>
+                            <option value="gamer afilidado"><?php echo L('promos_role_gamer'); ?></option>
+                            <option value="empresa"><?php echo L('promos_role_b2b'); ?></option>
+                            <option value="mayorista"><?php echo L('promos_role_wholesaler'); ?></option>
+                        </select>
+                        <p class="fs-11 text-muted mt-12"><?php echo L('promos_seg_help'); ?></p>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label class="form-label">Fecha y Hora Fin</label>
-                    <input type="datetime-local" id="promoFechaFin" class="form-input">
-                </div>
-            </div>
 
-            <div class="d-grid grid-2 gap-16 mt-16">
-                <label class="d-flex ai-center gap-8 cursor-pointer fs-13">
-                    <input type="checkbox" id="promoSoloSocios">
-                    <span>Solo para socios</span>
-                </label>
-                <label class="d-flex ai-center gap-8 cursor-pointer fs-13">
-                    <input type="checkbox" id="promoActiva" checked>
-                    <span>Activa</span>
-                </label>
+                <div class="alert alert-warning mt-24">
+                    <i class="fa-solid fa-triangle-exclamation fs-16"></i>
+                    <div>
+                        <strong><?php echo L('promos_priority_title'); ?></strong> <?php echo L('promos_priority_help'); ?>
+                    </div>
+                </div>
             </div>
         </form>
-        <div class="modal-footer pt-0 border-top-0">
-            <button onclick="window.cerrarModalPromo()" class="btn-cancel">Cancelar</button>
-            <button onclick="window.guardarPromo()" class="btn-save w-auto px-24">Guardar promoción</button>
+
+        <div class="modal-footer full-width p-24 bg-surface1 border-top">
+            <button onclick="window.cerrarModalPromo()" class="btn-cancel px-24 py-12 fs-14 fw-600"><?php echo L('modal_cancel'); ?></button>
+            <button onclick="window.guardarPromo()" class="btn-save px-32 py-12 fs-14 fw-700 background-accent text-white br-12 shadow-sm transition">
+                <i class="fa-solid fa-floppy-disk mr-8"></i> <?php echo L('promos_btn_save'); ?>
+            </button>
         </div>
     </div>
 </div>

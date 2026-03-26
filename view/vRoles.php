@@ -4,15 +4,18 @@
         <div class="section-title">
             <div class="d-flex ai-center gap-12 mb-4">
                 <i class="fa-solid fa-user-shield text-accent fs-32"></i>
-                <h1 class="m-0 fs-28">Roles y Permisos</h1>
+                <h1 class="m-0 fs-28"><?php echo L('roles_title'); ?></h1>
             </div>
-            <p class="text-muted fs-14">Define las capacidades de cada perfil de usuario en el sistema.</p>
+            <p class="text-muted fs-14"><?php echo L('roles_subtitle'); ?></p>
         </div>
-        <form method="post">
-            <button type="submit" name="volver" class="btn-icon w-auto h-auto gap-8 fs-14 p-10-20">
-                <i class="fa-solid fa-house"></i> Dashboard
-            </button>
-        </form>
+        <div class="d-flex gap-12 ai-center">
+            <a href="index.php?irUsuarios=1" class="btn-back">
+                <?php echo L('login_back'); ?>
+            </a>
+            <a href="index.php?irDashboard=1" class="btn-back">
+                <i class="fa-solid fa-house"></i> <?php echo L('roles_btn_dashboard'); ?>
+            </a>
+        </div>
     </div>
 
     <?php if ($avRoles['mensajeOk']): ?>
@@ -37,23 +40,23 @@
         <!-- LISTADO DE ROLES -->
         <div class="card p-0 br-20 bg-white shadow-sm border-2 overflow-hidden">
             <div class="p-20 border-bottom bg-surface">
-                <h3 class="m-0 fs-16"><i class="fa-solid fa-list-ul mr-8"></i> Roles Definidos</h3>
+                <h3 class="m-0 fs-16"><i class="fa-solid fa-list-ul mr-8"></i> <?php echo L('roles_card_list'); ?></h3>
             </div>
             <table class="data-table mb-0">
                 <thead>
                     <tr>
-                        <th class="pl-20">Nombre del Rol</th>
-                        <th>Descripción</th>
-                        <th class="text-right pr-20">Acciones</th>
+                        <th class="pl-20"><?php echo L('roles_th_name'); ?></th>
+                        <th><?php echo L('roles_th_desc'); ?></th>
+                        <th class="text-right pr-20"><?php echo L('roles_th_actions'); ?></th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php foreach ($avRoles['roles'] as $r): ?>
                         <tr>
-                            <td class="pl-20 font-bold"><?php echo htmlspecialchars($r['nombre']); ?></td>
-                            <td class="text-muted fs-13"><?php echo htmlspecialchars($r['descripcion']); ?></td>
+                            <td class="pl-20 font-bold"><?php echo L('role_' . strtolower($r['nombre'])); ?></td>
+                            <td class="text-muted fs-13"><?php echo L('role_' . strtolower($r['nombre']) . '_desc'); ?></td>
                             <td class="text-right pr-20">
-                                <button class="btn-icon" onclick='cargarRolParaEditar(<?php echo json_encode($r); ?>)' title="Editar rol y permisos">
+                                <button class="btn-icon" onclick='cargarRolParaEditar(<?php echo htmlspecialchars(json_encode($r), ENT_QUOTES, "UTF-8"); ?>)' title="<?php echo L('roles_tip_edit'); ?>">
                                     <i class="fa-solid fa-pen-to-square"></i>
                                 </button>
                             </td>
@@ -65,7 +68,7 @@
 
         <!-- FORMULARIO DE GESTIÓN -->
         <div class="card p-24 br-20 bg-white shadow-sm border-2">
-            <h3 class="m-0 fs-18 mb-20" id="formTitle"><i class="fa-solid fa-plus-circle text-accent mr-8"></i> Crear Nuevo Rol</h3>
+            <h3 class="m-0 fs-18 mb-20" id="formTitle"><i class="fa-solid fa-plus-circle text-accent mr-8"></i> <?php echo L('roles_card_manage'); ?></h3>
 
             <form method="post" id="roleForm">
                 <input type="hidden" name="Analitica" value=""> <!-- Fake para Router si fuera necesario -->
@@ -73,24 +76,24 @@
                 <input type="hidden" name="idRol" id="idRol" value="0">
 
                 <div class="form-group mb-16">
-                    <label class="fs-12 font-bold mb-8 d-block text-muted tt-uppercase">Nombre del Rol</label>
-                    <input type="text" name="nombreRol" id="roleName" class="form-input" placeholder="Ej: Supervisor, Almacén..." required>
+                    <label class="fs-12 font-bold mb-8 d-block text-muted tt-uppercase"><?php echo L('roles_label_name'); ?></label>
+                    <input type="text" name="nombreRol" id="roleName" class="form-input" placeholder="<?php echo L('roles_name_placeholder'); ?>" required>
                 </div>
 
                 <div class="form-group mb-20">
-                    <label class="fs-12 font-bold mb-8 d-block text-muted tt-uppercase">Descripción</label>
-                    <textarea name="descRol" id="roleDesc" class="form-input" style="height: 80px; resize: none;" placeholder="Breve nota sobre qué personal usa este rol..."></textarea>
+                    <label class="fs-12 font-bold mb-8 d-block text-muted tt-uppercase"><?php echo L('roles_th_desc'); ?></label>
+                    <textarea name="descRol" id="roleDesc" class="form-input" style="height: 80px; resize: none;" placeholder="<?php echo L('roles_desc_placeholder'); ?>"></textarea>
                 </div>
 
                 <div class="mb-12">
-                    <label class="fs-12 font-bold mb-12 d-block text-muted tt-uppercase border-bottom pb-4"><i class="fa-solid fa-key mr-8"></i> Permisos Habilitados</label>
+                    <label class="fs-12 font-bold mb-12 d-block text-muted tt-uppercase border-bottom pb-4"><i class="fa-solid fa-key mr-8"></i> <?php echo L('roles_label_perms'); ?></label>
                     <div class="d-flex flex-column gap-12 mt-12" id="permissionsList">
                         <?php foreach ($avRoles['permisos'] as $p): ?>
                             <label class="checkbox-item d-flex ai-center gap-12 p-8 br-8 cursor-pointer hover-bg-surface">
                                 <input type="checkbox" name="permisos[]" value="<?php echo $p['id']; ?>" class="perm-check" data-clave="<?php echo $p['clave']; ?>">
                                 <div>
-                                    <div class="fs-14 font-bold"><?php echo htmlspecialchars($p['descripcion']); ?></div>
-                                    <div class="fs-11 text-muted">Clave: <?php echo $p['clave']; ?></div>
+                                    <div class="fs-14 font-bold"><?php echo L('perm_' . strtolower($p['clave'])); ?></div>
+                                    <div class="fs-11 text-muted"><?php echo L('roles_perm_key'); ?>: <?php echo $p['clave']; ?></div>
                                 </div>
                             </label>
                         <?php endforeach; ?>
@@ -99,9 +102,9 @@
 
                 <div class="d-flex gap-12 mt-32 border-top pt-20">
                     <button type="submit" class="btn-filter flex-1 jc-center">
-                        <i class="fa-solid fa-floppy-disk"></i> Guardar Configuración
+                        <i class="fa-solid fa-floppy-disk"></i> <?php echo L('roles_btn_save'); ?>
                     </button>
-                    <button type="button" class="btn-cancel w-auto" onclick="limpiarForm()">Cancelar</button>
+                    <button type="button" class="btn-cancel w-auto" onclick="limpiarForm()"><?php echo L('modal_cancel'); ?></button>
                 </div>
             </form>
         </div>
@@ -109,26 +112,38 @@
 </div>
 
 <script>
+    let lastRequestId = 0;
+
     async function cargarRolParaEditar(rol) {
-        document.getElementById('formTitle').innerHTML = '<i class="fa-solid fa-shield-halved text-accent mr-8"></i> Editar Rol: ' + rol.nombre;
+        const requestId = ++lastRequestId;
+        const roleNames = {
+            'admin': "<?php echo L('role_admin'); ?>",
+            'cajero': "<?php echo L('role_cajero'); ?>"
+        };
+        const editLabel = "<?php echo L('roles_js_edit_title'); ?>";
+        const localizedName = roleNames[rol.nombre.toLowerCase()] || rol.nombre;
+        document.getElementById('formTitle').innerHTML = '<i class="fa-solid fa-shield-halved text-accent mr-8"></i> ' + editLabel + ': ' + localizedName;
         document.getElementById('idRol').value = rol.id;
         document.getElementById('roleName').value = rol.nombre;
         document.getElementById('roleDesc').value = rol.descripcion || '';
 
-        // Resetear checkboxes
+        // Resetear checkboxes inmediatamente
         const checks = document.querySelectorAll('.perm-check');
         checks.forEach(c => c.checked = false);
 
-        // Cargar permisos del rol vía API (o inyectados si pesaran poco)
+        // Cargar permisos del rol vía API
         try {
             const resp = await fetch('api/rolPermisos.php?idRol=' + rol.id);
             const data = await resp.json();
-            if (data.ok && data.claves) {
+
+            // Solo aplicar si esta sigue siendo la solicitud más reciente
+            if (requestId === lastRequestId && data.ok && data.claves) {
                 checks.forEach(c => {
                     if (data.claves.includes(c.dataset.clave)) {
                         c.checked = true;
                     }
                 });
+            } else {
             }
         } catch (e) {
             console.error("Error cargando permisos del rol", e);
@@ -136,13 +151,29 @@
     }
 
     function limpiarForm() {
-        document.getElementById('formTitle').innerHTML = '<i class="fa-solid fa-plus-circle text-accent mr-8"></i> Crear Nuevo Rol';
+        lastRequestId++; // Cancelar cualquier petición de carga en curso
+        const newLabel = "<?php echo L('roles_card_manage'); ?>";
+        document.getElementById('formTitle').innerHTML = '<i class="fa-solid fa-plus-circle text-accent mr-8"></i> ' + newLabel;
         document.getElementById('idRol').value = "0";
         document.getElementById('roleForm').reset();
+
+        const checks = document.querySelectorAll('.perm-check');
+        checks.forEach(c => c.checked = false);
     }
 </script>
 
 <style>
+    .section-header a {
+        text-decoration: none !important;
+        transition: all 0.2s ease;
+    }
+
+    .section-header a:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow);
+        background: var(--surface2);
+    }
+
     .checkbox-item:hover {
         background: var(--surface);
     }

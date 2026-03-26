@@ -31,49 +31,96 @@ class EntradaStockPDO
         string $notas = '',
         ?PDO $db = null
     ): array {
+        // Auto-migración: asegurar que la tabla entradas_stock existe
+        static $tablaCreada = false;
+        if (!$tablaCreada) {
+            try {
+                // Crear tabla si no existe
+                DBPDO::ejecutarConsulta("CREATE TABLE IF NOT EXISTS entradas_stock (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    id_producto INT NOT NULL,
+                    cantidad INT NOT NULL,
+                    precio_coste DECIMAL(10,4) NOT NULL DEFAULT 0,
+                    cmp_anterior DECIMAL(10,4) NOT NULL DEFAULT 0,
+                    cmp_resultante DECIMAL(10,4) NOT NULL DEFAULT 0,
+                    stock_anterior INT NOT NULL DEFAULT 0,
+                    stock_nuevo INT NOT NULL DEFAULT 0,
+                    id_usuario INT DEFAULT NULL,
+                    notas TEXT DEFAULT NULL,
+                    fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_producto (id_producto)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+            } catch (\Throwable $e) {
+                error_log("EntradaStockPDO: Error auto-migrando tabla entradas_stock: " . $e->getMessage());
+            }
+            $tablaCreada = true;
+        }
+
         // 1. Obtener stock y CMP actuales del producto
-        $sqlProd = "SELECT stock_actual, precio_coste FROM productos WHERE id = :id";
+        $sqlProd = "SELECT p.precio_coste, p.stock_actual, p.precio_venta, p.margen
+                    FROM productos p WHERE p.id = :id";
+        
+        $stmt = ($db) ? $db->prepare($sqlProd) : null;
         if ($db) {
-            $stmt = $db->prepare($sqlProd);
             $stmt->execute([':id' => $idProducto]);
             $prod = $stmt->fetch(PDO::FETCH_ASSOC);
         } else {
             $q = DBPDO::ejecutarConsulta($sqlProd, [':id' => $idProducto]);
             $prod = $q->fetch(PDO::FETCH_ASSOC);
         }
+
         if (!$prod) {
             throw new \RuntimeException("Producto ID {$idProducto} no encontrado.");
         }
 
-        $stockActual  = (int)$prod['stock_actual'];
-        $cmpActual    = (float)$prod['precio_coste'];
-        $stockNuevo   = $stockActual + $cantidad;
+        $stockActual    = (int)$prod['stock_actual'];
+        $cmpActual      = (float)$prod['precio_coste'];
+        $pvpActual      = (float)$prod['precio_venta'];
+        $margen         = (float)($prod['margen'] ?? 0);
+
+        // IMPORTANTE: Para el cálculo del CMP, si el stock actual es negativo,
+        // lo tratamos como 0 para no "corromper" la media ponderada con deudas de stock.
+        $stockPonderado = max(0, $stockActual);
+        $stockNuevo     = $stockActual + $cantidad;
 
         // 2. Calcular nuevo CMP
-        if ($stockNuevo <= 0) {
+        if ($stockPonderado <= 0) {
             $cmpNuevo = $precioCoste;
         } else {
             $cmpNuevo = round(
-                ($stockActual * $cmpActual + $cantidad * $precioCoste) / $stockNuevo,
+                ($stockPonderado * $cmpActual + $cantidad * $precioCoste) / ($stockPonderado + $cantidad),
                 4
             );
         }
 
-        // 3. Actualizar el producto: stock y precio_coste (CMP)
-        $sqlUpdate = "UPDATE productos SET stock_actual = :stock, precio_coste = :cmp WHERE id = :id";
-        $paramsUpdate = [':stock' => $stockNuevo, ':cmp' => $cmpNuevo, ':id' => $idProducto];
+        // 2b. AJUSTE AUTOMÁTICO DE PVP SI HAY MARGEN DEFINIDO
+        $pvpNuevo = $pvpActual;
+        if ($margen > 0) {
+            $pvpNuevo = round($cmpNuevo * (1 + ($margen / 100)), 2);
+        }
+
+        // 3. Actualizar el producto: precio_coste (CMP), stock y PVP (si cambió)
+        $sqlUpdate = "UPDATE productos SET stock_actual = :stock, precio_coste = :cmp, precio_venta = :pvp WHERE id = :id";
+        $paramsUpdate = [
+            ':stock' => $stockNuevo, 
+            ':cmp'   => $cmpNuevo, 
+            ':pvp'   => $pvpNuevo,
+            ':id'    => $idProducto
+        ];
 
         // 4. Registrar el movimiento de entrada
         $sqlInsert = "INSERT INTO entradas_stock
                 (id_producto, cantidad, precio_coste, cmp_anterior, cmp_resultante,
                  stock_anterior, stock_nuevo, id_usuario, notas)
-             VALUES (:prod, :qty, :coste, :cmpAnt, :cmpRes, :stkAnt, :stkNuevo, :usr, :notas)";
+              VALUES (:prod, :qty, :coste, :cmpAnt, :cmpRes, :stkAnt, :stkNuevo, :usr, :notas)";
+
         $paramsInsert = [
             ':prod'    => $idProducto,
             ':qty'     => $cantidad,
-            ':coste'   => round($precioCoste, 2),
-            ':cmpAnt'  => round($cmpActual, 2),
-            ':cmpRes'  => round($cmpNuevo, 2),
+            ':coste'   => round($precioCoste, 4),
+            ':cmpAnt'  => round($cmpActual, 4),
+            ':cmpRes'  => round($cmpNuevo, 4),
             ':stkAnt'  => $stockActual,
             ':stkNuevo' => $stockNuevo,
             ':usr'     => $idUsuario,
@@ -90,7 +137,27 @@ class EntradaStockPDO
             DBPDO::ejecutarConsulta($sqlInsert, $paramsInsert);
         }
 
+        // 5. REGISTRAR AUDITORÍA DE PRECIO SI EL PVP CAMBIÓ AUTOMÁTICAMENTE
+        if ($pvpNuevo !== $pvpActual) {
+            $sqlAudit = "INSERT INTO auditoria_precios_base (id_producto, precio_old, precio_new, motivo, id_usuario) 
+                         VALUES (:p, :old, :new, :m, :u)";
+            $paramsAudit = [
+                ':p'   => $idProducto,
+                ':old' => $pvpActual,
+                ':new' => $pvpNuevo,
+                ':m'   => "Ajuste automático por cambio de CMP (Margen: {$margen}%)",
+                ':u'   => $idUsuario
+            ];
+            if ($db) {
+                $stmtAudit = $db->prepare($sqlAudit);
+                $stmtAudit->execute($paramsAudit);
+            } else {
+                DBPDO::ejecutarConsulta($sqlAudit, $paramsAudit);
+            }
+        }
+
         // Registrar en MovimientosStock
+        require_once __DIR__ . '/MovimientoStockPDO.php';
         MovimientoStockPDO::registrarMovimiento(
             $idProducto,
             'compra',

@@ -1,10 +1,9 @@
 <?php
+require_once __DIR__ . '/csrf_check.php';
 
 /**
  * API: gestionProducto.php
  * Gestiona las operaciones CRUD de productos (solo admins).
- * Acciones: añadir | editar | eliminar | baja
- * Devuelve JSON con el resultado.
  */
 ini_set('display_errors', 0);
 error_reporting(0);
@@ -16,20 +15,10 @@ try {
     require_once __DIR__ . '/../model/Usuario.php';
     require_once __DIR__ . '/../model/Producto.php';
     require_once __DIR__ . '/../model/ProductoPDO.php';
+    require_once __DIR__ . '/../model/MovimientoStockPDO.php';
     require_once __DIR__ . '/../core/231018libreriaValidacion.php';
 
-    // Auto-migración: crear columnas si no existen
-    try {
-        DBPDO::ejecutarConsulta("ALTER TABLE productos ADD COLUMN IF NOT EXISTS iva DECIMAL(5,2) DEFAULT 21.00");
-    } catch (Throwable $e) {
-    }
-    try {
-        DBPDO::ejecutarConsulta("ALTER TABLE productos ADD COLUMN IF NOT EXISTS meses_garantia INT DEFAULT 24");
-    } catch (Throwable $e) {
-    }
-
-    session_start();
-
+    // session_start(); // Handled by csrf_check.php
 
     // Solo POST
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -56,35 +45,44 @@ try {
     $accion = $datos['accion'] ?? '';
 
     if ($accion === 'añadir' || $accion === 'editar') {
+        // Sanitizar campos opcionales para evitar errores en la librería de validación con strings vacíos
+        $datos['precio_venta'] = (isset($datos['precio_venta']) && $datos['precio_venta'] !== '') ? $datos['precio_venta'] : 0;
+        $datos['precio_coste'] = (isset($datos['precio_coste']) && $datos['precio_coste'] !== '') ? $datos['precio_coste'] : 0;
+        $datos['stock_actual'] = (isset($datos['stock_actual']) && $datos['stock_actual'] !== '') ? $datos['stock_actual'] : 0;
+
         $aErrores = [
-            'icono' => null, // Icono es opcional ahora
+            'icono' => null,
             'referencia' => validacionFormularios::comprobarAlfaNumerico($datos['referencia'] ?? '', 50, 3, 0),
             'nombre' => validacionFormularios::comprobarAlfaNumerico($datos['nombre'] ?? '', 100, 3, 1),
-            'precio_proveedor' => validacionFormularios::comprobarFloat($datos['precio_proveedor'] ?? '', 1000000, 0, 1),
-            'precio_venta' => validacionFormularios::comprobarFloat($datos['precio_venta'] ?? '', 1000000, 0, 1),
-            'iva' => validacionFormularios::comprobarFloat($datos['iva'] ?? '', 100, 0, 0), // Optional as it might use codigo_iva
-            'stock_actual' => validacionFormularios::comprobarEntero($datos['stock_actual'] ?? '', 1000000, 0, 0),
+            'precio_venta' => validacionFormularios::comprobarFloat($datos['precio_venta'] ?? '', 1000000, 0, 0), // Opcional
+            'precio_coste' => validacionFormularios::comprobarFloat($datos['precio_coste'] ?? '', 1000000, 0, 0), // Opcional
+            'stock_actual' => validacionFormularios::comprobarEntero($datos['stock_actual'] ?? '', 1000000, 0, 0), // Opcional
             'stock_minimo' => validacionFormularios::comprobarEntero($datos['stock_minimo'] ?? '', 1000000, 0, 0),
             'meses_garantia' => validacionFormularios::comprobarEntero($datos['meses_garantia'] ?? '', 120, 0, 1),
-            'id_proveedor' => validacionFormularios::comprobarEntero($datos['id_proveedor'] ?? '', 1000000, 0, 0)
+            'id_proveedor' => validacionFormularios::comprobarEntero($datos['id_proveedor'] ?? '', 1000000, 0, 0),
+            'margen' => validacionFormularios::comprobarFloat($datos['margen'] ?? '', 1000, 0, 0)
         ];
 
+        // Lógica de producto inactivo por defecto si falta precio o stock (solo al añadir)
+        if ($accion === 'añadir') {
+            $hasPrice = !empty($datos['precio_venta']) && (float)$datos['precio_venta'] > 0;
+            $hasStock = !empty($datos['stock_actual']) && (int)$datos['stock_actual'] > 0;
+            
+            if (!$hasPrice || !$hasStock) {
+                $datos['activo'] = 0;
+            } else {
+                $datos['activo'] = 1;
+            }
+        }
 
-
-        // Limpiar errores (convertir strings vacíos a null)
         foreach ($aErrores as $clave => $error) {
             if ($error !== null && trim($error) === '') {
                 $aErrores[$clave] = null;
             }
         }
 
-        // Extra: prices must not be negative
         if ((float)($datos['precio_venta'] ?? 0) < 0) {
             echo json_encode(['ok' => false, 'error' => 'El precio de venta no puede ser negativo', 'aErrores' => ['precio_venta' => 'El precio de venta no puede ser negativo']]);
-            exit;
-        }
-        if ((float)($datos['precio_coste'] ?? 0) < 0) {
-            echo json_encode(['ok' => false, 'error' => 'El precio de coste no puede ser negativo', 'aErrores' => ['precio_coste' => 'El precio de coste no puede ser negativo']]);
             exit;
         }
 
@@ -100,7 +98,6 @@ try {
     }
 
     switch ($accion) {
-
         case 'añadir':
             $nuevo = ProductoPDO::añadirProducto($datos);
             echo json_encode([
@@ -110,16 +107,13 @@ try {
                     'name'     => $nuevo['nombre'],
                     'codigo'   => $nuevo['referencia'],
                     'price'    => (float)$nuevo['precio_venta'],
-                    'iva'      => (float)$nuevo['iva'],
                     'icono'    => $nuevo['icono'],
                     'cat'      => $nuevo['categoria'],
                     'stock'    => !empty($nuevo['es_pack']) ? ProductoPDO::calcularStockPack((int)$nuevo['id']) : (int)$nuevo['stock_actual'],
                     'inactive' => false,
-                    'variantes' => json_decode($nuevo['variantes'] ?? '[]', true),
                     'es_pack'  => (int)($nuevo['es_pack'] ?? 0),
                     'componentes_pack' => !empty($nuevo['es_pack']) ? ProductoPDO::obtenerComponentesPack((int)$nuevo['id']) : []
                 ]
-
             ]);
             break;
 
@@ -144,12 +138,17 @@ try {
             echo json_encode(['ok' => true, 'activo' => $activo]);
             break;
 
-        case 'reparar_precios':
-            // Maintenance: Fix any negative prices in the DB by taking absolute value
-            DBPDO::ejecutarConsulta("UPDATE productos SET precio_venta = ABS(precio_venta) WHERE precio_venta < 0");
-            DBPDO::ejecutarConsulta("UPDATE productos SET precio_coste = ABS(precio_coste) WHERE precio_coste < 0");
-            DBPDO::ejecutarConsulta("UPDATE producto_variantes SET precio_venta = ABS(precio_venta) WHERE precio_venta < 0");
-            echo json_encode(['ok' => true, 'mensaje' => 'Precios negativos corregidos a su valor absoluto']);
+        case 'retirada_stock':
+            $id = (int)($datos['id'] ?? 0);
+            $cantidad = (int)($datos['cantidad'] ?? 0);
+            $motivo = $datos['motivo'] ?? 'Retirada manual';
+            if (!$id) throw new InvalidArgumentException('ID de producto inválido');
+            if ($cantidad <= 0) throw new InvalidArgumentException('La cantidad debe ser mayor que 0');
+
+            $idUsuario = $_SESSION['usuarioActualTPV']->getId();
+            ProductoPDO::reducirStock($id, $cantidad);
+            MovimientoStockPDO::registrarMovimiento($id, 'ajuste', -$cantidad, $idUsuario, $motivo);
+            echo json_encode(['ok' => true]);
             break;
 
         default:

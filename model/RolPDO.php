@@ -5,7 +5,7 @@
  * Gestiona la persistencia de roles y sus permisos.
  * @package Modelos
  */
-require_once 'DBPDO.php';
+require_once __DIR__ . '/DBPDO.php';
 
 class RolPDO
 {

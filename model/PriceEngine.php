@@ -1,0 +1,355 @@
+<?php
+
+/**
+ * Clase: PriceEngine
+ * Centraliza el cálculo de precios, tarifas y promociones con fines de auditoría.
+ */
+
+require_once __DIR__ . '/DBPDO.php';
+require_once __DIR__ . '/ProductoPDO.php';
+require_once __DIR__ . '/TarifaPrecioPDO.php';
+require_once __DIR__ . '/PromocionPDO.php';
+
+class PriceEngine
+{
+
+    /**
+     * Calcula el precio final de un producto aplicando la cadena de descuentos.
+     * 
+     * @param int $idProducto
+     * @param int|null $idCliente
+     * @param int $cantidad
+     * @param string|null $codigoCupon
+     * @return array Breakdown del precio y descuentos aplicados.
+     */
+    public static function calculate(int $idProducto, ?int $idCliente = null, int $cantidad = 1, ?string $codigoCupon = null): array
+    {
+        $producto = ProductoPDO::obtenerProductoPorId($idProducto);
+        if (!$producto) {
+            throw new Exception("Producto no encontrado");
+        }
+
+        $precioBase = (float)$producto['precio_venta'];
+        $precioActual = $precioBase;
+        $descuentos = [];
+
+        // 1. Aplicar Tarifa (Prioridad)
+        $tarifas = self::obtenerTarifasAplicables($idProducto, $idCliente);
+        if (!empty($tarifas)) {
+            $t = $tarifas[0];
+            if ($t['tipo'] === 'percent') {
+                $importeVariacion = round($precioActual * ($t['valor'] / 100), 2);
+            } else {
+                $importeVariacion = (float)$t['valor'];
+            }
+
+            if ($importeVariacion != 0) {
+                $precioActual += $importeVariacion;
+                $descuentos[] = [
+                    'id_origen' => $t['id'],
+                    'tipo_descuento' => 'tarifa',
+                    'nombre' => $t['nombre'],
+                    'valor_descontado' => $importeVariacion // Subida: +, Bajada: -
+                ];
+            }
+        }
+
+        // 2. Aplicar Promociones de volumen / Bundle
+        // Nota: Las promociones tipo 'bundle' suelen requerir contexto de carrito completo,
+        // pero aquí implementamos la lógica por línea si es aplicable.
+        $promos = self::obtenerPromocionesAplicables($idProducto, $idCliente, $cantidad);
+        foreach ($promos as $p) {
+            $importePromo = 0;
+            if ($p['tipo'] === 'percent') {
+                $importePromo = round($precioActual * ($p['valor'] / 100), 2);
+            } elseif ($p['tipo'] === 'amount') {
+                $importePromo = (float)$p['valor'];
+            } elseif ($p['tipo'] === 'bundle' && $p['bundle_buy_qty'] > 0) {
+                // Ejemplo 3x2: compras 3, pagas 2. 
+                // Descuento unitario = (Precio * (Buy - Pay)) / Buy
+                $unidadesGratis = floor($cantidad / $p['bundle_buy_qty']) * ($p['bundle_buy_qty'] - $p['bundle_pay_qty']);
+                if ($unidadesGratis > 0) {
+                    $importeTotalPromo = $precioActual * $unidadesGratis;
+                    $importePromo = round($importeTotalPromo / $cantidad, 2);
+                }
+            }
+
+            if ($importePromo > 0) {
+                $precioActual -= $importePromo;
+                $descuentos[] = [
+                    'id_origen' => $p['id'],
+                    'tipo_descuento' => 'promocion',
+                    'nombre' => $p['label'],
+                    'valor_descontado' => -$importePromo
+                ];
+            }
+        }
+
+        // 3. Aplicar Cupones / Socio
+        if ($codigoCupon) {
+            $cupon = self::obtenerCuponAplicable($codigoCupon, $idProducto, $idCliente);
+            if ($cupon) {
+                $importeCupon = 0;
+                if ($cupon['tipo'] === 'percent') {
+                    $importeCupon = round($precioActual * ($cupon['valor'] / 100), 2);
+                } else {
+                    $importeCupon = (float)$cupon['valor'];
+                }
+
+                if ($importeCupon > 0) {
+                    $precioActual -= $importeCupon;
+                    $descuentos[] = [
+                        'id_origen' => $cupon['id'],
+                        'tipo_descuento' => 'cupon',
+                        'nombre' => "Cupón: " . $codigoCupon,
+                        'valor_descontado' => -$importeCupon
+                    ];
+                }
+            }
+        }
+
+        return [
+            'precio_base' => $precioBase,
+            'precio_unitario_final' => round($precioActual, 2),
+            'total_descuento_unitario' => round($precioBase - $precioActual, 2),
+            'descuentos' => $descuentos
+        ];
+    }
+
+    private static function obtenerTarifasAplicables(int $idProducto, ?int $idCliente, bool $ignoreContextFilters = false): array
+    {
+        // En la nueva estructura, usamos tarifa_productos para scope='productos'
+        $ahora = date('Y-m-d');
+        $pro = ProductoPDO::obtenerProductoPorId($idProducto);
+        $cat = $pro['categoria'] ?? '';
+
+        // Obtenemos todas las activas hoy basándose solo en el estado 'activo' y fechas globales
+        // Si ignoramos filtros de contexto, al menos deben seguir siendo vigentes por fecha
+        $sql = "SELECT t.* FROM tarifas_precios t 
+                WHERE t.activo = 1 
+                AND t.fecha_aplicacion <= :hoy 
+                AND (t.fecha_fin IS NULL OR t.fecha_fin >= :hoy)";
+
+        $q = DBPDO::ejecutarConsulta($sql, [':hoy' => $ahora]);
+        $todas = $q->fetchAll(PDO::FETCH_ASSOC);
+
+        $aplicables = [];
+        foreach ($todas as $t) {
+            $aplica = false;
+            
+            // 0. Verificar exclusión explícita
+            $excluidos = json_decode($t['excluidos'] ?? '[]', true) ?: [];
+            if (in_array($idProducto, $excluidos)) {
+                continue;
+            }
+
+            // Verificar Scope
+            if ($t['scope'] === 'todos') {
+                $aplica = true;
+            } elseif ($t['scope'] === 'categoria' && $t['categoria'] === $cat) {
+                $aplica = true;
+            } elseif ($t['scope'] === 'productos') {
+                $check = DBPDO::ejecutarConsulta("SELECT 1 FROM tarifa_productos WHERE id_tarifa = :t AND id_producto = :p", [
+                    ':t' => $t['id'],
+                    ':p' => $idProducto
+                ])->fetch();
+                if ($check) $aplica = true;
+            }
+
+            if ($aplica && !$ignoreContextFilters && !self::esValidoPorFiltros($t, $idCliente)) {
+                $aplica = false;
+            }
+
+            if ($aplica) {
+                $aplicables[] = $t;
+            }
+        }
+
+        // Ordenar por prioridad DESC
+        usort($aplicables, function ($a, $b) {
+            return $b['prioridad'] <=> $a['prioridad'];
+        });
+
+        return $aplicables;
+    }
+
+    private static function obtenerPromocionesAplicables(int $idProducto, ?int $idCliente, int $cantidad, bool $ignoreContextFilters = false): array
+    {
+        $todas = PromocionPDO::listarActivas();
+        $pro = ProductoPDO::obtenerProductoPorId($idProducto);
+        $cat = $pro['categoria'] ?? '';
+
+        $aplicables = [];
+        foreach ($todas as $p) {
+            // Si es un cupón (tiene código), no se aplica automáticamente aquí
+            if (!empty($p['codigo'])) continue;
+
+            // 0. Verificar exclusión explícita
+            $excluidos = json_decode($p['excluidos'] ?? '[]', true) ?: [];
+            if (in_array($idProducto, $excluidos)) {
+                continue;
+            }
+
+            $aplica = false;
+            if (!$p['id_producto'] && !$p['producto_ids'] && !$p['categoria_code']) {
+                $aplica = true; // General
+            } elseif ($p['id_producto'] == $idProducto) {
+                $aplica = true;
+            } elseif ($p['producto_ids']) {
+                $ids = json_decode($p['producto_ids'], true) ?: [];
+                if (in_array((int)$idProducto, $ids)) $aplica = true;
+            } elseif ($p['categoria_code'] == $cat) {
+                $aplica = true;
+            }
+
+            if ($aplica && !$ignoreContextFilters && !self::esValidoPorFiltros($p, $idCliente)) {
+                $aplica = false;
+            }
+
+            if ($aplica) {
+                $aplicables[] = $p;
+            }
+        }
+        return $aplicables;
+    }
+
+    private static function obtenerCuponAplicable(string $codigo, int $idProducto, ?int $idCliente): ?array
+    {
+        $ahora = date('Y-m-d H:i:s');
+        $sql = "SELECT * FROM promociones 
+                WHERE codigo = :codigo 
+                AND activo = 1 
+                AND (fecha_inicio IS NULL OR fecha_inicio <= :ahora) 
+                AND (fecha_fin IS NULL OR fecha_fin >= :ahora)
+                LIMIT 1";
+        $q = DBPDO::ejecutarConsulta($sql, [':codigo' => $codigo, ':ahora' => $ahora]);
+        $c = $q->fetch(PDO::FETCH_ASSOC);
+
+        if (!$c) return null;
+
+        // 0. Verificar exclusión explícita
+        $excluidos = json_decode($c['excluidos'] ?? '[]', true) ?: [];
+        if (in_array($idProducto, $excluidos)) {
+            return null;
+        }
+
+        // Verificar si aplica al producto
+        $pro = ProductoPDO::obtenerProductoPorId($idProducto);
+        $cat = $pro['categoria'] ?? '';
+
+        if ($c['id_producto'] && $c['id_producto'] != $idProducto) {
+            // Check if it's in producto_ids before rejecting
+            $inIds = false;
+            if ($c['producto_ids']) {
+                $ids = json_decode($c['producto_ids'], true) ?: [];
+                if (in_array((int)$idProducto, $ids)) $inIds = true;
+            }
+            if (!$inIds) return null;
+        } elseif (!$c['id_producto'] && $c['producto_ids']) {
+            $ids = json_decode($c['producto_ids'], true) ?: [];
+            if (!in_array((int)$idProducto, $ids)) return null;
+        }
+
+        if ($c['categoria_code'] && $c['categoria_code'] != $cat) return null;
+
+        if (!self::esValidoPorFiltros($c, $idCliente)) return null;
+
+        return $c;
+    }
+
+    private static function esValidoPorFiltros(array $item, ?int $idCliente): bool
+    {
+        $isSpecificClient = false;
+
+        // 1. Validar por Cliente Específico (Solo para Tarifas si tienen id_cliente o cliente_ids)
+        if (!empty($item['id_cliente'])) {
+            $isSpecificClient = true;
+            if ((int)$item['id_cliente'] !== (int)$idCliente) {
+                return false;
+            }
+        }
+        
+        if (!empty($item['cliente_ids'])) {
+            $isSpecificClient = true;
+            if (!$idCliente) return false;
+            $ids = json_decode($item['cliente_ids'], true) ?: [];
+            if (!in_array((int)$idCliente, $ids)) {
+                return false;
+            }
+        }
+
+        // 2. Validar Día de la Semana
+        if (!empty($item['dias_semana'])) {
+            $hoySemana = date('w'); // 0 (Dom) a 6 (Sab)
+            $mapaDias = ['dom', 'lun', 'mar', 'mie', 'jue', 'vie', 'sab'];
+            $diaActual = $mapaDias[$hoySemana];
+            $diasPermitidos = array_map('trim', explode(',', strtolower($item['dias_semana'])));
+            if (!in_array($diaActual, $diasPermitidos)) return false;
+        }
+
+        // 3. Validar Franja Horaria (Hora Actual)
+        if (!empty($item['hora_inicio']) || !empty($item['hora_fin'])) {
+            $ahoraHora = date('H:i:s');
+            $hInicio = $item['hora_inicio'] ?: '00:00:00';
+            $hFin = $item['hora_fin'] ?: '23:59:59';
+            if ($ahoraHora < $hInicio || $ahoraHora > $hFin) return false;
+        }
+
+        // 4. Validar Segmento de Clientes (Roles) - Solo si no es cliente específico
+        if (!$isSpecificClient && !empty($item['roles_segmento'])) {
+            if (!$idCliente) return false;
+            
+            // Obtener rol del cliente
+            $c = DBPDO::ejecutarConsulta("SELECT rol FROM clientes WHERE id = :id", [':id' => $idCliente])->fetch();
+            $rolCliente = strtolower($c['rol'] ?? 'general');
+            
+            $segmentosPermitidos = array_map('trim', explode(',', strtolower($item['roles_segmento'])));
+            if (!in_array($rolCliente, $segmentosPermitidos)) return false;
+        }
+
+        // 5. Soporte Legacy "Solo Socios" - Solo si no es cliente específico
+        if (!$isSpecificClient && isset($item['solo_socios']) && $item['solo_socios'] == 1) {
+            if (!$idCliente) return false;
+            $c = DBPDO::ejecutarConsulta("SELECT rol FROM clientes WHERE id = :id", [':id' => $idCliente])->fetch();
+            if (strtolower($c['rol'] ?? '') !== 'socio') return false;
+        }
+
+        return true;
+    }
+
+    public static function getRulesForProduct(int $idProducto): array
+    {
+        // Reutilizamos la lógica de obtención pero devolviendo objetos descriptivos
+        // Para el panel de administración (gestión de exclusiones), ignoramos filtros de contexto
+        // para que se vean todas las reglas que *podrían* aplicar al producto.
+        $tarifas = self::obtenerTarifasAplicables($idProducto, null, true);
+        $promos  = self::obtenerPromocionesAplicables($idProducto, null, 1, true);
+
+        $res = [];
+        foreach ($tarifas as $t) {
+            $res[] = [
+                'id'         => $t['id'],
+                'nombre'     => $t['nombre'],
+                'tipo_regla' => 'tarifa',
+                'tipo'       => $t['tipo'],
+                'valor'      => (float)$t['valor'],
+                'prioridad'  => (int)$t['prioridad']
+            ];
+        }
+        foreach ($promos as $p) {
+            $res[] = [
+                'id'         => $p['id'],
+                'nombre'     => $p['label'],
+                'tipo_regla' => 'promocion',
+                'tipo'       => $p['tipo'],
+                'valor'      => (float)$p['valor'],
+                'prioridad'  => (int)$p['prioridad']
+            ];
+        }
+
+        // Ordenar por prioridad DESC
+        usort($res, fn($a, $b) => $b['prioridad'] <=> $a['prioridad']);
+        
+        return $res;
+    }
+}

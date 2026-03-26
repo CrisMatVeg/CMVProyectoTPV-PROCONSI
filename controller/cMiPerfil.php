@@ -16,9 +16,17 @@ $error = null;
 $success = null;
 $aErrores = [
     'nombre_completo' => null,
+    'pass_actual' => null,
     'pass1' => null,
     'pass2' => null
 ];
+
+// Navegación Global
+if (isset($_REQUEST['volver']) || isset($_REQUEST['irDashboard'])) {
+    $_SESSION['paginaEnCurso'] = 'Dashboard';
+    header('Location: index.php');
+    exit;
+}
 
 $entradaOK = true;
 
@@ -28,9 +36,18 @@ if (isset($_REQUEST['guardarCambios'])) {
     $aErrores['nombre_completo'] = validacionFormularios::comprobarAlfabetico($_REQUEST['nombre_completo'], 100, 3, 1);
 
     if (!empty($_REQUEST['pass1'])) {
-        $aErrores['pass1'] = validacionFormularios::validarPassword($_REQUEST['pass1'], 20, 4, 1, 1);
+        // Verificar contraseña actual
+        $userActual = $_SESSION['usuarioActualTPV']->getUsername();
+        $passActual = $_REQUEST['pass_actual'] ?? '';
+        
+        $check = UsuarioPDO::validarUsuario($userActual, $passActual);
+        if (!$check) {
+            $aErrores['pass_actual'] = "La contraseña actual no es correcta.";
+        }
+
+        $aErrores['pass1'] = validacionFormularios::validarPassword($_REQUEST['pass1'], 20, 4, 2, 1);
         if ($_REQUEST['pass1'] !== $_REQUEST['pass2']) {
-            $aErrores['pass2'] = "Las contraseñas no coinciden.";
+            $aErrores['pass2'] = "La nueva contraseña no coincide con su repetición.";
         }
     }
 

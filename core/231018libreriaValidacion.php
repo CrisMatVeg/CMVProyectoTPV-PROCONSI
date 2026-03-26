@@ -523,5 +523,3 @@ class validacionFormularios {  //ELIMINA EL METODO VALIDATEDATE Y LO INCLUYE EN 
         return $mensajeError;
     }
 }
-
-?>

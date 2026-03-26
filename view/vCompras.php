@@ -3,18 +3,18 @@
     <!-- CABECERA DE SECCIÓN -->
     <div class="section-header container-wider">
         <div class="section-title">
-            <h1>Gestión de Compras y Existencias</h1>
-            <p>Controla las entradas de mercadería (Albaranes) y su posterior facturación y pago.</p>
+            <h1><?php echo L('dashboard_btn_purchases'); ?></h1>
+            <p><?php echo L('dashboard_btn_purchases_sub'); ?></p>
         </div>
         <div class="d-flex gap-12 ai-center">
             <a href="index.php?irDashboard=1" class="btn-back">
-                <i class="fa-solid fa-arrow-left"></i> Volver
+                <?php echo L('login_back'); ?>
             </a>
             <button onclick="abrirModalNuevoAlbaran()" class="btn-add">
-                <i class="fa-solid fa-truck-ramp-box"></i> Nuevo Albarán
+                <i class="fa-solid fa-truck-ramp-box"></i> <?php echo L('purchase_btn_new_albaran'); ?>
             </button>
             <button onclick="abrirModalNuevaFactura()" class="btn-save" style="background: var(--accent);">
-                <i class="fa-solid fa-file-invoice-dollar"></i> Registrar Factura
+                <i class="fa-solid fa-file-invoice-dollar"></i> <?php echo L('purchase_btn_new_invoice'); ?>
             </button>
         </div>
     </div>
@@ -23,10 +23,10 @@
     <div class="container-wider mb-24">
         <div class="d-flex gap-24 border-bottom pb-8">
             <button class="tab-btn active" onclick="switchTab('albaranes', this)">
-                <i class="fa-solid fa-boxes-stacked mr-8"></i> Albaranes / Entradas
+                <i class="fa-solid fa-boxes-stacked mr-8"></i> <?php echo L('purchase_tab_albaranes'); ?>
             </button>
             <button class="tab-btn" onclick="switchTab('facturas', this)">
-                <i class="fa-solid fa-file-invoice mr-8"></i> Facturas Recibidas
+                <i class="fa-solid fa-file-invoice mr-8"></i> <?php echo L('purchase_tab_facturas'); ?>
             </button>
         </div>
     </div>
@@ -37,18 +37,18 @@
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th class="w-180 pl-20">Fecha</th>
-                        <th>Nº Albarán</th>
-                        <th>Proveedor</th>
-                        <th class="text-right">Importe</th>
-                        <th class="text-center">Estado</th>
-                        <th class="text-center pr-20">Acciones</th>
+                        <th class="w-180 pl-20"><?php echo L('prod_th_date'); ?></th>
+                        <th><?php echo L('purchase_th_albaran'); ?></th>
+                        <th><?php echo L('prod_modal_label_provider'); ?></th>
+                        <th class="text-right"><?php echo L('tpv_total'); ?></th>
+                        <th class="text-center"><?php echo L('prod_th_status'); ?></th>
+                        <th class="text-center pr-20"><?php echo L('prod_th_actions'); ?></th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (empty($avInicioPrivado['historico_albaranes'])): ?>
                         <tr>
-                            <td colspan="6" class="p-40 text-center text-muted">No hay albaranes registrados.</td>
+                            <td colspan="6" class="p-40 text-center text-muted"><?php echo L('purchase_no_albaranes'); ?></td>
                         </tr>
                     <?php else: ?>
                         <?php foreach ($avInicioPrivado['historico_albaranes'] as $a): ?>
@@ -59,7 +59,7 @@
                                 <td class="text-right font-mono"><?php echo number_format($a['total'], 2, ',', '.'); ?> €</td>
                                 <td class="text-center">
                                     <span class="badge <?php echo $a['estado'] === 'pendiente' ? 'badge-warning' : 'badge-success'; ?>">
-                                        <?php echo ucfirst($a['estado']); ?>
+                                        <?php echo L('purchase_status_' . strtolower($a['estado']), true); ?>
                                     </span>
                                 </td>
                                 <td class="text-center">
@@ -81,18 +81,18 @@
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th class="w-180 pl-20">Fecha Factura</th>
-                        <th>Nº Factura</th>
-                        <th>Proveedor</th>
-                        <th class="text-right">Total</th>
-                        <th class="text-center">Pago</th>
-                        <th class="text-center pr-20">Acciones</th>
+                        <th class="w-180 pl-20"><?php echo L('purchase_th_invoice_date'); ?></th>
+                        <th><?php echo L('purchase_th_invoice_num'); ?></th>
+                        <th><?php echo L('prod_modal_label_provider'); ?></th>
+                        <th class="text-right"><?php echo L('tpv_total'); ?></th>
+                        <th class="text-center"><?php echo L('hist_th_payment'); ?></th>
+                        <th class="text-center pr-20"><?php echo L('prod_th_actions'); ?></th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (empty($avInicioPrivado['historico_facturas'])): ?>
                         <tr>
-                            <td colspan="6" class="p-40 text-center text-muted">No hay facturas registradas.</td>
+                            <td colspan="6" class="p-40 text-center text-muted"><?php echo L('purchase_no_facturas'); ?></td>
                         </tr>
                     <?php else: ?>
                         <?php foreach ($avInicioPrivado['historico_facturas'] as $f): ?>
@@ -106,7 +106,7 @@
                                 <td class="text-center">
                                     <span class="badge badge-info">
                                         <i class="fa-solid <?php echo $f['metodo_pago'] === 'caja' ? 'fa-cash-register' : 'fa-building-columns'; ?> mr-4"></i>
-                                        <?php echo ucfirst($f['metodo_pago']); ?>
+                                        <?php echo L('purchase_method_' . ($f['metodo_pago'] === 'caja' ? 'cash' : ($f['metodo_pago'] === 'banco' ? 'bank' : 'other')), true); ?>
                                     </span>
                                 </td>
                                 <td class="text-center">
@@ -124,19 +124,111 @@
 </div>
 
 <!-- MODAL NUEVO ALBARÁN (Stock Entry) -->
+<style>
+    /* === ALBARAN MODAL === */
+    #modalNuevoAlbaran .modal-header h2 {
+        font-size: 18px;
+    }
+
+    #modalNuevoAlbaran .modal-header {
+        padding-bottom: 16px;
+    }
+
+    #albLineas tr td {
+        padding: 6px 8px;
+        vertical-align: middle;
+    }
+
+    #albLineas input[type="number"] {
+        font-family: monospace;
+        font-size: 13px;
+    }
+
+    #albLineas .price-cell {
+        background: var(--surface2);
+        border-radius: 6px;
+        padding: 4px 8px;
+        text-align: right;
+        font-weight: 700;
+        font-family: monospace;
+        min-width: 100px;
+    }
+
+    .alb-info-box {
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(99, 102, 241, 0.06));
+        border: 1px solid rgba(59, 130, 246, 0.2);
+        border-radius: 12px;
+        padding: 14px 16px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 16px;
+        font-size: 12px;
+        line-height: 1.5;
+        color: var(--text-muted);
+    }
+
+    .alb-info-box strong {
+        color: var(--text);
+    }
+
+    .alb-total-box {
+        background: var(--surface);
+        border: 2px solid var(--accent);
+        border-radius: 16px;
+        padding: 16px 20px;
+        text-align: right;
+    }
+
+    .alb-total-label {
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-muted);
+        margin-bottom: 4px;
+    }
+
+    .alb-total-amount {
+        font-size: 28px;
+        font-weight: 800;
+        font-family: monospace;
+        color: var(--accent);
+        line-height: 1;
+    }
+
+    .empty-lines-state {
+        text-align: center;
+        padding: 32px;
+        color: var(--text-muted);
+        font-size: 13px;
+    }
+
+    .empty-lines-state i {
+        font-size: 28px;
+        margin-bottom: 8px;
+        opacity: 0.3;
+        display: block;
+    }
+</style>
+
 <div id="modalNuevoAlbaran" class="modal-overlay-bg">
-    <div class="modal-content" style="max-width: 1000px; width: 95%;">
+    <div class="modal-content" style="max-width: 1000px; width: 95%; border-radius: 20px; overflow: hidden;">
         <div class="modal-header">
-            <h2>Registrar Entrada de Mercadería (Albarán)</h2>
+            <div>
+                <h2 style="margin:0 0 2px 0"><?php echo L('purchase_modal_albaran_title'); ?></h2>
+                <span style="font-size:12px; color: var(--text-muted); font-weight:400;"><?php echo L('purchase_modal_albaran_sub'); ?></span>
+            </div>
             <button class="btn-close-modal" onclick="cerrarModalNuevoAlbaran()">&times;</button>
         </div>
 
         <div class="p-24 overflow-y-auto" style="max-height: 80vh;">
-            <div class="d-grid grid-3 gap-16 mb-24 p-16 bg-surface2 br-12 border-2">
+            <!-- Cabecera del albarán -->
+            <div class="d-grid grid-3 gap-16 mb-20 p-16 bg-surface2 br-12 border-2">
                 <div class="form-group mb-0">
-                    <label class="form-label fs-11 tt-uppercase">Proveedor *</label>
+                    <label class="form-label fs-11 tt-uppercase"><?php echo L('prod_modal_label_provider'); ?> *</label>
                     <select id="albProveedor" class="form-input" onchange="actualizarREAlbaran()">
-                        <option value="">-- Seleccionar Proveedor --</option>
+                        <option value="">-- <?php echo L('purchase_select_prov_hint'); ?> --</option>
                         <?php foreach ($avInicioPrivado['proveedores'] as $p): ?>
                             <option value="<?php echo $p['id']; ?>" data-re="<?php echo $p['aplica_re'] ? '1' : '0'; ?>">
                                 <?php echo htmlspecialchars($p['nombre']); ?>
@@ -145,62 +237,70 @@
                     </select>
                 </div>
                 <div class="form-group mb-0">
-                    <label class="form-label fs-11 tt-uppercase">Nº Albarán / Referencia *</label>
-                    <input type="text" id="albNum" class="form-input font-mono" placeholder="Ej: ALB-2024-001">
+                    <label class="form-label fs-11 tt-uppercase"><?php echo L('purchase_label_albaran_ref'); ?> *</label>
+                    <input type="text" id="albNum" class="form-input font-mono" placeholder="<?php echo L('purchase_placeholder_alb_ref'); ?>">
                 </div>
                 <div class="form-group mb-0">
-                    <label class="form-label fs-11 tt-uppercase">Fecha Entrada</label>
+                    <label class="form-label fs-11 tt-uppercase"><?php echo L('purchase_label_entry_date'); ?></label>
                     <input type="date" id="albFecha" class="form-input" value="<?php echo date('Y-m-d'); ?>">
                 </div>
             </div>
 
-            <div class="search-bar mb-16">
+            <!-- Búsqueda de productos -->
+            <div class="search-bar mb-12">
                 <div class="search-input-wrap flex-1">
                     <i class="fa-solid fa-magnifying-glass"></i>
-                    <input type="text" id="albBusqueda" class="search-input" placeholder="Buscar producto para añadir al albarán..." onkeyup="buscarProductoAlbaran(this.value)">
+                    <input type="text" id="albBusqueda" class="search-input" placeholder="<?php echo L('purchase_search_placeholder'); ?>" onkeyup="buscarProductoAlbaran(this.value)">
                     <div id="albResultados" class="search-results-dropdown d-none"></div>
                 </div>
             </div>
 
-            <div class="table-container mb-24" style="max-height: 400px; overflow-y: auto;">
-                <table class="data-table mb-0">
+            <!-- Tabla de líneas -->
+            <div class="table-container mb-16" style="max-height: 320px; overflow-y: auto;">
+                <table class="data-table mb-0" style="min-width: 700px;">
                     <thead style="position: sticky; top: 0; z-index: 10;">
                         <tr>
-                            <th>Producto</th>
-                            <th class="w-100 text-center">Cantidad</th>
-                            <th class="w-180 text-right">Coste Neto (€)</th>
-                            <th class="w-80 text-center">IVA</th>
-                            <th class="w-80 text-center th-re">RE</th>
-                            <th class="w-180 text-right">Total Línea</th>
-                            <th class="w-60"></th>
+                            <th class="pl-20"><?php echo L('prod_th_name'); ?></th>
+                            <th class="w-100 text-center"><?php echo L('prod_th_qty'); ?></th>
+                            <th class="w-180 text-right"><?php echo L('purchase_th_cost_net'); ?></th>
+                            <th class="w-70 text-center"><?php echo L('modal_label_iva'); ?></th>
+                            <th class="w-70 text-center th-re">RE</th>
+                            <th class="w-140 text-right"><?php echo L('purchase_th_line_total'); ?></th>
+                            <th class="w-50"></th>
                         </tr>
                     </thead>
-                    <tbody id="albLineas"></tbody>
+                    <tbody id="albLineas">
+                        <tr id="albEmptyRow">
+                            <td colspan="7">
+                                <div class="empty-lines-state">
+                                    <i class="fa-solid fa-box-open"></i>
+                                    <?php echo L('purchase_empty_lines'); ?>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
                 </table>
             </div>
 
-            <div class="d-grid grid-2-1 gap-24 ai-start mb-16">
-                <div class="p-16 br-12 border-2 bg-blue-light border-blue d-flex ai-center gap-12">
-                    <i class="fa-solid fa-circle-info text-accent fs-24"></i>
-                    <p class="fs-12 m-0">
-                        El albarán incrementará el <strong>stock</strong> y actualizará el <strong>precio de coste (CMP)</strong>.
-                        Quedará marcado como "Pendiente de Facturar" hasta que registres la factura correspondiente.
-                    </p>
-                </div>
-                <div class="bg-surface p-20 br-16 border-2 shadow-sm text-right">
-                    <div class="d-flex jc-space-between mb-12 ai-center">
-                        <span class="font-bold text-accent">TOTAL ALBARÁN</span>
-                        <span class="fs-24 font-bold text-accent font-mono"><span id="albTotal">0,00</span> €</span>
-                    </div>
-                </div>
+            <!-- Info + Total -->
+            <div class="alb-info-box">
+                <i class="fa-solid fa-circle-info text-accent fs-20"></i>
+                <p class="m-0">
+                    <?php echo L('purchase_info_stock_cmp'); ?>
+                    <?php echo L('purchase_info_pending'); ?>
+                </p>
+            </div>
+            <div class="alb-total-box">
+                <div class="alb-total-label"><?php echo L('purchase_total_albaran'); ?></div>
+                <div class="alb-total-amount"><span id="albTotal">0,00</span> <span style="font-size:18px">€</span></div>
             </div>
         </div>
 
         <div class="modal-footer pt-16 border-top p-24">
-            <button class="btn-cancel" onclick="cerrarModalNuevoAlbaran()">Cancelar</button>
+            <button class="btn-cancel" onclick="cerrarModalNuevoAlbaran()"><?php echo L('modal_cancel'); ?></button>
             <div class="flex-1"></div>
             <button id="btnGuardarAlbaran" class="btn-save w-auto px-32" onclick="guardarAlbaran()">
-                <i class="fa-solid fa-save mr-8"></i> Procesar Albarán
+                <i class="fa-solid fa-check-circle mr-8"></i> <?php echo L('purchase_btn_process'); ?>
             </button>
         </div>
     </div>
@@ -208,59 +308,59 @@
 
 <!-- MODAL REGISTRAR FACTURA (Billing and Payment) -->
 <div id="modalNuevaFactura" class="modal-overlay-bg">
-    <div class="modal-content w-700">
+    <div class="modal-content w-700" style="max-width: 700px; border-radius: 20px; overflow: hidden;">
         <div class="modal-header">
-            <h2>Registrar Factura de Proveedor</h2>
+            <h2><?php echo L('purchase_modal_fac_title'); ?></h2>
             <button class="btn-close-modal" onclick="cerrarModalNuevaFactura()">&times;</button>
         </div>
 
         <div class="p-24">
             <div class="d-grid grid-2 gap-16 mb-24">
                 <div class="form-group">
-                    <label class="form-label fs-11 tt-uppercase">Proveedor</label>
+                    <label class="form-label fs-11 tt-uppercase"><?php echo L('prod_modal_label_provider'); ?></label>
                     <select id="facProveedor" class="form-input" onchange="cargarAlbaranesPendientes()">
-                        <option value="">-- Seleccionar Proveedor --</option>
+                        <option value="">-- <?php echo L('purchase_select_prov_hint'); ?> --</option>
                         <?php foreach ($avInicioPrivado['proveedores'] as $p): ?>
                             <option value="<?php echo $p['id']; ?>"><?php echo htmlspecialchars($p['nombre']); ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="form-group">
-                    <label class="form-label fs-11 tt-uppercase">Nº Factura Oficial *</label>
-                    <input type="text" id="facNum" class="form-input font-mono" placeholder="Ej: 2024/FACT-001">
+                    <label class="form-label fs-11 tt-uppercase"><?php echo L('purchase_label_fac_num'); ?> *</label>
+                    <input type="text" id="facNum" class="form-input font-mono" placeholder="<?php echo L('purchase_placeholder_fac_num'); ?>">
                 </div>
                 <div class="form-group">
-                    <label class="form-label fs-11 tt-uppercase">Fecha Factura</label>
+                    <label class="form-label fs-11 tt-uppercase"><?php echo L('purchase_label_fac_date'); ?></label>
                     <input type="date" id="facFecha" class="form-input" value="<?php echo date('Y-m-d'); ?>">
                 </div>
                 <div class="form-group">
-                    <label class="form-label fs-11 tt-uppercase">Medio de Pago</label>
+                    <label class="form-label fs-11 tt-uppercase"><?php echo L('tpv_payment_method'); ?></label>
                     <select id="facPago" class="form-input">
-                        <option value="banco">Transferencia / Banco</option>
-                        <option value="caja">Efectivo (Caja TPV)</option>
-                        <option value="otro">Otros</option>
+                        <option value="banco"><?php echo L('purchase_method_bank'); ?></option>
+                        <option value="caja"><?php echo L('purchase_method_cash'); ?></option>
+                        <option value="otro"><?php echo L('purchase_method_other'); ?></option>
                     </select>
                 </div>
             </div>
 
-            <div class="mb-8 fs-12 fw-700 tt-uppercase opacity-50">Albaranes pendientes de facturar</div>
+            <div class="mb-8 fs-12 fw-700 tt-uppercase opacity-50"><?php echo L('purchase_label_pending_alb'); ?></div>
             <div id="listaAlbaranesPendientes" class="border-2 br-12 p-8 overflow-y-auto mb-24" style="max-height: 200px; background: var(--surface2);">
-                <div class="p-20 text-center opacity-50 fs-13">Selecciona un proveedor para ver sus albaranes</div>
+                <div class="p-20 text-center opacity-50 fs-13"><?php echo L('purchase_select_prov_hint'); ?></div>
             </div>
 
             <div class="bg-surface p-20 br-16 border-2 text-right">
                 <div class="d-flex jc-space-between ai-center">
-                    <span class="font-bold text-accent">TOTAL A PAGAR</span>
+                    <span class="font-bold text-accent"><?php echo L('purchase_total_to_pay'); ?></span>
                     <span class="fs-24 font-bold text-accent font-mono"><span id="facTotal">0,00</span> €</span>
                 </div>
             </div>
         </div>
 
         <div class="modal-footer pt-16 border-top p-24">
-            <button class="btn-cancel" onclick="cerrarModalNuevaFactura()">Cancelar</button>
+            <button class="btn-cancel" onclick="cerrarModalNuevaFactura()"><?php echo L('modal_cancel'); ?></button>
             <div class="flex-1"></div>
             <button id="btnGuardarFactura" class="btn-save w-auto px-32" onclick="guardarFactura()" disabled>
-                <i class="fa-solid fa-file-invoice-dollar mr-8"></i> Generar Factura y Pago
+                <i class="fa-solid fa-file-invoice-dollar mr-8"></i> <?php echo L('purchase_btn_generate_fac'); ?>
             </button>
         </div>
     </div>
@@ -268,14 +368,14 @@
 
 <!-- MODAL DETALLES -->
 <div id="modalDetalle" class="modal-overlay-bg">
-    <div class="modal-content w-600">
+    <div class="modal-content w-600" style="max-width: 600px; border-radius: 20px; overflow: hidden;">
         <div class="modal-header">
-            <h2 id="detalleTitulo">Detalles</h2>
+            <h2 id="detalleTitulo"><?php echo L('purchase_modal_details_title'); ?></h2>
             <button class="btn-close-modal" onclick="cerrarModalDetalle()">&times;</button>
         </div>
         <div id="detalleContent" class="p-24 overflow-y-auto" style="max-height: 70vh;"></div>
         <div class="modal-footer pt-16 border-top p-24">
-            <button class="btn-cancel" onclick="cerrarModalDetalle()">Cerrar</button>
+            <button class="btn-cancel" onclick="cerrarModalDetalle()"><?php echo L('modal_close'); ?></button>
         </div>
     </div>
 </div>
@@ -413,31 +513,87 @@
     function actualizarREAlbaran() {
         const sel = document.getElementById('albProveedor');
         if (sel.selectedIndex <= 0) return;
+
+        // Si ya hay productos y cambiamos de proveedor, advertir
+        if (albLineas.length > 0) {
+            showCustomConfirm(
+                "<?php echo L('purchase_js_change_prov_title'); ?>",
+                "<?php echo L('purchase_js_change_prov_body'); ?>",
+                () => {
+                    albLineas = [];
+                    renderLineasAlbaran();
+                    aplicarCambioProveedor(sel);
+                },
+                "<?php echo L('purchase_js_change_prov_btn'); ?>",
+                'danger'
+            );
+            // Revertir temporalmente la selección hasta que el usuario confirme
+            // (Esto es un poco complejo sin guardar el valor anterior, pero podemos forzar el cambio si acepta)
+        } else {
+            aplicarCambioProveedor(sel);
+        }
+    }
+
+    function aplicarCambioProveedor(sel) {
         albAplicaRE = sel.options[sel.selectedIndex].dataset.re === '1';
         document.getElementById('modalNuevoAlbaran').classList.toggle('has-re', albAplicaRE);
+        document.getElementById('albBusqueda').value = '';
+        document.getElementById('albResultados').classList.add('d-none');
         calcularTotalAlbaran();
     }
 
     function buscarProductoAlbaran(q) {
         const dd = document.getElementById('albResultados');
+        const idProv = document.getElementById('albProveedor').value;
+
+        if (!idProv) {
+            showCustomAlert("<?php echo L('prod_th_status'); ?>", "<?php echo L('purchase_js_select_prov_first'); ?>", "warning");
+            return dd.classList.add('d-none');
+        }
+
         if (q.length < 2) return dd.classList.add('d-none');
-        const res = productosDB.filter(p => p.nombre.toLowerCase().includes(q.toLowerCase()) || p.referencia.toLowerCase().includes(q.toLowerCase())).slice(0, 10);
+
+        // Filtrar por nombre/referencia Y por el proveedor seleccionado
+        const res = productosDB.filter(p => {
+            const matchesQuery = p.nombre.toLowerCase().includes(q.toLowerCase()) ||
+                p.referencia.toLowerCase().includes(q.toLowerCase());
+            const matchesProv = parseInt(p.id_proveedor) === parseInt(idProv);
+            return matchesQuery && matchesProv;
+        }).slice(0, 10);
+
         if (res.length > 0) {
-            dd.innerHTML = res.map(p => `<div class="search-result-item" onclick="añadirLineaAlbaran(${p.id})"><b>${p.nombre}</b> <small>(${p.referencia})</small></div>`).join('');
+            dd.innerHTML = res.map(p => `
+                <div class="search-result-item" onclick="añadirLineaAlbaran(${p.id})">
+                    <b>${p.nombre}</b> <small>(${p.referencia})</small>
+                </div>
+            `).join('');
             dd.classList.remove('d-none');
-        } else dd.classList.add('d-none');
+        } else {
+            dd.innerHTML = '<div class="p-12 text-center text-muted fs-12"><?php echo L('purchase_js_no_products_found'); ?></div>';
+            dd.classList.remove('d-none');
+        }
     }
 
-    function añadirLineaAlbaran(id) {
+    async function añadirLineaAlbaran(id) {
         const p = productosDB.find(x => x.id === id);
-        if (albLineas.find(l => l.producto_id === id)) return alert('Ya añadido');
+        insertarLineaProcesada(p);
+    }
+
+    function insertarLineaProcesada(p) {
+        const nombreMostrar = `${p.nombre} (${p.referencia})`;
+
+        if (albLineas.find(l => l.producto_id === p.id)) {
+            return showCustomAlert("<?php echo L('prod_th_status'); ?>", "<?php echo L('purchase_js_product_added'); ?>", 'warning');
+        }
+
         let rePct = 0;
         if (p.iva >= 21) rePct = 5.2;
         else if (p.iva >= 10) rePct = 1.4;
         else if (p.iva >= 4) rePct = 0.5;
+
         albLineas.push({
             producto_id: p.id,
-            nombre: p.nombre,
+            nombre: nombreMostrar,
             cantidad: 1,
             precio_coste_neto: 0,
             iva_pct: parseFloat(p.iva),
@@ -449,24 +605,56 @@
     }
 
     function renderLineasAlbaran() {
-        document.getElementById('albLineas').innerHTML = albLineas.map((l, i) => `
-            <tr>
-                <td class="font-bold pl-20">${l.nombre}</td>
-                <td><input type="number" class="form-input text-center w-80" value="${l.cantidad}" onchange="albLineas[${i}].cantidad=parseFloat(this.value);renderLineasAlbaran()"></td>
-                <td><input type="number" class="form-input text-right w-120" value="${l.precio_coste_neto}" step="0.01" onchange="albLineas[${i}].precio_coste_neto=parseFloat(this.value);renderLineasAlbaran()"></td>
-                <td class="text-center opacity-70">${l.iva_pct}%</td>
-                <td class="text-center opacity-70 th-re">${l.re_pct}%</td>
-                <td class="text-right font-bold">${(l.cantidad * l.precio_coste_neto * (1 + (l.iva_pct / 100) + (albAplicaRE ? l.re_pct / 100 : 0))).toFixed(2)} €</td>
-                <td><button class="btn-icon text-red" onclick="albLineas.splice(${i},1);renderLineasAlbaran()"><i class="fa-solid fa-trash"></i></button></td>
-            </tr>
-        `).join('');
+        const tbody = document.getElementById('albLineas');
+        const emptyRow = document.getElementById('albEmptyRow');
+
+        // Limpiamos el contenido previo (excepto el emptyRow si queremos reusarlo, pero es más limpio reconstruir)
+        tbody.innerHTML = '';
+
+        if (albLineas.length === 0) {
+            // Reinsertamos el emptyRow si la lista está vacía
+            tbody.innerHTML = `
+                <tr id="albEmptyRow">
+                    <td colspan="7">
+                        <div class="empty-lines-state">
+                            <i class="fa-solid fa-box-open"></i>
+                            <?php echo L('purchase_empty_lines'); ?>
+                        </div>
+                    </td>
+                </tr>
+            `;
+            calcularTotalAlbaran();
+            return;
+        }
+
+        const rows = albLineas.map((l, i) => {
+            const isZero = parseFloat(l.precio_coste_neto) <= 0;
+            const priceStyle = isZero ? 'border: 2px solid #ef4444; background: #fef2f2; color:#991b1b;' : '';
+            const totalLinea = l.cantidad * l.precio_coste_neto * (1 + (l.iva_pct / 100) + (albAplicaRE ? l.re_pct / 100 : 0));
+
+            return `
+                <tr>
+                    <td class="font-bold pl-20" style="max-width:220px;">
+                        ${l.nombre}
+                    </td>
+                    <td style="width:90px;"><input type="number" class="form-input text-center" style="width:80px;padding:6px;" value="${l.cantidad}" min="1" onchange="albLineas[${i}].cantidad=Math.max(1,parseFloat(this.value)||1);renderLineasAlbaran()"></td>
+                    <td style="width:160px;"><input type="number" class="form-input text-right font-mono" style="width:140px;padding:6px;${priceStyle}" value="${parseFloat(l.precio_coste_neto).toFixed(2)}" step="0.01" placeholder="0.00" onchange="albLineas[${i}].precio_coste_neto=parseFloat(this.value)||0;renderLineasAlbaran()"></td>
+                    <td class="text-center fs-12 text-muted" style="width:60px;">${l.iva_pct}%</td>
+                    <td class="text-center fs-12 text-muted th-re" style="width:60px;">${l.re_pct}%</td>
+                    <td class="text-right font-bold font-mono" style="width:120px;">${totalLinea.toFixed(2)} €</td>
+                    <td style="width:40px;"><button class="btn-icon text-red" title="<?php echo L('purchase_js_del_line'); ?>" onclick="albLineas.splice(${i},1);renderLineasAlbaran()"><i class="fa-solid fa-trash-can"></i></button></td>
+                </tr>
+            `;
+        }).join('');
+
+        tbody.innerHTML = rows;
         calcularTotalAlbaran();
     }
 
     function calcularTotalAlbaran() {
         let total = 0;
         albLineas.forEach(l => total += l.cantidad * l.precio_coste_neto * (1 + (l.iva_pct / 100) + (albAplicaRE ? l.re_pct / 100 : 0)));
-        document.getElementById('albTotal').innerText = total.toLocaleString('es-ES', {
+        document.getElementById('albTotal').innerText = total.toLocaleString("<?php echo L('locale'); ?>", {
             minimumFractionDigits: 2
         });
     }
@@ -474,7 +662,33 @@
     async function guardarAlbaran() {
         const prov = document.getElementById('albProveedor').value;
         const num = document.getElementById('albNum').value;
-        if (!prov || !num || albLineas.length === 0) return alert('Datos incompletos');
+
+        if (!prov || !num) {
+            return showCustomAlert("<?php echo L('prod_th_status'); ?>", "<?php echo L('purchase_js_incomplete_fields'); ?>", 'warning');
+        }
+
+        if (albLineas.length === 0) {
+            return showCustomAlert("<?php echo L('prod_th_status'); ?>", "<?php echo L('purchase_js_empty_albaran'); ?>", 'warning');
+        }
+
+        // Validar que no haya precios a 0
+        const preciosCero = albLineas.filter(l => parseFloat(l.precio_coste_neto) <= 0);
+        if (preciosCero.length > 0) {
+            const nombres = preciosCero.map(l => l.nombre).join(', ');
+            showCustomConfirm(
+                "<?php echo L('purchase_js_zero_cost_title'); ?>",
+                "<?php echo L('purchase_js_zero_cost_body'); ?>".replace('{productos}', nombres),
+                () => ejecutarGuardarAlbaran(prov, num),
+                "<?php echo L('purchase_js_zero_cost_btn'); ?>",
+                'danger'
+            );
+            return;
+        }
+
+        ejecutarGuardarAlbaran(prov, num);
+    }
+
+    async function ejecutarGuardarAlbaran(prov_id, numero) {
         const btn = document.getElementById('btnGuardarAlbaran');
         btn.disabled = true;
         try {
@@ -482,17 +696,22 @@
                 method: 'POST',
                 body: JSON.stringify({
                     action: 'registrar_albaran',
-                    proveedor_id: prov,
-                    numero_albaran: num,
+                    proveedor_id: prov_id,
+                    numero_albaran: numero,
                     fecha: document.getElementById('albFecha').value,
                     lineas: albLineas
                 })
             });
             const res = await r.json();
-            if (res.success) window.location.reload();
-            else alert('Error: ' + res.error);
+            if (res.success) {
+                // Notificar al TPV que el stock ha cambiado
+                sessionStorage.setItem('tpv_refresh_stock', Date.now());
+                window.location.reload();
+            } else {
+                showCustomAlert("<?php echo L('prod_js_error'); ?>", res.error || "<?php echo L('prod_js_error'); ?>", 'error');
+            }
         } catch (e) {
-            alert('Error de conexión');
+            showCustomAlert("<?php echo L('prod_js_error'); ?>", "<?php echo L('prod_js_error'); ?>", 'error');
         } finally {
             btn.disabled = false;
         }
@@ -504,7 +723,7 @@
         document.getElementById('facProveedor').value = '';
         document.getElementById('facNum').value = '';
         document.getElementById('facTotal').innerText = '0,00';
-        document.getElementById('listaAlbaranesPendientes').innerHTML = '<div class="p-20 text-center opacity-50 fs-13">Selecciona un proveedor</div>';
+        document.getElementById('listaAlbaranesPendientes').innerHTML = '<div class="p-20 text-center opacity-50 fs-13"><?php echo L('purchase_select_prov_hint'); ?></div>';
         document.getElementById('modalNuevaFactura').style.display = 'flex';
     }
 
@@ -520,13 +739,13 @@
             const data = await r.json();
             albaranesPendientes = data.filter(a => a.proveedor_id == provId);
             const container = document.getElementById('listaAlbaranesPendientes');
-            if (albaranesPendientes.length === 0) container.innerHTML = '<div class="p-20 text-center opacity-50 fs-13">No hay albaranes pendientes para este proveedor</div>';
+            if (albaranesPendientes.length === 0) container.innerHTML = '<div class="p-20 text-center opacity-50 fs-13"><?php echo L('purchase_no_pending_alb'); ?></div>';
             else {
                 container.innerHTML = albaranesPendientes.map(a => `
                     <div class="alb-item" id="alb-row-${a.id}" onclick="toggleSeleccionAlbaran(${a.id}, ${a.total})">
                         <div>
                             <div class="fw-700">${a.numero_albaran}</div>
-                            <div class="fs-11 text-muted">${new Date(a.fecha).toLocaleDateString()}</div>
+                            <div class="fs-11 text-muted">${new Date(a.fecha).toLocaleDateString("<?php echo L('locale'); ?>")}</div>
                         </div>
                         <div class="fw-700 font-mono text-accent">${parseFloat(a.total).toFixed(2)} €</div>
                     </div>
@@ -558,7 +777,7 @@
             const a = albaranesPendientes.find(x => x.id === id);
             if (a) total += parseFloat(a.total);
         });
-        document.getElementById('facTotal').innerText = total.toLocaleString('es-ES', {
+        document.getElementById('facTotal').innerText = total.toLocaleString("<?php echo L('locale'); ?>", {
             minimumFractionDigits: 2
         });
         document.getElementById('btnGuardarFactura').disabled = (albaranesSeleccionados.length === 0);
@@ -566,7 +785,7 @@
 
     async function guardarFactura() {
         const num = document.getElementById('facNum').value;
-        if (!num) return alert('Nº Factura obligatorio');
+        if (!num) return showCustomAlert("<?php echo L('prod_th_status'); ?>", "<?php echo L('purchase_js_incomplete_fields'); ?>", 'warning');
         const btn = document.getElementById('btnGuardarFactura');
         btn.disabled = true;
         try {
@@ -583,9 +802,9 @@
             });
             const res = await r.json();
             if (res.success) window.location.reload();
-            else alert('Error: ' + res.error);
+            else showCustomAlert('Error', res.error, 'error');
         } catch (e) {
-            alert('Error de conexión');
+            showCustomAlert("<?php echo L('warning'); ?>", "<?php echo L('tpv_js_conn_error'); ?>", 'error');
         } finally {
             btn.disabled = false;
         }
@@ -595,14 +814,14 @@
     async function verDetalleAlbaran(id) {
         const r = await fetch('api/compras.php?type=albaran&id=' + id);
         const a = await r.json();
-        document.getElementById('detalleTitulo').innerText = 'Albarán ' + a.numero_albaran;
+        document.getElementById('detalleTitulo').innerText = "<?php echo L('purchase_th_albaran'); ?> " + a.numero_albaran;
         document.getElementById('detalleContent').innerHTML = `
-            <div class="mb-16"><b>Proveedor:</b> ${a.proveedor_nombre} <br> <b>Fecha:</b> ${new Date(a.fecha).toLocaleDateString()}</div>
+            <div class="mb-16"><b><?php echo L('purchase_modal_details_vendor'); ?>:</b> ${a.proveedor_nombre} <br> <b><?php echo L('purchase_modal_details_date'); ?>:</b> ${new Date(a.fecha).toLocaleDateString()}</div>
             <table class="data-table">
-                <thead><tr><th>Producto</th><th class="text-right">Cant.</th><th class="text-right">Total</th></tr></thead>
+                <thead><tr><th><?php echo L('prod_th_name'); ?></th><th class="text-right"><?php echo L('prod_th_qty'); ?></th><th class="text-right"><?php echo L('tpv_total'); ?></th></tr></thead>
                 <tbody>${a.lineas.map(l => `<tr><td>${l.producto_nombre}</td><td class="text-right">${l.cantidad}</td><td class="text-right font-mono">${(l.cantidad * l.precio_coste_neto * (1+(l.iva_pct/100)+(l.re_pct/100))).toFixed(2)} €</td></tr>`).join('')}</tbody>
             </table>
-            <div class="text-right mt-16 fs-20 font-bold text-accent">Total: ${parseFloat(a.total).toFixed(2)} €</div>
+            <div class="text-right mt-16 fs-20 font-bold text-accent"><?php echo L('tpv_total'); ?>: ${parseFloat(a.total).toFixed(2)} €</div>
         `;
         document.getElementById('modalDetalle').style.display = 'flex';
     }
@@ -610,21 +829,21 @@
     async function verDetalleFactura(id) {
         const r = await fetch('api/compras.php?type=factura&id=' + id);
         const f = await r.json();
-        document.getElementById('detalleTitulo').innerText = 'Factura ' + f.numero_factura;
+        document.getElementById('detalleTitulo').innerText = "<?php echo L('purchase_th_invoice_num'); ?> " + f.numero_factura;
         document.getElementById('detalleContent').innerHTML = `
             <div class="mb-16">
-                <b>Proveedor:</b> ${f.proveedor_nombre} <br> 
-                <b>Fecha:</b> ${new Date(f.fecha_factura).toLocaleDateString()} <br>
-                <b>Pago:</b> <span class="badge badge-info">${f.metodo_pago}</span>
+                <b><?php echo L('purchase_modal_details_vendor'); ?>:</b> ${f.proveedor_nombre} <br> 
+                <b><?php echo L('purchase_modal_details_date'); ?>:</b> ${new Date(f.fecha_factura).toLocaleDateString()} <br>
+                <b><?php echo L('purchase_modal_details_payment'); ?>:</b> <span class="badge badge-info">${f.metodo_pago}</span>
             </div>
-            <div class="fw-700 mb-8 tt-uppercase fs-11 opacity-50">Albaranes incluidos:</div>
+            <div class="fw-700 mb-8 tt-uppercase fs-11 opacity-50"><?php echo L('purchase_modal_details_included_alb'); ?>:</div>
             ${f.albaranes.map(a => `
                 <div class="p-12 br-8 border-2 mb-4 d-flex jc-space-between ai-center">
                     <span>${a.numero_albaran} (${new Date(a.fecha).toLocaleDateString()})</span>
                     <span class="font-mono">${parseFloat(a.total).toFixed(2)} €</span>
                 </div>
             `).join('')}
-            <div class="text-right mt-16 fs-24 font-bold text-accent">Total Factura: ${parseFloat(f.total).toFixed(2)} €</div>
+            <div class="text-right mt-16 fs-24 font-bold text-accent"><?php echo L('purchase_modal_details_total_fac'); ?>: ${parseFloat(f.total).toFixed(2)} €</div>
         `;
         document.getElementById('modalDetalle').style.display = 'flex';
     }
@@ -632,4 +851,76 @@
     function cerrarModalDetalle() {
         document.getElementById('modalDetalle').style.display = 'none';
     }
+
+    // --- MANEJO DE PEDIDO AUTOMÁTICO (Viene de vProductos) ---
+    window.addEventListener('DOMContentLoaded', () => {
+        const dataRaw = sessionStorage.getItem('tpv_pedido_auto_data');
+        if (!dataRaw) return;
+
+        let data;
+        try {
+            data = JSON.parse(dataRaw);
+        } catch (e) {
+            sessionStorage.removeItem('tpv_pedido_auto_data');
+            return;
+        }
+
+        if (!data || data.length === 0) {
+            sessionStorage.removeItem('tpv_pedido_auto_data');
+            return;
+        }
+
+        const pedido = data[0];
+
+        // Abrir modal albarán
+        abrirModalNuevoAlbaran();
+
+        // Seleccionar proveedor
+        const provSelect = document.getElementById('albProveedor');
+        if (provSelect) {
+            provSelect.value = pedido.proveedor_id;
+            actualizarREAlbaran();
+        }
+
+        // Generar número de albarán sugerido
+        document.getElementById('albNum').value = 'AUTO-' + new Date().toISOString().slice(0, 10).replace(/-/g, '') + '-' + Math.random().toString(36).substr(2, 4).toUpperCase();
+
+        // Cargar líneas del pedido automático
+        albLineas = pedido.productos.map(p => ({
+            producto_id: p.id,
+            nombre: p.nombre,
+            cantidad: p.cantidad,
+            precio_coste_neto: p.precio_coste_neto,
+            iva_pct: p.iva_pct,
+            re_pct: p.re_pct
+        }));
+
+        renderLineasAlbaran();
+
+        const tieneCero = albLineas.some(l => parseFloat(l.precio_coste_neto) <= 0);
+        let bannerMsg = tieneCero ?
+            "<?php echo L('purchase_auto_banner_zero'); ?>".replace('{prov}', pedido.proveedor_nombre) :
+            "<?php echo L('purchase_auto_banner_ok'); ?>".replace('{prov}', pedido.proveedor_nombre);
+
+        if (data.length > 1) {
+            bannerMsg += "<?php echo L('purchase_auto_banner_multi'); ?>".replace('{count}', data.length);
+        }
+
+        // Insertar banner al inicio del modal
+        const bannerEl = document.createElement('div');
+        bannerEl.style.cssText = 'background:#fef9c3;border:1px solid #f59e0b;color:#92400e;padding:12px 16px;font-size:13px;margin-bottom:16px;border-radius:8px;';
+        bannerEl.innerHTML = bannerMsg;
+        const lineasContainer = document.getElementById('albLineas');
+        if (lineasContainer && lineasContainer.parentNode) {
+            lineasContainer.parentNode.insertBefore(bannerEl, lineasContainer);
+        }
+
+        // Manejo secuencial: Si hay más proveedores, actualizar sessionStorage para el siguiente
+        if (data.length > 1) {
+            const restantes = data.slice(1);
+            sessionStorage.setItem('tpv_pedido_auto_data', JSON.stringify(restantes));
+        } else {
+            sessionStorage.removeItem('tpv_pedido_auto_data');
+        }
+    });
 </script>

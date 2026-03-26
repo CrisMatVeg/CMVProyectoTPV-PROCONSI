@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/csrf_check.php';
 
 /**
  * API: gestionTarifa.php
@@ -15,7 +16,7 @@ try {
     require_once __DIR__ . '/../model/TarifaPrecioPDO.php';
     require_once __DIR__ . '/../model/Usuario.php';
 
-    session_start();
+    // session_start(); // Handled by csrf_check.php
     if (!isset($_SESSION['usuarioActualTPV']) || $_SESSION['usuarioActualTPV']->getRol() !== 'admin') {
         http_response_code(401);
         echo json_encode(['ok' => false, 'error' => 'No autorizado']);
@@ -106,18 +107,12 @@ function validarTarifa(array $d): array
     if (empty($d['nombre'])) {
         $err['nombre'] = 'El nombre es obligatorio';
     }
-    if (!in_array($d['tipo'] ?? '', ['percent'], true)) {
+    if (!in_array($d['tipo'] ?? '', ['percent', 'amount'], true)) {
         $err['tipo'] = 'Tipo no válido';
     }
     if (!isset($d['valor']) || !is_numeric($d['valor'])) {
         $err['valor'] = 'Valor inválido';
     }
-    // La fecha ya no es estrictamente obligatoria si se usa segmentación o reglas permanentes
-    /*
-    if (empty($d['fecha_aplicacion'])) {
-        $err['fecha_aplicacion'] = 'La fecha de aplicación es obligatoria';
-    }
-    */
 
     $scope = $d['scope'] ?? 'todos';
     if (!in_array($scope, ['todos', 'categoria', 'productos'], true)) {

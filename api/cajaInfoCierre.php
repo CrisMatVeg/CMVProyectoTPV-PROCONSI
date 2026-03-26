@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/csrf_check.php';
+
 /**
  * API: cajaInfoCierre.php
  * Devuelve retiradas y deudas asociadas a un cierre fiscal concreto.
@@ -14,7 +16,7 @@ try {
     require_once __DIR__ . '/../model/CajaTurnoPDO.php';
     require_once __DIR__ . '/../model/CajaDeudaPDO.php';
 
-    session_start();
+    // session_start(); // Handled by csrf_check.php
     if (!isset($_SESSION['usuarioActualTPV'])) {
         http_response_code(401);
         echo json_encode(['ok' => false, 'error' => 'No autorizado']);
@@ -26,27 +28,35 @@ try {
         throw new Exception('ID de cierre inválido');
     }
 
-    // Buscar turnos asociados a este cierre
-    $sqlTurnos = "SELECT * FROM caja_turnos WHERE fecha_cierre IS NOT NULL AND fecha_cierre >= (
-                      SELECT fecha FROM cierres_fiscales WHERE id = :id
-                  ) AND fecha_cierre <= (
-                      SELECT fecha FROM cierres_fiscales WHERE id = :id
-                  )";
-    $qT = DBPDO::ejecutarConsulta($sqlTurnos, [':id' => $idCierre]);
-    $turnos = $qT->fetchAll(PDO::FETCH_ASSOC);
+    // Buscar turnos asociados a este cierre mediante la columna num_z
+    $turnos = CajaTurnoPDO::listarTurnosPorCierre($idCierre);
 
     $retiros = [];
-    foreach ($turnos as $t) {
-        $movs = CajaTurnoPDO::listarRetiros((int)$t['id']);
-        foreach ($movs as $m) {
+    foreach ($turnos as &$t) {
+        $t['movimientos'] = CajaTurnoPDO::listarMovimientosTurno((int)$t['id']);
+        foreach ($t['movimientos'] as $m) {
             $retiros[] = $m;
         }
     }
+    // Eliminar duplicados por id si los hubiera
+    $retirosUnicos = [];
+    $idsVistos = [];
+    foreach ($retiros as $r) {
+        if (!in_array($r['id'], $idsVistos)) {
+            $retirosUnicos[] = $r;
+            $idsVistos[] = $r['id'];
+        }
+    }
+    $retiros = $retirosUnicos;
 
     $deudas = CajaDeudaPDO::listarPorCierre($idCierre);
 
-    echo json_encode(['ok' => true, 'retiros' => $retiros, 'deudas' => $deudas]);
+    echo json_encode([
+        'ok'      => true,
+        'turnos'  => $turnos,
+        'retiros' => $retiros,
+        'deudas'  => $deudas
+    ]);
 } catch (Throwable $e) {
     echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
 }
-

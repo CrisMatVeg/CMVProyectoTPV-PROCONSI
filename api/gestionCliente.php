@@ -1,9 +1,8 @@
 <?php
+require_once __DIR__ . '/csrf_check.php';
 
 /**
  * API: gestionCliente.php
- * - Desde TPV: buscar / registrar socio rápido (acciones "buscar" / "registrar")
- * - Desde panel admin: alta/edición de clientes completos (sin "accion", usa campos de formulario).
  */
 
 ini_set('display_errors', 0);
@@ -15,8 +14,9 @@ try {
     require_once __DIR__ . '/../model/DBPDO.php';
     require_once __DIR__ . '/../model/ClientePDO.php';
     require_once __DIR__ . '/../model/Usuario.php';
+    require_once __DIR__ . '/../model/Validador.php';
 
-    session_start();
+    // session_start(); // Handled by csrf_check.php
     if (!isset($_SESSION['usuarioActualTPV'])) {
         http_response_code(401);
         echo json_encode(['ok' => false, 'error' => 'No autenticado']);
@@ -26,7 +26,6 @@ try {
     $input  = json_decode(file_get_contents('php://input'), true) ?? [];
     $accion = $input['accion'] ?? '';
 
-    // ── Flujo TPV: búsqueda / alta rápida de socio ────────────────────────
     if ($accion === 'buscar') {
         $nif = trim($input['nif'] ?? '');
         if ($nif === '') {
@@ -41,6 +40,7 @@ try {
                     'nombre'   => $cli['nombre'],
                     'nif'      => $cli['nif'],
                     'rol'      => $cli['rol'] ?? 'general',
+                    'puntos'   => $cli['puntos'] ?? 0,
                 ],
             ]);
         } else {
@@ -59,7 +59,10 @@ try {
             throw new Exception('Nombre y NIF son obligatorios para registrar un cliente');
         }
 
-        // Si ya existe un cliente con ese NIF lo reutilizamos y actualizamos datos básicos
+        if (!Validador::validarDocumento($nif)) {
+            throw new Exception('El NIF/CIF proporcionado no tiene un formato válido.');
+        }
+
         $cli = ClientePDO::obtenerPorNif($nif);
         if ($cli) {
             $cli['nombre']   = $nombre;
@@ -90,19 +93,13 @@ try {
         }
         $tipoFiltro = $input['tipo'] ?? null;
 
-        $sql = "SELECT id, tipo, rol, nombre, apellidos, nif 
-                FROM clientes 
-                WHERE (fecha_baja IS NULL)";
+        $sql = "SELECT id, tipo, rol, nombre, apellidos, nif, puntos FROM clientes WHERE (fecha_baja IS NULL)";
         $params = [];
-
         if (in_array($tipoFiltro, ['particular', 'empresa'], true)) {
             $sql .= " AND tipo = :tipo";
             $params[':tipo'] = $tipoFiltro;
         }
-
-        $sql .= " AND (nombre LIKE :t OR apellidos LIKE :t OR nif LIKE :t)
-                  ORDER BY nombre, apellidos 
-                  LIMIT 20";
+        $sql .= " AND (nombre LIKE :t OR apellidos LIKE :t OR nif LIKE :t) ORDER BY nombre, apellidos LIMIT 20";
         $params[':t'] = '%' . $term . '%';
 
         $q = DBPDO::ejecutarConsulta($sql, $params);
@@ -112,7 +109,6 @@ try {
         exit;
     }
 
-    // ── Flujo ADMIN: alta/edición completa de clientes ────────────────────
     if ($_SESSION['usuarioActualTPV']->getRol() !== 'admin') {
         http_response_code(401);
         echo json_encode(['ok' => false, 'error' => 'No autorizado']);
@@ -124,10 +120,12 @@ try {
         if (!$id) throw new Exception('ID obligatorio para el historial');
 
         require_once __DIR__ . '/../model/VentaPDO.php';
+        require_once __DIR__ . '/../model/ValePDO.php';
         $ventas = VentaPDO::obtenerVentasPorCliente($id);
+        $vales  = ValePDO::obtenerValesPorCliente($id);
 
-        // Enhance with detailed payment history if needed, but basic info is enough for the overview table.
-        echo json_encode(['ok' => true, 'ventas' => $ventas]);
+        $cliente = ClientePDO::obtenerPorId($id);
+        echo json_encode(['ok' => true, 'ventas' => $ventas, 'vales' => $vales, 'cliente' => $cliente]);
         exit;
     }
 
@@ -147,14 +145,24 @@ try {
         throw new Exception('El nombre es obligatorio');
     }
 
+    $nifInput = trim($input['nif'] ?? '');
+    if ($nifInput !== '' && !Validador::validarDocumento($nifInput)) {
+        throw new Exception('El NIF/CIF proporcionado no tiene un formato válido.');
+    }
+
+    $telefonoInput = trim($input['telefono'] ?? '');
+    if ($telefonoInput !== '' && !Validador::validarTelefono($telefonoInput)) {
+        throw new Exception('El teléfono proporcionado no tiene un formato válido.');
+    }
+
     $data = [
         'tipo'      => $tipo,
         'rol'       => $input['rol'] ?? 'general',
         'nombre'    => $nombre,
         'apellidos' => $input['apellidos'] ?? '',
-        'nif'       => $input['nif'] ?? null,
+        'nif'       => $nifInput ?: null,
         'email'     => $input['email'] ?? null,
-        'telefono'  => $input['telefono'] ?? null,
+        'telefono'  => $telefonoInput ?: null,
         'direccion' => $input['direccion'] ?? null,
         'cp'        => $input['cp'] ?? null,
         'poblacion' => $input['poblacion'] ?? null,

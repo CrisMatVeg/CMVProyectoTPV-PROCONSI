@@ -122,4 +122,22 @@ class ClientePDO
     {
         return self::listarPorRol('mayorista');
     }
+    public static function sumarPuntos(int $id, int $puntos): void
+    {
+        $sql = "UPDATE clientes SET puntos = puntos + :puntos, ultima_compra = NOW() WHERE id = :id";
+        DBPDO::ejecutarConsulta($sql, [':id' => $id, ':puntos' => $puntos]);
+    }
+
+    public static function restarPuntos(int $id, int $puntos): void
+    {
+        $sql = "UPDATE clientes SET puntos = puntos - :puntos WHERE id = :id AND puntos >= :puntos";
+        DBPDO::ejecutarConsulta($sql, [':id' => $id, ':puntos' => $puntos]);
+    }
+
+    public static function checkExpiracion(int $id): void
+    {
+        // Si ha pasado más de 1 año desde la última compra, los puntos caducan (se ponen a 0)
+        $sql = "UPDATE clientes SET puntos = 0 WHERE id = :id AND ultima_compra < DATE_SUB(NOW(), INTERVAL 1 YEAR)";
+        DBPDO::ejecutarConsulta($sql, [':id' => $id]);
+    }
 }

@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/csrf_check.php';
 
 /**
  * API: guardarVenta.php
@@ -22,7 +23,7 @@ try {
     // MIGRACIÓN AUTOMÁTICA (Provisional para estabilizar el sistema)
     try {
         DBPDO::ejecutarConsulta("ALTER TABLE ventas ADD COLUMN IF NOT EXISTS efectivo_recibido DECIMAL(10,2) DEFAULT 0.00");
-        DBPDO::ejecutarConsulta("ALTER TABLE lineas_venta ADD COLUMN IF NOT EXISTS variantes JSON DEFAULT NULL");
+        DBPDO::ejecutarConsulta("ALTER TABLE pagos_venta ADD COLUMN IF NOT EXISTS id_turno INT DEFAULT NULL");
     } catch (Throwable $e) { /* Ya existe o error menor */
     }
 
@@ -32,9 +33,11 @@ try {
     require_once __DIR__ . '/../model/VentaPDO.php';
     require_once __DIR__ . '/../model/CajaTurnoPDO.php';
     require_once __DIR__ . '/../model/ClientePDO.php';
+    require_once __DIR__ . '/../model/Validador.php';
+    ProductoPDO::init(); // Asegurar esquema fuera de cualquier transacción posterior
 
     // Iniciar sesión para verificar autenticación
-    session_start();
+    // session_start(); // Handled by csrf_check.php
 
     // Solo POST permitido
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -86,14 +89,7 @@ try {
         $nif_cliente = $nifRaw; // Asignar nif_cliente aquí
         $aErrores['empresaNif'] = validacionFormularios::comprobarNoVacio($nifRaw);
         if (!$aErrores['empresaNif']) {
-            // Validar NIF/CIF español:
-            // - CIF empresa: letra [ABCDEFGHJNPQRSUVW] + 7 dígitos + dígito o letra de control
-            // - DNI (autónomo): 8 dígitos + letra de control
-            // - NIE (extranjero): X, Y o Z + 7 dígitos + letra de control
-            $esCIF = preg_match('/^[ABCDEFGHJNPQRSUVW]\d{7}[0-9A-J]$/i', $nifRaw);
-            $esDNI = preg_match('/^\d{8}[TRWAGMYFPDXBNJZSQVHLCKE]$/i', $nifRaw);
-            $esNIE = preg_match('/^[XYZ]\d{7}[TRWAGMYFPDXBNJZSQVHLCKE]$/i', $nifRaw);
-            if (!$esCIF && !$esDNI && !$esNIE) {
+            if (!Validador::validarDocumento($nifRaw)) {
                 $aErrores['empresaNif'] = 'El CIF/NIF no tiene un formato válido (ej: B12345678, 12345678A, X1234567A).';
             }
         }
@@ -151,7 +147,25 @@ try {
         $datos['idCliente'] = $clienteIdParaVenta;
     }
     $datos['idTurno'] = (int)$turnoActual['id'];
+
+    // [REMOVIDO] La validación y consumo de vales ahora se gestiona internamente en VentaPDO::guardarVenta
+    // para soportar pagos mixtos y asegurar la atomicidad de la transacción.
+
     $numTicket = VentaPDO::guardarVenta($datos, $idUsuario);
+
+    // El consumo del vale se realiza ahora dentro de VentaPDO::guardarVenta
+
+    // [NUEVO] Registrar Log
+    require_once __DIR__ . '/../model/LogPDO.php';
+    $descLog = "Venta registrada (#$numTicket) por importe de " . number_format($total, 2, ',', '.') . "€";
+    $tipoLog = 'VENTA';
+    
+    if (($datos['descuentoAmt'] ?? 0) > 0) {
+        $tipoLog = 'DESCUENTO';
+        $descLog .= " (CON DESCUENTO de " . number_format($datos['descuentoAmt'], 2, ',', '.') . "€)";
+    }
+    
+    LogPDO::addLog($tipoLog, $descLog, ['numTicket' => $numTicket, 'total' => $total, 'metodo' => $metodo_pago]);
 
     // Obtener la venta completa para devolver al frontend
     $ventaCompleta = VentaPDO::obtenerVentaPorTicket($numTicket);

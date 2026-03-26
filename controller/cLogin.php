@@ -40,7 +40,7 @@ if (isset($_REQUEST['acceder'])) {
         $_REQUEST['password'],
         20,
         4,
-        1,
+        2, // Tipo 2: Permite números y letras
         1
     );
 
@@ -67,13 +67,18 @@ if (isset($_REQUEST['acceder'])) {
             // Guardar usuario en sesión para la app
             $_SESSION['usuarioActualTPV'] = $usuario;
 
+            // Log: LOGIN
+            LogPDO::addLog('LOGIN', 'El usuario ha iniciado sesión correctamente');
+
             // Redirigir al Dashboard
             $_SESSION['paginaEnCurso'] = 'Dashboard';
             header('Location: index.php');
             exit;
         } else {
             // Usuario o contraseña incorrecta
-            $aErrores['username'] = 'Usuario o contraseña incorrecta';
+            $aErrores['username'] = 'El nombre de usuario o la contraseña no son correctos.';
+            $aRespuestas['username'] = ''; // Borrado de datos de inputs
+            $aRespuestas['password'] = '';
             $entradaOK = false;
         }
     }

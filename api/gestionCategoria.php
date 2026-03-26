@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/csrf_check.php';
 
 /**
  * API: gestionCategoria.php
@@ -14,7 +15,7 @@ try {
     require_once __DIR__ . '/../model/Usuario.php';
     require_once __DIR__ . '/../model/CategoriaPDO.php';
 
-    session_start();
+    // session_start(); // Handled by csrf_check.php
 
     // Solo administradores
     if (!isset($_SESSION['usuarioActualTPV']) || $_SESSION['usuarioActualTPV']->getRol() !== 'admin') {
@@ -45,6 +46,17 @@ try {
                 break;
             }
             $res = CategoriaPDO::eliminar($id);
+            echo json_encode(['ok' => $res]);
+            break;
+
+        case 'asignarIVA':
+            $idCategoria = (int)($input['idCategoria'] ?? 0);
+            $idTipoIva = (int)($input['idTipoIva'] ?? 0);
+            if ($idCategoria <= 0 || $idTipoIva <= 0) {
+                echo json_encode(['ok' => false, 'error' => 'ID de categoría o IVA inválido']);
+                break;
+            }
+            $res = CategoriaPDO::asignarIVA($idCategoria, $idTipoIva);
             echo json_encode(['ok' => $res]);
             break;
 

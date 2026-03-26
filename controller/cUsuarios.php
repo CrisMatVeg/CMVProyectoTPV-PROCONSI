@@ -7,7 +7,7 @@
  */
 
 // Si no es admin, fuera
-if ($_SESSION['usuarioActualTPV']->getRol() !== 'admin') {
+if (!isset($_SESSION['usuarioActualTPV']) || $_SESSION['usuarioActualTPV']->getRol() !== 'admin') {
     $_SESSION['paginaEnCurso'] = 'Dashboard';
     header('Location: index.php');
     exit;
@@ -53,7 +53,8 @@ if (isset($_REQUEST['irRoles'])) {
 $aErrores = [
     'nombre' => null,
     'login' => null,
-    'password' => null
+    'password' => null,
+    'email' => null
 ];
 $entradaOK = true;
 // Obtener lista de roles para los formularios
@@ -69,6 +70,7 @@ if (isset($_REQUEST['addUsuario'])) {
     $aErrores['nombre'] = validacionFormularios::comprobarAlfabetico($_REQUEST['nombre'] ?? '', 100, 3, 1);
     $aErrores['login'] = validacionFormularios::comprobarAlfaNumerico($_REQUEST['username'] ?? '', 15, 4, 1);
     $aErrores['password'] = validacionFormularios::validarPassword($_REQUEST['password'] ?? '', 20, 4, 1, 1);
+    $aErrores['email'] = !empty($_REQUEST['email']) ? validacionFormularios::validarEmail($_REQUEST['email']) : null;
 
     foreach ($aErrores as $e) {
         if ($e != null) $entradaOK = false;
@@ -79,6 +81,7 @@ if (isset($_REQUEST['addUsuario'])) {
         $login = $_REQUEST['username'];
         $pass = $_REQUEST['password'];
         $idRol = (int)($_REQUEST['idRol'] ?? 0);
+        $email = $_REQUEST['email'] ?? null;
 
         // Buscar el nombre del rol para el campo legacy 'rol'
         $nombreRol = 'cajero';
@@ -89,10 +92,23 @@ if (isset($_REQUEST['addUsuario'])) {
             }
         }
 
-        UsuarioPDO::añadirUsuario($nombre, $login, $pass, $nombreRol, $idRol);
-        header('Location: index.php'); // Recargar para ver cambios
+        UsuarioPDO::añadirUsuario($nombre, $login, $pass, $nombreRol, $idRol, $email);
+        header('Location: index.php?irUsuarios=1'); // Recargar para ver cambios
         exit;
     }
+}
+
+// Acción: Editar Usuario (Nombre y Email)
+if (isset($_REQUEST['editUsuario'])) {
+    $id = (int)$_REQUEST['idUsuario'];
+    $nombre = $_REQUEST['nombre_edit'] ?? '';
+    $email = $_REQUEST['email_edit'] ?? '';
+
+    if (!empty($nombre)) {
+        UsuarioPDO::editarUsuario($id, $nombre, $email);
+    }
+    header('Location: index.php?irUsuarios=1');
+    exit;
 }
 
 // Acción: Cambiar Rol

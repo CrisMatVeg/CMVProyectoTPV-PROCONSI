@@ -4,66 +4,72 @@
 
     <div class="section-header container-wider">
         <div class="section-title">
-            <h1>Catálogo</h1>
-            <p>Administra tus productos estándar y packs de venta combinados.</p>
+            <h1><?php echo L('prod_title'); ?></h1>
+            <p><?php echo L('prod_subtitle'); ?></p>
         </div>
         <div class="d-flex gap-12 ai-center flex-wrap">
             <a href="index.php?irDashboard=1" class="btn-back">
-                <i class="fa-solid fa-arrow-left"></i> Volver
+                <?php echo L('login_back'); ?>
             </a>
 
             <div class="tabs-nav mr-12">
                 <button class="tab-btn active" onclick="switchTab('productos')" id="btnTabProductos">
-                    <i class="fa-solid fa-box-open"></i>Productos
+                    <?php echo L('prod_tab_standard'); ?>
                 </button>
                 <button class="tab-btn" onclick="switchTab('packs')" id="btnTabPacks">
-                    <i class="fa-solid fa-boxes-stacked"></i>Packs
+                    <?php echo L('prod_tab_packs'); ?>
                 </button>
             </div>
 
             <div class="d-flex gap-8 ai-center bg-surface2 p-4 br-12 border">
                 <!-- Botón Exportar -->
                 <div class="ie-dropdown-wrap" id="exportDropdownWrap">
-                    <button class="btn-filter" onclick="toggleExportDropdown()" style="border:none; background:transparent;">
-                        <i class="fa-solid fa-file-export"></i> Exportar
+                    <button class="btn-filter" onclick="toggleExportDropdown()" style="border:none; background:transparent; color: var(--text-main) !important;">
+                        <?php echo L('prod_btn_export'); ?>
                     </button>
                     <div class="ie-dropdown" id="exportDropdown">
                         <a href="api/exportarProductos.php?format=csv" class="ie-dropdown-item">
-                            <i class="fa-solid fa-file-csv text-green"></i> CSV (Excel)
+                            <?php echo L('prod_export_csv'); ?>
                         </a>
                         <a href="api/exportarProductos.php?format=json" class="ie-dropdown-item">
-                            <i class="fa-solid fa-file-code text-accent"></i> JSON
+                            <?php echo L('prod_export_json'); ?>
                         </a>
                     </div>
                 </div>
 
                 <div class="vr mx-4" style="height: 20px; width: 1px; background: var(--border); opacity: 0.5;"></div>
 
-                <button class="btn-filter" onclick="document.getElementById('importFileInput').click()" style="border:none; background:transparent;">
-                    <i class="fa-solid fa-file-import"></i> Importar
+                <button class="btn-filter" onclick="document.getElementById('importFileInput').click()" style="border:none; background:transparent; color: var(--text-main) !important;">
+                    <?php echo L('prod_btn_import'); ?>
                 </button>
                 <input type="file" id="importFileInput" accept=".csv,.json" class="d-none" onchange="importarProductos(this)">
 
                 <div class="vr mx-4" style="height: 20px; width: 1px; background: var(--border); opacity: 0.5;"></div>
 
-                <button onclick="abrirModalGestionCategorias()" class="btn-filter" style="border:none; background:transparent;">
-                    <i class="fa-solid fa-tags"></i> Categorías
+                <button onclick="abrirModalGestionCategorias()" class="btn-filter" style="border:none; background:transparent; color: var(--text-main) !important;">
+                    <?php echo L('prod_btn_categories'); ?>
                 </button>
 
                 <div class="vr mx-4" style="height: 20px; width: 1px; background: var(--border); opacity: 0.5;"></div>
 
-                <button onclick="generarPedidoAutomatico()" class="btn-filter" id="btnPedidoAuto" style="border:none; background:transparent; color: var(--accent);">
-                    <i class="fa-solid fa-wand-magic-sparkles"></i> Pedido Auto
+                <button onclick="generarPedidoAutomatico()" class="btn-filter" id="btnPedidoAuto" style="border:none; background:transparent; color: var(--accent-primary) !important; font-weight: 600;">
+                    <?php echo L('prod_btn_auto_order'); ?>
+                </button>
+
+                <div class="vr mx-4" style="height: 20px; width: 1px; background: var(--border); opacity: 0.5;"></div>
+
+                <button onclick="abrirModalMargenMasivo()" class="btn-filter" id="btnMargenMasivo" style="border:none; background:transparent; color: #7c3aed !important; font-weight: 600;" title="<?php echo L('prod_tip_mass_margin'); ?>">
+                    <?php echo L('prod_btn_mass_margin'); ?>
                 </button>
             </div>
 
             <div class="flex-1"></div>
 
             <button onclick="abrirModalProducto()" class="btn-save h-44 px-20 shadow-sm" id="btnNuevoProducto">
-                <i class="fa-solid fa-plus"></i> Nuevo Producto
+                <i class="fa-solid fa-plus"></i> <?php echo L('prod_btn_new_product'); ?>
             </button>
             <button onclick="abrirModalPack()" class="btn-save h-44 px-20 shadow-sm d-none" id="btnNuevoPack">
-                <i class="fa-solid fa-plus"></i> Nuevo Pack
+                <i class="fa-solid fa-plus"></i> <?php echo L('prod_btn_new_pack'); ?>
             </button>
         </div>
     </div>
@@ -72,23 +78,23 @@
     <div class="filters-panel container-wider">
         <div class="search-bar-wrap flex-1">
             <i class="fa-solid fa-magnifying-glass search-icon"></i>
-            <input type="text" id="prodSearch" placeholder="Buscar por nombre o SKU..." class="search-input">
+            <input type="text" id="prodSearch" placeholder="<?php echo L('prod_search_placeholder'); ?>" class="search-input">
         </div>
         <div class="d-flex gap-8" id="filtersPrecios">
-            <input type="number" id="filterPriceMin" placeholder="Precio Min" class="form-input w-100 fs-12">
-            <input type="number" id="filterPriceMax" placeholder="Precio Max" class="form-input w-100 fs-12">
+            <input type="number" id="filterPriceMin" placeholder="<?php echo L('prod_filter_price_min'); ?>" class="form-input fs-12" style="width: 125px;">
+            <input type="number" id="filterPriceMax" placeholder="<?php echo L('prod_filter_price_max'); ?>" class="form-input fs-12" style="width: 125px;">
         </div>
         <select id="filterCat" class="filter-input p-10 br-8" onchange="applyFilters()">
-            <option value="all">Todas las categorías</option>
+            <option value="all"><?php echo L('prod_filter_cat_all'); ?></option>
             <?php foreach ($avProductos['categorias'] as $c): ?>
                 <option value="<?php echo htmlspecialchars($c['codigo']); ?>"><?php echo htmlspecialchars($c['nombre']); ?></option>
             <?php endforeach; ?>
         </select>
         <select id="filterEstado" class="filter-input p-10 br-8" onchange="applyFilters()">
-            <option value="all">Todos los estados</option>
-            <option value="1">Activos</option>
-            <option value="0">Inactivos</option>
-            <option value="bajo_stock">Bajo Stock</option>
+            <option value="all"><?php echo L('prod_filter_status_all'); ?></option>
+            <option value="1"><?php echo L('prod_status_active'); ?></option>
+            <option value="0"><?php echo L('prod_status_inactive'); ?></option>
+            <option value="bajo_stock"><?php echo L('prod_status_low_stock'); ?></option>
         </select>
     </div>
 
@@ -97,15 +103,15 @@
         <table class="data-table">
             <thead>
                 <tr>
-                    <th class="w-60 pl-20">ID</th>
-                    <th class="w-80 text-center">Icono</th>
-                    <th>Producto</th>
-                    <th>Código</th>
-                    <th>Categoría</th>
-                    <th class="text-right">Stock</th>
-                    <th class="text-right">Precio</th>
-                    <th class="text-center">Estado</th>
-                    <th class="text-center pr-20">Acciones</th>
+                    <th class="w-60 pl-20"><?php echo L('prod_th_id'); ?></th>
+                    <th class="w-80 text-center"><?php echo L('prod_th_icon'); ?></th>
+                    <th><?php echo L('prod_th_name'); ?></th>
+                    <th><?php echo L('prod_th_code'); ?></th>
+                    <th><?php echo L('prod_th_category'); ?></th>
+                    <th class="text-right"><?php echo L('prod_th_stock'); ?></th>
+                    <th class="text-right"><?php echo L('prod_th_price'); ?></th>
+                    <th class="text-center"><?php echo L('prod_th_status'); ?></th>
+                    <th class="text-center pr-20"><?php echo L('prod_th_actions'); ?></th>
                 </tr>
             </thead>
             <tbody id="productsTableBody">
@@ -150,14 +156,16 @@
                             <?php
                             $stock = (int)$p['stock'];
                             $stockMin = (int)$p['stock_minimo'];
-                            $esCritico = ($stock <= $stockMin);
+                            $esCritico = ($stockMin > 0 && $stock <= $stockMin);
                             ?>
                             <div class="d-flex flex-column ai-end">
                                 <span class="<?php echo $esCritico ? 'text-red bg-red-soft px-4 br-4' : ''; ?>">
                                     <?php echo $stock; ?>
                                 </span>
                                 <?php if ($esCritico): ?>
-                                    <span class="fs-9 tt-uppercase text-red font-bold">Mín: <?php echo $stockMin; ?></span>
+                                    <span class="fs-9 tt-uppercase text-red font-bold"><?php echo L('prod_stock_min_label'); ?> <?php echo $stockMin; ?></span>
+                                <?php else: ?>
+                                    <span class="fs-9 tt-uppercase text-muted"><?php echo L('prod_stock_min_label'); ?> <?php echo $stockMin; ?></span>
                                 <?php endif; ?>
                             </div>
                         </td>
@@ -167,26 +175,29 @@
                         <td class="text-center">
                             <?php if ($p['activo']): ?>
                                 <span class="status-pill status-active">
-                                    <i class="fa-solid fa-circle-check"></i> Activo
+                                    <i class="fa-solid fa-circle-check"></i> <?php echo L('prod_pill_active'); ?>
                                 </span>
                             <?php else: ?>
                                 <span class="status-pill status-inactive">
-                                    <i class="fa-solid fa-circle-xmark"></i> Inactivo
+                                    <i class="fa-solid fa-circle-xmark"></i> <?php echo L('prod_pill_inactive'); ?>
                                 </span>
                             <?php endif; ?>
                         </td>
                         <td class="text-center">
                             <div class="d-flex jc-center gap-8 pr-20">
-                                <button onclick="abrirModalHistorial(<?php echo $p['id']; ?>, '<?php echo addslashes(htmlspecialchars($p['nombre'])); ?>')" title="Historial Stock" class="btn-icon text-accent">
+                                <button onclick="abrirModalHistorial(<?php echo $p['id']; ?>, '<?php echo addslashes(htmlspecialchars($p['nombre'])); ?>')" title="<?php echo L('prod_tip_history_stock'); ?>" class="btn-icon text-accent">
                                     <i class="fa-solid fa-clock-rotate-left"></i>
                                 </button>
-                                <button onclick='abrirModalProducto(<?php echo json_encode($p); ?>)' title="Editar" class="btn-icon">
+                                <button onclick="abrirModalHistorialPrecios(<?php echo $p['id']; ?>, '<?php echo addslashes(htmlspecialchars($p['nombre'])); ?>')" title="<?php echo L('prod_tip_history_prices'); ?>" class="btn-icon" style="color: var(--yellow, #f59e0b);">
+                                    <i class="fa-solid fa-tag"></i>
+                                </button>
+                                <button onclick='abrirModalProducto(<?php echo json_encode($p); ?>)' title="<?php echo L('user_tip_edit'); ?>" class="btn-icon">
                                     <i class="fa-solid fa-pen"></i>
                                 </button>
-                                <button onclick="toggleEstadoProducto(<?php echo $p['id']; ?>)" title="<?php echo $p['activo'] ? 'Dar de baja' : 'Activar'; ?>" class="btn-icon <?php echo $p['activo'] ? 'text-red' : 'text-green'; ?>">
+                                <button onclick="toggleEstadoProducto(<?php echo $p['id']; ?>)" title="<?php $p['activo'] ? L('prod_tip_deactivate') : L('prod_tip_activate'); ?>" class="btn-icon <?php echo $p['activo'] ? 'text-red' : 'text-green'; ?>">
                                     <i class="fa-solid fa-<?php echo $p['activo'] ? 'arrow-down' : 'arrow-up'; ?>"></i>
                                 </button>
-                                <button onclick="eliminarProducto(<?php echo $p['id']; ?>, '<?php echo addslashes(htmlspecialchars($p['nombre'])); ?>')" title="Eliminar" class="btn-icon text-red" style="opacity:0.7;">
+                                <button onclick="eliminarProducto(<?php echo $p['id']; ?>, '<?php echo addslashes(htmlspecialchars($p['nombre'])); ?>')" title="<?php echo L('modal_delete'); ?>" class="btn-icon text-red" style="opacity:0.7;">
                                     <i class="fa-solid fa-trash"></i>
                                 </button>
                             </div>
@@ -197,7 +208,7 @@
                     <td colspan="9">
                         <div class="empty-state">
                             <i class="fa-solid fa-box-open"></i>
-                            No se han encontrado productos con los filtros seleccionados.
+                            <?php echo L('prod_no_results'); ?>
                         </div>
                     </td>
                 </tr>
@@ -210,14 +221,14 @@
         <table class="data-table">
             <thead>
                 <tr>
-                    <th class="w-60 pl-20">ID</th>
-                    <th class="w-80 text-center">Icono</th>
-                    <th>Nombre del Pack</th>
-                    <th>Referencia</th>
-                    <th>Componentes</th>
-                    <th class="text-right">Precio Venta</th>
-                    <th class="text-center">Estado</th>
-                    <th class="text-center pr-20">Acciones</th>
+                    <th class="w-60 pl-20"><?php echo L('prod_th_id'); ?></th>
+                    <th class="w-80 text-center"><?php echo L('prod_th_icon'); ?></th>
+                    <th><?php echo L('prod_th_pack_name'); ?></th>
+                    <th><?php echo L('prod_th_pack_ref'); ?></th>
+                    <th><?php echo L('prod_th_pack_components'); ?></th>
+                    <th class="text-right"><?php echo L('prod_th_pack_price'); ?></th>
+                    <th class="text-center"><?php echo L('prod_th_status'); ?></th>
+                    <th class="text-center pr-20"><?php echo L('prod_th_actions'); ?></th>
                 </tr>
             </thead>
             <tbody id="packsTableBody">
@@ -238,7 +249,7 @@
                         </td>
                         <td class="font-bold">
                             <?php echo htmlspecialchars($p['nombre']); ?>
-                            <span class="ml-8 px-6 py-2 br-4 fs-10 bg-accent-soft text-accent border border-accent">PACK</span>
+                            <span class="ml-8 px-6 py-2 br-4 fs-10 bg-accent-soft text-accent border border-accent"><?php echo L('prod_pill_pack'); ?></span>
                         </td>
                         <td class="text-muted"><?php echo htmlspecialchars($p['codigo']); ?></td>
                         <td class="fs-12 text-muted">
@@ -250,7 +261,7 @@
                                 }
                                 echo implode('<br>', $comps);
                             } else {
-                                echo '<em>Sin componentes</em>';
+                                echo '<em>' . L('prod_no_components', true) . '</em>';
                             }
                             ?>
                         </td>
@@ -260,23 +271,23 @@
                         <td class="text-center">
                             <?php if ($p['activo']): ?>
                                 <span class="status-pill status-active">
-                                    <i class="fa-solid fa-circle-check"></i> Activo
+                                    <i class="fa-solid fa-circle-check"></i> <?php echo L('prod_pill_active'); ?>
                                 </span>
                             <?php else: ?>
                                 <span class="status-pill status-inactive">
-                                    <i class="fa-solid fa-circle-xmark"></i> Inactivo
+                                    <i class="fa-solid fa-circle-xmark"></i> <?php echo L('prod_pill_inactive'); ?>
                                 </span>
                             <?php endif; ?>
                         </td>
                         <td class="text-center">
                             <div class="d-flex jc-center gap-8 pr-20">
-                                <button onclick='abrirModalPack(<?php echo json_encode($p); ?>)' title="Editar Pack" class="btn-icon">
+                                <button onclick='abrirModalPack(<?php echo json_encode($p); ?>)' title="<?php echo L('user_tip_edit'); ?>" class="btn-icon">
                                     <i class="fa-solid fa-pen"></i>
                                 </button>
-                                <button onclick="toggleEstadoProducto(<?php echo $p['id']; ?>)" title="<?php echo $p['activo'] ? 'Dar de baja' : 'Activar'; ?>" class="btn-icon <?php echo $p['activo'] ? 'text-red' : 'text-green'; ?>">
+                                <button onclick="toggleEstadoProducto(<?php echo $p['id']; ?>)" title="<?php $p['activo'] ? L('prod_tip_deactivate') : L('prod_tip_activate'); ?>" class="btn-icon <?php echo $p['activo'] ? 'text-red' : 'text-green'; ?>">
                                     <i class="fa-solid fa-<?php echo $p['activo'] ? 'arrow-down' : 'arrow-up'; ?>"></i>
                                 </button>
-                                <button onclick="eliminarProducto(<?php echo $p['id']; ?>, '<?php echo addslashes(htmlspecialchars($p['nombre'])); ?>')" title="Eliminar Pack" class="btn-icon text-red" style="opacity:0.7;">
+                                <button onclick="eliminarProducto(<?php echo $p['id']; ?>, '<?php echo addslashes(htmlspecialchars($p['nombre'])); ?>')" title="<?php echo L('modal_delete'); ?>" class="btn-icon text-red" style="opacity:0.7;">
                                     <i class="fa-solid fa-trash"></i>
                                 </button>
                             </div>
@@ -287,8 +298,9 @@
                     <td colspan="8">
                         <div class="empty-state">
                             <i class="fa-solid fa-boxes-stacked"></i>
-                            No se han encontrado packs con los filtros seleccionados.
+                            <?php echo L('prod_no_results_packs'); ?>
                         </div>
+                    </td>
                     </td>
                 </tr>
             </tbody>
@@ -299,217 +311,411 @@
 
 
 
-<script>
+<style>
+    /* ===== ESTILOS MEJORADOS MODAL DE PRODUCTO ===== */
 
-</script>
+    /* --- Layout general del modal --- */
+    #modalProducto .modal-content {
+        display: flex;
+        flex-direction: column;
+        max-height: 92vh;
+    }
+
+    #modalProducto #formProducto {
+        flex: 1;
+        overflow-y: auto;
+        overflow-x: hidden;
+        min-height: 0;
+    }
+
+    #modalProducto .modal-footer {
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        padding: 20px 32px;
+        border-top: 2px solid var(--surface2);
+        background: var(--surface);
+    }
+
+    .modal-footer .btn-save {
+        margin-left: 12px;
+    }
+
+    .modal-footer .btn-cancel {
+        margin-right: 12px;
+    }
+
+    /* --- Tabs --- */
+    .tabs-nav {
+        display: flex;
+        gap: 8px;
+        padding: 12px 24px 0;
+        border-bottom: 2px solid var(--border, var(--surface2));
+        background: var(--surface2);
+        flex-shrink: 0;
+    }
+
+    .tab-btn {
+        position: relative;
+        background: none;
+        border: none;
+        padding: 12px 24px;
+        cursor: pointer;
+        opacity: 0.55;
+        transition: all 0.2s;
+        font-weight: 700;
+        font-size: 13px;
+        border-radius: 8px 8px 0 0;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        white-space: nowrap;
+        border-bottom: 3px solid transparent;
+        color: var(--text);
+    }
+
+    .tab-btn:hover {
+        opacity: 0.85;
+        background: rgba(0, 0, 0, 0.06);
+    }
+
+    .tab-btn.active {
+        opacity: 1;
+        border-bottom-color: var(--accent);
+        color: var(--accent);
+        background: var(--bg-body, var(--surface));
+    }
+
+    /* --- Campo CMP bloqueado --- */
+    .input-readonly-cmp {
+        background: var(--surface2) !important;
+        border-color: transparent !important;
+        cursor: not-allowed !important;
+        color: var(--text-muted) !important;
+        font-style: italic;
+    }
+
+    .cmp-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--accent);
+        background: rgba(59, 130, 246, 0.12);
+        border: 1px solid var(--accent);
+        border-radius: 20px;
+        padding: 2px 8px;
+    }
+
+    /* --- Secciones dentro de pestaña --- */
+    .tab-section {
+        background: var(--bg-body, var(--surface));
+        border-radius: 12px;
+        padding: 24px;
+        margin-bottom: 24px;
+        border: 1.5px solid var(--border, var(--surface2));
+    }
+
+    .tab-section-title {
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--text-muted);
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .tab-section .form-group+.form-group {
+        margin-top: 16px;
+    }
+
+    /* --- Tabla de Tarifas --- */
+    #listaTarifasProductoBody tr td,
+    #listaTarifasProductoBody tr+tr th {
+        padding: 10px 12px;
+        vertical-align: middle;
+    }
+
+    .tarifas-table th {
+        padding: 10px 12px;
+        white-space: nowrap;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        font-weight: 700;
+        color: var(--text-muted);
+        background: var(--surface2);
+    }
+
+    .tarifas-table th:first-child {
+        min-width: 180px;
+    }
+
+    .tarifas-table th:nth-child(2) {
+        min-width: 90px;
+    }
+
+    .tarifas-table th:nth-child(3) {
+        min-width: 90px;
+    }
+
+    .tarifas-table th:nth-child(4) {
+        min-width: 80px;
+    }
+
+    .tarifas-table th:last-child {
+        min-width: 70px;
+    }
+
+    .tarifas-table td {
+        padding: 10px 12px;
+        vertical-align: middle;
+        font-size: 13px;
+    }
+</style>
 
 
 <!-- MODAL AÑADIR/EDITAR PRODUCTO -->
 <div id="modalProducto" class="modal-overlay-bg">
-    <div class="modal-content" style="max-width: 800px; padding: 0; overflow: hidden;">
+    <div class="modal-content" style="max-width: 900px; padding: 0; overflow: hidden; border-radius: 20px;">
         <div class="modal-header">
-            <h2 id="modalTitle">Nuevo Producto</h2>
+            <h2 id="modalTitle"><?php echo L('prod_modal_title_new'); ?></h2>
             <button onclick="cerrarModalProducto()" class="btn-close-modal">&times;</button>
         </div>
-        <form id="formProducto" class="modal-body">
-            <input type="hidden" id="prodId">
+        <form id="formProducto" class="modal-body p-0">
+            <!-- TABS NAVIGATION -->
+            <div class="tabs-nav border-bottom px-20 pt-10 bg-surface1">
+                <button type="button" class="tab-btn active" onclick="switchModalTab('general', this)">
+                    <?php echo L('prod_modal_tab_general'); ?>
+                </button>
+                <button type="button" class="tab-btn" onclick="switchModalTab('precios', this)">
+                    <?php echo L('prod_modal_tab_precios'); ?>
+                </button>
+                <button type="button" class="tab-btn" onclick="switchModalTab('tarifas', this)" id="btnTabModalTarifas">
+                    <?php echo L('prod_modal_tab_tarifas'); ?>
+                </button>
+            </div>
 
-            <div class="d-grid grid-1-3 gap-24 mb-24">
-                <!-- Columna Izquierda: Imagen y Meta -->
-                <div class="d-flex flex-column gap-16">
-                    <div class="form-group mb-0">
-                        <label class="form-label">Imagen del Producto</label>
-                        <div class="d-flex flex-column ai-center gap-12 p-16 bg-surface2 br-12 border-2">
-                            <div id="imgPreview" class="prod-img-preview m-0" style="width: 120px; height: 120px;">
-                                <i class="fa-solid fa-image fs-32 opacity-20"></i>
+            <div class="p-24">
+                <input type="hidden" id="prodId">
+
+                <!-- TAB GENERAL -->
+                <div id="modalTabGeneral" class="modal-tab-content">
+                    <div class="d-grid grid-1-3 gap-32 mb-32">
+                        <!-- Columna Izquierda: Imagen -->
+                        <div class="d-flex flex-column gap-20">
+                            <div class="form-group mb-0">
+                                <label class="form-label mb-8"><?php echo L('prod_modal_label_image'); ?></label>
+                                <div class="d-flex flex-column ai-center gap-16 p-20 bg-surface2 br-16 border-2">
+                                    <div id="imgPreview" class="prod-img-preview m-0" style="width: 140px; height: 140px;">
+                                        <i class="fa-solid fa-image fs-40 opacity-20"></i>
+                                    </div>
+                                    <input type="file" id="prodFile" accept="image/*" class="d-none" onchange="previewImage(this)">
+                                    <button type="button" onclick="document.getElementById('prodFile').click()" class="btn-filter w-auto h-auto p-12-20 fs-13 gap-8">
+                                        <i class="fa-solid fa-upload"></i> <?php echo L('prod_modal_btn_upload'); ?>
+                                    </button>
+                                    <input type="hidden" id="prodIcono">
+                                </div>
                             </div>
-                            <input type="file" id="prodFile" accept="image/*" class="d-none" onchange="previewImage(this)">
-                            <button type="button" onclick="document.getElementById('prodFile').click()" class="btn-filter w-auto h-auto p-10-16 fs-12 gap-8">
-                                <i class="fa-solid fa-upload"></i> Subir
-                            </button>
-                            <input type="hidden" id="prodIcono">
+                        </div>
+
+                        <!-- Columna Derecha: Datos Principales -->
+                        <div class="d-flex flex-column gap-32">
+                            <div class="form-group mb-0">
+                                <label class="form-label mb-4"><?php echo L('prod_modal_label_name'); ?></label>
+                                <input type="text" id="prodNombre" placeholder="<?php echo L('prod_placeholder_name'); ?>" class="form-input p-12 fs-15">
+                                <span class="form-error mt-4" id="err-nombre"></span>
+                            </div>
+                            <div class="d-grid grid-2 gap-32">
+                                <div class="form-group mb-0">
+                                    <label class="form-label mb-4"><?php echo L('prod_modal_label_sku'); ?></label>
+                                    <input type="text" id="prodCodigo" placeholder="<?php echo L('prod_placeholder_sku'); ?>" class="form-input font-mono p-12">
+                                    <span class="form-error mt-4" id="err-referencia"></span>
+                                </div>
+                                <div class="form-group mb-0">
+                                    <label class="form-label mb-4"><?php echo L('prod_th_category'); ?></label>
+                                    <select id="prodCat" class="form-input p-12">
+                                        <?php foreach ($avProductos['categorias'] as $c): ?>
+                                            <option value="<?php echo htmlspecialchars($c['codigo']); ?>"><?php echo htmlspecialchars($c['nombre']); ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- Columna Derecha: Datos Principales -->
-                <div class="d-flex flex-column gap-16">
-                    <div class="form-group mb-0">
-                        <label class="form-label">Nombre del Producto</label>
-                        <input type="text" id="prodNombre" placeholder="Ej: Auriculares Pro Max" class="form-input">
-                        <span class="form-error" id="err-nombre"></span>
+                    <div class="form-group mb-32">
+                        <label class="form-label mb-4"><?php echo L('prod_modal_label_desc'); ?></label>
+                        <textarea id="prodDesc" placeholder="<?php echo L('prod_placeholder_desc'); ?>" class="form-input" rows="2"></textarea>
                     </div>
 
-                    <div class="d-grid grid-2 gap-16">
+                    <div class="d-grid gap-32 mb-16 p-16 bg-surface2 br-12 border-2" style="grid-template-columns: 1fr 1fr;">
                         <div class="form-group mb-0">
-                            <label class="form-label">Referencia (SKU)</label>
-                            <input type="text" id="prodCodigo" placeholder="AUD-001" class="form-input font-mono">
-                            <span class="form-error" id="err-referencia"></span>
+                            <label class="form-label fs-11 tt-uppercase mb-4"><?php echo L('prod_modal_label_provider'); ?></label>
+                            <select id="prodProveedor" class="form-input">
+                                <option value=""><?php echo L('prod_modal_label_provider_none'); ?></option>
+                                <?php foreach ($avProductos['proveedores'] as $p): ?>
+                                    <option value="<?php echo $p['id']; ?>" data-re="<?php echo $p['aplica_re']; ?>">
+                                        <?php echo htmlspecialchars($p['nombre']); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
                         </div>
                         <div class="form-group mb-0">
-                            <label class="form-label">Categoría</label>
-                            <select id="prodCat" class="form-input">
-                                <?php foreach ($avProductos['categorias'] as $c): ?>
-                                    <option value="<?php echo htmlspecialchars($c['codigo']); ?>"><?php echo htmlspecialchars($c['nombre']); ?></option>
+                            <label class="form-label fs-11 tt-uppercase mb-4"><?php echo L('prod_modal_label_iva'); ?></label>
+                            <select id="prodIvaTipo" class="form-input">
+                                <?php foreach ($avProductos['tipos_iva'] as $t): ?>
+                                    <option value="<?php echo htmlspecialchars($t['codigo']); ?>"
+                                        data-porcentaje="<?php echo $t['porcentaje']; ?>"
+                                        data-re="<?php echo $t['recargo_equivalencia'] ?? 0; ?>">
+                                        <?php echo htmlspecialchars($t['nombre'] . ' (' . (float)$t['porcentaje'] . '%)'); ?>
+                                    </option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
                     </div>
                 </div>
-            </div>
+                <!-- /TAB GENERAL -->
 
-            <div class="form-group mb-24">
-                <label class="form-label">Descripción</label>
-                <textarea id="prodDesc" placeholder="Detalles técnicos y descripción comercial..." class="form-input" rows="2"></textarea>
-            </div>
+                <!-- TAB PRECIOS Y STOCK -->
+                <div id="modalTabPrecios" class="modal-tab-content d-none">
 
-            <div class="d-grid gap-16 mb-24 p-16 bg-surface2 br-12 border-2" style="grid-template-columns: 1fr 1fr;">
-                <div class="form-group mb-0">
-                    <label class="form-label fs-11 tt-uppercase">Proveedor</label>
-                    <select id="prodProveedor" class="form-input" onchange="seleccionarProveedor(this)">
-                        <option value="">-- Sin Proveedor --</option>
-                        <?php foreach ($avProductos['proveedores'] as $p): ?>
-                            <option value="<?php echo $p['id']; ?>" data-re="<?php echo $p['aplica_re']; ?>">
-                                <?php echo htmlspecialchars($p['nombre']); ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                <div class="form-group mb-0">
-                    <label class="form-label fs-11 tt-uppercase">Precio Proveedor (€)</label>
-                    <input type="text" id="prodPrecioProveedor" placeholder="0.00" class="form-input text-right font-mono" oninput="calcularCosteAutomatico()">
-                    <span class="form-error" id="err-precio_proveedor"></span>
-                </div>
-            </div>
+                    <!-- Coste y Margen -->
+                    <div class="tab-section" style="position:relative;">
+                        <div class="tab-section-title">
+                            <i class="fa-solid fa-lock-open"></i> <?php echo L('prod_modal_label_cost_cmp'); ?>
+                        </div>
+                        <div class="d-flex ai-center gap-8 mb-4">
+                            <span class="cmp-badge"><i class="fa-solid fa-robot"></i> <?php echo L('prod_modal_badge_auto'); ?></span>
+                            <span class="fs-11 text-muted"><?php echo L('prod_modal_badge_auto_desc'); ?></span>
+                        </div>
+                        <div class="d-grid gap-16 mt-12" style="grid-template-columns: 1fr 1fr;">
+                            <div class="form-group mb-0">
+                                <label class="form-label fs-11 tt-uppercase d-flex ai-center jc-between mb-4">
+                                    <span><?php echo L('prod_modal_label_cost'); ?> <span class="opacity-50">(<?php echo L('optional'); ?>)</span></span>
+                                    <button type="button" id="btnHistorialCostes" onclick="abrirModalHistorialCostes()" class="btn-icon p-0 fs-11 text-accent" title="<?php echo L('prod_modal_tip_cost_history'); ?>" style="display:none;">
+                                        <?php echo L('prod_modal_btn_history'); ?>
+                                    </button>
+                                </label>
+                                <input type="text" id="prodPrecioCoste" placeholder="<?php echo L('prod_placeholder_price'); ?>"
+                                    class="form-input text-right font-mono"
+                                    readonly
+                                    tabindex="-1"
+                                    title="<?php echo L('prod_modal_tip_cost_auto'); ?>">
+                                <span class="form-error" id="err-precio_coste"></span>
+                            </div>
+                            <div class="form-group mb-0">
+                                <label class="form-label fs-11 tt-uppercase mb-4"><?php echo L('prod_modal_label_margin'); ?></label>
+                                <input type="number" id="prodMargen" placeholder="<?php echo L('prod_placeholder_margin'); ?>" step="0.01"
+                                    class="form-input text-right font-mono"
+                                    oninput="calcularPrecioDesdeMargen()"
+                                    title="<?php echo L('prod_modal_tip_margin_calc'); ?>">
+                            </div>
+                        </div>
+                    </div>
 
-            <div class="d-grid gap-16 mb-24 p-16 bg-surface2 br-12 border-2" style="grid-template-columns: 1fr;">
-                <div class="form-group mb-0">
-                    <label class="form-label fs-11 tt-uppercase">Tipo IVA</label>
-                    <select id="prodIvaTipo" class="form-input" onchange="calcularCosteAutomatico()">
-                        <?php foreach ($avProductos['tipos_iva'] as $t): ?>
-                            <option value="<?php echo htmlspecialchars($t['codigo']); ?>"
-                                data-porcentaje="<?php echo $t['porcentaje']; ?>"
-                                data-re="<?php echo $t['recargo_equivalencia'] ?? 0; ?>">
-                                <?php echo htmlspecialchars($t['nombre'] . ' (' . (float)$t['porcentaje'] . '%)'); ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-            </div>
+                    <!-- PVP Venta -->
+                    <div class="tab-section">
+                        <div class="tab-section-title">
+                            <?php echo L('prod_th_price'); ?>
+                        </div>
+                        <div class="form-group mb-0">
+                            <label class="form-label fs-11 tt-uppercase mb-4"><?php echo L('prod_th_price'); ?> (€) <span class="opacity-50">(<?php echo L('optional'); ?>)</span></label>
+                            <input type="text" id="prodPrecioVenta" placeholder="<?php echo L('prod_placeholder_price'); ?>"
+                                class="form-input text-right font-bold font-mono text-accent fs-18"
+                                oninput="calcularMargenDesdePrecio()"
+                                title="<?php echo L('prod_modal_tip_price_calc'); ?>">
+                            <span class="form-error" id="err-precio_venta"></span>
+                        </div>
+                    </div>
 
-
-            <div class="d-grid grid-2 gap-16 mb-24">
-                <div class="form-group mb-0">
-                    <label class="form-label fs-11 tt-uppercase d-flex ai-center gap-4">
-                        PVP Coste (Calculado €) <i class="fa-solid fa-calculator text-muted"></i>
-                    </label>
-                    <input type="text" id="prodPrecioCoste" placeholder="0.00" class="form-input text-right font-mono bg-disabled" readonly>
-                    <span class="form-error" id="err-precio_coste"></span>
+                    <!-- Stock -->
+                    <div class="tab-section">
+                        <div class="tab-section-title">
+                            <?php echo L('prod_th_stock'); ?>
+                        </div>
+                        <div class="d-grid grid-3 gap-32">
+                            <div class="form-group mb-0 text-center d-flex flex-column ai-center">
+                                <label class="form-label fs-11 tt-uppercase d-flex ai-center gap-4 jc-center mb-4">
+                                    <?php echo L('prod_modal_label_stock_actual'); ?> <span class="opacity-50">(<?php echo L('optional'); ?>)</span> <i class="fa-solid fa-circle-info text-muted" title="<?php echo L('prod_modal_tip_stock_manual'); ?>"></i>
+                                </label>
+                                <div class="d-flex jc-center w-full" style="max-width: 140px; position: relative;">
+                                    <input type="text" id="prodStock" placeholder="<?php echo L('prod_placeholder_stock'); ?>" class="form-input text-center font-bold flex-1 h-44 fs-16" style="border-radius: 12px; border-width: 2px;">
+                                    <button type="button" id="btnRetirarStock" class="btn-icon text-red d-none" onclick="retirarStockManual()" title="<?php echo L('prod_modal_tip_stock_withdraw'); ?>" style="position: absolute; right: -36px; top: 50%; transform: translateY(-50%);">
+                                        <i class="fa-solid fa-minus-circle fs-20"></i>
+                                    </button>
+                                </div>
+                                <span class="form-error" id="err-stock_actual"></span>
+                            </div>
+                            <div class="form-group mb-0">
+                                <label class="form-label fs-11 tt-uppercase mb-4"><?php echo L('prod_modal_label_stock_min'); ?></label>
+                                <input type="text" id="prodStockMin" placeholder="<?php echo L('prod_placeholder_stock_min'); ?>" class="form-input text-center">
+                                <span class="form-error" id="err-stock_minimo"></span>
+                            </div>
+                            <div class="form-group mb-0">
+                                <label class="form-label fs-11 tt-uppercase mb-4"><?php echo L('prod_modal_label_warranty'); ?></label>
+                                <input type="text" id="prodGarantia" placeholder="<?php echo L('prod_placeholder_warranty'); ?>" class="form-input text-center">
+                                <span class="form-error" id="err-meses_garantia"></span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="form-group mb-0">
-                    <label class="form-label fs-11 tt-uppercase">PVP Venta (€)</label>
-                    <input type="text" id="prodPrecioVenta" placeholder="0.00" class="form-input text-right font-bold font-mono text-accent">
-                    <span class="form-error" id="err-precio_venta"></span>
-                </div>
-            </div>
-
-
-            <div class="d-grid grid-3 gap-16 mb-24">
-                <div class="form-group mb-0">
-                    <label class="form-label fs-11 tt-uppercase d-flex ai-center gap-4">
-                        Stock Actual <i class="fa-solid fa-circle-info text-muted" title="Para cambiarlo en productos existentes, usa el botón de Entrada de Stock"></i>
-                    </label>
-                    <input type="text" id="prodStock" placeholder="0" class="form-input text-center font-bold">
-                    <span class="form-error" id="err-stock_actual"></span>
-                </div>
-                <div class="form-group mb-0">
-                    <label class="form-label fs-11 tt-uppercase">Stock Mínimo</label>
-                    <input type="text" id="prodStockMin" placeholder="5" class="form-input text-center">
-                    <span class="form-error" id="err-stock_minimo"></span>
-                </div>
-                <div class="form-group mb-0">
-                    <label class="form-label fs-11 tt-uppercase">Garantía (meses)</label>
-                    <input type="text" id="prodGarantia" placeholder="24" class="form-input text-center">
-                    <span class="form-error" id="err-meses_garantia"></span>
-                </div>
-            </div>
-
-            <!-- (Eliminado: Componentes del Pack, ahora están en el modal exclusivo modalPack) -->
-
-            <!-- Variantes -->
-            <div id="sectionVariantes" class="p-16 border-2 br-12 mb-24">
-                <label class="form-label mb-12 d-flex ai-center gap-8">
-                    <i class="fa-solid fa-tags text-muted"></i> Variantes (Talla, Color, etc.)
-                </label>
-                <div id="variantesContainer" class="d-flex flex-wrap gap-8 mb-12">
-                    <!-- JS filler -->
-                </div>
-                <div class="d-grid grid-1-1-60 gap-8">
-                    <input type="text" id="nuevaVarianteLabel" placeholder="Atributo" class="form-input fs-12">
-                    <input type="text" id="nuevaVarianteValue" placeholder="Valor" class="form-input fs-12">
-                    <button type="button" onclick="añadirVarianteUI()" class="btn-save w-auto p-0-12 h-40">
-                        <i class="fa-solid fa-plus"></i>
-                    </button>
-                </div>
-                <input type="hidden" id="prodVariantes">
-            </div>
-
-            <!-- Atributos / Etiquetas -->
-            <div id="sectionAtributos" class="p-16 border-2 br-12 mb-24">
-                <label class="form-label mb-12 d-flex ai-center gap-8">
-                    <i class="fa-solid fa-bookmark text-muted"></i> Atributos Extras (Etiquetas, Ej: Navidad, Oferta)
-                </label>
-                <div id="atributosContainer" class="d-flex flex-wrap gap-8 mb-12">
-                    <!-- JS filler -->
-                </div>
-                <div class="d-grid grid-1-100 gap-8" style="grid-template-columns: 1fr auto;">
-                    <input type="text" id="nuevoAtributoValue" placeholder="Nuevo Atributo..." class="form-input fs-12">
-                    <button type="button" onclick="añadirAtributoUI()" class="btn-save w-auto p-0-12 h-40">
-                        <i class="fa-solid fa-plus"></i>
-                    </button>
-                </div>
-                <input type="hidden" id="prodAtributos">
-            </div>
-
-            <!-- Gestión de Variantes Físicas (Stock individual) -->
-            <div id="sectionVariantesFisicas" class="p-16 border-2 br-12 mb-24 d-none">
-                <label class="form-label mb-12 d-flex ai-center gap-8">
-                    <i class="fa-solid fa-boxes-stacked text-muted"></i> Gestión de Variantes Físicas (Stock Individual)
-                </label>
-                <div class="table-container" style="max-height: 250px; overflow-y: auto; background: var(--bg-body);">
-                    <table class="w-100 fs-12">
-                        <thead>
-                            <tr style="background: var(--surface2);">
-                                <th class="p-8 text-left">Variante</th>
-                                <th class="p-8 text-left">SKU</th>
-                                <th class="p-8 text-center" style="width: 80px;">Stock</th>
-                                <th class="p-8 text-right" style="width: 100px;">Precio (€)</th>
-                                <th class="p-8 text-center" style="width: 60px;">Activa</th>
-                                <th class="p-8 text-center" style="width: 40px;"></th>
-                            </tr>
-                        </thead>
-                        <tbody id="listaVariantesBody">
-                            <!-- JS filler -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+                <!-- /TAB PRECIOS Y STOCK -->
 
 
-            <div class="modal-footer">
-                <button type="button" onclick="cerrarModalProducto()" class="btn-cancel">Cancelar</button>
-                <div class="flex-1"></div>
-                <button type="submit" id="btnGuardarProd" class="btn-save w-auto px-32">Guardar Producto</button>
-            </div>
-        </form>
-    </div>
-</div>
+                <!-- TAB TARIFAS -->
+                <div id="modalTabTarifas" class="modal-tab-content d-none">
+                    <div class="p-16 border-2 br-12 mb-24 bg-surface2">
+                        <label class="form-label mb-8 d-flex ai-center gap-8">
+                            <i class="fa-solid fa-percent text-accent"></i> <?php echo L('prod_modal_tab_tarifas_title'); ?>
+                        </label>
+                        <div class="fs-12 text-muted mb-16" style="line-height:1.6;">
+                            <?php echo L('prod_modal_tab_tarifas_desc'); ?>
+                            <?php echo L('prod_modal_tab_tarifas_desc2'); ?>
+                        </div>
+                        <div class="table-container" style="background: var(--bg-body); border-radius: 8px; overflow: hidden;">
+                            <table class="w-100 tarifas-table" style="border-collapse: collapse;">
+                                <thead>
+                                    <tr>
+                                        <th class="text-left"><?php echo L('prod_modal_th_rule'); ?></th>
+                                        <th class="text-center"><?php echo L('prod_modal_th_type'); ?></th>
+                                        <th class="text-right"><?php echo L('prod_modal_th_variation'); ?></th>
+                                        <th class="text-center"><?php echo L('prod_modal_th_priority'); ?></th>
+                                        <th class="text-center"><?php echo L('prod_modal_th_action'); ?></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="listaTarifasProductoBody">
+                                    <!-- JS filler -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <!-- /TAB TARIFAS -->
+
+            </div><!-- /p-24 -->
+        </form><!-- /formProducto -->
+
+        <div class="modal-footer">
+            <button type="button" onclick="cerrarModalProducto()" class="btn-cancel"><?php echo L('modal_cancel'); ?></button>
+            <div class="flex-1"></div>
+            <button type="button" id="btnGuardarProd" class="btn-save w-auto px-32"><?php echo L('prod_modal_btn_save'); ?></button>
+        </div>
+    </div><!-- /modal-content -->
+</div><!-- /modalProducto -->
 
 <!-- MODAL AÑADIR/EDITAR PACK -->
 <div id="modalPack" class="modal-overlay-bg d-none">
-    <div class="modal-content" style="max-width: 1000px; padding: 0; overflow: hidden;">
+    <div class="modal-content" style="max-width: 1000px; padding: 0; overflow: hidden; border-radius: 20px;">
         <div class="modal-header">
-            <h2 id="modalPackTitle">Nuevo Pack de Venta</h2>
+            <h2 id="modalPackTitle"><?php echo L('prod_modal_pack_title_new'); ?></h2>
             <button type="button" onclick="cerrarModalPack()" class="btn-close-modal">&times;</button>
         </div>
         <form id="formPack" class="modal-body">
@@ -519,14 +725,14 @@
                 <!-- Columna Izquierda: Imagen y Meta -->
                 <div class="d-flex flex-column gap-16">
                     <div class="form-group mb-0">
-                        <label class="form-label">Imagen del Pack</label>
+                        <label class="form-label"><?php echo L('prod_modal_pack_label_image'); ?></label>
                         <div class="d-flex flex-column ai-center gap-12 p-16 bg-surface2 br-12 border-2">
                             <div id="imgPreviewPack" class="prod-img-preview m-0" style="width: 120px; height: 120px;">
                                 <i class="fa-solid fa-boxes-stacked fs-32 opacity-20"></i>
                             </div>
                             <input type="file" id="packFile" accept="image/*" class="d-none" onchange="previewImagePack(this)">
                             <button type="button" onclick="document.getElementById('packFile').click()" class="btn-filter w-auto h-auto p-10-16 fs-12 gap-8">
-                                <i class="fa-solid fa-upload"></i> Subir
+                                <i class="fa-solid fa-upload"></i> <?php echo L('prod_modal_btn_upload'); ?>
                             </button>
                             <input type="hidden" id="packIcono">
                         </div>
@@ -536,17 +742,17 @@
                 <!-- Columna Derecha: Datos Principales -->
                 <div class="d-flex flex-column gap-16">
                     <div class="form-group mb-0">
-                        <label class="form-label">Nombre del Pack</label>
-                        <input type="text" id="packNombre" placeholder="Ej: Pack Ahorro Invierno" class="form-input" required>
+                        <label class="form-label"><?php echo L('prod_modal_pack_label_name'); ?></label>
+                        <input type="text" id="packNombre" placeholder="<?php echo L('prod_placeholder_pack_name'); ?>" class="form-input" required>
                     </div>
 
                     <div class="d-grid grid-2 gap-16">
                         <div class="form-group mb-0">
-                            <label class="form-label">Referencia (Opcional)</label>
-                            <input type="text" id="packCodigo" placeholder="PACK-INV-001" class="form-input font-mono">
+                            <label class="form-label"><?php echo L('prod_modal_pack_label_sku'); ?></label>
+                            <input type="text" id="packCodigo" placeholder="<?php echo L('prod_placeholder_pack_sku'); ?>" class="form-input font-mono">
                         </div>
                         <div class="form-group mb-0">
-                            <label class="form-label">Categoría</label>
+                            <label class="form-label"><?php echo L('prod_th_category'); ?></label>
                             <select id="packCat" class="form-input">
                                 <?php foreach ($avProductos['categorias'] as $c): ?>
                                     <option value="<?php echo htmlspecialchars($c['codigo']); ?>"><?php echo htmlspecialchars($c['nombre']); ?></option>
@@ -557,11 +763,11 @@
 
                     <div class="d-grid grid-2 gap-16">
                         <div class="form-group mb-0">
-                            <label class="form-label fs-11 tt-uppercase">Precio Venta Pack (€)</label>
-                            <input type="text" id="packPrecioVenta" placeholder="0.00" class="form-input text-right font-bold font-mono text-accent" required>
+                            <label class="form-label fs-11 tt-uppercase"><?php echo L('prod_modal_pack_label_price'); ?> (€)</label>
+                            <input type="text" id="packPrecioVenta" placeholder="<?php echo L('prod_placeholder_price'); ?>" class="form-input text-right font-bold font-mono text-accent" required>
                         </div>
                         <div class="form-group mb-0">
-                            <label class="form-label fs-11 tt-uppercase">IVA (%)</label>
+                            <label class="form-label fs-11 tt-uppercase"><?php echo L('prod_modal_pack_label_iva'); ?> (%)</label>
                             <select id="packIvaTipo" class="form-input">
                                 <?php foreach ($avProductos['tipos_iva'] as $t): ?>
                                     <option value="<?php echo htmlspecialchars($t['codigo']); ?>">
@@ -578,16 +784,16 @@
             <div class="p-20 border-2 border-accent br-12 mb-24 bg-surface1 col-span-1-3 pack-components-section" style="width: 100%; box-sizing: border-box; grid-column: 1 / -1;">
 
                 <label class="form-label mb-12 d-flex ai-center gap-8 text-accent font-bold">
-                    <i class="fa-solid fa-boxes-packing"></i> Componentes Físicos del Pack
+                    <i class="fa-solid fa-boxes-packing"></i> <?php echo L('prod_modal_pack_label_components'); ?>
                 </label>
                 <div class="fs-12 text-muted mb-24">
-                    Añade los productos que componen este pack. Al vender el pack, el TPV descontará automáticamente el stock especificado de cada uno de los productos que lo conforman.
+                    <?php echo L('prod_modal_pack_components_desc'); ?>
                 </div>
 
                 <div class="d-flex mb-24" style="width: 100%;">
                     <div class="pack-search-container" style="width: 100%; position: relative;">
                         <i class="fa-solid fa-magnifying-glass pack-search-icon" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted); z-index: 10;"></i>
-                        <input type="text" id="packSearchInput" class="form-input border-accent pl-40" style="width: 100%; padding-left: 40px !important;" placeholder="Buscar producto por nombre o ref..." autocomplete="off" oninput="buscarProductoParaPack(this.value)">
+                        <input type="text" id="packSearchInput" class="form-input border-accent pl-40" style="width: 100%; padding-left: 40px !important;" placeholder="<?php echo L('prod_modal_pack_search_placeholder'); ?>" autocomplete="off" oninput="buscarProductoParaPack(this.value)">
                         <div id="packSearchResults" class="search-results-dropdown" style="display:none; position: absolute; width: 100%; left: 0; top: 100%; z-index: 1000; background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-lg); border-radius: 8px; max-height: 300px; overflow-y: auto;"></div>
                     </div>
                 </div>
@@ -597,9 +803,9 @@
                     <table class="full-width fs-12 pack-components-table">
                         <thead>
                             <tr style="background: var(--surface2);">
-                                <th class="p-8 text-left">SKU</th>
-                                <th class="p-8 text-left">Producto</th>
-                                <th class="p-8 text-center" style="width: 80px;">Cant.</th>
+                                <th class="p-8 text-left"><?php echo L('prod_th_sku'); ?></th>
+                                <th class="p-8 text-left"><?php echo L('prod_th_name'); ?></th>
+                                <th class="p-8 text-center" style="width: 80px;"><?php echo L('prod_th_qty'); ?></th>
                                 <th class="p-8 text-center" style="width: 40px;"></th>
                             </tr>
                         </thead>
@@ -611,9 +817,9 @@
             </div>
 
             <div class="modal-footer">
-                <button type="button" onclick="cerrarModalPack()" class="btn-cancel">Cancelar</button>
+                <button type="button" onclick="cerrarModalPack()" class="btn-cancel"><?php echo L('modal_cancel'); ?></button>
                 <div class="flex-1"></div>
-                <button type="submit" id="btnGuardarPack" class="btn-save w-auto px-32" style="background: var(--accent); color: white;">Guardar Pack</button>
+                <button type="submit" id="btnGuardarPack" class="btn-save w-auto px-32" style="background: var(--accent); color: white;"><?php echo L('prod_modal_btn_save_pack'); ?></button>
             </div>
         </form>
     </div>
@@ -691,14 +897,14 @@
     }
 </style>
 <div id="modalHistorialStock" class="modal-overlay-bg d-none">
-    <div class="modal-content printable-area" style="padding: 0; overflow: visible; border: none; border-radius: 20px; box-shadow: 0 30px 60px rgba(0,0,0,0.4); background: var(--surface);">
+    <div class="modal-content printable-area" style="padding: 0; overflow: hidden; border: none; border-radius: 20px; box-shadow: 0 30px 60px rgba(0,0,0,0.4); background: var(--surface);">
         <div class="modal-header" style="background: linear-gradient(135deg, var(--surface) 0%, var(--surface2) 100%); padding: 32px; border-bottom: 1px solid var(--border); position: relative;">
             <div class="d-flex ai-center gap-20">
                 <div class="bg-accent-soft p-16 br-16 text-accent" style="box-shadow: 0 8px 16px rgba(var(--accent-rgb), 0.1);">
                     <i class="fa-solid fa-clock-rotate-left fs-28"></i>
                 </div>
                 <div>
-                    <h2 id="historialTitle" class="m-0 fs-24 font-bold mb-4">Historial de Stock</h2>
+                    <h2 id="historialTitle" class="m-0 fs-24 font-bold mb-4"><?php echo L('prod_modal_stock_history_title'); ?></h2>
                     <div id="historialSubtitle" class="fs-14 opacity-70"></div>
                 </div>
             </div>
@@ -710,11 +916,11 @@
                 <table class="stock-log-table">
                     <thead>
                         <tr>
-                            <th style="width: 180px;">Fecha y Hora</th>
-                            <th style="width: 160px;">Operación</th>
-                            <th style="width: 110px;" class="text-center">Variación</th>
-                            <th style="width: 150px;">Responsable</th>
-                            <th style="width: auto;">Observaciones</th>
+                            <th style="width: 180px;"><?php echo L('prod_modal_th_datetime'); ?></th>
+                            <th style="width: 160px;"><?php echo L('prod_modal_th_operation'); ?></th>
+                            <th style="width: 110px;" class="text-center"><?php echo L('prod_modal_th_variation'); ?></th>
+                            <th style="width: 150px;"><?php echo L('prod_modal_th_user'); ?></th>
+                            <th style="width: auto;"><?php echo L('prod_modal_th_obs'); ?></th>
                         </tr>
                     </thead>
                     <tbody id="historialTableBody" class="fs-13">
@@ -726,11 +932,129 @@
 
         <div class="modal-footer" style="padding: 24px 32px; background: var(--surface); border-top: 1px solid var(--border); display: flex; align-items: center;">
             <button type="button" onclick="cerrarModalHistorial()" class="btn-cancel" style="border: 1px solid var(--border); padding: 12px 24px; border-radius: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
-                <i class="fa-solid fa-xmark"></i> Cerrar
+                <i class="fa-solid fa-xmark"></i> <?php echo L('modal_close'); ?>
             </button>
         </div>
     </div>
 </div>
+
+<!-- MODAL HISTORIAL DE PRECIOS -->
+<div id="modalHistorialPrecios" class="modal-overlay-bg d-none">
+    <div class="modal-content" style="max-width: 860px; padding: 0; overflow: hidden; border-radius: 20px; box-shadow: 0 30px 60px rgba(0,0,0,0.4); background: var(--surface);">
+        <div class="modal-header" style="background: linear-gradient(135deg, var(--surface) 0%, var(--surface2) 100%); padding: 28px 32px; border-bottom: 1px solid var(--border); position: relative;">
+            <div class="d-flex ai-center gap-16">
+                <div style="background: rgba(245,158,11,0.12); color: #f59e0b; padding: 14px; border-radius: 14px; box-shadow: 0 4px 12px rgba(245,158,11,0.18);">
+                    <i class="fa-solid fa-tag fs-22"></i>
+                </div>
+                <div>
+                    <h2 id="historialPreciosTitle" class="m-0 fs-20 font-bold mb-4"><?php echo L('prod_modal_price_history_title'); ?></h2>
+                    <div id="historialPreciosSubtitle" class="fs-13 opacity-60"></div>
+                </div>
+            </div>
+            <button type="button" onclick="cerrarModalHistorialPrecios()" class="btn-close-modal" style="position: absolute; top: 28px; right: 28px; background: var(--surface2); width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--border);">&times;</button>
+        </div>
+        <div class="modal-body" style="padding: 0; min-height: 300px;">
+            <div style="max-height: 500px; overflow-y: auto;">
+                <table class="data-table" style="width: 100%;">
+                    <thead>
+                        <tr>
+                            <th style="padding: 14px 20px;"><?php echo L('prod_modal_th_date'); ?></th>
+                            <th style="padding: 14px 20px; text-align: right;"><?php echo L('prod_modal_th_price_old'); ?></th>
+                            <th style="padding: 14px 20px; text-align: right;"><?php echo L('prod_modal_th_price_new'); ?></th>
+                            <th style="padding: 14px 20px; text-align: right;"><?php echo L('prod_modal_th_variation'); ?></th>
+                            <th style="padding: 14px 20px;"><?php echo L('prod_modal_th_reason'); ?></th>
+                            <th style="padding: 14px 20px;"><?php echo L('prod_modal_th_user'); ?></th>
+                        </tr>
+                    </thead>
+                    <tbody id="historialPreciosBody">
+                        <tr>
+                            <td colspan="6" class="text-center p-24 opacity-50"><?php echo L('loading'); ?></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="modal-footer" style="padding: 20px 28px; border-top: 1px solid var(--border);">
+            <button type="button" onclick="cerrarModalHistorialPrecios()" class="btn-cancel">
+                <i class="fa-solid fa-xmark"></i> <?php echo L('modal_close'); ?>
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    async function abrirModalHistorialPrecios(id, nombre) {
+        const modal = document.getElementById('modalHistorialPrecios');
+        const title = document.getElementById('historialPreciosTitle');
+        const subtitle = document.getElementById('historialPreciosSubtitle');
+        const body = document.getElementById('historialPreciosBody');
+
+        title.innerText = <?php echo json_encode(L('prod_js_history_for', true)); ?> + nombre;
+        subtitle.innerText = <?php echo json_encode(L('prod_js_fetching_prices', true)); ?>;
+        body.innerHTML = '<tr><td colspan="6" class="text-center p-24 opacity-50"><i class="fa-solid fa-spinner fa-spin mr-8"></i>' + <?php echo json_encode(L('prod_js_searching', true)); ?> + '</td></tr>';
+
+        modal.classList.remove('d-none');
+        modal.style.display = 'flex';
+
+        try {
+            const resp = await fetch(`api/obtenerHistorialPrecios.php?id=${id}`);
+            const data = await resp.json();
+
+            if (data.ok) {
+                subtitle.innerText = data.historial.length > 0 ?
+                    `${data.historial.length} ` + <?php echo json_encode(L('prod_hist_changes_registered', true)); ?> :
+                    <?php echo json_encode(L('prod_hist_no_changes', true)); ?>;
+
+                if (data.historial.length === 0) {
+                    body.innerHTML = `
+                        <tr><td colspan="6">
+                            <div style="padding: 60px 40px; text-align: center; color: var(--text-muted);">
+                                <div style="font-size: 48px; opacity: 0.15; margin-bottom: 20px;"><i class="fa-solid fa-tag"></i></div>
+                                <div style="font-size: 16px; font-weight: bold; margin-bottom: 8px;"><?php echo L('prod_hist_empty_title'); ?></div>
+                                <div style="font-size: 13px; opacity: 0.6;"><?php echo L('prod_hist_empty_sub'); ?></div>
+                            </div>
+                        </td></tr>`;
+                } else {
+                    body.innerHTML = data.historial.map(h => {
+                        const anterior = parseFloat(h.precio_old);
+                        const nuevo = parseFloat(h.precio_new);
+                        const diff = nuevo - anterior;
+                        const diffStr = (diff >= 0 ? '+' : '') + diff.toFixed(2);
+                        const diffColor = diff < 0 ? 'color:#ef4444;' : diff > 0 ? 'color:#22c55e;' : 'color:var(--text-muted);';
+                        const fecha = new Date(h.fecha);
+                        return `
+                        <tr>
+                            <td style="padding: 14px 20px; font-size: 12px; color: var(--text-muted);">
+                                ${fecha.toLocaleDateString()}<br>
+                                <strong>${fecha.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</strong>
+                            </td>
+                            <td style="padding: 14px 20px; text-align: right; font-family: monospace; text-decoration: line-through; opacity: 0.5;">${anterior.toFixed(2)} €</td>
+                            <td style="padding: 14px 20px; text-align: right; font-family: monospace; font-weight: bold;">${nuevo.toFixed(2)} €</td>
+                            <td style="padding: 14px 20px; text-align: right; font-family: monospace; font-weight: bold; ${diffColor}">${diffStr} €</td>
+                            <td style="padding: 14px 20px; font-size: 13px; font-style: italic; opacity: 0.75;">${h.motivo || '<span style="opacity:0.3">' + <?php echo json_encode(L('prod_hist_no_reason', true)); ?> + '</span>'}</td>
+                            <td style="padding: 14px 20px; font-size: 12px;">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <div style="width:26px; height:26px; border-radius:50%; background:var(--surface2); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:bold; flex-shrink:0;">
+                                        ${(h.nombre_usuario || 'S').charAt(0).toUpperCase()}
+                                    </div>
+                                    ${h.nombre_usuario || <?php echo json_encode(L('prod_hist_system', true)); ?>}
+                                </div>
+                            </td>
+                        </tr>`;
+                    }).join('');
+                }
+            } else {
+                body.innerHTML = `<tr><td colspan="6" class="text-center p-32" style="color:var(--red);">Error: ${data.error}</td></tr>`;
+            }
+        } catch (e) {
+            body.innerHTML = '<tr><td colspan="6" class="text-center p-32 text-red">' + <?php echo json_encode(L('prod_js_error_fetching_history', true)); ?> + '</td></tr>';
+        }
+    }
+
+    function cerrarModalHistorialPrecios() {
+        document.getElementById('modalHistorialPrecios').style.display = 'none';
+    }
+</script>
 
 <script>
     // IVA general vigente, calculado en el backend (para que se actualice automáticamente si cambia en tipos_iva)
@@ -743,38 +1067,40 @@
      * Lógica de gestión de productos (JS integrado por ahora)
      */
 
-    function calcularCosteAutomatico() {
-        const inputProveedor = document.getElementById('prodPrecioProveedor');
-        const selIva = document.getElementById('prodIvaTipo');
-        const selProv = document.getElementById('prodProveedor');
-        const inputCoste = document.getElementById('prodPrecioCoste');
+    // --- Lógica de cálculo de precios ---
+    // El coste ahora es manual o CMP automático de albaranes, no depende de un precio fijo de proveedor.
 
-        if (!inputProveedor || !selIva || !selProv || !inputCoste) return;
+    function calcularPrecioDesdeMargen() {
+        const coste = parseFloat(document.getElementById('prodPrecioCoste').value) || 0;
+        const margen = parseFloat(document.getElementById('prodMargen').value) || 0;
+        const inputVenta = document.getElementById('prodPrecioVenta');
 
-        const precioProv = parseFloat(inputProveedor.value.replace(',', '.')) || 0;
-        const optIva = selIva.options[selIva.selectedIndex];
-        const ivaPerc = parseFloat(optIva.dataset.porcentaje) || 0;
-
-        const optProv = selProv.options[selProv.selectedIndex];
-        const appliesRE = optProv && parseInt(optProv.dataset.re) === 1;
-        const rePerc = appliesRE ? (parseFloat(optIva.dataset.re) || 0) : 0;
-
-        const totalFactor = 1 + (ivaPerc / 100) + (rePerc / 100);
-        const costeFinal = (precioProv * totalFactor).toFixed(2);
-
-        inputCoste.value = costeFinal;
+        if (coste >= 0) {
+            const precioVenta = coste * (1 + (margen / 100));
+            inputVenta.value = precioVenta.toFixed(2);
+        }
     }
 
-    function seleccionarProveedor(select) {
-        calcularCosteAutomatico();
+    function calcularMargenDesdePrecio() {
+        const coste = parseFloat(document.getElementById('prodPrecioCoste').value) || 0;
+        const venta = parseFloat(document.getElementById('prodPrecioVenta').value.replace(',', '.')) || 0;
+        const inputMargen = document.getElementById('prodMargen');
+
+        if (coste > 0) {
+            const margen = ((venta / coste) - 1) * 100;
+            inputMargen.value = margen.toFixed(2);
+        } else {
+            inputMargen.value = '0.00';
+        }
     }
+
 
     // --- FUNCIONES GLOBALES DE MODALES ---
 
     function abrirModalProducto(producto = null) {
         const modal = document.getElementById('modalProducto');
         const title = document.getElementById('modalTitle');
-        const form = document.getElementById('formProducto');
+        const productForm = document.getElementById('formProducto');
 
         // Cerrar cualquier otro modal-overlay antes de abrir este
         document.querySelectorAll('.modal-overlay-bg').forEach(m => {
@@ -784,107 +1110,397 @@
         // Limpiar errores previos
         document.querySelectorAll('.form-error').forEach(el => el.innerText = '');
 
+        const inputCoste = document.getElementById('prodPrecioCoste');
+        const inputStock = document.getElementById('prodStock');
+        const btnRetirada = document.getElementById('btnRetirarStock');
+        const btnTabTarifas = document.getElementById('btnTabModalTarifas');
+        const btnHistCoste = document.getElementById('btnHistorialCostes');
+
         if (producto) {
-            title.innerText = 'Editar Producto';
+            title.innerText = <?php echo json_encode(L('prod_modal_title_edit', true)); ?>;
             document.getElementById('prodId').value = producto.id;
-            document.getElementById('prodIcono').value = producto.icono;
-            document.getElementById('prodCodigo').value = producto.codigo;
-            document.getElementById('prodNombre').value = producto.nombre;
+            document.getElementById('prodIcono').value = producto.icono || '';
+            document.getElementById('prodCodigo').value = producto.codigo || '';
+            document.getElementById('prodNombre').value = producto.nombre || '';
             document.getElementById('prodDesc').value = producto.descripcion || '';
-            document.getElementById('prodCat').value = producto.categoria;
+            document.getElementById('prodCat').value = producto.categoria || '';
             document.getElementById('prodProveedor').value = producto.id_proveedor || '';
             document.getElementById('prodGarantia').value = producto.meses_garantia || '24';
 
-            // Seleccionar el tipo de IVA actual del producto en el select
             const selIva = document.getElementById('prodIvaTipo');
-            if (selIva) {
-                selIva.value = producto.codigo_iva || 'GENERAL';
-            }
-            document.getElementById('prodPrecioProveedor').value = producto.precio_proveedor || '0.00';
-            document.getElementById('prodPrecioCoste').value = producto.precio_coste || '0.00';
-            document.getElementById('prodPrecioVenta').value = producto.precio || '0.00';
-            document.getElementById('prodStock').value = producto.stock;
+            if (selIva) selIva.value = producto.codigo_iva || 'GENERAL';
+
+            inputCoste.value = parseFloat(producto.precio_coste || 0).toFixed(2);
+            document.getElementById('prodPrecioVenta').value = producto.price || producto.precio || '0.00';
+            inputStock.value = producto.stock !== undefined ? producto.stock : (producto.stock_actual || '0');
             document.getElementById('prodStockMin').value = producto.stock_minimo || '0';
+            document.getElementById('prodMargen').value = producto.margen || '0.00';
 
+            if (parseFloat(producto.margen || 0) <= 0) calcularMargenDesdePrecio();
 
-            // Deshabilitar edición manual de coste y stock (gestionado por Entradas)
-            document.getElementById('prodPrecioCoste').readOnly = true;
-            document.getElementById('prodStock').readOnly = true;
-            document.getElementById('prodPrecioCoste').style.opacity = '0.7';
-            document.getElementById('prodStock').style.opacity = '0.7';
+            // Bloquear edición manual de stock y coste para productos existentes
+            inputCoste.readOnly = true;
+            inputStock.readOnly = true;
+            inputCoste.style.opacity = '0.7';
+            inputStock.style.opacity = '0.7';
+            inputCoste.classList.add('input-readonly-cmp');
+            inputCoste.title = <?php echo json_encode(L('prod_modal_tip_cost_auto', true)); ?>;
+            inputStock.title = <?php echo json_encode(L('prod_modal_tip_stock_auto', true)); ?>;
 
-            // Cargar Variantes
-            const container = document.getElementById('variantesContainer');
-            container.innerHTML = '';
-            if (producto.variantes) {
-                try {
-                    const vars = typeof producto.variantes === 'string' ? JSON.parse(producto.variantes) : producto.variantes;
-                    for (const [l, v] of Object.entries(vars)) {
-                        if (Array.isArray(v)) {
-                            v.forEach(val => añadirVarianteUI(l, val));
-                        } else {
-                            añadirVarianteUI(l, v);
-                        }
-                    }
-                    syncVariantes();
-                } catch (e) {
-                    console.error("Error parsing variantes", e);
-                }
-            }
+            if (btnRetirada) btnRetirada.classList.remove('d-none');
+            if (btnTabTarifas) btnTabTarifas.style.display = 'block';
+            if (btnHistCoste) btnHistCoste.style.display = 'inline-block';
 
-            // Cargar Atributos
-            const attrContainer = document.getElementById('atributosContainer');
-            attrContainer.innerHTML = '';
-            if (producto.atributos) {
-                try {
-                    const attrs = typeof producto.atributos === 'string' ? JSON.parse(producto.atributos) : producto.atributos;
-                    if (Array.isArray(attrs)) {
-                        attrs.forEach(v => añadirAtributoUI(v));
-                    }
-                    syncAtributos();
-                } catch (e) {
-                    console.error("Error parsing atributos", e);
-                }
-            }
-
-
-            cargarVariantesFisicas(producto.id);
-
-            // Mostrar preview
+            // Preview imagen
             const preview = document.getElementById('imgPreview');
-            if (producto.icono && producto.icono.startsWith('data:image')) {
-                preview.innerHTML = `<img src="${producto.icono}" style="width:100%; height:100%; object-fit:contain; border-radius:8px;">`;
-            } else {
-                preview.innerHTML = `<span class="fs-24">${producto.icono || '<i class="fa-solid fa-image"></i>'}</span>`;
+            if (preview) {
+                if (producto.icono && producto.icono.startsWith('data:image')) {
+                    preview.innerHTML = `<img src="${producto.icono}" style="width:100%; height:100%; object-fit:contain; border-radius:8px;">`;
+                } else {
+                    preview.innerHTML = `<span class="fs-24">${producto.icono || '<i class="fa-solid fa-image"></i>'}</span>`;
+                }
             }
+
+            // Cargar tarifas
+            cargarTarifasProducto(producto.id);
+
         } else {
-            title.innerText = 'Nuevo Producto';
-            form.reset();
+            title.innerText = <?php echo json_encode(L('prod_modal_title_new', true)); ?>;
+            if (productForm && typeof productForm.reset === 'function') {
+                productForm.reset();
+            }
             document.getElementById('prodId').value = '';
-            document.getElementById('prodProveedor').value = '';
+            document.getElementById('prodIcono').value = '';
+            document.getElementById('prodIvaTipo').value = 'GENERAL';
             document.getElementById('imgPreview').innerHTML = '<i class="fa-solid fa-image"></i>';
 
+            inputCoste.readOnly = false;
+            inputStock.readOnly = false;
+            inputCoste.style.opacity = '1';
+            inputStock.style.opacity = '1';
+            inputCoste.classList.remove('input-readonly-cmp');
+            inputCoste.title = <?php echo json_encode(L('prod_modal_tip_margin_calc', true)); ?>;
+            inputStock.title = <?php echo json_encode(L('prod_modal_label_stock', true)); ?>;
 
-            document.getElementById('sectionVariantesFisicas').classList.add('d-none');
-            document.getElementById('variantesContainer').innerHTML = '';
-            document.getElementById('atributosContainer').innerHTML = '';
-            document.getElementById('prodAtributos').value = '';
-            document.getElementById('prodVariantes').value = '';
-
-            // Habilitar campos si es producto nuevo
-            document.getElementById('prodPrecioProveedor').value = '0.00';
-            document.getElementById('prodPrecioCoste').readOnly = true;
-            document.getElementById('prodStock').readOnly = false;
-            document.getElementById('prodPrecioCoste').style.opacity = '0.7';
-            document.getElementById('prodStock').style.opacity = '1';
-
-
-            // Nuevo producto: usar IVA general vigente como valor por defecto
-            const selIva = document.getElementById('prodIvaTipo');
-            if (selIva) selIva.value = 'GENERAL';
+            if (btnRetirada) btnRetirada.classList.add('d-none');
+            if (btnTabTarifas) btnTabTarifas.style.display = 'none';
+            if (btnHistCoste) btnHistCoste.style.display = 'none';
         }
 
+        switchModalTab('general', document.querySelector('#modalProducto .tab-btn'));
         modal.style.display = 'flex';
+    }
+
+    /* --- LÓGICA MARGEN MASIVO --- */
+    let excepcionesMasivas = [];
+    let timerBusquedaExcepciones = null;
+
+    function abrirModalMargenMasivo() {
+        const modal = document.getElementById('modalMargenMasivo');
+        modal.classList.remove('d-none');
+        modal.style.display = 'flex';
+        document.getElementById('massMargenInput').value = '';
+        document.getElementById('margenPreviewBox').style.display = 'none';
+        document.getElementById('btnAplicarMargen').disabled = true;
+        
+        excepcionesMasivas = [];
+        actualizarUIExcepciones();
+        document.getElementById('buscadorExcepciones').value = '';
+        lanzarBusquedaExcepciones('');
+    }
+
+    function buscarExcepcionesAlEscribir() {
+        if (timerBusquedaExcepciones) clearTimeout(timerBusquedaExcepciones);
+        timerBusquedaExcepciones = setTimeout(() => {
+            const query = document.getElementById('buscadorExcepciones').value.trim();
+            lanzarBusquedaExcepciones(query);
+        }, 300);
+    }
+
+    async function lanzarBusquedaExcepciones(query) {
+        const url = 'api/gestionProducto.php?accion=listar'; 
+        try {
+            const resp = await fetch(url);
+            const r = await resp.json();
+            if (r.ok) {
+                let html = '';
+                const prods = r.productos.filter(p => !p.es_pack && (query === '' || p.nombre.toLowerCase().includes(query.toLowerCase()) || (p.referencia && p.referencia.toLowerCase().includes(query.toLowerCase()))));
+                const topProds = prods.slice(0, 30);
+                
+                if (topProds.length === 0) {
+                    html = '<div class="text-center p-20 text-muted fs-12">' + <?php echo json_encode(L('prod_js_no_results', true)); ?> + '</div>';
+                } else {
+                    topProds.forEach(p => {
+                        const isSelected = excepcionesMasivas.some(ex => ex.id == p.id);
+                        html += `
+                            <div class="d-flex ai-center jc-between p-12 br-8 bg-surface border">
+                                <div class="d-flex ai-center gap-12">
+                                    <div class="fs-18 text-muted"><i class="${p.icono ? p.icono : 'fa-solid fa-box'}"></i></div>
+                                    <div>
+                                        <div class="font-bold fs-13 text-ellipsis" style="max-width:280px;">${p.nombre}</div>
+                                        <div class="fs-10 text-muted">REF: ${p.referencia || 'S/N'}</div>
+                                    </div>
+                                </div>
+                                <button type="button" class="btn ${isSelected ? 'btn-red' : 'btn-outline'} px-12 py-6 fs-11" onclick="toggleExcepcionMasiva(${p.id}, '${p.nombre.replace(/'/g, "\\'")}', '${(p.referencia||'').replace(/'/g, "\\'")}')">
+                                    <i class="fa-solid ${isSelected ? 'fa-minus' : 'fa-plus'}"></i> ${isSelected ? <?php echo json_encode(L('prod_js_remove', true)); ?> : <?php echo json_encode(L('prod_js_add', true)); ?>}
+                                </button>
+                            </div>
+                        `;
+                    });
+                }
+                document.getElementById('listaExcepciones').innerHTML = html;
+            }
+        } catch(e) {}
+    }
+
+    function toggleExcepcionMasiva(id, nombre, ref) {
+        const idx = excepcionesMasivas.findIndex(ex => ex.id == id);
+        if (idx > -1) {
+            excepcionesMasivas.splice(idx, 1);
+        } else {
+            excepcionesMasivas.push({id, nombre, referencia: ref});
+        }
+        actualizarUIExcepciones();
+        const query = document.getElementById('buscadorExcepciones').value.trim();
+        lanzarBusquedaExcepciones(query); 
+        previewMargenMasivo();
+    }
+
+    function actualizarUIExcepciones() {
+        document.getElementById('contadorExcepciones').innerText = `${excepcionesMasivas.length} ` + <?php echo json_encode(L('selected', true)); ?>;
+    }
+
+    function cerrarModalMargenMasivo() {
+        document.getElementById('modalMargenMasivo').style.display = 'none';
+    }
+
+    let timerPreviewMargen = null;
+
+    function previewMargenMasivo() {
+        const margen = parseFloat(document.getElementById('massMargenInput').value);
+        const btn = document.getElementById('btnAplicarMargen');
+
+        if (isNaN(margen) || margen < 0) {
+            btn.disabled = true;
+            document.getElementById('margenPreviewBox').style.display = 'none';
+            return;
+        }
+
+        btn.disabled = false;
+
+        // Debounce para no saturar la API
+        if (timerPreviewMargen) clearTimeout(timerPreviewMargen);
+        timerPreviewMargen = setTimeout(async () => {
+            const categoria = document.getElementById('massCategoriaSelect').value;
+            try {
+                const resp = await fetch('api/aplicarMargenMasivo.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        margen,
+                        categoria,
+                        excepciones: excepcionesMasivas.map(e => e.id),
+                        preview: true
+                    })
+                });
+                const r = await resp.json();
+                if (r.ok) {
+                    document.getElementById('previewCountOk').innerText = r.actualizados;
+                    document.getElementById('previewCountOmit').innerText = r.omitidos;
+                    document.getElementById('margenPreviewBox').style.display = 'block';
+                }
+            } catch (e) {}
+        }, 500);
+    }
+
+    function confirmarAplicarMargen() {
+        const margen = document.getElementById('massMargenInput').value;
+        const catLabel = document.getElementById('massCategoriaSelect').options[document.getElementById('massCategoriaSelect').selectedIndex].text;
+
+        showCustomConfirm(
+            <?php echo json_encode(L('prod_js_apply_margin_confirm_title', true)); ?>,
+            <?php echo json_encode(L('prod_js_apply_margin_confirm_body', true)); ?>.replace('{margen}', margen).replace('{categoria}', catLabel),
+            async () => {
+                    const btn = document.getElementById('btnAplicarMargen');
+                    const oldHtml = btn.innerHTML;
+                    btn.disabled = true;
+                    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + <?php echo json_encode(L('prod_js_applying', true)); ?>;
+
+                    const categoria = document.getElementById('massCategoriaSelect').value;
+                    try {
+                        const resp = await fetch('api/aplicarMargenMasivo.php', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                margen,
+                                categoria,
+                                excepciones: excepcionesMasivas.map(e => e.id)
+                            })
+                        });
+                        const r = await resp.json();
+                        if (r.ok) {
+                            showCustomAlert(<?php echo json_encode(L('prod_js_success', true)); ?>, r.mensaje || <?php echo json_encode(L('prod_toast_stock_adj_success', true)); ?>, 'success');
+                            location.reload();
+                        } else {
+                            showCustomAlert(<?php echo json_encode(L('prod_js_error', true)); ?>, r.mensaje || r.error || <?php echo json_encode(L('prod_js_error', true)); ?>, 'error');
+                        }
+                    } catch (e) {
+                        showCustomAlert(<?php echo json_encode(L('prod_js_error', true)); ?>, <?php echo json_encode(L('prod_js_error', true)); ?> + ": " + e.message, 'error');
+                    } finally {
+                        btn.disabled = false;
+                        btn.innerHTML = oldHtml;
+                    }
+                },
+                <?php echo json_encode(L('prod_modal_mass_margin_btn_apply', true)); ?>,
+                'danger'
+        );
+    }
+
+    async function abrirModalHistorialCostes() {
+        const id = document.getElementById('prodId').value;
+        const nombre = document.getElementById('prodNombre').value;
+        if (!id) return;
+
+        const modal = document.getElementById('modalHistorialCostes');
+        const title = document.getElementById('costesTitle');
+        const body = document.getElementById('costesTableBody');
+
+        title.innerText = <?php echo json_encode(L('prod_js_history_cmp_for', true)); ?> + nombre;
+        body.innerHTML = '<tr><td colspan="5" class="text-center p-24 opacity-50"><i class="fa-solid fa-spinner fa-spin"></i> ' + <?php echo json_encode(L('loading', true)); ?> + '</td></tr>';
+
+        modal.classList.remove('d-none');
+        modal.style.display = 'flex';
+
+        try {
+            const resp = await fetch(`api/obtenerHistorialCostes.php?id=${id}`);
+            const data = await resp.json();
+
+            if (data.ok) {
+                if (data.historial.length === 0) {
+                    body.innerHTML = `<tr><td colspan="5" class="text-center p-48 text-muted">${<?php echo json_encode(L('prod_modal_tab_tarifas_none', true)); ?>}</td></tr>`;
+                } else {
+                    body.innerHTML = data.historial.map(h => {
+                        const fecha = new Date(h.fecha);
+                        return `
+                            <tr>
+                                <td class="pl-20 fs-12">
+                                    ${fecha.toLocaleDateString()}<br>
+                                    <span class="opacity-50">${fecha.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+                                </td>
+                                <td class="text-center font-bold">${h.cantidad}</td>
+                                <td class="text-right font-mono">${parseFloat(h.precio_coste).toFixed(2)} €</td>
+                                <td class="text-right font-mono text-muted">${parseFloat(h.cmp_anterior).toFixed(2)} €</td>
+                                <td class="text-right pr-20 font-mono font-bold text-accent">${parseFloat(h.cmp_resultante).toFixed(2)} €</td>
+                            </tr>
+                        `;
+                    }).join('');
+                }
+            } else {
+                body.innerHTML = `<tr><td colspan="5" class="text-center p-32 text-red">Error: ${data.error}</td></tr>`;
+            }
+        } catch (e) {
+            body.innerHTML = '<tr><td colspan="5" class="text-center p-32 text-red">Error de red.</td></tr>';
+        }
+    }
+
+    function cerrarModalHistorialCostes() {
+        document.getElementById('modalHistorialCostes').style.display = 'none';
+    }
+
+    function resetFormProducto() {
+        document.getElementById('prodNombre').value = '';
+        document.getElementById('prodCodigo').value = '';
+        document.getElementById('prodDesc').value = '';
+        document.getElementById('prodCat').selectedIndex = 0;
+        document.getElementById('prodProveedor').value = '';
+        document.getElementById('prodIvaTipo').value = 'GENERAL';
+        document.getElementById('prodPrecioCoste').value = '0.00';
+        document.getElementById('prodPrecioVenta').value = '0.00';
+        document.getElementById('prodStock').value = '0';
+        document.getElementById('prodStockMin').value = '0';
+        document.getElementById('prodGarantia').value = '24';
+        document.getElementById('prodMargen').value = '0.00';
+    }
+
+    function switchModalTab(tabId, btn) {
+        // Toggle tabs
+        document.querySelectorAll('#modalProducto .modal-tab-content').forEach(c => c.classList.add('d-none'));
+        document.getElementById('modalTab' + tabId.charAt(0).toUpperCase() + tabId.slice(1)).classList.remove('d-none');
+
+        // Toggle buttons
+        document.querySelectorAll('#modalProducto .tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+    }
+
+    async function cargarTarifasProducto(idProducto) {
+        const tbody = document.getElementById('listaTarifasProductoBody');
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center p-20"><i class="fa-solid fa-spinner fa-spin"></i> ' + <?php echo json_encode(L('loading', true)); ?> + '</td></tr>';
+
+        try {
+            const resp = await fetch('api/gestionExclusiones.php', {
+                method: 'POST',
+                body: JSON.stringify({
+                    accion: 'listar_aplicables',
+                    id_producto: idProducto
+                })
+            });
+            const data = await resp.json();
+
+            if (!data.ok) throw new Error(data.error);
+
+            tbody.innerHTML = '';
+            if (data.reglas.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center p-20 text-muted">' + <?php echo json_encode(L('prod_modal_tab_tarifas_none', true)); ?> + '</td></tr>';
+                return;
+            }
+
+            data.reglas.forEach(r => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="p-8 font-bold">${r.nombre}</td>
+                    <td class="p-8 text-center"><span class="px-6 py-2 br-4 fs-10 bg-surface1 text-muted border">${r.tipo_regla === 'tarifa' ? <?php echo json_encode(L('prod_modal_pill_tariff', true)); ?> : <?php echo json_encode(L('prod_modal_pill_promo', true)); ?>}</span></td>
+                    <td class="p-8 text-right font-mono ${r.valor > 0 ? 'text-green' : 'text-red'}">${r.valor > 0 ? '+' : ''}${r.valor}${r.tipo === 'percent' ? '%' : '€'}</td>
+                    <td class="p-8 text-center text-muted">${r.prioridad}</td>
+                    <td class="p-8 text-right">
+                        <button type="button" onclick="excluirDeRegla(${idProducto}, ${r.id}, '${r.tipo_regla}')" class="btn-icon text-red" title="Excluir producto de esta regla">
+                            <i class="fa-solid fa-ban"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } catch (e) {
+            tbody.innerHTML = `<tr><td colspan="5" class="text-center p-20 text-red">Error al cargar tarifas: ${e.message}</td></tr>`;
+        }
+    }
+
+    async function excluirDeRegla(idProducto, idRegla, tipo) {
+        if (!confirm(<?php echo json_encode(L('prod_js_confirm_exclude_title', true)); ?>.replace('{tipo}', (tipo === 'tarifa' ? <?php echo json_encode(L('prod_modal_pill_tariff', true)); ?>.toLowerCase() : <?php echo json_encode(L('prod_modal_pill_promo', true)); ?>.toLowerCase())))) return;
+
+        try {
+            const resp = await fetch('api/gestionExclusiones.php', {
+                method: 'POST',
+                body: JSON.stringify({
+                    accion: 'excluir',
+                    id_producto: idProducto,
+                    id_regla: idRegla,
+                    tipo: tipo
+                })
+            });
+            const data = await resp.json();
+            if (data.ok) {
+                if (typeof showToast === 'function') showToast(<?php echo json_encode(L('prod_js_excluded_success', true)); ?>);
+                cargarTarifasProducto(idProducto);
+            } else {
+                showCustomAlert(<?php echo json_encode(L('prod_js_error', true)); ?>, data.error, 'error');
+            }
+        } catch (e) {
+            showCustomAlert(<?php echo json_encode(L('prod_js_error', true)); ?>, <?php echo json_encode(L('prod_js_connection', true)); ?> + ": " + e.message, 'error');
+        }
     }
 
     function cerrarModalProducto() {
@@ -895,16 +1511,18 @@
     function abrirModalPack(pack = null) {
         const modal = document.getElementById('modalPack');
         const title = document.getElementById('modalPackTitle');
-        const form = document.getElementById('formPack');
+        const packForm = document.getElementById('formPack');
 
-        if (!modal || !title || !form) return;
+        if (!modal || !title || !packForm) return;
 
         // Cerrar cualquier otro modal-overlay antes de abrir este
         document.querySelectorAll('.modal-overlay-bg').forEach(m => {
             m.style.display = 'none';
         });
 
-        form.reset();
+        if (packForm && typeof packForm.reset === 'function') {
+            packForm.reset();
+        }
         document.querySelectorAll('.form-error').forEach(e => e.textContent = '');
         componentesPackActivos = [];
 
@@ -981,82 +1599,62 @@
         location.reload();
     }
 
+    async function aplicarIvaCategoria(idCategoria) {
+        const select = document.getElementById('iva-cat-' + idCategoria);
+        const idTipoIva = select.value;
 
-
-
-
-    function añadirVarianteUI(label = null, value = null) {
-        const l = label || document.getElementById('nuevaVarianteLabel').value.trim();
-        const v = value || document.getElementById('nuevaVarianteValue').value.trim();
-
-        if (!l || !v) return;
-
-        const container = document.getElementById('variantesContainer');
-        const pill = document.createElement('div');
-        pill.className = 'cat-tab d-flex ai-center gap-8 p-4-12 fs-12';
-        pill.dataset.label = l;
-        pill.dataset.value = v;
-        pill.innerHTML = `
-        <span><strong>${l}:</strong> ${v}</span>
-        <i class="fa-solid fa-xmark cursor-pointer opacity-70 hover-opacity-100" onclick="this.parentElement.remove(); syncVariantes();"></i>
-    `;
-        container.appendChild(pill);
-
-        if (!label) { // Si viene del botón manual
-            document.getElementById('nuevaVarianteLabel').value = '';
-            document.getElementById('nuevaVarianteValue').value = '';
-            syncVariantes();
+        if (!idTipoIva) {
+            showCustomAlert(<?php echo json_encode(L('warning', true)); ?>, <?php echo json_encode(L('prod_modal_cat_option_select', true)); ?>, 'warning');
+            return;
         }
+
+        showCustomConfirm(
+            <?php echo json_encode(L('prod_js_cat_iva_confirm_title', true)); ?>,
+            <?php echo json_encode(L('prod_js_cat_iva_confirm_body', true)); ?>,
+            async () => {
+                    try {
+                        const resp = await fetch('api/gestionCategoria.php', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                accion: 'asignarIVA',
+                                idCategoria: idCategoria,
+                                idTipoIva: idTipoIva
+                            })
+                        });
+
+                        const r = await resp.json();
+                        if (r.ok) {
+                            showCustomAlert(<?php echo json_encode(L('prod_js_success', true)); ?>, <?php echo json_encode(L('prod_js_cat_iva_success', true)); ?>, 'success');
+                        } else {
+                            showCustomAlert(<?php echo json_encode(L('prod_js_error', true)); ?>, r.error || <?php echo json_encode(L('prod_js_cat_iva_error', true)); ?>, 'error');
+                        }
+                    } catch (e) {
+                        console.error(e);
+                        showCustomAlert(<?php echo json_encode(L('prod_js_error', true)); ?>, <?php echo json_encode(L('prod_js_connection', true)); ?>, 'error');
+                    }
+                },
+                <?php echo json_encode(L('prod_js_cat_iva_apply_btn', true)); ?>,
+                'danger'
+        );
     }
 
-    function syncVariantes() {
-        const pills = document.querySelectorAll('#variantesContainer > div');
-        const variantes = {};
-        pills.forEach(p => {
-            const label = p.dataset.label;
-            const value = p.dataset.value;
-            if (!variantes[label]) {
-                variantes[label] = [];
-            }
-            if (!variantes[label].includes(value)) {
-                variantes[label].push(value);
-            }
-        });
-        document.getElementById('prodVariantes').value = Object.keys(variantes).length ? JSON.stringify(variantes) : '';
-    }
 
+
+
+
+
+    /* Lógica de atributos deshabilitada
     function añadirAtributoUI(value = null) {
-        const v = value || document.getElementById('nuevoAtributoValue').value.trim();
-
-        if (!v) return;
-
-        const container = document.getElementById('atributosContainer');
-        const pill = document.createElement('div');
-        pill.className = 'cat-tab d-flex ai-center gap-8 p-4-12 fs-12 bg-accent-soft text-accent border border-accent';
-        pill.dataset.value = v;
-        pill.innerHTML = `
-        <span>${v}</span>
-        <i class="fa-solid fa-xmark cursor-pointer opacity-70 hover-opacity-100" onclick="this.parentElement.remove(); syncAtributos();"></i>
-        `;
-        container.appendChild(pill);
-
-        if (!value) {
-            document.getElementById('nuevoAtributoValue').value = '';
-            syncAtributos();
-        }
+        ...
     }
 
     function syncAtributos() {
-        const pills = document.querySelectorAll('#atributosContainer > div');
-        const atributos = [];
-        pills.forEach(p => {
-            const value = p.dataset.value;
-            if (!atributos.includes(value)) {
-                atributos.push(value);
-            }
-        });
-        document.getElementById('prodAtributos').value = atributos.length ? JSON.stringify(atributos) : '';
+        ...
     }
+    */
 
 
 
@@ -1075,69 +1673,13 @@
 
 
 
-    async function cargarVariantesFisicas(idProd) {
-        const container = document.getElementById('sectionVariantesFisicas');
-        const body = document.getElementById('listaVariantesBody');
-        body.innerHTML = '<tr><td colspan="6" class="p-12 text-center text-muted">Cargando variantes...</td></tr>';
-
-        try {
-            const resp = await fetch(`api/gestionVariante.php?accion=listar&id_producto=${idProd}`);
-            const data = await resp.json();
-
-            if (data.ok && data.lista.length > 0) {
-                container.classList.remove('d-none');
-                body.innerHTML = '';
-                data.lista.forEach(v => {
-                    const tr = document.createElement('tr');
-                    tr.className = 'border-bottom-1';
-                    tr.innerHTML = `
-                        <td class="p-8">${v.nombre}</td>
-                        <td class="p-8"><input type="text" class="form-input fs-11 p-4 w-100 var-sku" value="${v.sku}" data-id="${v.id}"></td>
-                        <td class="p-8"><input type="number" class="form-input fs-11 p-4 w-100 text-center var-stock" value="${v.stock_actual}" data-id="${v.id}" oninput="sincronizarStockTotal()"></td>
-                        <td class="p-8"><input type="number" class="form-input fs-11 p-4 w-100 text-right var-precio" value="${v.precio_venta || ''}" placeholder="Base" step="0.01" data-id="${v.id}"></td>
-                        <td class="p-8 text-center"><input type="checkbox" class="var-activo" ${parseInt(v.activo) ? 'checked' : ''} data-id="${v.id}"></td>
-                        <td class="p-8 text-center"></td>
-                    `;
-                    body.appendChild(tr);
-                });
-                sincronizarStockTotal();
-            } else {
-                container.classList.add('d-none');
-            }
-        } catch (e) {
-            console.error(e);
-            body.innerHTML = '<tr><td colspan="6" class="p-12 text-center text-red">Error al cargar variantes</td></tr>';
-        }
-    }
-
-    function sincronizarStockTotal() {
-        const stocks = document.querySelectorAll('.var-stock');
-        let total = 0;
-        let tieneVariantes = false;
-        stocks.forEach(s => {
-            total += parseInt(s.value || 0);
-            tieneVariantes = true;
-        });
-
-        if (tieneVariantes) {
-            const inputStock = document.getElementById('prodStock');
-            inputStock.value = total;
-            inputStock.readOnly = true;
-            inputStock.style.opacity = '0.7';
-            inputStock.title = "El stock total se calcula sumando las variantes";
-        } else {
-            document.getElementById('prodStock').readOnly = false;
-            document.getElementById('prodStock').style.opacity = '1';
-        }
-    }
-
-    document.getElementById('formProducto').onsubmit = async (e) => {
-        e.preventDefault();
-
-        // Limpiar errores previos
-        document.querySelectorAll('.form-error').forEach(el => el.innerText = '');
-
+    // Modificamos el guardado para que use el botón directamente ya que no hay un <form> envolviendo todo el modal-body ahora
+    document.getElementById('btnGuardarProd').onclick = async (e) => {
         const id = document.getElementById('prodId').value;
+        const btn = document.getElementById('btnGuardarProd');
+        btn.disabled = true;
+        const oldHtml = btn.innerHTML;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + <?php echo json_encode(L('prod_js_saving', true)); ?>;
 
         // Resolver tipo de IVA seleccionado
         const selIva = document.getElementById('prodIvaTipo');
@@ -1145,23 +1687,6 @@
         const tipoIva = TIPOS_IVA.find(t => t.codigo === codigoIva);
         const ivaValor = tipoIva ? tipoIva.porcentaje : IVA_GENERAL_ACTUAL;
 
-        // Recoger variantes físicas si existen
-        const listaVariantes = [];
-        const filasVariantes = document.querySelectorAll('#listaVariantesBody tr');
-        filasVariantes.forEach(tr => {
-            const inSku = tr.querySelector('.var-sku');
-            if (!inSku) return;
-
-            listaVariantes.push({
-                id: inSku.dataset.id,
-                sku: inSku.value.trim(),
-                stock_actual: tr.querySelector('.var-stock').value,
-                precio_venta: tr.querySelector('.var-precio').value,
-                activo: tr.querySelector('.var-activo').checked ? 1 : 0
-            });
-        });
-
-        // ── Objeto datos completo con todos los campos requeridos ──
         const datos = {
             accion: id ? 'editar' : 'añadir',
             id: id,
@@ -1172,26 +1697,29 @@
             categoria: document.getElementById('prodCat').value,
             iva: ivaValor,
             meses_garantia: document.getElementById('prodGarantia').value,
-            precio_coste: document.getElementById('prodPrecioCoste').value,
             precio_venta: document.getElementById('prodPrecioVenta').value,
-            stock_actual: document.getElementById('prodStock').value,
             stock_minimo: document.getElementById('prodStockMin').value,
             requiere_serial: 0,
-            variantes: document.getElementById('prodVariantes').value || null,
-            atributos: document.getElementById('prodAtributos').value || null,
+            atributos: (document.getElementById('prodAtributos') || {
+                value: null
+            }).value || null,
             codigo_iva: codigoIva,
-            precio_proveedor: document.getElementById('prodPrecioProveedor').value,
+            precio_proveedor: 0,
             id_proveedor: document.getElementById('prodProveedor').value || null,
-            aplica_re: document.getElementById('prodAplicaRE').checked ? 1 : 0,
+            aplica_re: 0,
             es_pack: 0,
-
             componentes_pack: null,
-
-            variantes_fisicas: listaVariantes.length > 0 ? listaVariantes : null
+            margen: document.getElementById('prodMargen').value || 0
         };
 
+        // El stock y el precio de coste (CMP) solo se envían al añadir un producto nuevo.
+        // Al editar, se gestionan mediante Albaranes/Compras para evitar sobrescribir con datos obsoletos del DOM.
+        if (!id) {
+            datos.precio_coste = document.getElementById('prodPrecioCoste').value;
+            datos.stock_actual = document.getElementById('prodStock').value;
+        }
+
         try {
-            // ── CORRECCIÓN: añadir Content-Type para que PHP pueda leer php://input ──
             const resp = await fetch('api/gestionProducto.php', {
                 method: 'POST',
                 headers: {
@@ -1204,31 +1732,34 @@
             if (r.ok) {
                 location.reload();
             } else {
+                document.querySelectorAll('.form-error').forEach(el => el.innerText = '');
                 if (r.aErrores) {
                     const map = {
                         'referencia': 'err-referencia',
                         'nombre': 'err-nombre',
-                        'precio_proveedor': 'err-precio_proveedor',
                         'precio_coste': 'err-precio_coste',
                         'precio_venta': 'err-precio_venta',
-                        'iva': 'err-iva',
                         'stock_actual': 'err-stock_actual',
                         'stock_minimo': 'err-stock_minimo',
                         'meses_garantia': 'err-meses_garantia'
                     };
-
                     for (const [key, msg] of Object.entries(r.aErrores)) {
                         const errId = map[key] || ('err-' + key);
                         const errEl = document.getElementById(errId);
                         if (errEl && msg) errEl.innerText = msg;
                     }
+                    // Volver a la pestaña de errores (precios o general)
+                    if (r.aErrores.nombre || r.aErrores.referencia) switchModalTab('general', document.querySelector('#modalProducto .tab-btn'));
+                    else switchModalTab('precios', document.querySelectorAll('#modalProducto .tab-btn')[1]);
                 } else {
-                    alert('Error: ' + r.error);
+                    showCustomAlert(<?php echo json_encode(L('prod_js_error_save', true)); ?>, r.error, 'error');
                 }
             }
         } catch (err) {
-            console.error(err);
-            alert('Error de conexión con el servidor');
+            showCustomAlert(<?php echo json_encode(L('prod_js_error', true)); ?>, <?php echo json_encode(L('prod_js_connection', true)); ?>, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = oldHtml;
         }
     };
 
@@ -1255,7 +1786,7 @@
 
                 // Actualizar botón
                 btn.className = `btn-icon ${activo ? 'text-red' : 'text-green'}`;
-                btn.title = activo ? 'Dar de baja' : 'Activar';
+                btn.title = activo ? <?php echo json_encode(L('prod_tip_deactivate', true)); ?> : <?php echo json_encode(L('prod_tip_activate', true)); ?>;
                 btn.querySelector('i').className = `fa-solid fa-${activo ? 'arrow-down' : 'arrow-up'}`;
 
                 // Actualizar data-activo (para los filtros)
@@ -1266,59 +1797,63 @@
                 if (pill) {
                     pill.className = activo ? 'status-pill status-active' : 'status-pill status-inactive';
                     pill.innerHTML = activo ?
-                        '<i class="fa-solid fa-circle-check"></i> Activo' :
-                        '<i class="fa-solid fa-circle-xmark"></i> Inactivo';
+                        '<i class="fa-solid fa-circle-check"></i> ' + <?php echo json_encode(L('prod_pill_active', true)); ?> :
+                        '<i class="fa-solid fa-circle-xmark"></i> ' + <?php echo json_encode(L('prod_pill_inactive', true)); ?>;
                 }
 
                 showNotification(
-                    `<i class="fa-solid fa-circle-check"></i> Producto ${activo ? 'activado' : 'dado de baja'}.`,
+                    <?php echo json_encode(L('prod_js_status_change_success', true)); ?>.replace('{status}', activo ? <?php echo json_encode(L('prod_js_status_active', true)); ?> : <?php echo json_encode(L('prod_js_status_inactive', true)); ?>),
                     activo ? 'success' : 'info'
                 );
             } else {
-                showNotification("<i class='fa-solid fa-circle-xmark'></i> " + (r.error || 'No se pudo cambiar estado'), 'error');
+                showNotification("<i class='fa-solid fa-circle-xmark'></i> " + (r.error || <?php echo json_encode(L('prod_js_status_change_error', true)); ?>), 'error');
             }
         } catch (err) {
             console.error(err);
-            showNotification("<i class='fa-solid fa-circle-xmark'></i> Error al cambiar estado", 'error');
+            showNotification("<i class='fa-solid fa-circle-xmark'></i> " + <?php echo json_encode(L('prod_js_status_change_error', true)); ?>, 'error');
         }
     }
 
-    async function eliminarProducto(id, nombre) {
-        if (!confirm(`¿Seguro que deseas ELIMINAR el producto "${nombre}"?\n\nEsta acción no se puede deshacer.`)) return;
-        try {
-            const resp = await fetch('api/gestionProducto.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
+    function eliminarProducto(id, nombre) {
+        if (!id) return;
+        showCustomConfirm(
+            <?php echo json_encode(L('prod_js_delete_confirm_title', true)); ?>,
+            <?php echo json_encode(L('prod_js_delete_confirm_body', true)); ?>.replace('{nombre}', nombre),
+            async () => {
+                    try {
+                        const resp = await fetch('api/gestionProducto.php', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                accion: 'eliminar',
+                                id: id
+                            }),
+                        });
+                        const r = await resp.json();
+                        if (r.ok) {
+                            const targetRow = document.querySelector(`.product-row[data-id="${id}"]`) ||
+                                Array.from(document.querySelectorAll('.product-row')).find(row => row.innerHTML.includes(`eliminarProducto(${id},`));
+
+                            if (targetRow) {
+                                targetRow.style.transition = 'opacity 0.3s, transform 0.3s';
+                                targetRow.style.opacity = '0';
+                                targetRow.style.transform = 'translateX(12px)';
+                                setTimeout(() => targetRow.remove(), 300);
+                            }
+                            showNotification('<i class="fa-solid fa-circle-check"></i> ' + <?php echo json_encode(L('prod_js_delete_success', true)); ?>, 'success');
+                        } else {
+                            showNotification('<i class="fa-solid fa-circle-xmark"></i> ' + <?php echo json_encode(L('prod_js_error', true)); ?> + ': ' + (r.error || <?php echo json_encode(L('prod_js_delete_error', true)); ?>), 'error');
+                        }
+                    } catch (e) {
+                        console.error(e);
+                        showNotification('<i class="fa-solid fa-circle-xmark"></i> ' + <?php echo json_encode(L('prod_js_connection', true)); ?>, 'error');
+                    }
                 },
-                body: JSON.stringify({
-                    accion: 'eliminar',
-                    id: id
-                })
-            });
-            const r = await resp.json();
-            if (r.ok) {
-                // Eliminar la fila del DOM sin recargar
-                const allBtns = document.querySelectorAll('.product-row td:last-child button');
-                let targetRow = null;
-                document.querySelectorAll('.product-row').forEach(row => {
-                    const btn = row.querySelector(`button[onclick*="eliminarProducto(${id},"]`);
-                    if (btn) targetRow = row;
-                });
-                if (targetRow) {
-                    targetRow.style.transition = 'opacity 0.3s, transform 0.3s';
-                    targetRow.style.opacity = '0';
-                    targetRow.style.transform = 'translateX(12px)';
-                    setTimeout(() => targetRow.remove(), 300);
-                }
-                showNotification('<i class="fa-solid fa-circle-check"></i> Producto eliminado.', 'success');
-            } else {
-                showNotification('<i class="fa-solid fa-circle-xmark"></i> Error: ' + (r.error || 'No se pudo eliminar'), 'error');
-            }
-        } catch (err) {
-            console.error(err);
-            showNotification('<i class="fa-solid fa-circle-xmark"></i> Error de conexión.', 'error');
-        }
+                <?php echo json_encode(L('modal_delete', true)); ?>,
+                'danger'
+        );
     }
 
     // Lógica de filtrado y ordenación
@@ -1391,7 +1926,7 @@
     async function cargarNS(idProd) {
         const listDiv = document.getElementById('nsList');
         const tableBody = document.getElementById('listaNSTablaBody');
-        listDiv.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Cargando...';
+        listDiv.innerHTML = <?php echo json_encode('<i class="fa-solid fa-spinner fa-spin"></i> ' . L('loading', true)); ?>;
         tableBody.innerHTML = '';
 
         try {
@@ -1409,10 +1944,10 @@
             const r = await resp.json();
             if (r.ok) {
                 if (r.lista.length === 0) {
-                    listDiv.innerText = 'Sin números de serie registrados.';
-                    tableBody.innerHTML = '<tr><td colspan="3" class="text-center p-16 text-muted">No hay números de serie para este producto.</td></tr>';
+                    listDiv.innerText = <?php echo json_encode(L('prod_js_ns_empty', true)); ?>;
+                    tableBody.innerHTML = '<tr><td colspan="3" class="text-center p-16 text-muted">' + <?php echo json_encode(L('prod_js_ns_empty', true)); ?> + '</td></tr>';
                 } else {
-                    listDiv.innerText = r.lista.length + ' unidades con S/N (Ver detalles en Gestionar)';
+                    listDiv.innerText = <?php echo json_encode(L('prod_js_ns_count', true)); ?>.replace('{count}', r.lista.length);
                     r.lista.forEach(item => {
                         const row = document.createElement('tr');
                         const color = item.estado === 'disponible' ? 'text-success' : 'text-danger';
@@ -1455,7 +1990,7 @@
                 document.getElementById('nuevoNS').value = '';
                 cargarNS(idProd);
             } else {
-                alert('Error: ' + (r.error || 'No se pudo añadir'));
+                alert(<?php echo json_encode(L('prod_js_error', true)); ?> + ": " + (r.error || <?php echo json_encode(L('error_unknown', true)); ?>));
             }
         } catch (err) {
             console.error(err);
@@ -1463,26 +1998,36 @@
     }
 
     async function eliminarNS(id) {
-        if (!confirm('¿Seguro que deseas eliminar este número de serie?')) return;
-        try {
-            // ── CORRECCIÓN: añadir Content-Type ──
-            const resp = await fetch('api/gestionNS.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
+        if (!id) return;
+        showCustomConfirm(
+            <?php echo json_encode(L('prod_js_cat_delete_confirm_title', true)); ?>,
+            <?php echo json_encode(L('prod_js_cat_delete_confirm_body', true)); ?>.replace('{nombre}', ''),
+            async () => {
+                    try {
+                        const resp = await fetch('api/gestionNS.php', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                accion: 'eliminar',
+                                id: id
+                            })
+                        });
+                        const r = await resp.json();
+                        if (r.ok) {
+                            cargarNS(document.getElementById('prodId').value);
+                        } else {
+                            showCustomAlert(<?php echo json_encode(L('prod_js_error', true)); ?>, r.error || <?php echo json_encode(L('prod_js_could_not_delete', true)); ?>, 'error');
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        showCustomAlert(<?php echo json_encode(L('prod_js_error', true)); ?>, <?php echo json_encode(L('prod_js_connection', true)); ?>, 'error');
+                    }
                 },
-                body: JSON.stringify({
-                    accion: 'eliminar',
-                    id: id
-                })
-            });
-            const r = await resp.json();
-            if (r.ok) {
-                cargarNS(document.getElementById('prodId').value);
-            }
-        } catch (err) {
-            console.error(err);
-        }
+                <?php echo json_encode(L('modal_delete', true)); ?>,
+                'danger'
+        );
     }
 
     // --- TABS LOGIC ---
@@ -1563,7 +2108,7 @@
 
         resCont.innerHTML = '';
         if (filtrados.length === 0) {
-            resCont.innerHTML = '<div class="p-16 text-muted fs-12 text-center"><i class="fa-solid fa-circle-info mr-8"></i> No hay coincidencias</div>';
+            resCont.innerHTML = '<div class="p-16 text-muted fs-12 text-center"><i class="fa-solid fa-circle-info mr-8"></i> ' + <?php echo json_encode(L('prod_js_no_results', true)); ?> + '</div>';
         } else {
             filtrados.forEach(p => {
                 const div = document.createElement('div');
@@ -1631,8 +2176,8 @@
                 <tr>
                     <td colspan="4" class="p-32 text-center text-muted">
                         <div class="opacity-40 mb-12"><i class="fa-solid fa-boxes-stacked fs-32"></i></div>
-                        <div class="fs-13 font-bold">Aún no hay componentes</div>
-                        <div class="fs-11">Usa el buscador superior para añadir productos al pack</div>
+                        <div class="fs-13 font-bold">${<?php echo json_encode(L('prod_no_components', true)); ?>}</div>
+                        <div class="fs-11">${<?php echo json_encode(L('prod_modal_pack_components_desc', true)); ?>}</div>
                     </td>
                 </tr>
             `;
@@ -1666,13 +2211,13 @@
         e.preventDefault();
 
         if (componentesPackActivos.length === 0) {
-            alert("Un pack debe tener al menos un componente.");
+            alert(<?php echo json_encode(L('prod_js_pack_min_components', true)); ?>);
             return;
         }
 
         const btn = document.getElementById('btnGuardarPack');
         btn.disabled = true;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Guardando...';
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + <?php echo json_encode(L('prod_js_saving', true)); ?>;
 
         const id = document.getElementById('packId').value || null;
         const codIva = document.getElementById('packIvaTipo').value;
@@ -1694,7 +2239,7 @@
             stock_actual: 0,
             stock_minimo: 0,
             meses_garantia: 24,
-            descripcion: 'Pack de productos',
+            descripcion: <?php echo json_encode(L('prod_tab_standard', true)); ?>,
             es_pack: 1,
             componentes_pack: componentesPackActivos
         };
@@ -1713,7 +2258,7 @@
                 cerrarModalPack();
                 location.reload();
             } else {
-                let msg = data.error || 'Error desconocido';
+                let msg = data.error || <?php echo json_encode(L('error_unknown', true)); ?>;
                 if (data.aErrores) {
                     const errorList = Object.entries(data.aErrores)
                         .filter(([k, v]) => v !== null && v !== '')
@@ -1721,13 +2266,13 @@
                         .join('\n');
                     if (errorList) msg += '\n\nDetalles:\n' + errorList;
                 }
-                alert('Error al guardar el pack:\n' + msg);
+                alert(<?php echo json_encode(L('prod_js_error_save', true)); ?> + ":\n" + msg);
             }
         } catch (err) {
-            alert('Error de conexión al servidor al guardar el pack.');
+            alert(<?php echo json_encode(L('prod_js_connection', true)); ?>);
         } finally {
             btn.disabled = false;
-            btn.innerHTML = 'Guardar Pack';
+            btn.innerHTML = <?php echo json_encode(L('prod_modal_btn_save_pack', true)); ?>;
         }
     });
 
@@ -1750,7 +2295,7 @@
         const ext = file.name.split('.').pop().toLowerCase();
 
         if (!['csv', 'json'].includes(ext)) {
-            showNotification('<i class="fa-solid fa-circle-xmark"></i> Formato no soportado. Usa CSV o JSON.', 'error');
+            showNotification('<i class="fa-solid fa-circle-xmark"></i> ' + <?php echo json_encode(L('prod_js_import_unsupported', true)); ?>, 'error');
             input.value = '';
             return;
         }
@@ -1758,7 +2303,7 @@
         const formData = new FormData();
         formData.append('file', file);
 
-        showNotification('<i class="fa-solid fa-spinner fa-spin"></i> Importando productos...', 'info');
+        showNotification('<i class="fa-solid fa-spinner fa-spin"></i> ' + <?php echo json_encode(L('prod_js_importing', true)); ?>, 'info');
 
         try {
             const resp = await fetch('api/importarProductos.php', {
@@ -1773,15 +2318,15 @@
                     errores
                 } = r.stats;
                 showNotification(
-                    `<i class="fa-solid fa-circle-check"></i> Importación completada: <strong>${creados} creados</strong>, <strong>${actualizados} actualizados</strong>${errores > 0 ? `, <span class="text-red">${errores} errores</span>` : ''}`,
+                    <?php echo json_encode(L('prod_js_import_success', true)); ?>.replace('{creados}', creados).replace('{actualizados}', actualizados) + (errores > 0 ? `, <span class="text-red">${errores} errores</span>` : ''),
                     'success'
                 );
                 setTimeout(() => location.reload(), 2500);
             } else {
-                showNotification('<i class="fa-solid fa-circle-xmark"></i> Error: ' + (r.error || 'Desconocido'), 'error');
+                showNotification('<i class="fa-solid fa-circle-xmark"></i> ' + <?php echo json_encode(L('prod_js_error', true)); ?> + ': ' + (r.error || <?php echo json_encode(L('error_unknown', true)); ?>), 'error');
             }
         } catch (err) {
-            showNotification('<i class="fa-solid fa-circle-xmark"></i> Error de conexión.', 'error');
+            showNotification('<i class="fa-solid fa-circle-xmark"></i> ' + <?php echo json_encode(L('prod_js_connection', true)); ?>, 'error');
         }
 
         input.value = '';
@@ -1819,7 +2364,7 @@
         const codigo = document.getElementById('newCatCodigo').value.trim();
 
         if (!nombre || !codigo) {
-            alert('Nombre y código son obligatorios');
+            showCustomAlert(<?php echo json_encode(L('prod_js_cat_add_error', true)); ?>, <?php echo json_encode(L('prod_js_cat_add_error_body', true)); ?>, 'warning');
             return;
         }
 
@@ -1841,7 +2386,7 @@
                 document.getElementById('newCatCodigo').value = '';
                 location.reload();
             } else {
-                alert('Error: ' + (r.error || 'No se pudo añadir'));
+                showCustomAlert(<?php echo json_encode(L('prod_js_error', true)); ?>, r.error || <?php echo json_encode(L('prod_js_delete_error', true)); ?>, 'error');
             }
         } catch (e) {
             console.error(e);
@@ -1849,28 +2394,35 @@
     }
 
     async function eliminarCategoria(id, nombre) {
-        if (!confirm(`¿Seguro que deseas eliminar la categoría "${nombre}"? \nLos productos asignados a ella no se borrarán, pero su categoría dejará de estar disponible.`)) return;
-
-        try {
-            const resp = await fetch('api/gestionCategoria.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
+        showCustomConfirm(
+            <?php echo json_encode(L('prod_js_cat_delete_confirm_title', true)); ?>,
+            <?php echo json_encode(L('prod_js_cat_delete_confirm_body', true)); ?>.replace('{nombre}', nombre),
+            async () => {
+                    try {
+                        const resp = await fetch('api/gestionCategoria.php', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                accion: 'eliminar',
+                                id
+                            })
+                        });
+                        const r = await resp.json();
+                        if (r.ok) {
+                            location.reload();
+                        } else {
+                            showCustomAlert(<?php echo json_encode(L('prod_js_error', true)); ?>, r.error || <?php echo json_encode(L('prod_js_delete_error', true)); ?>, 'error');
+                        }
+                    } catch (e) {
+                        console.error(e);
+                        showCustomAlert(<?php echo json_encode(L('prod_js_error', true)); ?>, <?php echo json_encode(L('prod_js_connection', true)); ?>, 'error');
+                    }
                 },
-                body: JSON.stringify({
-                    accion: 'eliminar',
-                    id
-                })
-            });
-            const r = await resp.json();
-            if (r.ok) {
-                location.reload();
-            } else {
-                alert('Error: ' + (r.error || 'No se pudo eliminar'));
-            }
-        } catch (e) {
-            console.error(e);
-        }
+                <?php echo json_encode(L('prod_js_cat_delete_btn', true)); ?>,
+                'danger'
+        );
     }
 
     // --- HISTORIAL DE STOCK ---
@@ -1880,9 +2432,9 @@
         const subtitle = document.getElementById('historialSubtitle');
         const body = document.getElementById('historialTableBody');
 
-        title.innerText = "Historial: " + nombre;
-        subtitle.innerText = "Cargando movimientos...";
-        body.innerHTML = '<tr><td colspan="5" class="text-center p-24 opacity-50">Consultando base de datos...</td></tr>';
+        title.innerText = <?php echo json_encode(L('prod_js_history_for', true)); ?> + nombre;
+         subtitle.innerText = <?php echo json_encode(L('prod_js_history_loading', true)); ?>;
+        body.innerHTML = '<tr><td colspan="5" class="text-center p-24 opacity-50">' + <?php echo json_encode(L('prod_js_searching', true)); ?> + '</td></tr>';
 
         modal.classList.remove('d-none');
         modal.style.display = 'flex';
@@ -1892,21 +2444,32 @@
             const data = await resp.json();
 
             if (data.ok) {
-                subtitle.innerText = `${data.historial.length} movimientos registrados`;
+                subtitle.innerText = `${data.historial.length} productos`;
                 if (data.historial.length === 0) {
                     body.innerHTML = `
                         <tr>
                             <td colspan="5">
                                 <div class="empty-log-container">
                                     <div class="empty-log-icon"><i class="fa-solid fa-ghost"></i></div>
-                                    <div class="fs-18 font-bold mb-8" style="color: var(--text);">Sin movimientos</div>
-                                    <div class="fs-14 opacity-60">No hay registros de cambios de stock para este producto.</div>
+                                    <div class="fs-18 font-bold mb-8" style="color: var(--text);">${<?php echo json_encode(L('prod_hist_no_changes', true)); ?>}</div>
+                                    <div class="fs-14 opacity-60">${<?php echo json_encode(L('prod_hist_empty_sub', true)); ?>}</div>
                                 </div>
                             </td>
                         </tr>
                     `;
                 } else {
-                    body.innerHTML = data.historial.map(m => `
+                    body.innerHTML = data.historial.map(m => {
+                        const translationMap = {
+                            'inicial': <?php echo json_encode(L('prod_js_status_inicial', true)); ?>,
+                            'compra': <?php echo json_encode(L('prod_js_status_compra', true)); ?>,
+                            'venta': <?php echo json_encode(L('prod_js_status_venta', true)); ?>,
+                            'devolucion': <?php echo json_encode(L('prod_js_status_devolucion', true)); ?>,
+                            'ajuste': <?php echo json_encode(L('prod_js_status_ajuste', true)); ?>,
+                            'retirada': <?php echo json_encode(L('prod_js_status_ajuste', true)); ?>
+                        };
+                        const translatedTipo = translationMap[m.tipo_movimiento.toLowerCase()] || m.tipo_movimiento;
+                        
+                        return `
                         <tr class="hover-bg-surface2 transition">
                             <td class="font-mono fs-12">
                                 <span class="text-muted">${new Date(m.fecha).toLocaleDateString()}</span><br>
@@ -1917,7 +2480,7 @@
                                     <div class="p-8 br-8 ${getTipoMovClase(m.tipo_movimiento)} d-flex ai-center jc-center" style="width:32px; height:32px; flex-shrink:0;">
                                         <i class="fa-solid ${getTipoMovIcono(m.tipo_movimiento)} fs-13"></i>
                                     </div>
-                                    <span class="tt-uppercase font-bold fs-10" style="letter-spacing: 0.05em;">${m.tipo_movimiento}</span>
+                                    <span class="tt-uppercase font-bold fs-10" style="letter-spacing: 0.05em;">${translatedTipo}</span>
                                 </div>
                             </td>
                             <td class="text-center">
@@ -1930,18 +2493,19 @@
                                     <div class="bg-surface2 br-circle d-flex ai-center jc-center fs-10 font-bold" style="width:28px; height:28px; border:1px solid var(--border); flex-shrink:0;">
                                         ${(m.nombre_usuario || 'S').charAt(0).toUpperCase()}
                                     </div>
-                                    <span class="opacity-90 fs-12">${m.nombre_usuario || 'Sistema'}</span>
+                                    <span class="opacity-90 fs-12">${m.nombre_usuario || <?php echo json_encode(L('prod_hist_system', true)); ?>}</span>
                                 </div>
                             </td>
-                            <td class="fs-12 italic opacity-70">${m.notas || '<span class="opacity-30">Sin notas</span>'}</td>
+                            <td class="fs-12 italic opacity-70">${m.notas || '<span class="opacity-30"><?php echo json_encode(L('prod_hist_no_reason', true)); ?></span>'}</td>
                         </tr>
-                    `).join('');
+                    `;
+                    }).join('');
                 }
             } else {
                 body.innerHTML = `<tr><td colspan="5" class="text-center p-48 text-red font-bold">Error: ${data.error}</td></tr>`;
             }
         } catch (e) {
-            body.innerHTML = '<tr><td colspan="5" class="text-center p-24 text-red">Error de red</td></tr>';
+            body.innerHTML = '<tr><td colspan="5" class="text-center p-24 text-red">' + <?php echo json_encode(L('prod_js_connection', true)); ?> + '</td></tr>';
         }
     }
 
@@ -1983,33 +2547,58 @@
         document.getElementById('modalHistorialStock').style.display = 'none';
     }
 
+    function generarPropuestaPedido() {
+        showCustomConfirm(
+            <?php echo json_encode(L('prod_js_order_prop_title', true)); ?>,
+            <?php echo json_encode(L('prod_js_order_prop_body', true)); ?>,
+            () => {
+                const btn = document.querySelector('button[onclick="generarPropuestaPedido()"]');
+                const old = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + <?php echo json_encode(L('prod_js_applying', true)); ?>;
+
+                location.href = 'index.php?irPropuestaPedido';
+            },
+            <?php echo json_encode(L('prod_js_order_prop_btn', true)); ?>,
+            'info'
+        );
+    }
 
     // --- PEDIDO AUTOMÁTICO ---
     async function generarPedidoAutomatico() {
-        if (!confirm("Se generarán pedidos de compra (albaranes pendientes) para todos los productos que estén por debajo de su stock mínimo. \n\n¿Deseas continuar?")) return;
 
-        showNotification("<i class='fa-solid fa-spinner fa-spin'></i> Calculando pedido...", 'info');
+        showNotification("<i class='fa-solid fa-spinner fa-spin'></i> Analizando stock...", 'info');
 
         try {
             const resp = await fetch('api/generarPedidoAuto.php');
             const data = await resp.json();
 
             if (data.ok) {
-                if (data.pedidos > 0) {
-                    showNotification(` < i class = 'fa-solid fa-circle-check' > < /i> ${data.mensaje}`, 'success');
+                if (data.datos_pedido && data.datos_pedido.length > 0) {
+                    // Guardar datos en sessionStorage para recuperarlos en vCompras
+                    sessionStorage.setItem('tpv_pedido_auto_data', JSON.stringify(data.datos_pedido));
+
+                    let tienePrecioCero = data.datos_pedido.some(prov => prov.productos.some(p => p.precio_coste_neto <= 0));
+                    let msg = `<i class='fa-solid fa-circle-check'></i> ${<?php echo json_encode(L('prod_toast_order_found_prefix', true)); ?>} ${data.datos_pedido.length} ${<?php echo json_encode(L('prod_toast_order_found_suffix', true)); ?>}`;
+
+                    if (tienePrecioCero) {
+                        msg += `<br><small style='color:#fbbf24'><i class='fa-solid fa-triangle-exclamation'></i> ${<?php echo json_encode(L('prod_toast_warn_zero_cost', true)); ?>}</small>`;
+                    }
+
+                    showNotification(msg, 'success');
+
                     setTimeout(() => {
-                        if (confirm("¿Deseas ir a la sección de compras para revisar los pedidos generados?")) {
-                            location.href = 'index.php?irAlbaranes=1'; // Asumiendo que esta es la página de albaranes de compra
-                        }
+                        location.href = 'index.php?irCompras=1&pedido_auto=1';
                     }, 2000);
                 } else {
-                    showNotification("<i class='fa-solid fa-circle-info'></i> " + data.mensaje, 'info');
+                    let msg = "<i class='fa-solid fa-circle-info'></i> " + <?php echo json_encode(L('prod_toast_no_low_stock', true)); ?>;
+                    showNotification(msg, 'info');
                 }
             } else {
-                showNotification("<i class='fa-solid fa-circle-xmark'></i> Error: " + data.error, 'error');
+                showNotification("<i class='fa-solid fa-circle-xmark'></i> " + <?php echo json_encode(L('prod_js_error', true)); ?> + ": " + data.error, 'error');
             }
         } catch (e) {
-            showNotification("<i class='fa-solid fa-circle-xmark'></i> Error de conexión", 'error');
+            showNotification("<i class='fa-solid fa-circle-xmark'></i> " + <?php echo json_encode(L('prod_js_connection', true)); ?>, 'error');
         }
     }
 
@@ -2040,7 +2629,7 @@
             if (cat !== 'all' && categoria !== cat) match = false;
 
             if (estado === 'bajo_stock') {
-                if (stock > stockMin) match = false;
+                if (stock > stockMin || activo !== '1') match = false;
             } else if (estado !== 'all' && activo !== estado) match = false;
 
             if (precio < pMin || precio > pMax) match = false;
@@ -2053,53 +2642,287 @@
         const noRes = document.getElementById('noResults');
         if (noRes) noRes.classList.toggle('d-none', visibles > 0 || document.getElementById('btnTabPacks').classList.contains('active'));
     };
+
+    async function retirarStockManual() {
+        const id = document.getElementById('prodId').value;
+        const nombre = document.getElementById('prodNombre').value;
+        const stockActual = parseInt(document.getElementById('prodStock').value) || 0;
+
+        if (!id) return;
+
+        showCustomPrompt(
+            <?php echo json_encode(L('prod_js_retira_title', true)); ?>.replace('{nombre}', nombre),
+            <?php echo json_encode(L('prod_js_retira_body', true)); ?>.replace('{stock}', stockActual),
+            async (cantidad) => {
+                    const cant = parseInt(cantidad);
+                    if (isNaN(cant) || cant <= 0) {
+                        return showCustomAlert(<?php echo json_encode(L('prod_js_error', true)); ?>, <?php echo json_encode(L('prod_js_qty_error', true)); ?>, 'error');
+                    }
+
+                    if (cant > stockActual) {
+                        showCustomConfirm(
+                            <?php echo json_encode(L('prod_js_stock_neg_title', true)); ?>,
+                            <?php echo json_encode(L('prod_js_stock_neg_body', true)); ?>.replace('{cant}', cant).replace('{stock}', stockActual).replace('{res}', stockActual - cant),
+                            () => solicitarMotivoRetirada(id, cant),
+                            <?php echo json_encode(L('prod_js_stock_neg_btn', true)); ?>,
+                            'warning'
+                        );
+                    } else {
+                        solicitarMotivoRetirada(id, cant);
+                    }
+                },
+                '',
+                'Cantidad (ej: 2)'
+        );
+    }
+
+    function solicitarMotivoRetirada(id, cant) {
+        showCustomPrompt(
+            <?php echo json_encode(L('prod_js_reason_title', true)); ?>,
+            <?php echo json_encode(L('prod_js_reason_body', true)); ?>,
+            async (motivo) => {
+                    if (!motivo || motivo.trim() === '') {
+                        return showCustomAlert(<?php echo json_encode(L('prod_js_error', true)); ?>, <?php echo json_encode(L('prod_js_reason_error', true)); ?>, 'error');
+                    }
+
+                    try {
+                        const resp = await fetch('api/gestionProducto.php', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                accion: 'retirada_stock',
+                                id: id,
+                                cantidad: cant,
+                                motivo: motivo
+                            })
+                        });
+                        const r = await resp.json();
+                        if (r.ok) {
+                            showCustomAlert(<?php echo json_encode(L('prod_js_success', true)); ?>, <?php echo json_encode(L('prod_toast_stock_adj_success', true)); ?>, 'success');
+                            setTimeout(() => location.reload(), 1500);
+                        } else {
+                            showCustomAlert('Error', r.error || 'No se pudo registrar el ajuste', 'error');
+                        }
+                    } catch (e) {
+                        showCustomAlert(<?php echo json_encode(L('prod_js_error', true)); ?>, <?php echo json_encode(L('prod_js_connection', true)); ?>, 'error');
+                    }
+                },
+                '',
+                'Motivo'
+        );
+    }
 </script>
+
+<!-- MODAL MARGEN MASIVO -->
+<div id="modalMargenMasivo" class="modal-overlay-bg" style="display:none;">
+    <div class="modal-content" style="max-width: 550px; border-radius: 20px;">
+        <div class="modal-header">
+            <h2><?php echo L('prod_modal_mass_margin_title'); ?></h2>
+            <button onclick="cerrarModalMargenMasivo()" class="btn-close-modal">&times;</button>
+        </div>
+        <div class="modal-body p-24">
+            <div class="p-16 bg-surface2 br-12 border mb-20 d-flex ai-center gap-12">
+                <div class="fs-24 text-accent"><i class="fa-solid fa-lightbulb"></i></div>
+                <p class="fs-12 m-0 text-muted">
+                    <?php echo L('prod_modal_mass_margin_info'); ?>
+                </p>
+            </div>
+
+            <div class="form-group mb-20">
+                <label class="form-label font-bold mb-8"><?php echo L('prod_modal_mass_margin_step1'); ?></label>
+                <select id="massCategoriaSelect" class="form-input h-44" onchange="previewMargenMasivo()">
+                    <option value="all"><?php echo L('prod_modal_mass_margin_cat_all'); ?></option>
+                    <?php foreach ($avProductos['categorias'] as $c): ?>
+                        <option value="<?php echo htmlspecialchars($c['codigo']); ?>">
+                            <?php echo htmlspecialchars($c['nombre']); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div class="form-group mb-20">
+                <label class="form-label font-bold mb-8"><?php echo L('prod_modal_mass_margin_step2'); ?></label>
+                <div class="d-flex ai-center gap-12">
+                    <input type="number" id="massMargenInput" class="form-input h-44 font-mono text-center fs-18" placeholder="0.00" step="0.01" oninput="previewMargenMasivo()">
+                    <div class="fs-20 font-bold opacity-30">%</div>
+                </div>
+            </div>
+
+            <div class="form-group mb-20">
+                <label class="form-label font-bold mb-8 d-flex jc-between ai-center">
+                    <span><?php echo L('prod_modal_mass_margin_step3'); ?></span>
+                    <span class="badge bg-surface2 text-muted fw-normal px-8 py-2 br-4" id="contadorExcepciones">0 <?php echo L('selected'); ?></span>
+                </label>
+                <div class="p-16 border br-12 bg-surface2">
+                    <div class="search-box mb-12">
+                        <i class="fa-solid fa-search"></i>
+                        <input type="text" id="buscadorExcepciones" class="form-input" placeholder="<?php echo L('prod_modal_mass_margin_ex_placeholder'); ?>" oninput="buscarExcepcionesAlEscribir()">
+                    </div>
+                    <div id="listaExcepciones" class="d-flex fd-column gap-8" style="max-height: 180px; overflow-y: auto;">
+                        <div class="text-center p-20 text-muted fs-12"><i class="fa-solid fa-info-circle mb-8 fs-16 d-block"></i> <?php echo L('prod_modal_mass_margin_ex_empty'); ?></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="margenPreviewBox" class="p-16 br-12 border-2" style="display:none; background: rgba(var(--accent-rgb), 0.05); border-style: dashed; border-color: var(--accent);">
+                <div class="fs-11 tt-uppercase font-bold text-accent mb-8" style="letter-spacing: 0.05em;"><?php echo L('prod_modal_mass_margin_preview_title'); ?></div>
+                <div class="d-flex jc-between ai-center mb-4">
+                    <span class="fs-13"><?php echo L('prod_modal_mass_margin_updating'); ?></span>
+                    <span id="previewCountOk" class="font-bold text-green fs-14">0</span>
+                </div>
+                <div class="d-flex jc-between ai-center">
+                    <span class="fs-13 text-muted"><?php echo L('prod_modal_mass_margin_omitted'); ?></span>
+                    <span id="previewCountOmit" class="font-bold text-red fs-14">0</span>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer px-24 pb-24 border-none">
+            <button type="button" onclick="cerrarModalMargenMasivo()" class="btn-cancel"><?php echo L('modal_cancel'); ?></button>
+            <button type="button" id="btnAplicarMargen" onclick="confirmarAplicarMargen()" class="btn-save px-24" style="background: #7c3aed; color: white;" disabled>
+                <i class="fa-solid fa-check"></i> <?php echo L('prod_modal_mass_margin_btn_apply'); ?>
+            </button>
+        </div>
+    </div>
+</div>
 
 <!-- MODAL GESTIÓN CATEGORÍAS -->
 <div id="modalCategorias" class="modal-overlay-bg">
-    <div class="modal-content" style="max-width: 500px; padding: 0; overflow: hidden;">
-        <div class="modal-header p-20 bg-surface2 border-bottom">
-            <h2 class="m-0 fs-18">Gestionar Categorías</h2>
-            <button onclick="cerrarModalCategorias()" class="btn-close-modal">&times;</button>
+    <div class="modal-content" style="max-width: 1100px; width: 95%; padding: 0; overflow: hidden; border-radius: 24px; box-shadow: 0 40px 80px rgba(0,0,0,0.45); border: 1px solid var(--border);">
+        <div class="modal-header p-24 bg-surface2 border-bottom" style="background: linear-gradient(135deg, var(--surface) 0%, var(--surface2) 100%);">
+            <div class="d-flex ai-center gap-15">
+                <div class="p-12 br-12 bg-accent-soft text-accent" style="box-shadow: 0 8px 20px rgba(var(--accent-rgb), 0.15); font-size: 24px;">
+                    <i class="fa-solid fa-tags"></i>
+                </div>
+                <div>
+                    <h2 class="m-0 fs-24 font-bold" style="letter-spacing: -0.02em;"><?php echo L('prod_modal_cat_title'); ?></h2>
+                    <p class="m-0 fs-13 text-muted opacity-80"><?php echo L('prod_modal_cat_subtitle'); ?></p>
+                </div>
+            </div>
+            <button onclick="cerrarModalCategorias()" class="btn-close-modal" style="background: var(--surface2); width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--border);">&times;</button>
         </div>
-        <div class="p-24">
-            <div class="d-grid grid-1-1 gap-8 mb-20 p-16 bg-surface2 br-12 border-2">
-                <div class="form-group mb-0">
-                    <label class="form-label fs-11">Nombre</label>
-                    <input type="text" id="newCatNombre" placeholder="Ej: Audio" class="form-input h-40">
+        <div class="p-32 bg-surface">
+            <div class="p-24 bg-surface2 br-20 border-2 mb-32" style="border-style: dashed; background: var(--surface2);">
+                <div class="fs-12 font-bold mb-16 text-accent tt-uppercase d-flex ai-center gap-8" style="letter-spacing: 0.12em;">
+                    <i class="fa-solid fa-circle-plus"></i> <?php echo L('prod_modal_cat_new_title'); ?>
                 </div>
-                <div class="form-group mb-0">
-                    <label class="form-label fs-11">Código (valor interno)</label>
-                    <input type="text" id="newCatCodigo" placeholder="ej: audio" class="form-input h-40">
+                <div class="d-grid gap-20" style="grid-template-columns: 2fr 1fr 1fr auto;">
+                    <div class="form-group mb-0">
+                        <label class="form-label fs-10 font-bold opacity-60"><?php echo L('prod_modal_cat_label_name'); ?></label>
+                        <input type="text" id="newCatNombre" placeholder="Ej: Audio, Sonido y Multimedia" class="form-input h-48 fs-14" style="border-radius: 12px;">
+                    </div>
+                    <div class="form-group mb-0">
+                        <label class="form-label fs-10 font-bold opacity-60"><?php echo L('prod_modal_cat_label_slug'); ?></label>
+                        <input type="text" id="newCatCodigo" placeholder="ej: audio-multimedia" class="form-input h-48 font-mono fs-13" style="border-radius: 12px;">
+                    </div>
+                    <div class="form-group mb-0">
+                        <label class="form-label fs-10 font-bold opacity-60"><?php echo L('prod_modal_cat_label_iva'); ?></label>
+                        <select id="newCatIva" class="form-input h-48 fs-13" style="border-radius: 12px;">
+                            <?php foreach ($avProductos['tipos_iva'] as $t): ?>
+                                <option value="<?php echo $t['id']; ?>" <?php echo ($t['porcentaje'] == 21) ? 'selected' : ''; ?>>
+                                    <?php echo $t['codigo']; ?> (<?php echo (float)$t['porcentaje']; ?>%)
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="d-flex ai-flex-end pb-4">
+                        <button onclick="añadirCategoria()" class="btn-save h-48 px-32 fs-14 font-bold shadow-sm" style="border-radius: 12px; background: var(--accent); color: white;">
+                            <?php echo L('prod_modal_cat_btn_add'); ?>
+                        </button>
+                    </div>
                 </div>
-                <button onclick="añadirCategoria()" class="btn-save w-full mt-12 grid-col-span-2">
-                    <i class="fa-solid fa-plus"></i> Añadir Categoría
-                </button>
             </div>
 
-            <div class="table-container" style="max-height: 300px; overflow-y: auto;">
-                <table class="w-100 fs-13">
-                    <thead>
-                        <tr>
-                            <th class="text-left py-12 pl-12">Categoría</th>
-                            <th class="text-left py-12">Código</th>
-                            <th class="text-center py-12">Acción</th>
+            <div class="table-container border br-16 overflow-hidden" style="max-height: 500px; overflow-y: auto; background: var(--surface); box-shadow: var(--shadow-sm);">
+                <table class="fs-13" style="width: 100%; border-collapse: collapse;">
+                    <thead style="position: sticky; top: 0; z-index: 10;">
+                        <tr class="text-left bg-surface2 border-bottom">
+                            <th class="p-20 text-muted tt-uppercase fs-10 font-bold" style="letter-spacing: 0.05em;"><?php echo L('prod_modal_cat_th_info'); ?></th>
+                            <th class="p-20 text-muted tt-uppercase fs-10 font-bold" style="letter-spacing: 0.05em; width: 400px;"><?php echo L('prod_modal_cat_th_iva'); ?></th>
+                            <th class="p-20 text-muted tt-uppercase fs-10 font-bold text-center" style="letter-spacing: 0.05em; width: 120px;"><?php echo L('prod_th_actions'); ?></th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody class="divide-y" style="background: var(--surface);">
                         <?php foreach ($avProductos['categorias'] as $c): ?>
-                            <tr class="border-bottom">
-                                <td class="py-12 pl-12 font-bold"><?php echo htmlspecialchars($c['nombre']); ?></td>
-                                <td class="py-12 text-muted"><?php echo htmlspecialchars($c['codigo']); ?></td>
-                                <td class="py-12 text-center">
-                                    <button onclick="eliminarCategoria(<?php echo $c['id']; ?>, '<?php echo addslashes(htmlspecialchars($c['nombre'])); ?>')" class="btn-icon text-red">
-                                        <i class="fa-solid fa-trash"></i>
+                            <tr class="hover-bg-surface2 transition-all">
+                                <td class="p-20">
+                                    <div class="d-flex ai-center gap-15">
+                                        <div class="p-10 br-10 bg-surface2 text-muted border">
+                                            <i class="fa-solid fa-folder-open"></i>
+                                        </div>
+                                        <div>
+                                            <div class="font-bold fs-15" style="color: var(--text);"><?php echo htmlspecialchars($c['nombre']); ?></div>
+                                            <div class="fs-11 text-muted font-mono opacity-60"><?php echo htmlspecialchars($c['codigo']); ?></div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="p-20">
+                                    <div class="d-flex ai-center gap-12 bg-surface2 p-8 br-12 border">
+                                        <select class="form-input h-38 fs-12 px-12 flex-1 border-none bg-none" id="iva-cat-<?php echo $c['id']; ?>">
+                                            <option value=""><?php echo L('prod_modal_cat_option_select'); ?></option>
+                                            <?php foreach ($avProductos['tipos_iva'] as $t): ?>
+                                                <option value="<?php echo $t['id']; ?>" <?php echo ($c['id_tipo_iva'] == $t['id']) ? 'selected' : ''; ?>>
+                                                    <?php echo $t['codigo']; ?> (<?php echo (float)$t['porcentaje']; ?>%)
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                        <button onclick="aplicarIvaCategoria(<?php echo $c['id']; ?>)" class="btn-save bg-accent text-white h-38 px-16 border-none shadow-sm hover-scale" title="Aplicar este IVA a todos los productos de esta categoría" style="border-radius: 8px;">
+                                            <i class="fa-solid fa-bolt mr-8"></i> <?php echo L('prod_modal_cat_btn_apply'); ?>
+                                        </button>
+                                    </div>
+                                </td>
+                                <td class="p-20 text-center">
+                                    <button onclick="eliminarCategoria(<?php echo $c['id']; ?>, '<?php echo addslashes(htmlspecialchars($c['nombre'])); ?>')" class="btn-icon text-red bg-red-soft p-12 br-12 transition-all hover-scale" title="<?php echo L('prod_modal_cat_tip_delete'); ?>" style="width: 42px; height: 42px;">
+                                        <i class="fa-solid fa-trash-can fs-16"></i>
                                     </button>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
                 </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL HISTORIAL COSTES (CMP) -->
+<div id="modalHistorialCostes" class="modal-overlay-bg">
+    <div class="modal-content" style="max-width: 900px; padding: 0; overflow: hidden; border-radius: 20px;">
+        <div class="modal-header p-20 bg-surface2 border-bottom d-flex ai-center jc-between">
+            <div class="d-flex ai-center gap-12">
+                <div class="p-10 br-12 bg-accent-soft text-accent">
+                    <i class="fa-solid fa-clock-rotate-left fs-18"></i>
+                </div>
+                <div>
+                    <h2 class="m-0 fs-18" id="costesTitle"><?php echo L('prod_modal_cost_history_title'); ?></h2>
+                    <p class="m-0 fs-12 text-muted"><?php echo L('prod_modal_cost_history_subtitle'); ?></p>
+                </div>
+            </div>
+            <button onclick="cerrarModalHistorialCostes()" class="btn-close-modal">&times;</button>
+        </div>
+        <div class="p-24">
+            <div class="table-container" style="max-height: 480px; overflow-y: auto;">
+                <table class="data-table fs-13">
+                    <thead style="position: sticky; top: 0; z-index: 10; background: var(--surface2);">
+                        <tr>
+                            <th class="text-left pl-20" style="white-space: nowrap;"><?php echo L('prod_modal_th_date'); ?></th>
+                            <th class="text-center" style="white-space: nowrap;"><?php echo L('prod_th_qty'); ?></th>
+                            <th class="text-right" style="white-space: nowrap;"><?php echo L('prod_modal_th_buy_price'); ?></th>
+                            <th class="text-right" style="white-space: nowrap;"><?php echo L('prod_modal_th_cmp_prev'); ?></th>
+                            <th class="text-right pr-20" style="white-space: nowrap;"><?php echo L('prod_modal_th_cmp_res'); ?></th>
+                        </tr>
+                    </thead>
+                    <tbody id="costesTableBody">
+                        <!-- Se llena vía JS -->
+                    </tbody>
+                </table>
+            </div>
+            <div class="mt-20 p-16 bg-surface2 br-12 border d-flex ai-center gap-12">
+                <div class="fs-18 text-accent"><i class="fa-solid fa-circle-info"></i></div>
+                <p class="fs-12 m-0 text-muted">
+                    <?php echo L('prod_modal_cost_history_info'); ?>
+                </p>
             </div>
         </div>
     </div>

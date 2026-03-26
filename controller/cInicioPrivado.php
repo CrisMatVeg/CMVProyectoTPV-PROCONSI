@@ -19,12 +19,6 @@ require_once 'model/TarifaPrecioPDO.php';
 $turnoCaja = CajaTurnoPDO::obtenerTurnoAbierto();
 $ultimoFondoSugerido = CajaTurnoPDO::obtenerUltimoFondoSugerido();
 
-if (isset($_POST['abrirCaja']) && !$turnoCaja) {
-    $fondoInicial = max(0, (float)($_POST['fondoInicial'] ?? 0));
-    CajaTurnoPDO::abrirTurno($_SESSION['usuarioActualTPV']->getId(), $fondoInicial);
-    // Recalcular estado de caja tras la apertura
-    $turnoCaja = CajaTurnoPDO::obtenerTurnoAbierto();
-}
 
 // Carga de productos desde la base de datos (incluyendo inactivos para el filtro "De baja")
 $oProductos = ProductoPDO::listarProductos(false);
@@ -51,10 +45,11 @@ foreach ($oProductos as $oProducto) {
 
         "inactive" => !$oProducto->getActivo(),
         "activo" => $oProducto->getActivo(),
-        "variantes" => $oProducto->getVariantes(),
+        "es_pack" => $oProducto->getEsPack(),
         "atributos" => $oProducto->getAtributos()
     ];
 }
+file_put_contents(__DIR__ . '/../tmp_debug_tpv_data.json', json_encode($aProductos, JSON_PRETTY_PRINT));
 
 // Cargar categorías dinámicas
 require_once 'model/CategoriaPDO.php';

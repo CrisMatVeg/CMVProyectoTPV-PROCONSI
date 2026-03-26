@@ -15,49 +15,43 @@ require_once __DIR__ . '/AppError.php';
 
 class DBPDO
 {
+    private static $instancia = null;
 
     /**
-     * Devuelve una conexión PDO activa para poder gestionar transacciones
+     * Devuelve una conexión PDO activa (Patrón Singleton)
      *
      * @return PDO
      */
     public static function getPDO()
     {
-        $conexion = new PDO(DSN, USERNAME, PASSWORD);
-        $conexion->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        if (self::$instancia === null) {
+            try {
+                self::$instancia = new PDO(DSN, USERNAME, PASSWORD);
+                self::$instancia->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-        date_default_timezone_set('Europe/Madrid');
-        $conexion->exec("SET time_zone = '+01:00'");
-
-        return $conexion;
+                date_default_timezone_set('Europe/Madrid');
+                self::$instancia->exec("SET time_zone = '+01:00'");
+            } catch (PDOException $e) {
+                // Manejo de error de conexión inicial
+                die("Error de conexión a la base de datos: " . $e->getMessage());
+            }
+        }
+        return self::$instancia;
     }
 
     /**
      * Ejecuta una consulta SQL y devuelve el PDOStatement.
      * No realiza fetch ni interpreta resultados.
      *
-     * @param string $sql Consulta SQL a ejecutar
+     * @param string $sentenciaSQL Consulta SQL a ejecutar
      * @param array|null $parametros Parámetros para consultas preparadas
      * @return PDOStatement Objeto PDOStatement ya ejecutado
      */
-    public static function ejecutarConsulta($sql, $parametros = null)
+    public static function ejecutarConsulta($sentenciaSQL, $parametros = null)
     {
         try {
-            $conexion = new PDO(DSN, USERNAME, PASSWORD);
-            $conexion->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-
-            date_default_timezone_set('Europe/Madrid');
-            $conexion->exec("SET time_zone = '+01:00'");
-
-            $consulta = $conexion->prepare($sql);
-
-            // Ejecutar con o sin parámetros
-            if ($parametros != null) {
-                $consulta->execute($parametros);
-            } else {
-                $consulta->execute();
-            }
-
+            $consulta = self::getPDO()->prepare($sentenciaSQL);
+            $consulta->execute($parametros);
             return $consulta;
         } catch (PDOException $e) {
             // Si es una petición API o AJAX, relanzamos la excepción para que el controlador la maneje (p.ej. devolver JSON)

@@ -11,17 +11,18 @@ class PagoPDO
     /**
      * Registra un nuevo pago parcial para una venta.
      */
-    public static function registrarPago(int $idVenta, float $importe, string $metodoPago, ?int $idUsuario = null, ?string $notas = null): int
+    public static function registrarPago(int $idVenta, float $importe, string $metodoPago, ?int $idUsuario = null, ?string $notas = null, ?int $idTurno = null): int
     {
-        $sql = "INSERT INTO pagos_venta (id_venta, importe, metodo_pago, id_usuario, notas)
-                VALUES (:idVenta, :importe, :metodoPago, :idUsuario, :notas)";
+        $sql = "INSERT INTO pagos_venta (id_venta, importe, metodo_pago, id_usuario, notas, id_turno)
+                VALUES (:idVenta, :importe, :metodoPago, :idUsuario, :notas, :idTurno)";
 
         DBPDO::ejecutarConsulta($sql, [
             ':idVenta'    => $idVenta,
             ':importe'    => round($importe, 2),
             ':metodoPago' => $metodoPago,
             ':idUsuario'  => $idUsuario,
-            ':notas'      => $notas
+            ':notas'      => $notas,
+            ':idTurno'    => $idTurno
         ]);
 
         $q = DBPDO::ejecutarConsulta("SELECT id FROM pagos_venta ORDER BY id DESC LIMIT 1");

@@ -10,6 +10,7 @@ $error = $_SESSION['error'] ?? null;
 
 // Si no hay error, redirigimos al inicio
 if (!$error) {
+    $_SESSION['paginaEnCurso'] = 'inicioPublico';
     header('Location: index.php');
     exit;
 }

@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/csrf_check.php';
 
 /**
  * API: obtenerHistorialStock.php
@@ -12,7 +13,7 @@ try {
     require_once __DIR__ . '/../model/MovimientoStockPDO.php';
     require_once __DIR__ . '/../model/Usuario.php';
 
-    session_start();
+    // session_start(); // Handled by csrf_check.php
     if (!isset($_SESSION['usuarioActualTPV'])) {
         throw new Exception('No autenticado');
     }

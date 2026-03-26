@@ -73,7 +73,6 @@ foreach ($oProductos as $oProd) {
         'activo'         => $oProd->getActivo(),
         'stock'          => (int)$oProd->getStockActual(),
         'codigo_iva'     => $oProd->getCodigoIva(),
-        'variantes'      => $oProd->getVariantes(),
         'atributos'      => $oProd->getAtributos(),
         'es_pack'        => $oProd->getEsPack(),
         'id_proveedor'   => $oProd->getIdProveedor(),
@@ -88,7 +87,7 @@ require_once 'model/CategoriaPDO.php';
 require_once 'model/ProveedorPDO.php';
 $tipoGeneral = TipoIVAPDO::obtenerVigentePorCodigo('GENERAL', date('Y-m-d'));
 $ivaGeneralActual = $tipoGeneral['porcentaje'] ?? 21.00;
-$tiposIva = TipoIVAPDO::listarTodos();
+$tiposIva = TipoIVAPDO::listarVigentesActuales();
 $listaCategorias = CategoriaPDO::listarTodas();
 $listaProveedores = ProveedorPDO::listarTodos(true); // Solo activos
 

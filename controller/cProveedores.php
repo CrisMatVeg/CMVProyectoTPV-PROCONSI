@@ -2,12 +2,13 @@
 require_once 'model/ProveedorPDO.php';
 // Verificar sesión
 if (!isset($_SESSION['usuarioActualTPV'])) {
-    header('Location: index.php?pagina=login');
+    $_SESSION['paginaEnCurso'] = 'Login';
+    header('Location: index.php');
     exit;
 }
 
 $avProveedorSet = [];
-$proveedores = ProveedorPDO::listarTodos(false); // Listar todos, incluyendo inactivos
+$proveedores = ProveedorPDO::listarTodos(false);
 
 foreach ($proveedores as $p) {
     $avProveedorSet[] = [

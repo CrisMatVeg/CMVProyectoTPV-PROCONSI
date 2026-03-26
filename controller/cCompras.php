@@ -5,10 +5,12 @@ require_once 'model/ProductoPDO.php';
 
 // Verificar sesión
 if (!isset($_SESSION['usuarioActualTPV'])) {
-    header('Location: index.php?pagina=login');
+    $_SESSION['paginaEnCurso'] = 'Login';
+    header('Location: index.php');
     exit;
 }
 
+$avInicioPrivado = [];
 $avInicioPrivado['proveedores'] = [];
 $proveedores = ProveedorPDO::listarTodos(true);
 foreach ($proveedores as $p) {
@@ -26,7 +28,8 @@ foreach ($productos as $p) {
         'id' => $p->getId(),
         'nombre' => $p->getNombre(),
         'referencia' => $p->getReferencia(),
-        'iva' => $p->getIVA()
+        'iva' => $p->getIVA(),
+        'id_proveedor' => $p->getIdProveedor()
     ];
 }
 

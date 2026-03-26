@@ -1,10 +1,10 @@
+console.log("main.js: Script loaded and executing (v15)");
 const PRODUCTS = typeof DB_PRODUCTS !== "undefined" ? DB_PRODUCTS : [];
 
-// Constants for financing
-const FINANCING_MIN_AMOUNT = 200;
 
 // ── Estado global ──────────────────────────────────────────────────────────────
-let cart = JSON.parse(localStorage.getItem("tpv_cart")) || [];
+let cart = JSON.parse(localStorage.getItem("tpv_cart")) || {};
+if (Array.isArray(cart)) cart = {}; // Migration from previous bad state
 let selectedPayment = "efectivo";
 let discountPct = 0;
 let ticketNum = 1001;
@@ -20,10 +20,40 @@ let isAdmin =
 let currentTicketNum = null;
 let socioActual = null;
 const SOCIO_DISCOUNT = 5;
-let financingAccepted = false;
+const PUNTOS_MIN_CANJE = 50;
+const PUNTOS_VALOR_EURO = 0.05; // 50 pts = 2.5€ => 1 pt = 0.05€
 let currentPromo = null;
 const PROMOS = typeof DB_PROMOS !== "undefined" ? DB_PROMOS : [];
 const TARIFAS = typeof DB_TARIFAS !== "undefined" ? DB_TARIFAS : [];
+let valeAplicado = null;
+
+function formatTicketNumber(numero, fecha, esFactura) {
+  const prefix = esFactura ? "F" : "T";
+  const d = new Date(fecha);
+  const datePart = `${d.getDate()}${d.getMonth() + 1}${d.getFullYear()}`;
+  return `${prefix}-${datePart}-${numero}`;
+}
+
+window.formatTicketNumber = formatTicketNumber;
+let clienteSeleccionado = null;
+let tipoClienteActual = "particular";
+let ULTIMOS_CLIENTES_BUSCADOS = [];
+
+// ── Interceptor CSRF para API ──────────────────────────────────────────────────
+(function () {
+  const originalFetch = window.fetch;
+  window.fetch = async function (resource, config) {
+    config = config || {};
+    const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+    if (csrfMeta && csrfMeta.content) {
+      config.headers = {
+        ...config.headers,
+        "X-CSRF-Token": csrfMeta.content,
+      };
+    }
+    return await originalFetch(resource, config);
+  };
+})();
 
 // ── Motor de Precios Dinámicos ────────────────────────────────────────────────
 function getEffectivePrice(p, socio = null) {
@@ -111,6 +141,9 @@ function getEffectivePrice(p, socio = null) {
 
 // ── Estado de venta pospuesta ──────────────────────────────────────────────────
 let postponedSale = JSON.parse(sessionStorage.getItem("postponedSale")) || null;
+let currentPayments = []; // [NUEVO] Para pagos mixtos
+let totalVentaActual = 0; // [NUEVO] Para sincronizar con el modal de cobro
+let checkoutContext = 'mixto'; // [NUEVO] Contexto original del sidebar
 
 // ── Tema (modo + acento) ──────────────────────────────────────────────────────
 function applyTheme(mode, accent) {
@@ -167,24 +200,17 @@ if (
 
 // ── DOMContentLoaded ──────────────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", function () {
-  // Asegurar que el panel de financiación esté oculto al cargar
   const finInfo = document.getElementById("finInfoPanel");
   if (finInfo) {
     finInfo.classList.add("d-none");
     finInfo.style.display = "none";
   }
 
-  // Trigger initial total calculation
-  const initialSubtotal = Object.values(cart).reduce(
-    (a, b) => a + b.price * b.qty,
-    0,
-  );
-  updateTotals(initialSubtotal);
+  // Renderizar estado guardado en localStorage
+  renderCart();
+  updatePostponeUI();
 
   try {
-    const fp = document.getElementById("financingPanel");
-    if (fp && !fp.classList.contains("panel-resizable"))
-      fp.classList.add("panel-resizable");
     const oi = document.getElementById("orderItems");
     if (oi && !oi.classList.contains("panel-resizable"))
       oi.classList.add("panel-resizable");
@@ -222,7 +248,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
 // ── Formato monetario ──────────────────────────────────────────────────────────
 function fmt(n) {
-  return n.toFixed(2).replace(".", ",") + " €";
+  const val = typeof n === "number" ? n : parseFloat(n) || 0;
+  return val.toFixed(2).replace(".", ",") + " €";
 }
 
 // ── Catálogo ───────────────────────────────────────────────────────────────────
@@ -302,28 +329,6 @@ function renderProducts() {
           ${p.inactive ? '<div class="baja-pill">Baja</div>' : ""}
           ${p.stock <= 0 ? '<div class="stock-pill" style="background:var(--red); color:white; position:absolute; top:10px; right:10px; padding:2px 8px; border-radius:10px; font-size:10px; font-weight:700;">AGOTADO</div>' : ""}
           ${(() => {
-            const v = p.variantes;
-            if (!v) return "";
-            if (Array.isArray(v) && v.length > 0)
-              return '<div class="variants-pill"><i class="fa-solid fa-tags"></i> Opciones</div>';
-            if (typeof v === "object" && Object.keys(v).length > 0)
-              return '<div class="variants-pill" style="top:5px; left:5px;"><i class="fa-solid fa-tags"></i> Opciones</div>';
-            if (typeof v === "string" && v.length > 2) {
-              try {
-                const parsed = JSON.parse(v);
-                if (
-                  (Array.isArray(parsed) && parsed.length > 0) ||
-                  (typeof parsed === "object" &&
-                    parsed !== null &&
-                    Object.keys(parsed).length > 0)
-                ) {
-                  return '<div class="variants-pill" style="top:5px; left:5px;"><i class="fa-solid fa-tags"></i> Opciones</div>';
-                }
-              } catch (e) {}
-            }
-            return "";
-          })()}
-          ${(() => {
             const attr = p.atributos;
             if (!attr) return "";
             try {
@@ -359,16 +364,13 @@ function renderProducts() {
           <div class="product-price" style="margin-top:auto">
             ${(() => {
               const eff = getEffectivePrice(p, socioActual);
-              if (Math.abs(eff - p.price) > 0.01) {
-                return `<span style="text-decoration:line-through; font-size:0.8em; opacity:0.6; margin-right:4px;">${fmt(p.price)}</span> ${fmt(eff)}`;
-              }
-              return fmt(p.price);
+              return fmt(eff);
             })()}
           </div>
           <div class="product-admin-bar">
-              <button class="admin-action edit" onclick="editProduct(event,${p.id})"><i class="fa-solid fa-pen-to-square"></i> Editar</button>
-              <button class="admin-action delete" onclick="deleteProduct(event,${p.id})"><i class="fa-solid fa-trash"></i> Borrar</button>
-              <button class="admin-action baja" onclick="toggleBaja(event,${p.id})"><i class="fa-solid ${p.inactive ? "fa-arrow-up" : "fa-arrow-down"}"></i> ${p.inactive ? "Alta" : "Baja"}</button>
+              <button class="admin-action edit" onclick="editProduct(event,${p.id})"><i class="fa-solid fa-pen-to-square"></i> ${I18N.edit}</button>
+              <button class="admin-action delete" onclick="deleteProduct(event,${p.id})"><i class="fa-solid fa-trash"></i> ${I18N.delete}</button>
+              <button class="admin-action baja" onclick="toggleBaja(event,${p.id})"><i class="fa-solid ${p.inactive ? "fa-arrow-up" : "fa-arrow-down"}"></i> ${p.inactive ? I18N.active : I18N.inactive}</button>
           </div>
       </div>
     `,
@@ -383,167 +385,42 @@ function handleCardClick(e, id, el) {
   const p = PRODUCTS.find((x) => x.id === id);
   if (!p || p.inactive) return;
 
-  // Parse variantes
-  let vars = p.variantes;
-  if (typeof vars === "string") {
-    try {
-      vars = JSON.parse(vars);
-    } catch (e) {
-      vars = null;
-    }
+  if (p.stock <= 0) {
+    showToast('<i class="fa-solid fa-circle-xmark"></i> ' + I18N.outOfStock);
+    return;
   }
-
-  const hasVariants =
-    vars &&
-    ((Array.isArray(vars) && vars.length > 0) ||
-      (typeof vars === "object" &&
-        vars !== null &&
-        Object.keys(vars).length > 0));
-
-  if (hasVariants) {
-    // Product has variant config — open picker (which will show physical variants from DB)
-    p.variantes_obj = vars;
-    showVariantPicker(p, el);
-  } else {
-    // No variants — check stock then add directly
-    if (p.stock <= 0) {
-      showToast('<i class="fa-solid fa-circle-xmark"></i> Producto agotado');
-      return;
-    }
-    addToCart(id, el);
-  }
-}
-
-async function showVariantPicker(p, el) {
-  const modal = document.getElementById("variantsModal");
-  const container = document.getElementById("variantsOptionsContainer");
-  if (!modal || !container) return;
-
-  container.innerHTML =
-    '<div class="p-24 text-center"><i class="fa-solid fa-spinner fa-spin fs-24"></i><p class="mt-8">Cargando opciones...</p></div>';
-  modal.classList.add("visible");
-
-  const titleEl = document.getElementById("variantsModalTitle");
-  if (titleEl) titleEl.textContent = `Opciones de ${p.name}`;
-
-  try {
-    const resp = await fetch(
-      `api/gestionVariante.php?accion=listar&id_producto=${p.id}`,
-    );
-    const data = await resp.json();
-
-    if (data.ok && data.lista.length > 0) {
-      container.innerHTML = "";
-      let anyShown = false;
-      data.lista.forEach((v) => {
-        if (parseInt(v.activo) === 0) return;
-        anyShown = true;
-
-        const btn = document.createElement("button");
-        btn.className = "variant-card-btn";
-        if (v.stock_actual <= 0) {
-          btn.disabled = true;
-        }
-
-        const isLowStock = v.stock_actual > 0 && v.stock_actual <= 5;
-        const priceToDisplay = v.precio_venta
-          ? parseFloat(v.precio_venta)
-          : p.price;
-
-        btn.innerHTML = `
-          <div class="v-stock-badge ${isLowStock ? "low-stock" : ""}">
-            ${v.stock_actual > 0 ? "Stock: " + v.stock_actual : "Agotado"}
-          </div>
-          <span class="v-name">${v.nombre}</span>
-          <span class="v-sku">${v.sku}</span>
-          <span class="v-price-tag">${fmt(priceToDisplay)}</span>
-        `;
-
-        btn.onclick = () => {
-          addToCart(
-            p.id,
-            el,
-            v.nombre,
-            v.id,
-            v.precio_venta ? parseFloat(v.precio_venta) : null,
-            v.stock_actual,
-          );
-          modal.classList.remove("visible");
-        };
-        container.appendChild(btn);
-      });
-
-      if (!anyShown) {
-        // All variants are inactive — allow direct add
-        container.innerHTML = `
-          <div class="p-24 text-center d-flex flex-column ai-center gap-16 w-100">
-            <div class="text-muted fs-14">Todas las variantes de este producto están desactivadas actualmente.</div>
-            <button class="btn-save py-14 full-width" style="max-width: 300px" onclick="addToCart(${p.id}, null); document.getElementById('variantsModal').classList.remove('visible');">
-              <i class="fa-solid fa-cart-plus mr-8"></i> Añadir base al carrito
-            </button>
-          </div>`;
-      }
-    } else {
-      // No physical DB variants — allow direct add to cart
-      container.innerHTML = `
-        <div class="p-16 text-center d-flex flex-column ai-center gap-12">
-          <div class="text-muted fs-13">Este producto no tiene variantes de stock individual configuradas.</div>
-          <button class="btn-save py-12 full-width" onclick="addToCart(${p.id}, null); document.getElementById('variantsModal').classList.remove('visible');">
-            <i class="fa-solid fa-cart-plus"></i> Añadir al carrito
-          </button>
-        </div>`;
-    }
-  } catch (e) {
-    console.error(e);
-    container.innerHTML =
-      '<div class="p-24 text-center text-red">Error al cargar opciones.</div>';
-  }
+  addToCart(id, el);
 }
 
 // ── Carrito ────────────────────────────────────────────────────────────────────
-function addToCart(
-  id,
-  el,
-  variantName = null,
-  variantId = null,
-  variantPrice = null,
-  variantStock = null,
-) {
+function addToCart(id, el) {
   const p = PRODUCTS.find((x) => x.id === id);
   if (!p) return;
 
-  const cartKey = variantId ? `${id}-v${variantId}` : id;
-  const currentStock = variantId !== null ? variantStock : p.stock;
-
+  const cartKey = id;
   if (cart[cartKey]) {
-    if (cart[cartKey].qty >= currentStock) {
+    if (cart[cartKey].qty >= p.stock) {
       showToast(
-        '<i class="fa-solid fa-circle-exclamation"></i> No hay más stock disponible',
+        '<i class="fa-solid fa-circle-exclamation"></i> ' + I18N.lowStockLimit,
       );
       return;
     }
     cart[cartKey].qty++;
   } else {
-    if (currentStock <= 0) return;
+    if (p.stock <= 0) return;
 
     const finalItem = { ...p };
-    if (variantId) {
-      finalItem.variant = variantName;
-      finalItem.variant_id = variantId;
-      if (variantPrice !== null) finalItem.price = variantPrice;
-    }
-
     const priceToApply = getEffectivePrice(finalItem, socioActual);
 
     cart[cartKey] = {
       ...finalItem,
       qty: 1,
       price: priceToApply,
-      maxStock: currentStock,
+      maxStock: p.stock,
+      iva: parseFloat(p.iva || 21),
+      serials: [],
+      cartKey: cartKey,
     };
-    cart[cartKey].iva = parseFloat(p.iva || 21);
-    cart[cartKey].serials = [];
-    cart[cartKey].cartKey = cartKey;
   }
 
   el.classList.add("adding");
@@ -554,13 +431,17 @@ function addToCart(
 function changeQty(cartKey, delta) {
   if (!cart[cartKey]) return;
   const item = cart[cartKey];
-  const p = PRODUCTS.find((x) => x.id === item.id);
+  const p = item.id > 0 ? PRODUCTS.find((x) => x.id === item.id) : null;
 
-  const limit = item.maxStock !== undefined ? item.maxStock : p.stock;
+  const limit = p
+    ? item.maxStock !== undefined
+      ? item.maxStock
+      : p.stock
+    : 999999;
 
   if (delta > 0 && item.qty >= limit) {
     showToast(
-      '<i class="fa-solid fa-circle-exclamation"></i> Límite de stock alcanzado',
+      '<i class="fa-solid fa-circle-exclamation"></i> ' + I18N.limitReached,
     );
     return;
   }
@@ -575,6 +456,7 @@ function clearCart() {
   discountPct = 0;
   socioActual = null;
   currentPromo = null;
+  localStorage.removeItem("tpv_cart"); // Persist empty state
   const el_discountCode = document.getElementById("discountCode");
   const el_discountRow = document.getElementById("discountRow");
   const el_errDiscount = document.getElementById("err-discount");
@@ -587,7 +469,7 @@ function clearCart() {
 function postponeSale() {
   if (Object.keys(cart).length === 0) {
     showToast(
-      '<i class="fa-solid fa-circle-exclamation"></i> El carrito está vacío',
+      '<i class="fa-solid fa-circle-exclamation"></i> ' + I18N.cartEmpty,
     );
     return;
   }
@@ -603,7 +485,7 @@ function postponeSale() {
   sessionStorage.setItem("postponedSale", JSON.stringify(postponedSale));
   clearCart();
   updatePostponeUI();
-  showToast('<i class="fa-solid fa-pause"></i> Venta pospuesta');
+  showToast('<i class="fa-solid fa-pause"></i> ' + I18N.salePostponed);
 }
 
 function resumeSale() {
@@ -612,7 +494,7 @@ function resumeSale() {
   if (Object.keys(cart).length > 0) {
     if (
       !confirm(
-        "Se perderá el carrito actual. ¿Deseas retomar la venta pospuesta?",
+        I18N.confirmResume,
       )
     )
       return;
@@ -634,7 +516,7 @@ function resumeSale() {
 
   updatePostponeUI();
   renderCart();
-  showToast('<i class="fa-solid fa-play"></i> Venta recuperada');
+  showToast('<i class="fa-solid fa-play"></i> ' + I18N.saleResumed);
 }
 
 function updatePostponeUI() {
@@ -692,6 +574,9 @@ function autoApplyBundlePromos() {
 }
 
 function renderCart() {
+  // Guardar estado en localStorage
+  localStorage.setItem("tpv_cart", JSON.stringify(cart));
+
   // Auto-aplicar promos de pack antes de calcular totales
   autoApplyBundlePromos();
 
@@ -836,36 +721,79 @@ function updateTotals(initialSubtotal) {
   // Factor de prorrateo para el IVA (si el total tiene descuento, el IVA baja proporcionalmente)
   const discountFactor = subtotal > 0 ? subtotalFinal / subtotal : 1;
 
-  let vat = 0;
+  // 3. Desglose de IVA por tipos para la UI
+  const ivaGroups = {};
   items.forEach((item) => {
+    const rate = parseFloat(item.iva || 21);
     const itemOrigSubtotal = item.price * item.qty;
     const itemDiscounted = itemOrigSubtotal * discountFactor;
-    vat += itemDiscounted * (item.iva / 100);
+    // Si el precio ya incluye IVA (PVP), el IVA contenido es: P * (iva/121)
+    const itemBase = itemDiscounted / (1 + rate / 100);
+    const itemTax = itemDiscounted - itemBase;
+
+    if (!ivaGroups[rate]) {
+      ivaGroups[rate] = { base: 0, tax: 0 };
+    }
+    ivaGroups[rate].base += itemBase;
+    ivaGroups[rate].tax += itemTax;
   });
 
-  const total = subtotalFinal + vat;
+  const totalVat = Object.values(ivaGroups).reduce((acc, g) => acc + g.tax, 0);
+  const total = subtotalFinal; // El total es el subtotal tras descuentos, ya incluye IVA (PVP)
+  const baseImponible = subtotalFinal - totalVat;
 
   // Actualizar UI
   const elSubtotal = document.getElementById("subtotal");
+  const elTotalAmt = document.getElementById("totalAmt");
+  const elChargeTotal = document.getElementById("chargeTotal");
+  const elDiscountAmt = document.getElementById("discountAmt");
+  const elIvaBreakdown = document.getElementById("ivaBreakdown");
+
   if (!elSubtotal) return;
 
-  elSubtotal.textContent = fmt(subtotal);
-  document.getElementById("vatAmt").textContent = fmt(vat);
-  document.getElementById("totalAmt").textContent = fmt(total);
-  document.getElementById("chargeTotal").textContent = fmt(total);
-  document.getElementById("discountAmt").textContent = "-" + fmt(totalDiscount);
+  // Mostramos la Base Imponible en el campo Subtotal
+  elSubtotal.textContent = fmt(baseImponible);
+
+  if (elTotalAmt) elTotalAmt.textContent = fmt(total);
+  if (elChargeTotal) elChargeTotal.textContent = fmt(total);
+  if (elDiscountAmt) elDiscountAmt.textContent = "-" + fmt(totalDiscount);
 
   const el_discountRow = document.getElementById("discountRow");
   if (el_discountRow) {
     el_discountRow.style.display = totalDiscount > 0 ? "flex" : "none";
   }
 
-  document.getElementById("chargeBtn").disabled = subtotal === 0;
+  // Renderizar desglose de IVA con el nuevo formato (Base por separado del IVA)
+  if (elIvaBreakdown) {
+    const rowSubtotal = document.getElementById("rowSubtotal");
+    if (rowSubtotal) rowSubtotal.style.display = "none";
 
-  // Factura obligatoria si total >= 400€
+    elIvaBreakdown.innerHTML = Object.entries(ivaGroups)
+      .map(
+        ([rate, data]) => `
+        <div class="total-row" style="margin-bottom: 2px;">
+          <span>Base imponible (${rate}%)</span>
+          <span>${fmt(data.base)}</span>
+        </div>
+        <div class="total-row" style="margin-bottom: 8px; border-bottom: 1px solid rgba(0,0,0,0.05); padding-bottom: 4px;">
+          <span>IVA ${rate}%</span>
+          <span>${fmt(data.tax)}</span>
+        </div>
+      `,
+      )
+      .join("");
+  }
+
+  const chargeBtn = document.getElementById("chargeBtn");
+  if (chargeBtn) chargeBtn.disabled = subtotal === 0;
+
+  // Sincronizar total global para el modal de cobro
+  totalVentaActual = total;
+
+  // Factura obligatoria si total >= 3000€
   const toggleFactura = document.getElementById("facturaToggle");
   if (toggleFactura) {
-    if (total >= 400) {
+    if (total >= 3000) {
       toggleFactura.checked = true;
       toggleFactura.disabled = true;
     } else {
@@ -873,55 +801,8 @@ function updateTotals(initialSubtotal) {
     }
   }
 
-  // Financiación
-  if (selectedPayment === "financiado") {
-    financingAccepted = false;
-    if (window._financingRecalcTimer)
-      clearTimeout(window._financingRecalcTimer);
-    window._financingRecalcTimer = setTimeout(() => {
-      try {
-        calcularCuotaFinanciacion();
-      } catch (e) {}
-    }, 80);
-  }
 
-  const finanBtn = document.getElementById("btnFinanciacion");
-  if (finanBtn) {
-    const finanMinBadge = document.getElementById("finanMinBadge");
-    const finanLockIcon = document.getElementById("finanLockIcon");
-    const finanBtnLabel = document.getElementById("finanBtnLabel");
 
-    if (total >= FINANCING_MIN_AMOUNT) {
-      finanBtn.classList.remove("locked");
-      finanBtn.disabled = false;
-      finanBtn.style.opacity = "1";
-      finanBtn.style.filter = "none";
-      finanBtn.style.cursor = "pointer";
-      if (finanLockIcon) finanLockIcon.className = "fa-solid fa-percent";
-      if (finanMinBadge) {
-        finanMinBadge.textContent = "DISPONIBLE";
-        finanMinBadge.classList.add("finan-badge-available");
-      }
-      if (finanBtnLabel) finanBtnLabel.textContent = "Financiación";
-    } else {
-      if (selectedPayment === "financiado") {
-        const efectivoBtn = document.querySelector(
-          '.pay-btn[data-method="efectivo"]',
-        );
-        if (efectivoBtn) selectPayment(efectivoBtn);
-      }
-      finanBtn.classList.add("locked");
-      finanBtn.disabled = true;
-      finanBtn.style.opacity = "0.5";
-      finanBtn.style.filter = "grayscale(100%) brightness(0.6)";
-      finanBtn.style.cursor = "not-allowed";
-      if (finanLockIcon) finanLockIcon.className = "fa-solid fa-lock";
-      if (finanMinBadge) {
-        finanMinBadge.textContent = `Mín. ${fmt(FINANCING_MIN_AMOUNT)}`;
-        finanMinBadge.classList.remove("finan-badge-available");
-      }
-    }
-  }
 
   if (selectedPayment === "a_cuenta") {
     validarACuenta();
@@ -930,23 +811,15 @@ function updateTotals(initialSubtotal) {
 
 // ── Pago ───────────────────────────────────────────────────────────────────────
 
-function selectPayment(el) {
-  if (el.disabled) {
-    showToast(
-      '<i class="fa-solid fa-lock"></i> Financiación disponible a partir de ' +
-        fmt(FINANCING_MIN_AMOUNT),
-    );
-    return;
-  }
+async function selectSidebarPayment(el) {
 
   document
     .querySelectorAll(".pay-btn")
     .forEach((b) => b.classList.remove("selected"));
   el.classList.add("selected");
   selectedPayment = el.dataset.method;
+  checkoutContext = selectedPayment; // Guardamos el contexto original del sidebar
 
-  // Siempre resetear estado de financiación al cambiar método
-  financingAccepted = false;
 
   const finInfo = document.getElementById("finInfoPanel");
   const aCuentaInfo = document.getElementById("aCuentaGestion");
@@ -955,381 +828,15 @@ function selectPayment(el) {
   if (finInfo) finInfo.classList.add("d-none");
   if (aCuentaInfo) aCuentaInfo.classList.add("d-none");
 
-  if (selectedPayment === "financiado") {
-    if (finInfo) finInfo.classList.remove("d-none");
-    cargarFinancieras();
-    updateFinancingInfo();
-  } else if (selectedPayment === "a_cuenta") {
+  if (selectedPayment === "a_cuenta") {
     if (aCuentaInfo) aCuentaInfo.classList.remove("d-none");
     validarACuenta();
   }
 }
 
-let LISTA_FINANCIERAS = [];
 
-let financingParams = {
-  entidad: "",
-  meses: "12",
-  pagaCliente: false,
-};
 
-function updateFinancingParams(mode = "inline") {
-  const suffix = mode === "modal" ? "_modal" : "";
-  const e = document.getElementById("finanEntidad" + suffix);
-  const m = document.getElementById("finanMeses" + suffix);
-  const p = document.getElementById("finanPagaCliente" + suffix);
-  if (e) financingParams.entidad = e.value;
-  if (m) financingParams.meses = m.value;
-  if (p) financingParams.pagaCliente = p.checked;
-}
 
-async function cargarFinancieras() {
-  const el = document.getElementById("finanEntidad");
-  const elModal = document.getElementById("finanEntidad_modal");
-  const mesesEl = document.getElementById("finanMeses");
-  const mesesModal = document.getElementById("finanMeses_modal");
-  const pagaEl = document.getElementById("finanPagaCliente");
-  const pagaModal = document.getElementById("finanPagaCliente_modal");
-
-  try {
-    const resp = await fetch("api/listarFinancieras.php");
-    const r = await resp.json();
-    if (r.ok) {
-      LISTA_FINANCIERAS = r.financieras;
-      const opts = r.financieras
-        .map(
-          (f) =>
-            `<option value="${f.id}" data-min="${f.min_importe}">${f.nombre}</option>`,
-        )
-        .join("");
-      if (el) {
-        el.innerHTML = '<option value="">Seleccione...</option>' + opts;
-        if (financingParams.entidad) el.value = financingParams.entidad;
-      }
-      if (elModal) {
-        elModal.innerHTML = '<option value="">Seleccione...</option>' + opts;
-        if (financingParams.entidad) elModal.value = financingParams.entidad;
-      }
-      if (mesesEl && financingParams.meses)
-        mesesEl.value = financingParams.meses;
-      if (mesesModal && financingParams.meses)
-        mesesModal.value = financingParams.meses;
-      if (pagaEl) pagaEl.checked = financingParams.pagaCliente;
-      if (pagaModal) pagaModal.checked = financingParams.pagaCliente;
-    }
-  } catch (e) {
-    console.warn("Error al cargar financieras:", e);
-  }
-}
-
-async function updateFinancingInfo() {
-  const entidadEl = document.getElementById("finanEntidad");
-  const mesesEl = document.getElementById("finanMeses");
-  const pagaEl = document.getElementById("finanPagaCliente");
-
-  if (!entidadEl || !mesesEl || !pagaEl) return;
-
-  const total = parseFloat(
-    document.getElementById("totalAmt").textContent.replace(",", "."),
-  );
-  if (isNaN(total)) return;
-
-  const entidadId = entidadEl.value;
-  if (!entidadId) return;
-
-  const financier = LISTA_FINANCIERAS.find((f) => f.id == entidadId);
-  if (!financier) return;
-
-  const meses = parseInt(mesesEl.value);
-  const pagaCliente = pagaEl.checked;
-
-  const totalCost = Object.values(cart).reduce((acc, item) => {
-    const pInfo = PRODUCTS.find((p) => p.id == item.id);
-    const cost = pInfo ? pInfo.precio_coste || 0 : 0;
-    return acc + cost * item.qty;
-  }, 0);
-
-  const subtotalSinIVA = total / 1.21;
-
-  let comisionPct = 0;
-  try {
-    const comisionRes = await fetch(
-      `api/obtenerComisionesPlazo.php?id=${financier.id}&meses=${meses}`,
-    );
-    const comisionData = await comisionRes.json();
-    if (comisionData.ok && comisionData.comision) {
-      const valor = pagaCliente
-        ? comisionData.comision.comision_con_interes
-        : comisionData.comision.comision_sin_interes;
-      comisionPct = parseFloat(valor) || 0;
-    }
-  } catch (e) {
-    console.warn("Error al obtener comisión:", e);
-  }
-
-  comisionPct = parseFloat(comisionPct) || 0;
-  const comisionAmt = total * (comisionPct / 100);
-  const netProfit = subtotalSinIVA - totalCost - comisionAmt;
-
-  const statusEl = document.getElementById("finInfoStatus");
-  const amountEl = document.getElementById("finInfoAmount");
-  const panelEl = document.getElementById("finInfoPanel");
-
-  if (statusEl && amountEl && panelEl) {
-    if (netProfit >= 0) {
-      statusEl.textContent = "✓ GANANCIA";
-      statusEl.style.color = "var(--green)";
-      amountEl.textContent = fmt(netProfit);
-      amountEl.style.color = "var(--green)";
-      panelEl.style.borderColor = "var(--green)";
-      panelEl.style.backgroundColor = "rgba(76, 175, 80, 0.05)";
-    } else {
-      statusEl.textContent = "✕ PÉRDIDA";
-      statusEl.style.color = "var(--red)";
-      amountEl.textContent = fmt(Math.abs(netProfit));
-      amountEl.style.color = "var(--red)";
-      panelEl.style.borderColor = "var(--red)";
-      panelEl.style.backgroundColor = "rgba(244, 67, 54, 0.05)";
-    }
-  }
-}
-
-function calcularCuotaFinanciacion(mode = "inline") {
-  if (selectedPayment !== "financiado") return;
-
-  const suffix = mode === "modal" ? "_modal" : "";
-  const entidadEl = document.getElementById("finanEntidad" + suffix);
-  const mesesEl = document.getElementById("finanMeses" + suffix);
-  const pagaEl = document.getElementById("finanPagaCliente" + suffix);
-
-  if (!entidadEl || !mesesEl || !pagaEl) return;
-
-  financingParams.entidad = entidadEl.value;
-  financingParams.meses = mesesEl.value;
-  financingParams.pagaCliente = pagaEl.checked;
-
-  const total = parseFloat(
-    document.getElementById("totalAmt").textContent.replace(",", "."),
-  );
-  if (isNaN(total)) return;
-
-  const entidadId = entidadEl.value;
-
-  if (mode === "inline") {
-    updateFinancingInfo();
-    return;
-  }
-
-  if (mode === "modal") {
-    const configEl = document.getElementById("finDetalleConfig");
-    if (!entidadId) {
-      if (configEl) configEl.classList.add("d-none");
-      return;
-    }
-    if (configEl) configEl.classList.remove("d-none");
-  }
-
-  const financier = LISTA_FINANCIERAS.find((f) => f.id == entidadId);
-  if (!financier) return;
-
-  const meses = parseInt(mesesEl.value);
-  const pagaCliente = pagaEl.checked;
-  const cuota = total / meses;
-
-  const elCuota = document.getElementById("finanCuota" + suffix);
-  if (elCuota) elCuota.textContent = fmt(cuota);
-
-  calcularRentabilidad(total, financier, meses, pagaCliente, mode);
-}
-
-async function calcularRentabilidad(
-  total,
-  financier,
-  meses,
-  pagaCliente,
-  mode = "inline",
-) {
-  const suffix = mode === "modal" ? "_modal" : "";
-
-  const totalCost = Object.values(cart).reduce((acc, item) => {
-    const pInfo = PRODUCTS.find((p) => p.id == item.id);
-    const cost = pInfo ? pInfo.precio_coste || 0 : 0;
-    return acc + cost * item.qty;
-  }, 0);
-
-  const subtotalSinIVA = total / 1.21;
-
-  let comisionPct = 0;
-  try {
-    const comisionRes = await fetch(
-      `api/obtenerComisionesPlazo.php?id=${financier.id}&meses=${meses}`,
-    );
-    const comisionData = await comisionRes.json();
-    if (comisionData.ok && comisionData.comision) {
-      const valor = pagaCliente
-        ? comisionData.comision.comision_con_interes
-        : comisionData.comision.comision_sin_interes;
-      comisionPct = parseFloat(valor) || 0;
-    }
-  } catch (e) {
-    console.warn("Error al obtener comisión:", e);
-  }
-
-  comisionPct = parseFloat(comisionPct) || 0;
-  const comisionAmt = total * (comisionPct / 100);
-  const netProfit = subtotalSinIVA - totalCost - comisionAmt;
-  const interesesTotal = comisionAmt;
-
-  if (mode === "modal") {
-    const margenEl = document.getElementById("finMargenBruto");
-    if (margenEl) margenEl.textContent = fmt(subtotalSinIVA - totalCost);
-
-    const comisionPctEl = document.getElementById("finComisionPct");
-    if (comisionPctEl)
-      comisionPctEl.textContent = `(${comisionPct.toFixed(2)}%)`;
-
-    const comisionEl = document.getElementById("finComisionBanco");
-    if (comisionEl) comisionEl.textContent = `-${fmt(comisionAmt)}`;
-
-    const totalAmtEl = document.getElementById("finTotalAmt");
-    if (totalAmtEl) totalAmtEl.textContent = fmt(total);
-
-    const interesesEl = document.getElementById("finInteresesAmt");
-    if (interesesEl) interesesEl.textContent = fmt(interesesTotal);
-
-    const resultEl = document.getElementById("profitStatus_modal");
-    if (resultEl) {
-      resultEl.textContent = fmt(netProfit);
-      const color =
-        netProfit >= subtotalSinIVA * 0.12
-          ? "var(--green)"
-          : netProfit > 0
-            ? "var(--orange)"
-            : "var(--red)";
-      resultEl.style.color = color;
-    }
-
-    const btnConfirm = document.getElementById("btnConfirmarFinanciacion");
-    if (btnConfirm) btnConfirm.disabled = false;
-  }
-}
-
-function confirmFinancingAccept() {
-  financingAccepted = true;
-  const confirmarBtn = document.getElementById("confirmarClienteBtn");
-  if (confirmarBtn) {
-    confirmarBtn.disabled = false;
-    confirmarBtn.style.opacity = "1";
-  }
-  showToast(
-    '<i class="fa-solid fa-check-circle"></i> Financiación aceptada - Procede al pago',
-  );
-
-  ["", "_modal"].forEach((s) => {
-    const dc = document.getElementById("financingDecisionContainer" + s);
-    if (dc) dc.style.display = "none";
-  });
-}
-
-function rejectFinancing() {
-  financingAccepted = false;
-
-  const efectivoBtn = document.querySelector(
-    '.pay-btn[data-method="efectivo"]',
-  );
-  if (efectivoBtn) selectPayment(efectivoBtn);
-
-  try {
-    document.getElementById("finanPagaCliente").checked = false;
-  } catch (e) {}
-  try {
-    document.getElementById("finanMeses").value = "12";
-  } catch (e) {}
-  try {
-    document.getElementById("finanPagaCliente_modal").checked = false;
-  } catch (e) {}
-  try {
-    document.getElementById("finanMeses_modal").value = "12";
-  } catch (e) {}
-
-  showToast(
-    '<i class="fa-solid fa-arrow-right"></i> Financiación rechazada - Método cambiado a efectivo',
-  );
-}
-
-function openFinancingModal() {
-  const modal = document.getElementById("financiacionModal");
-  if (!modal) return;
-
-  const entidadModal = document.getElementById("finanEntidad_modal");
-  const mesesModal = document.getElementById("finanMeses_modal");
-  const pagaClienteModal = document.getElementById("finanPagaCliente_modal");
-
-  if (entidadModal && financingParams.entidad)
-    entidadModal.value = financingParams.entidad;
-  if (mesesModal && financingParams.meses)
-    mesesModal.value = financingParams.meses;
-  if (pagaClienteModal) pagaClienteModal.checked = financingParams.pagaCliente;
-
-  if (entidadModal)
-    entidadModal.onchange = () => {
-      updateFinancingParams("modal");
-      calcularCuotaFinanciacion("modal");
-    };
-  if (mesesModal)
-    mesesModal.onchange = () => {
-      updateFinancingParams("modal");
-      calcularCuotaFinanciacion("modal");
-    };
-  if (pagaClienteModal)
-    pagaClienteModal.onchange = () => {
-      updateFinancingParams("modal");
-      calcularCuotaFinanciacion("modal");
-    };
-
-  modal.classList.add("visible");
-  cargarFinancieras();
-  setTimeout(() => calcularCuotaFinanciacion("modal"), 80);
-}
-
-function closeFinancingModal() {
-  const modal = document.getElementById("financiacionModal");
-  if (!modal) return;
-  modal.classList.remove("visible");
-
-  const entInline = document.getElementById("finanEntidad");
-  const mesesInline = document.getElementById("finanMeses");
-  const pagaInline = document.getElementById("finanPagaCliente");
-  if (entInline) entInline.value = financingParams.entidad;
-  if (mesesInline) mesesInline.value = financingParams.meses;
-  if (pagaInline) pagaInline.checked = financingParams.pagaCliente;
-
-  if (selectedPayment === "financiado") updateFinancingInfo();
-}
-
-function confirmarFinanciacionModal() {
-  const entidadModal = document.getElementById("finanEntidad_modal");
-  const mesesModal = document.getElementById("finanMeses_modal");
-  const pagaClienteModal = document.getElementById("finanPagaCliente_modal");
-
-  if (!entidadModal || !entidadModal.value) {
-    showToast("⚠️ Selecciona una entidad financiera");
-    return;
-  }
-
-  const entidadHidden = document.getElementById("finanEntidad");
-  const mesesHidden = document.getElementById("finanMeses");
-  const pagaClienteHidden = document.getElementById("finanPagaCliente");
-
-  if (entidadHidden) entidadHidden.value = entidadModal.value;
-  if (mesesHidden) mesesHidden.value = mesesModal ? mesesModal.value : "12";
-  if (pagaClienteHidden)
-    pagaClienteHidden.value =
-      pagaClienteModal && pagaClienteModal.checked ? "1" : "0";
-
-  closeFinancingModal();
-  showToast("✓ Financiación configurada");
-}
 
 // ── Sidebar resizer ────────────────────────────────────────────────────────────
 function initSidebarResizer() {
@@ -1406,11 +913,12 @@ function applyDiscount() {
   if (promo) {
     const minSub = parseFloat(promo.min_subtotal) || 0;
     if (subtotal < minSub) {
+      const msg = I18N.promoMinAmount.replace('{amount}', fmt(minSub));
       if (el_errDiscount) {
-        el_errDiscount.innerText = `Importe mínimo ${fmt(minSub)} para usar este cupón`;
+        el_errDiscount.innerText = msg;
       } else {
         showToast(
-          `<i class="fa-solid fa-circle-exclamation"></i> Importe mínimo ${fmt(minSub)} para usar este cupón`,
+          `<i class="fa-solid fa-circle-exclamation"></i> ${msg}`,
         );
       }
       return;
@@ -1420,90 +928,25 @@ function applyDiscount() {
     updateTotals(subtotal);
 
     let descText = "";
-    if (promo.tipo === "percent") descText = `${promo.valor}% aplicado`;
+    if (promo.tipo === "percent") descText = `${promo.valor}% ${I18N.promoApplied}`;
     else if (promo.tipo === "amount")
-      descText = `-${fmt(promo.valor)} aplicado`;
-    else descText = "Promoción aplicada";
+      descText = `-${fmt(promo.valor)} ${I18N.promoApplied}`;
+    else descText = I18N.promoApplied;
 
     showToast(
       `<i class="fa-solid fa-circle-check"></i> ${descText} (${promo.codigo})`,
     );
   } else {
     if (el_errDiscount) {
-      el_errDiscount.innerText = "Código no válido o inactivo";
+      el_errDiscount.innerText = I18N.promoInvalid;
     } else {
       showToast(
-        '<i class="fa-solid fa-circle-xmark"></i> Código no válido o inactivo',
+        '<i class="fa-solid fa-circle-xmark"></i> ' + I18N.promoInvalid,
       );
     }
   }
 }
 
-// ── Modal tipo de cliente ──────────────────────────────────────────────────────
-let tipoClienteActual = "particular";
-let clienteSeleccionado = null;
-let ULTIMOS_CLIENTES_BUSCADOS = [];
-
-function processPayment() {
-  tipoClienteActual = "particular";
-  document.getElementById("empresaDatos").classList.add("d-none");
-  document.getElementById("empresaNombre").value = "";
-  document.getElementById("empresaNif").value = "";
-  document.getElementById("efectivoRecibido").value = "";
-
-  const aCuentaPagado = document.getElementById("aCuentaPagado");
-  const aCuentaFecha = document.getElementById("aCuentaFechaLimite");
-  if (aCuentaPagado) aCuentaPagado.value = "0.00";
-  if (aCuentaFecha) {
-    const nextMonth = new Date();
-    nextMonth.setMonth(nextMonth.getMonth() + 1);
-    aCuentaFecha.value = nextMonth.toISOString().split("T")[0];
-  }
-
-  const cambioEl = document.getElementById("efectivoCambio");
-  cambioEl.textContent = "0,00 €";
-  cambioEl.classList.remove("text-red");
-  cambioEl.classList.add("text-accent");
-
-  const efectivoGestion = document.getElementById("efectivoGestion");
-  if (selectedPayment === "efectivo") {
-    efectivoGestion.classList.remove("d-none");
-    setTimeout(() => document.getElementById("efectivoRecibido").focus(), 100);
-  } else {
-    efectivoGestion.classList.add("d-none");
-  }
-
-  const btnP = document.getElementById("btnParticular");
-  const btnE = document.getElementById("btnEmpresa");
-  const btnS = document.getElementById("btnSocio");
-  btnP.classList.add("selected-type");
-  btnE.classList.remove("selected-type");
-  if (btnS) btnS.classList.remove("selected-type");
-
-  socioActual = null;
-  document.getElementById("socioBusqueda").classList.add("d-none");
-  document.getElementById("socioRegistro").classList.add("d-none");
-  document.getElementById("socioInfo").innerText = "";
-  clienteSeleccionado = null;
-
-  const gen = document.getElementById("clienteBusquedaGenerica");
-  if (gen) {
-    gen.classList.add("d-none");
-    const res = document.getElementById("clienteResultados");
-    if (res) res.innerHTML = "";
-    const btnAdd = document.getElementById("btnAddCliente");
-    if (btnAdd) btnAdd.classList.add("d-none");
-  }
-  const reg = document.getElementById("clienteRegistro");
-  if (reg) reg.classList.add("d-none");
-
-  document.querySelectorAll(".form-error").forEach((el) => (el.innerText = ""));
-  document.getElementById("clienteModal").classList.add("visible");
-  // Al confirmar un socio/cliente, refrescamos los precios de los productos en el catálogo
-  // para que se vean las tarifas aplicadas a ese cliente específico o tipo de cliente.
-  renderProducts();
-  renderCart(); // Por si cambiamos el cliente a mitad de pedido
-}
 
 function cerrarModalCliente() {
   document.getElementById("clienteModal").classList.remove("visible");
@@ -1536,6 +979,16 @@ function seleccionarTipoCliente(tipo) {
     btnP.classList.add("selected-type");
     socioActual = null;
     if (gen) gen.classList.remove("d-none");
+    // [NUEVO] Si es una venta rápida de particular (efectivo), enfocamos el monto directamente
+    if (selectedPayment === 'efectivo') {
+        setTimeout(() => {
+            const input = document.getElementById("mixPagoMonto");
+            if (input) {
+                input.focus();
+                input.select();
+            }
+        }, 150);
+    }
   } else if (tipo === "socio") {
     if (btnS) btnS.classList.add("selected-type");
     document.getElementById("socioBusqueda").classList.remove("d-none");
@@ -1550,6 +1003,9 @@ function seleccionarTipoCliente(tipo) {
 
   const subtotal = Object.values(cart).reduce((a, b) => a + b.price * b.qty, 0);
   updateTotals(subtotal);
+
+  quitarValeAplicado();
+  quitarPuntosCanjeados();
 }
 
 async function buscarSocio() {
@@ -1558,7 +1014,7 @@ async function buscarSocio() {
 
   const info = document.getElementById("socioInfo");
   const btnAdd = document.getElementById("btnAddSocio");
-  info.innerText = "Buscando...";
+  info.innerText = I18N.searching;
   btnAdd.classList.add("d-none");
 
   try {
@@ -1573,17 +1029,172 @@ async function buscarSocio() {
     if (r.ok) {
       socioActual = r.cliente;
       info.innerHTML = `<i class="fa-solid fa-check-circle text-green"></i> ${r.cliente.nombre} (${r.cliente.nif})`;
-      showToast("Socio identificado");
+      showToast(I18N.socioFound);
+      cargarValesCliente(r.cliente.id);
+      mostrarPuntosCliente(r.cliente);
       renderCart(); // Re-render to show discounts if any
     } else {
-      info.innerHTML = `<span class="text-red">Socio no encontrado.</span>`;
+      info.innerHTML = `<span class="text-red">${I18N.socioNotFound}</span>`;
       btnAdd.classList.remove("d-none");
       socioActual = null;
     }
   } catch (e) {
     console.error(e);
-    info.innerText = "Error en la búsqueda.";
+    info.innerText = I18N.connError;
   }
+}
+
+/**
+ * Carga los vales disponibles para un cliente y los muestra en el panel del TPV.
+ */
+async function cargarValesCliente(idCliente) {
+  const container = document.getElementById("clienteValesContainer");
+  const listado = document.getElementById("listadoValesCliente");
+  if (!container || !listado) return;
+
+  quitarValeAplicado();
+  listado.innerHTML = `<div class="fs-11 opacity-70">${I18N.vouchersSearching}</div>`;
+  container.classList.remove("d-none");
+
+  try {
+    const resp = await fetch("api/listarValesCliente.php", {
+      method: "POST",
+      body: JSON.stringify({ id_cliente: idCliente }),
+    });
+    const r = await resp.json();
+
+    if (r.ok && r.vales && r.vales.length > 0) {
+      listado.innerHTML = r.vales
+        .map(
+          (v) => `
+        <div class="d-flex jc-space-between ai-center p-8 bg-surface1 br-6 border-2">
+          <div class="d-flex flex-column">
+            <span class="fs-12 font-bold font-mono">${v.codigo}</span>
+            <span class="fs-11 text-accent">${fmt(parseFloat(v.importe_restante))}</span>
+          </div>
+          <button type="button" onclick='aplicarVale(${JSON.stringify(v)})' class="btn-save fs-10 p-2-8 w-auto">${I18N.apply}</button>
+        </div>
+      `,
+        )
+        .join("");
+    } else {
+      listado.innerHTML =
+        `<div class="fs-11 opacity-50 p-4">${I18N.vouchersNone}</div>`;
+    }
+  } catch (e) {
+    console.error("Error cargando vales:", e);
+    listado.innerHTML =
+      `<div class="fs-11 text-red">${I18N.connError}</div>`;
+  }
+}
+
+function aplicarVale(vale) {
+  valeAplicado = vale;
+  const resumen = document.getElementById("valeAplicadoResumen");
+  const totalLabel = document.getElementById("valeAplicadoTotal");
+  const pendienteLabel = document.getElementById("valePendienteCobro");
+  const listado = document.getElementById("listadoValesCliente");
+
+  const totalText = document.getElementById("totalAmt").textContent;
+  const totalTPV =
+    parseFloat(
+      totalText.replace("€", "").replace(/\./g, "").replace(",", ".").trim(),
+    ) || 0;
+
+  if (resumen && totalLabel) {
+    resumen.classList.remove("d-none");
+    totalLabel.textContent = fmt(parseFloat(vale.importe_restante));
+    if (pendienteLabel) {
+      const rest = Math.max(0, totalTPV - parseFloat(vale.importe_restante));
+      pendienteLabel.textContent = fmt(rest);
+    }
+  }
+  if (listado) listado.classList.add("d-none");
+
+  showToast(`<i class="fa-solid fa-ticket"></i> ${I18N.voucherApplied.replace('{code}', vale.codigo)}`);
+  updateTotals(totalTPV); // Recalcular totales para reflejar el vale
+}
+
+function quitarValeAplicado() {
+  valeAplicado = null;
+  const resumen = document.getElementById("valeAplicadoResumen");
+  const listado = document.getElementById("listadoValesCliente");
+
+  if (resumen) resumen.classList.add("d-none");
+  if (listado) listado.classList.remove("d-none");
+  updateTotals(Object.values(cart).reduce((a, b) => a + b.price * b.qty, 0)); // Recalcular totales
+}
+
+function mostrarPuntosCliente(cliente) {
+  const container = document.getElementById("clientePuntosContainer");
+  const label = document.getElementById("labelPuntosDisponibles");
+  const msgCanje = document.getElementById("puntosCanjeMsg");
+  const controles = document.getElementById("controlesCanjePuntos");
+  const select = document.getElementById("puntosAcanjearSelect");
+
+  if (!container || !label || !msgCanje || !controles || !select) return;
+
+  quitarPuntosCanjeados();
+  container.classList.remove("d-none");
+  clienteActualPuntos = parseInt(cliente.puntos || 0); // La API devuelve 'puntos'
+  label.textContent = clienteActualPuntos;
+
+  if (clienteActualPuntos >= PUNTOS_MIN_CANJE) {
+    controles.classList.remove("d-none");
+    msgCanje.classList.add("d-none");
+    
+    // Rellenamos el select con múltiplos de 50
+    let html = "";
+    const maxBloques = Math.floor(clienteActualPuntos / 50);
+    for (let i = 1; i <= maxBloques; i++) {
+        const pts = i * 50;
+        const dto = (pts / 50) * 2.5; // 50 pts = 2.5€ (según diseño vInicio)
+        html += `<option value="${pts}">${pts} pts (-${dto.toFixed(2)}€)</option>`;
+    }
+    select.innerHTML = html;
+  } else {
+    controles.classList.add("d-none");
+    msgCanje.classList.remove("d-none");
+    msgCanje.textContent = `Te faltan ${PUNTOS_MIN_CANJE - clienteActualPuntos} puntos para un descuento.`;
+  }
+}
+
+function canjearPuntos() {
+  const select = document.getElementById("puntosAcanjearSelect");
+  if (!select) return;
+
+  const pts = parseInt(select.value);
+  if (isNaN(pts) || pts < PUNTOS_MIN_CANJE || pts > clienteActualPuntos) return;
+  
+  const dto = (pts / 50) * 2.5;
+  
+  puntosCanjeados = pts;
+  puntosDescuentoAmt = dto;
+  
+  document.getElementById("puntosCanjeArea").classList.add("d-none");
+  document.getElementById("puntosAplicadosResumen").classList.remove("d-none");
+  
+  const discLabel = document.getElementById("puntosDiscountVal");
+  const ptsLabel = document.getElementById("puntosRedeemedVal");
+  if (discLabel) discLabel.textContent = `-${dto.toFixed(2).replace(".", ",")} €`;
+  if (ptsLabel) ptsLabel.textContent = pts;
+  
+  showToast(I18N.pointsApplied.replace("{amount}", pts));
+  renderCart();
+}
+
+function updatePuntosDiscountPreview() {} // Placeholder for the onchange event
+
+function quitarPuntosCanjeados() {
+  puntosCanjeados = 0;
+  puntosDescuentoAmt = 0;
+  
+  const area = document.getElementById("puntosCanjeArea");
+  const res = document.getElementById("puntosAplicadosResumen");
+  if (area) area.classList.remove("d-none");
+  if (res) res.classList.add("d-none");
+  
+  renderCart();
 }
 
 function mostrarRegistroSocio() {
@@ -1604,7 +1215,7 @@ async function guardarNuevoSocio() {
   const nif = document.getElementById("newSocioNif").value.trim();
 
   if (!nombre || !nif) {
-    alert("Nombre y NIF son obligatorios");
+    alert(I18N.nameNifRequired);
     return;
   }
 
@@ -1657,10 +1268,10 @@ function mostrarRegistroCliente() {
   const tit = document.getElementById("clienteRegistroTitulo");
   if (tit)
     tit.innerText =
-      "Nuevo " +
+      I18N.newLabel.replace('(', '').replace(')', '') + ' ' +
       (tipoClienteActual === "empresa"
-        ? "Cliente Empresa"
-        : "Cliente Particular");
+        ? I18N.empresa
+        : I18N.particular);
 }
 
 function cancelarRegistroCliente() {
@@ -1674,7 +1285,7 @@ async function guardarNuevoCliente() {
   const tipo = tipoClienteActual; // particular o empresa
 
   if (!nombre) {
-    alert("El nombre es obligatorio");
+    alert(I18N.fieldRequired);
     return;
   }
 
@@ -1801,74 +1412,482 @@ function seleccionarClienteGuardado(idx) {
       (c.nombre || "") + (c.apellidos ? " " + c.apellidos : "");
     const nifTxt = c.nif ? ` (${c.nif})` : "";
     resEl.innerHTML = `<i class="fa-solid fa-check-circle text-success"></i> ${nombreCompleto}${nifTxt}`;
+    cargarValesCliente(c.id);
+    mostrarPuntosCliente(c);
   }
 
-  showToast("Cliente seleccionado");
+  showToast(I18N.clientIdentified);
   validarACuenta();
   renderCart(); // Por si el cliente tiene tarifas especiales o es socio
+  updateMixSummary(); // Actualizar el resumen si hay
 }
 
-function calcularCambio() {
-  const recibido =
-    parseFloat(document.getElementById("efectivoRecibido").value) || 0;
-  const items = Object.values(cart);
-  const subtotal = items.reduce((a, b) => a + b.price * b.qty, 0);
-  const discountAmt = (subtotal * discountPct) / 100;
-  const base = subtotal - discountAmt;
-  const total = base * 1.21;
+async function processPayment() {
+  // Sincronizar totalVentaActual desde el DOM (fuente de verdad actualizada por renderCart/UiController)
+  const elTotalAmt = document.getElementById("totalAmt");
+  if (elTotalAmt) {
+    totalVentaActual = parseFloat(elTotalAmt.textContent.replace(/[^\d,-]/g, '').replace(',', '.')) || 0;
+  }
 
-  const cambio = recibido - total;
-  const cambioEl = document.getElementById("efectivoCambio");
-  const confirmarBtn = document.getElementById("confirmarClienteBtn");
+  // 1. Sincronizar contexto y método desde el sidebar
+  const activeSidebarBtn = document.querySelector(".pay-btn.selected");
+  if (activeSidebarBtn) {
+    checkoutContext = activeSidebarBtn.dataset.method;
+    selectedPayment = checkoutContext;
+  }
 
-  if (recibido > 0) {
-    cambioEl.textContent = fmt(Math.max(0, cambio));
-    if (cambio < -0.01) {
-      cambioEl.classList.remove("text-accent");
-      cambioEl.classList.add("text-red");
-      confirmarBtn.disabled = true;
+  // 2. Resetear selección de cliente a Particular por defecto (si no hay uno ya activo)
+  if (!clienteSeleccionado && !socioActual) {
+    document.getElementById("btnParticular").click();
+  }
+  
+  currentPayments = []; // Reset pagos mixtos
+
+  // 2. Si hay un vale aplicado, lo añadimos como primer pago
+  if (valeAplicado) {
+    currentPayments.push({
+      metodo: "vale",
+      importe: Math.min(totalVentaActual, parseFloat(valeAplicado.importe_restante)),
+      label: `Vale: ${valeAplicado.codigo}`,
+    });
+  }
+
+  // Si hay puntos canjeados, los añadimos como un pago
+  if (puntosCanjeados > 0 && puntosDescuentoAmt > 0) {
+    currentPayments.push({
+      metodo: "puntos",
+      importe: Math.min(totalVentaActual - currentPayments.reduce((acc, p) => acc + p.importe, 0), puntosDescuentoAmt),
+      label: `Puntos: ${puntosCanjeados}`,
+    });
+  }
+
+  // 3. Pre-añadir el método seleccionado en el sidebar (Efectivo por defecto)
+  const totalPagadoValesPuntos = currentPayments.reduce((acc, p) => acc + p.importe, 0);
+  const pendiente = Math.max(0, totalVentaActual - totalPagadoValesPuntos);
+
+  // Pre-añadimos siempre que no sea mixto (incluso efectivo ahora para simplificar el modal)
+  if (pendiente > 0.01 && selectedPayment && selectedPayment !== 'mixto') {
+    // Si ya existe un pago de este método, lo actualizamos en lugar de añadir otro
+    const existing = currentPayments.find(p => p.metodo === selectedPayment);
+    if (existing) {
+        existing.importe = pendiente;
+        existing.recibido = selectedPayment === 'efectivo' ? pendiente : pendiente;
     } else {
-      cambioEl.classList.remove("text-red");
-      cambioEl.classList.add("text-accent");
-      confirmarBtn.disabled = false;
+        // Si es a_cuenta, solo lo pre-añadimos si hay un cliente seleccionado
+        const tieneCliente = !!(clienteSeleccionado || socioActual);
+        
+        if (selectedPayment !== 'a_cuenta' || tieneCliente) {
+          currentPayments.push({
+            metodo: selectedPayment,
+            importe: pendiente,
+            recibido: selectedPayment === 'efectivo' ? pendiente : pendiente,
+            label: selectedPayment.charAt(0).toUpperCase() + selectedPayment.slice(1).replace('_', ' ')
+          });
+        }
     }
+  }
+
+  abrirModalPago();
+  updateMixSummary();
+  
+  // 4. Lógica de UI Condicional: Ocultar selector si no es mixto
+  const el_selector = document.getElementById("selectorMetodoPago");
+  const el_pagoMontoArea = document.getElementById("pagoMontoArea");
+  const el_btnAnadir = el_pagoMontoArea ? el_pagoMontoArea.querySelector("button") : null;
+  const el_labelMonto = document.getElementById("labelMontoPago");
+  const el_gestionArea = document.getElementById("cobroMixtoGestion");
+
+  // Función helper para mostrar un elemento superando el !important de updateMixSummary
+  function forceShow(el) {
+    if (!el) return;
+    el.style.removeProperty("display");
+    el.classList.remove("d-none");
+    el.style.display = "flex";
+  }
+  function forceHide(el) {
+    if (!el) return;
+    el.style.setProperty("display", "none", "important");
+  }
+
+  if (selectedPayment === 'mixto') {
+      if (el_selector) el_selector.classList.remove("d-none");
+      if (el_gestionArea) el_gestionArea.classList.remove("d-none");
+      if (el_labelMonto) el_labelMonto.textContent = "Importe a añadir (€)";
+      forceShow(el_pagoMontoArea);
+  } else {
+      // Es un método individual: ocultar selector de métodos del modal
+      if (el_selector) el_selector.classList.add("d-none");
+
+      if (selectedPayment === 'efectivo') {
+          if (el_labelMonto) el_labelMonto.textContent = "Efectivo Recibido (€)";
+          if (el_gestionArea) el_gestionArea.classList.remove("d-none");
+          // Mostrar área de input superando !important
+          forceShow(el_pagoMontoArea);
+          // Ocultar botón "Añadir" pero mantener el input visible
+          if (el_btnAnadir) el_btnAnadir.classList.add("d-none");
+          // Seleccionar efectivo en el selector de modal (aunque esté oculto)
+          const btnEfe = document.getElementById("btnEfectivo");
+          if (btnEfe) selectModalPayment(btnEfe);
+          // Focus en el input de monto
+          setTimeout(() => {
+            const inputMonto = document.getElementById("mixPagoMonto");
+            if (inputMonto) { inputMonto.value = ""; inputMonto.focus(); }
+          }, 100);
+      } else if (selectedPayment === 'a_cuenta') {
+          const tieneCliente = !!(clienteSeleccionado || socioActual);
+          if (tieneCliente) {
+              if (el_gestionArea) el_gestionArea.classList.add("d-none");
+          } else {
+              if (el_labelMonto) el_labelMonto.textContent = "Importe Fiado";
+              if (el_gestionArea) el_gestionArea.classList.remove("d-none");
+              forceShow(el_pagoMontoArea);
+              const btnAcu = document.getElementById("btnAcuenta");
+              if (btnAcu) selectModalPayment(btnAcu);
+          }
+      } else {
+          // Tarjeta, Bizum: ya se añadieron automáticamente arriba, ocultar área de input
+          forceHide(el_pagoMontoArea);
+          if (el_gestionArea) el_gestionArea.classList.add("d-none");
+      }
+  }
+}
+
+ // ── Pagos Mixtos (Split Payments) ─────────────────────────────────────────────
+function updateMixSummary() {
+  const totalPagado = currentPayments.reduce((acc, p) => acc + p.importe, 0);
+  const pendiente = Math.max(0, totalVentaActual - totalPagado);
+
+  const el_Total = document.getElementById("mixTotalVenta");
+  const el_Pagado = document.getElementById("mixTotalPagado");
+  const el_Pendiente = document.getElementById("mixTotalPendiente");
+
+  if (el_Total) el_Total.textContent = fmt(totalVentaActual);
+  if (el_Pagado) el_Pagado.textContent = fmt(totalPagado);
+  
+  const el_PendienteRow = el_Pendiente?.parentElement;
+  const el_Lista = document.getElementById("mixListaPagos");
+  const el_BtnAdd = document.getElementById("mixBtnAddPago");
+
+  if (el_Pendiente) {
+    el_Pendiente.textContent = fmt(pendiente);
+    el_Pendiente.parentElement.classList.toggle("text-red", pendiente > 0.01);
+    el_Pendiente.parentElement.classList.toggle("text-green", pendiente <= 0.01);
+  }
+
+  // Si no es mixto, ocultamos la lista de pagos, el selector y el botón de AÑADIR (petición usuario)
+  if (checkoutContext !== 'mixto') {
+      if (el_Lista) el_Lista.style.setProperty("display", "none", "important");
+      if (el_PendienteRow) el_PendienteRow.style.setProperty("display", "none", "important");
+      if (el_BtnAdd) el_BtnAdd.style.setProperty("display", "none", "important");
+      
+      const el_selector = document.getElementById("selectorMetodoPago");
+      if (el_selector) el_selector.style.setProperty("display", "none", "important");
+
+      // Ocultar también cualquier fila extra del resumen excepto el Total
+      const resContainer = document.getElementById("pagosMixResumen");
+      if (resContainer) {
+          Array.from(resContainer.children).forEach((child, idx) => {
+              if (idx > 0) child.style.setProperty("display", "none", "important");
+          });
+      }
+  } else {
+      if (el_Lista) el_Lista.style.display = "";
+      if (el_PendienteRow) el_PendienteRow.style.display = "";
+      if (el_BtnAdd) el_BtnAdd.style.display = "";
+      const el_selector = document.getElementById("selectorMetodoPago");
+      if (el_selector) el_selector.style.display = "";
+
+      // [NUEVO] Restricción: No permitir 'A Cuenta' en cobros mixtos
+      const bAcu = document.getElementById("btnAcuenta");
+      if (bAcu) bAcu.style.setProperty("display", "none", "important");
+
+      const resContainer = document.getElementById("pagosMixResumen");
+      if (resContainer) {
+          Array.from(resContainer.children).forEach((child) => {
+              child.style.display = "";
+          });
+      }
+  }
+
+  // Si ya no queda nada, habilitar botón de cobrar
+  const btnFinal = document.getElementById("confirmarClienteBtn");
+  if (btnFinal) {
+    btnFinal.disabled = (pendiente > 0.01 && currentPayments.length > 0) || (currentPayments.length === 0 && pendiente > 0.01);
+    // Realmente, si hay pagos y el pendiente es 0, habilitamos.
+    // Si no hay pagos, se puede cobrar si el total es > 0? No, en mixto debe haber pagos.
+    btnFinal.disabled = pendiente > 0.01;
+  }
+
+  renderPaymentsList();
+}
+
+function renderPaymentsList() {
+  const container = document.getElementById("mixListaPagos");
+  if (!container) return;
+
+  if (currentPayments.length === 0) {
+    container.innerHTML = `<div class="p-12 text-center opacity-50 fs-12 italic border-2 br-8 dashed" style="border-style: dashed;">${I18N.noPayments}</div>`;
+    return;
+  }
+
+  const icons = {
+    efectivo: "fa-money-bill-1",
+    tarjeta: "fa-credit-card",
+    bizum: "fa-mobile-screen",
+    a_cuenta: "fa-file-invoice-dollar",
+    vale: "fa-ticket",
+    puntos: "fa-star"
+  };
+
+  container.innerHTML = currentPayments
+    .map(
+      (p, index) => `
+    <div class="d-flex ai-center jc-space-between p-8-12 bg-surface1 br-8 border-1 mb-4 animate-slide-right">
+        <div class="d-flex ai-center gap-8">
+            <i class="fa-solid ${icons[p.metodo] || "fa-wallet"} opacity-70"></i>
+            <span class="badge ${p.metodo === "efectivo" ? "bg-accent text-white" : "bg-surface3 border-1 text-primary"} p-2-6 br-4 fs-9 font-bold uppercase">${I18N[p.metodo] || p.metodo.replace("_", " ")}</span>
+            <span class="font-mono font-bold">${fmt(p.importe)}</span>
+        </div>
+        <button onclick="removePagoMixto(${index})" class="text-red border-none bg-none cursor-pointer hover-scale p-4">
+            <i class="fa-solid fa-trash-can"></i>
+        </button>
+    </div>
+  `,
+    )
+    .join("");
+}
+
+function selectModalPayment(btn) {
+  // Limpiar selección previa de botones del selector
+  document.querySelectorAll(".btn-tpv-method").forEach((b) => {
+    b.classList.remove("border-accent", "bg-accent-soft");
+    b.style.borderColor = "";
+  });
+
+  btn.classList.add("border-accent", "bg-accent-soft");
+  btn.style.borderColor = "var(--accent)";
+
+  const metodo = btn.id.replace("btn", "").toLowerCase();
+  selectedPayment = metodo === "acuenta" ? "a_cuenta" : metodo;
+
+  // Mostrar área de monto forzando sobre el !important de updateMixSummary
+  const area = document.getElementById("pagoMontoArea");
+  if (area) {
+    area.style.removeProperty("display");
+    area.classList.remove("d-none");
+    area.style.display = "block";
+  }
+
+  // Ajustar labels y visibilidad de extras
+  document.getElementById("extraEfectivo").classList.toggle("d-none", metodo !== "efectivo");
+  document.getElementById("extraAcuenta").classList.toggle("d-none", metodo !== "acuenta");
+
+  // Pre-rellenar con lo que falta
+  const totalPagado = currentPayments.reduce((acc, p) => acc + p.importe, 0);
+  const pendiente = Math.max(0, totalVentaActual - totalPagado);
+  const inputMonto = document.getElementById("mixPagoMonto");
+  if (inputMonto) {
+    inputMonto.value = pendiente.toFixed(2);
+    inputMonto.focus();
+    inputMonto.select();
+    calcularCambioMix();
+  }
+
+  // Auto-scroll para que el input sea visible en el modal
+  setTimeout(() => {
+    if (area) area.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, 50);
+}
+
+
+function addPagoMixto() {
+  const inputMonto = document.getElementById("mixPagoMonto");
+  const importeIngresado = parseFloat(inputMonto.value) || 0;
+
+  if (importeIngresado <= 0) {
+    showToast(`<i class='fa-solid fa-circle-exclamation'></i> ${I18N.enterAmount}`);
+    return;
+  }
+
+  // Verificamos si es a_cuenta y si hay cliente
+  if (selectedPayment === "a_cuenta") {
+    const clienteId = tipoClienteActual === 'socio' ? (socioActual ? socioActual.id : null) : (clienteSeleccionado ? clienteSeleccionado.id : null);
+    if (!clienteId) {
+      document.getElementById("aCuentaAlertaCliente").classList.remove("d-none");
+      showToast(`<i class='fa-solid fa-user-xmark'></i> ${I18N.clientNotFound}`);
+      return;
+    }
+    const fecha = document.getElementById("aCuentaFechaLimite").value;
+    if (!fecha) {
+      showToast(`<i class='fa-solid fa-calendar-xmark'></i> ${I18N.enterDate}`);
+      return;
+    }
+  }
+
+  const totalPagado = currentPayments.reduce((acc, p) => acc + p.importe, 0);
+  const pendiente = Math.max(0, totalVentaActual - totalPagado);
+  
+  // Sincronizar contexto desde el sidebar (Back-up por si falló la global)
+  const activeSideBtn = document.querySelector(".pay-btn.selected");
+  const currentCtx = activeSideBtn ? activeSideBtn.dataset.method : checkoutContext;
+
+  // VALIDACIÓN SEGURIDAD: Si venimos de un modo individual "Efectivo", bloquear pagos parciales (petición usuario)
+  if (currentCtx === 'efectivo' && importeIngresado < pendiente) {
+    showToast(`<i class='fa-solid fa-circle-exclamation'></i> ${I18N.cashTotalRequired}`);
+    return;
+  }
+
+  const importeAplicado = Math.min(importeIngresado, pendiente);
+
+  // Añadir pago
+  currentPayments.push({
+    metodo: selectedPayment,
+    importe: importeAplicado,
+    recibido: selectedPayment === "efectivo" ? importeIngresado : importeAplicado,
+    fecha_limite: selectedPayment === "a_cuenta" ? document.getElementById("aCuentaFechaLimite").value : null,
+  });
+
+  // Limpiar y actualizar
+  inputMonto.value = "";
+  const cambioEl = document.getElementById("efectivoCambio");
+  if (cambioEl) cambioEl.textContent = "0,00 €";
+
+  updateMixSummary();
+  showToast(`<i class='fa-solid fa-circle-check'></i> ${I18N.paymentIdentified}`);
+
+  // Resetear selección de botones
+  document.querySelectorAll(".btn-tpv-method").forEach((b) => {
+    b.classList.remove("border-accent", "bg-accent-soft");
+    b.style.borderColor = "";
+  });
+  document.getElementById("pagoMontoArea").classList.add("d-none");
+}
+
+function removePagoMixto(index) {
+  currentPayments.splice(index, 1);
+  updateMixSummary();
+}
+
+function calcularCambioMix() {
+  const inputMonto = document.getElementById("mixPagoMonto");
+  const montoIngresado = parseFloat(inputMonto?.value) || 0;
+  
+  const totalPagado = currentPayments.reduce((acc, p) => acc + p.importe, 0);
+  const pendiente = Math.max(0, totalVentaActual - totalPagado);
+
+  const el_labelMonto = document.getElementById("labelMontoPago");
+  const cambioEl = document.getElementById("efectivoCambio");
+  if (!cambioEl) return;
+
+  if (selectedPayment === "efectivo" && montoIngresado > 0) {
+    // Si es un pago individual de efectivo (no mixto), actualizamos el recibido del pago de efectivo real
+    if (checkoutContext === 'efectivo') {
+        const pagoEfeActual = currentPayments.find(p => p.metodo === 'efectivo');
+        if (pagoEfeActual) {
+            pagoEfeActual.recibido = montoIngresado;
+        }
+    }
+
+    // Calcular cambio relativo al total de la venta si es el único pago
+    const totalPagar = totalVentaActual - (valeAplicado ? valeAplicado.importe : 0) - puntosDescuentoAmt;
+    if (montoIngresado > totalPagar) {
+        cambioEl.textContent = fmt(montoIngresado - totalPagar);
+    } else {
+        cambioEl.textContent = "0,00 €";
+    }
+  } else if (selectedPayment === "efectivo" && montoIngresado > pendiente) {
+    const cambio = montoIngresado - pendiente;
+    cambioEl.textContent = fmt(cambio);
   } else {
     cambioEl.textContent = "0,00 €";
-    confirmarBtn.disabled = true;
   }
+
+  // [NUEVO] Actualizar el resumen para que se vea el cambio si se ha modificado el recibido
+  updateMixSummary();
 }
-
-async function confirmarCliente() {
+/**
+ * Función auxiliar para calcular el total final del carrito (reutilizando la lógica de renderCart)
+ */
+function calculateFinalTotal() {
   const items = Object.values(cart);
+  let subtotal = items.reduce((s, i) => s + i.price * i.qty, 0);
 
-  if (selectedPayment === "a_cuenta") {
-    const clienteId =
-      tipoClienteActual === "socio"
-        ? socioActual
-          ? socioActual.id
-          : null
-        : clienteSeleccionado
-          ? clienteSeleccionado.id
-          : null;
+  // Bundle discounts
+  let bundleDiscountTotal = 0;
+  if (
+    currentPromo &&
+    (currentPromo.tipo === "bundle" || currentPromo.tipo === "fixed_bundle")
+  ) {
+    const groups = {};
+    items.forEach((item) => {
+      if (!groups[item.id])
+        groups[item.id] = { baseId: item.id, cat: item.cat, units: [] };
+      for (let i = 0; i < item.qty; i++) groups[item.id].units.push(item.price);
+    });
+    Object.values(groups).forEach((group) => {
+      let applies = false;
+      if (currentPromo.id_producto && currentPromo.id_producto == group.baseId)
+        applies = true;
+      else if (
+        currentPromo.categoria_code &&
+        currentPromo.categoria_code === group.cat
+      )
+        applies = true;
+      else if (!currentPromo.id_producto && !currentPromo.categoria_code)
+        applies = true;
+      if (!applies) return;
 
-    if (!clienteId && tipoClienteActual !== "empresa") {
-      const alerta = document.getElementById("aCuentaAlertaCliente");
-      if (alerta) {
-        alerta.classList.remove("d-none");
-        alerta.style.display = "flex"; // Ensure it shows if d-none is weak
+      const buyQty = parseInt(currentPromo.bundle_buy_qty) || 0;
+      const payQty = parseInt(currentPromo.bundle_pay_qty) || 0;
+      const totalQty = group.units.length;
+
+      if (currentPromo.tipo === "bundle" && buyQty > 0 && payQty > 0) {
+        const sets = Math.floor(totalQty / buyQty);
+        const freeUnits = sets * (buyQty - payQty);
+        const sorted = [...group.units].sort((a, b) => a - b);
+        bundleDiscountTotal += sorted
+          .slice(0, freeUnits)
+          .reduce((s, p) => s + p, 0);
+      } else if (currentPromo.tipo === "fixed_bundle" && buyQty > 0) {
+        const sets = Math.floor(totalQty / buyQty);
+        const avgPrice = group.units.reduce((s, p) => s + p, 0) / totalQty;
+        const normalPrice = sets * buyQty * avgPrice;
+        const bundlePrice = sets * parseFloat(currentPromo.valor);
+        if (normalPrice > bundlePrice)
+          bundleDiscountTotal += normalPrice - bundlePrice;
       }
-      showToast(
-        "⚠️ Para cobros a cuenta es obligatorio seleccionar un cliente o socio",
-      );
-      return;
-    } else {
-      // Hide alert if client IS selected
-      const alerta = document.getElementById("aCuentaAlertaCliente");
-      if (alerta) alerta.classList.add("d-none");
-    }
+    });
   }
 
-  ejecutarCobroFinal();
+  const subtotalAfterBundles = subtotal - bundleDiscountTotal;
+  let couponDiscount = 0;
+  if (
+    currentPromo &&
+    (currentPromo.tipo === "percent" || currentPromo.tipo === "amount")
+  ) {
+    if (currentPromo.tipo === "percent")
+      couponDiscount = (subtotalAfterBundles * currentPromo.valor) / 100;
+    else couponDiscount = Math.min(subtotalAfterBundles, currentPromo.valor);
+  }
+
+  const socioAmt =
+    socioActual && socioActual.es_socio
+      ? (subtotalAfterBundles - couponDiscount) * (SOCIO_DISCOUNT / 100)
+      : 0;
+  
+  // Descuento por puntos
+  const puntosAmt = puntosDescuentoAmt;
+
+  const subtotalFinal = subtotal - (bundleDiscountTotal + couponDiscount + socioAmt + puntosAmt);
+
+  const discountFactor = subtotal > 0 ? subtotalFinal / subtotal : 1;
+  let vatTotal = 0;
+  items.forEach((item) => {
+    const line = item.price * item.qty * discountFactor;
+    vatTotal += line * (item.iva / 100);
+  });
+
+  return subtotalFinal + vatTotal;
 }
 
 function abrirModalPago() {
@@ -1879,7 +1898,7 @@ function abrirModalPago() {
 async function ejecutarCobroFinal() {
   const btn = document.getElementById("confirmarClienteBtn");
   btn.disabled = true;
-  btn.textContent = "Guardando…";
+  btn.textContent = I18N.saving;
 
   const items = Object.values(cart);
 
@@ -1958,8 +1977,11 @@ async function ejecutarCobroFinal() {
     socioActual && socioActual.es_socio
       ? (subtotalAfterBundles - couponDiscount) * (SOCIO_DISCOUNT / 100)
       : 0;
+  
+  // Descuento por puntos
+  const puntosAmt = puntosDescuentoAmt;
 
-  const totalDiscountAmt = bundleDiscountTotal + couponDiscount + socioAmt;
+  const totalDiscountAmt = bundleDiscountTotal + couponDiscount + socioAmt + puntosAmt;
   const subtotalFinal = subtotal - totalDiscountAmt;
 
   // IVA prorateado
@@ -1980,11 +2002,15 @@ async function ejecutarCobroFinal() {
   }
   if (socioAmt > 0) {
     descuentoLabel +=
-      (descuentoLabel ? " + " : "") + "Socio " + SOCIO_DISCOUNT + "%";
+      (descuentoLabel ? " + " : "") + I18N.socio + " " + SOCIO_DISCOUNT + "%";
   }
   if (couponDiscount > 0 && currentPromo && currentPromo.codigo) {
     descuentoLabel +=
       (descuentoLabel ? " + " : "") + "Cupón " + currentPromo.codigo;
+  }
+  if (puntosAmt > 0) {
+    descuentoLabel +=
+      (descuentoLabel ? " + " : "") + I18N.pointsRedeemedLabel.replace('{amount}', puntosCanjeados);
   }
   // ──────────────────────────────────────────────────────────────────────────────
 
@@ -2005,20 +2031,62 @@ async function ejecutarCobroFinal() {
       document.getElementById("newClienteNombre")?.value ||
       (clienteSeleccionado ? clienteSeleccionado.nombre : null);
     if (!clienteId && !nombreCli) {
-      showToast(
-        "⚠ Factura obligatoria (>400€ o manual). Selecciona o registra un cliente.",
-      );
+      showToast(I18N.facturaRequired);
       btn.disabled = false;
-      btn.textContent = "Cobrar";
+      btn.textContent = I18N.charge;
       return;
     }
   }
 
-  if (selectedPayment === "financiado" && !financingAccepted) {
-    showToast("⚠ Debes aceptar o rechazar la financiación antes de proceder");
-    btn.disabled = false;
-    btn.textContent = "Cobrar";
-    return;
+  console.log("ejecutarCobroFinal: Procediendo con el cobro...", checkoutContext);
+
+  // 1. VALIDACIÓN SEGURIDAD: Efectivo no puede ser inferior al total si es el único pago (petición usuario)
+  if (checkoutContext === "efectivo") {
+    // Buscamos el pago de efectivo que hemos pre-añadido al 100%
+    const pagoEfe = currentPayments.find((p) => p.metodo === "efectivo");
+    const totalVenta = totalVentaActual - (valeAplicado ? valeAplicado.importe : 0) - puntosDescuentoAmt;
+
+    if (!pagoEfe || (parseFloat(pagoEfe.recibido) || 0) < totalVenta - 0.01) {
+      showToast(
+        `<i class='fa-solid fa-circle-exclamation'></i> ${I18N.cashTotalRequired}`,
+      );
+      btn.disabled = false;
+      btn.textContent = I18N.charge;
+      return;
+    }
+  }
+
+  const totalEfectivoRecibido = currentPayments
+    .filter((p) => p.metodo === "efectivo")
+    .reduce((sum, p) => sum + (p.recibido || p.importe), 0);
+
+  const totalOtrosPagos = currentPayments
+    .filter((p) => p.metodo !== "efectivo")
+    .reduce((sum, p) => sum + p.importe, 0);
+
+  const totalVenta = totalVentaActual - (valeAplicado ? valeAplicado.importe : 0) - puntosDescuentoAmt;
+  const efectivoNecesario = Math.max(0, totalVenta - totalOtrosPagos);
+  const cambioARetornar = Math.max(0, totalEfectivoRecibido - efectivoNecesario);
+
+  // 2. VALIDACIÓN CAJA: No permitir devolución si no hay efectivo suficiente en el cajón
+  if (cambioARetornar > 0.01) {
+    try {
+      const respCaja = await fetch("./api/cajaEstadoActual.php").then(r => r.json());
+      if (respCaja.ok) {
+        const efectivoEnCaja = parseFloat(respCaja.efectivoActual) || 0;
+        if (cambioARetornar > efectivoEnCaja + 0.01) {
+          showToast(
+            `<i class='fa-solid fa-vault'></i> No hay suficiente efectivo en caja para devolver el cambio (${fmt(cambioARetornar)}). Disponible: ${fmt(efectivoEnCaja)}`,
+          );
+          btn.disabled = false;
+          btn.textContent = "Cobrar";
+          return;
+        }
+      }
+    } catch (errCaja) {
+      console.error("Error validando saldo de caja:", errCaja);
+      // Opcional: ¿Bloqueamos si falla la API de caja? Por seguridad, mejor solo loguear si no es crítico.
+    }
   }
 
   const payload = {
@@ -2041,12 +2109,20 @@ async function ejecutarCobroFinal() {
             : null,
     idCliente: clienteId,
     esFactura: facturaActiva ? 1 : 0,
-    metodoPago: selectedPayment,
+    comentarios:
+      document.getElementById("ticketComentarios")?.value.trim() || null,
+    metodoPago:
+      currentPayments.filter(p => parseFloat(p.importe) > 0).length === 1 
+        ? currentPayments.filter(p => parseFloat(p.importe) > 0)[0].metodo 
+        : "mixto",
+    pagos: currentPayments.filter(p => parseFloat(p.importe) > 0),
     subtotal,
     total: totalFinal,
-    descuentoPct: 0, // Siempre enviamos el importe, no el %
     descuentoAmt: totalDiscountAmt,
     descuentoLabel,
+    puntosGanados: Math.floor(totalVentaActual),
+    puntosCanjeados: puntosCanjeados,
+    puntosDescuentoAmt: puntosDescuentoAmt,
     lineas: items.map((it) => ({
       id: it.id,
       name: it.variant ? `${it.name} (${it.variant})` : it.name,
@@ -2057,46 +2133,19 @@ async function ejecutarCobroFinal() {
       serials: it.serials || [],
     })),
     efectivo: {
-      recibido:
-        parseFloat(document.getElementById("efectivoRecibido").value) || 0,
+      recibido: totalEfectivoRecibido,
     },
-    pagadoACuenta:
-      selectedPayment === "a_cuenta"
-        ? parseFloat(document.getElementById("aCuentaPagado").value) || 0
-        : 0,
-    fechaLimitePago:
-      selectedPayment === "a_cuenta"
-        ? document.getElementById("aCuentaFechaLimite").value
-        : null,
+    idVale: valeAplicado ? valeAplicado.id : null,
+    codigoVale: valeAplicado ? valeAplicado.codigo : null,
+    importeVale: valeAplicado
+      ? Math.min(totalFinal, parseFloat(valeAplicado.importe_restante))
+      : 0,
+    puntosCanjeados: puntosCanjeados,
+    importePuntosCanjeados: puntosDescuentoAmt,
+    codigoCupon:
+      currentPromo && currentPromo.codigo ? currentPromo.codigo : null,
   };
 
-  if (selectedPayment === "financiado") {
-    const totalVenta = payload.total;
-    const entidadEl = document.getElementById("finanEntidad");
-    const mesesEl = document.getElementById("finanMeses");
-    const pagaClienteEl = document.getElementById("finanPagaCliente");
-
-    if (!entidadEl || !entidadEl.value) {
-      showToast("⚠️ Selecciona una entidad financiera");
-      btn.disabled = false;
-      btn.textContent = "Cobrar";
-      return;
-    }
-
-    const meses = parseInt(mesesEl?.value || 12);
-    const pagaCliente = pagaClienteEl?.checked ? true : false;
-
-    payload.financiacion = {
-      idFinanciera: entidadEl.value,
-      meses,
-      cuotaMensual: totalVenta / meses,
-      importeIntereses: 0,
-      modalidad: pagaCliente
-        ? "cliente_paga_intereses"
-        : "vendedor_paga_intereses",
-      notas: "Financiado desde TPV (Smart System)",
-    };
-  }
 
   try {
     const resp = await fetch("./api/guardarVenta.php", {
@@ -2124,7 +2173,7 @@ async function ejecutarCobroFinal() {
       cerrarModalCliente();
       clearCart();
       showToast(
-        "<i class='fa-solid fa-circle-check'></i> Venta guardada correctamente",
+        `<i class='fa-solid fa-circle-check'></i> ${I18N.successSave}`,
       );
     } else {
       throw new Error("La API no devolvió los datos de la venta.");
@@ -2134,14 +2183,13 @@ async function ejecutarCobroFinal() {
     showToast("<i class='fa-solid fa-circle-xmark'></i> " + err.message);
   } finally {
     btn.disabled = false;
-    btn.textContent = "Cobrar";
+    btn.textContent = I18N.charge;
   }
 }
 
 function validarACuenta() {
-  const pagado =
-    parseFloat(document.getElementById("aCuentaPagado").value) || 0;
-  const fecha = document.getElementById("aCuentaFechaLimite").value;
+  const pagado = parseFloat(document.getElementById("aCuentaPagado")?.value) || 0;
+  const fecha = document.getElementById("aCuentaFechaLimite")?.value;
   const errFecha = document.getElementById("err-aCuentaFecha");
   const btn = document.getElementById("confirmarClienteBtn");
   const alerta = document.getElementById("aCuentaAlertaCliente");
@@ -2152,13 +2200,14 @@ function validarACuenta() {
     alerta.style.display = ""; // Remove any inline style
   }
 
-  const total = parseFloat(
-    document.getElementById("totalAmt").textContent.replace(",", "."),
-  );
+  const elTotal = document.getElementById("mixTotalVenta") || document.getElementById("totalAmt");
+  const total = elTotal ? parseFloat(elTotal.textContent.replace(",", ".")) || 0 : 0;
 
-  btn.disabled = false;
+  if (btn) btn.disabled = false;
 
-  if (selectedPayment === "a_cuenta") {
+  const tieneAcuenta = selectedPayment === "a_cuenta" || currentPayments.some(p => p.metodo === "a_cuenta");
+
+  if (tieneAcuenta) {
     const clienteId =
       tipoClienteActual === "socio"
         ? socioActual
@@ -2170,12 +2219,12 @@ function validarACuenta() {
 
     if (!clienteId && tipoClienteActual !== "empresa") {
       if (alerta) alerta.classList.remove("d-none");
-      btn.disabled = true;
+      if (btn) btn.disabled = true;
     }
 
     if (!fecha) {
-      if (errFecha) errFecha.innerText = "La fecha límite es obligatoria";
-      btn.disabled = true;
+      if (errFecha) errFecha.innerText = I18N.dateRequired;
+      if (btn) btn.disabled = true;
     }
 
     if (pagado >= total) {
@@ -2236,7 +2285,7 @@ function mostrarTicket(v, isFromTPV = true) {
   const errEmail = document.getElementById("err-email");
   if (errEmail) errEmail.innerText = "";
 
-  const fmt2 = (n) => parseFloat(n).toFixed(2).replace(".", ",") + " €";
+  // uses global fmt(n)
 
   let date = new Date();
   if (v.fecha) {
@@ -2252,7 +2301,7 @@ function mostrarTicket(v, isFromTPV = true) {
   const isFactura = v.tipo_cliente === "empresa" || v.es_factura == 1;
   const el_tkTipoDoc = document.getElementById("tkTipoDoc");
   if (el_tkTipoDoc)
-    el_tkTipoDoc.textContent = isFactura ? "FACTURA" : "TICKET DE VENTA";
+    el_tkTipoDoc.textContent = isFactura ? I18N.invoice : I18N.ticket;
 
   const ticketWrapper = document.getElementById("ticketContenido");
   if (ticketWrapper) {
@@ -2286,15 +2335,44 @@ function mostrarTicket(v, isFromTPV = true) {
     if (nifMeta) nifMeta.classList.add("d-none");
   }
 
+  // Fidelización: Actualizar información de puntos en el ticket
+  const el_pointsEarned = document.getElementById("tkPointsEarnedTotal");
+  const el_pointsRedeemed = document.getElementById("tkPointsRedeemed");
+  const el_pointsBalance = document.getElementById("tkPointsTotalBalance");
+  
+  if (el_pointsEarned) el_pointsEarned.textContent = v.puntos_ganados || 0;
+  if (el_pointsRedeemed) el_pointsRedeemed.textContent = v.puntos_canjeados || 0;
+  if (el_pointsBalance) {
+      // Si tenemos información del balance actual del cliente, la mostramos
+      el_pointsBalance.textContent = v.puntos_cliente_actual || "—";
+  }
+
+  // Resetear pestañas del ticket
+  switchTicketTab('summary');
+
   const el_tkNumero = document.getElementById("tkNumero");
-  if (el_tkNumero)
-    el_tkNumero.textContent = "#" + String(v.numero_ticket).padStart(4, "0");
+  if (el_tkNumero) {
+    const esFactura = v.tipo_cliente === 'empresa' || v.es_factura == 1;
+    el_tkNumero.textContent = window.formatTicketNumber ? window.formatTicketNumber(v.numero_ticket, v.fecha, esFactura) : v.numero_ticket;
+  }
   const el_tkFecha = document.getElementById("tkFecha");
   if (el_tkFecha) el_tkFecha.textContent = fechaStr;
   const el_tkMetodo = document.getElementById("tkMetodo");
   if (el_tkMetodo)
     el_tkMetodo.textContent =
       v.metodo_pago.charAt(0).toUpperCase() + v.metodo_pago.slice(1);
+
+  // Mostrar comentarios si existen
+  const commentsSec = document.getElementById("tkCommentsSection");
+  const commentsTxt = document.getElementById("tkCommentsText");
+  if (commentsSec && commentsTxt) {
+    if (v.comentarios && v.comentarios.trim() !== "") {
+      commentsTxt.textContent = v.comentarios;
+      commentsSec.classList.remove("d-none");
+    } else {
+      commentsSec.classList.add("d-none");
+    }
+  }
 
   const tkCajero = document.getElementById("tkCajero");
   if (tkCajero) {
@@ -2323,10 +2401,10 @@ function mostrarTicket(v, isFromTPV = true) {
                   <span style="font-weight:600; ${l.devuelta ? "text-decoration:line-through;" : ""}">${l.nombre_producto}</span>
                   <span style="color:var(--text-muted); font-size:11px; margin-left:6px;">${l.codigo_producto}</span>
                 </div>
-                <span style="font-family:'DM Mono',monospace; font-weight:600;">${fmt2(l.total_linea)}</span>
+                <span style="font-family:'DM Mono',monospace; font-weight:600;">${fmt(l.total_linea)}</span>
               </div>
               <div style="display:flex; align-items:center; gap:8px; margin-top:4px;">
-                <span style="color:var(--text-muted); font-size:11px;">${l.cantidad} × ${fmt2(l.precio_unitario)}</span>
+                <span style="color:var(--text-muted); font-size:11px;">${l.cantidad} × ${fmt(l.precio_unitario)}</span>
                 <span class="fs-10 px-6 py-2 br-4" style="background:${isExpired ? "var(--red-light)" : "var(--green-light)"}; color:${isExpired ? "var(--red)" : "var(--green)"}; font-weight:700;">
                   <i class="fa-solid fa-shield-halved"></i>
                   ${isExpired ? "Garantía AGOTADA" : "Garantía hasta " + gStr}
@@ -2349,45 +2427,96 @@ function mostrarTicket(v, isFromTPV = true) {
       })
       .join("");
 
-  const el_tkSubtotal = document.getElementById("tkSubtotal");
-  if (el_tkSubtotal) el_tkSubtotal.textContent = fmt2(v.subtotal);
-  const el_tkBase = document.getElementById("tkBase");
-  if (el_tkBase) el_tkBase.textContent = fmt2(v.base_imponible);
-  const el_tkIva = document.getElementById("tkIva");
-  if (el_tkIva) el_tkIva.textContent = fmt2(v.iva_amt);
+  // ── Desglose IVA por tipo (calculado desde las líneas) ─────────────────────
+  const el_tkSubtotalRow = document.getElementById("tkSubtotalRow");
+  const el_tkIvaDesglose = document.getElementById("tkIvaDesglose");
   const el_tkTotal = document.getElementById("tkTotal");
-  if (el_tkTotal) el_tkTotal.textContent = fmt2(v.total);
+
+  const vTotal = parseFloat(v.total) || 0;
+  const vSubtotal = parseFloat(v.subtotal) || 0;
+  const vDescAmt = parseFloat(v.descuento_amt) || 0;
+  const vDescPct = parseFloat(v.descuento_pct) || 0;
+
+  // Si no hay ningún descuento aplicado, calcular directamente desde las líneas (factorDesc=1)
+  // Si hay descuento, prorratear usando v.total / v.subtotal para distribuirlo proporcionalmente
+  const factorDesc =
+    (vDescAmt > 0 || vDescPct > 0) && vSubtotal > 0 ? vTotal / vSubtotal : 1;
+
+  // Agrupar base e IVA por tipo, usando total_linea y excluyendo devueltas
+  const ivaGrupos = {};
+  v.lineas.forEach((l) => {
+    if (l.devuelta) return;
+    const rate = parseFloat(l.iva_aplicado ?? 21);
+    const pvpDesc = parseFloat(l.total_linea) * factorDesc;
+    const base = pvpDesc / (1 + rate / 100);
+    const tax = pvpDesc - base;
+    if (!ivaGrupos[rate]) ivaGrupos[rate] = { base: 0, tax: 0 };
+    ivaGrupos[rate].base += base;
+    ivaGrupos[rate].tax += tax;
+  });
+
+  // TOTAL coherente: suma exacta del desglose (base+tax de cada grupo)
+  // Esto evita que un v.total incorrecto en BD cause inconsistencias visuales
+  const displayTotal = Object.values(ivaGrupos).reduce(
+    (acc, g) => acc + g.base + g.tax,
+    0,
+  );
+
+  // Actualizar TOTAL derivado del desglose
+  if (el_tkTotal) el_tkTotal.textContent = fmt(displayTotal);
+
+  // Ocultar fila Subtotal genérica (queda reemplazada por el desglose)
+  if (el_tkSubtotalRow) el_tkSubtotalRow.style.display = "none";
+
+  // Renderizar una fila Base imponible + IVA por cada tipo de IVA
+  if (el_tkIvaDesglose) {
+    el_tkIvaDesglose.innerHTML = Object.entries(ivaGrupos)
+      .sort(([a], [b]) => parseFloat(a) - parseFloat(b))
+      .map(
+        ([rate, data]) => `
+        <div class="ticket-total-row label text-muted">
+          <span>Base imponible (${rate}%)</span><span>${fmt(data.base)}</span>
+        </div>
+        <div class="ticket-total-row label text-muted">
+          <span>IVA ${rate}%</span><span>${fmt(data.tax)}</span>
+        </div>
+      `,
+      )
+      .join("");
+  }
 
   const tkEfectivoRow = document.getElementById("tkEfectivoRow");
   if (tkEfectivoRow) {
-    if (v.metodo_pago === "efectivo" && parseFloat(v.efectivo_recibido) > 0) {
+    let tieneEfectivo = (v.metodo_pago === "efectivo");
+    let importeEfectivoMixto = 0;
+    if (v.metodo_pago === "mixto" && v.pagos && v.pagos.length > 0) {
+      v.pagos.forEach(p => {
+        if (p.metodo_pago === "efectivo" && parseFloat(p.importe) > 0) {
+          tieneEfectivo = true;
+          importeEfectivoMixto += parseFloat(p.importe);
+        }
+      });
+    }
+
+    if (tieneEfectivo && parseFloat(v.efectivo_recibido) > 0) {
       tkEfectivoRow.classList.remove("d-none");
       const el_tkEntregado = document.getElementById("tkEntregado");
       const el_tkCambio = document.getElementById("tkCambio");
-      if (el_tkEntregado)
-        el_tkEntregado.textContent = fmt2(v.efectivo_recibido);
-      if (el_tkCambio)
-        el_tkCambio.textContent = fmt2(v.efectivo_recibido - v.total);
+      
+      let efectivoCambio = 0;
+      if (v.metodo_pago === "mixto") {
+         efectivoCambio = Math.max(0, parseFloat(v.efectivo_recibido) - importeEfectivoMixto);
+      } else {
+         efectivoCambio = Math.max(0, parseFloat(v.efectivo_recibido) - displayTotal);
+      }
+
+      if (el_tkEntregado) el_tkEntregado.textContent = fmt(v.efectivo_recibido);
+      if (el_tkCambio) el_tkCambio.textContent = fmt(efectivoCambio);
     } else {
       tkEfectivoRow.classList.add("d-none");
     }
   }
 
-  const tkFinancingRow = document.getElementById("tkFinancingRow");
-  if (tkFinancingRow) {
-    if (v.metodo_pago === "financiado" && v.nombre_financiera) {
-      tkFinancingRow.classList.remove("d-none");
-      const el_tkFinanEntidad = document.getElementById("tkFinanEntidad");
-      const el_tkFinanPlazo = document.getElementById("tkFinanPlazo");
-      const el_tkFinanCuota = document.getElementById("tkFinanCuota");
-      if (el_tkFinanEntidad)
-        el_tkFinanEntidad.textContent = v.nombre_financiera;
-      if (el_tkFinanPlazo) el_tkFinanPlazo.textContent = v.meses + " meses";
-      if (el_tkFinanCuota) el_tkFinanCuota.textContent = fmt2(v.cuota_mensual);
-    } else {
-      tkFinancingRow.classList.add("d-none");
-    }
-  }
 
   // --- NUEVO: MOSTRAR PAGOS PARCIALES ---
   const tkPagosSection = document.getElementById("tkPagosSection");
@@ -2410,6 +2539,9 @@ function mostrarTicket(v, isFromTPV = true) {
           tkPagosLista.innerHTML =
             '<div class="text-muted fs-11">No hay abonos registrados aún.</div>';
         } else {
+          // Factor de corrección: si total en BD difiere del displayTotal (ventas con datos corruptos)
+          // escalamos los importes para que sean coherentes con el desglose
+          const pagoFactor = vTotal > 0 ? displayTotal / vTotal : 1;
           tkPagosLista.innerHTML = v.pagos
             .map((p) => {
               const fStr = new Date(p.fecha).toLocaleString("es-ES", {
@@ -2421,7 +2553,7 @@ function mostrarTicket(v, isFromTPV = true) {
               return `
               <div style="display: flex; justify-content: space-between; font-size: 11px; border-bottom: 1px solid rgba(0,0,0,0.05); padding-bottom: 2px;">
                 <span><span class="text-muted">${fStr}</span> · ${mtd} ${p.nombre_usuario ? "(" + p.nombre_usuario + ")" : ""}</span>
-                <span class="font-mono text-success fw-bold">+${fmt2(p.importe)}</span>
+                <span class="font-mono text-success fw-bold">+${fmt(parseFloat(p.importe) * pagoFactor)}</span>
               </div>
             `;
             })
@@ -2463,7 +2595,7 @@ function mostrarTicket(v, isFromTPV = true) {
       if (el_tkDescAmt) {
         el_tkDescAmt.textContent =
           "−" +
-          fmt2(
+          fmt(
             discountAmt > 0
               ? discountAmt
               : (parseFloat(v.subtotal) * discountPctVal) / 100,
@@ -2475,6 +2607,9 @@ function mostrarTicket(v, isFromTPV = true) {
   }
 
   document.getElementById("ticketModal").classList.add("visible");
+
+  // Sincronizar estado en la UI de fondo (Historial)
+  updateVentaStatusUI(v.numero_ticket, v.estado, v);
 }
 
 async function imprimirTicket() {
@@ -2487,46 +2622,23 @@ async function imprimirTicket() {
   window.open(`./api/imprimirTicket.php?id=${currentTicketNum}`, "_blank");
 }
 
-async function descargarPDFTicket() {
+function descargarPDFTicket() {
   if (!currentTicketNum) {
     showToast("<i class='fa-solid fa-circle-xmark'></i> No hay ticket cargado");
     return;
   }
 
-  showToast(
-    "<i class='fa-solid fa-spinner fa-spin'></i> Preparando PDF...",
-    "info",
-  );
+  const isFactura =
+    document.getElementById("tkTipoDoc")?.textContent.includes("FACTURA") ||
+    false;
+  const tipo = isFactura ? "factura" : "ticket";
 
-  try {
-    // Obtenemos el HTML procesado
-    const resp = await fetch(
-      `./api/generarPDFTicket.php?id=${currentTicketNum}`,
-    );
-    const html = await resp.text();
-
-    const opt = {
-      margin: 10,
-      filename: `ElectronBazar_Ticket_${currentTicketNum}.pdf`,
-      image: { type: "jpeg", quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true },
-      jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-    };
-
-    // Generamos y descargamos
-    html2pdf().set(opt).from(html).save();
-
-    showToast(
-      "<i class='fa-solid fa-circle-check'></i> PDF descargado correctamente",
-      "success",
-    );
-  } catch (e) {
-    console.error("Error al generar PDF:", e);
-    showToast(
-      "<i class='fa-solid fa-circle-xmark'></i> Error al generar el PDF",
-      "error",
-    );
-  }
+  const a = document.createElement("a");
+  a.href = `./api/generarPDFTicket.php?id=${currentTicketNum}&tipo=${tipo}`;
+  a.target = "_blank"; // Abrir en pestaña nueva para evitar bloqueos
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 }
 
 async function enviarTicketEmail() {
@@ -2672,7 +2784,7 @@ async function procesarAbonoParcial() {
 
   if (
     window.currentVentaPendiente !== undefined &&
-    importe > window.currentVentaPendiente
+    importe - window.currentVentaPendiente > 0.001
   ) {
     showToast(
       "⚠️ El importe introducido (" +
@@ -2721,11 +2833,32 @@ async function procesarAbonoParcial() {
   }
 }
 
-function updateVentaStatusUI(numTicket, nuevoEstado) {
+function updateVentaStatusUI(numTicket, nuevoEstado, extraData) {
   const el = document.getElementById("status-venta-" + numTicket);
   if (!el) return;
 
-  if (nuevoEstado === "devuelta") {
+  if (nuevoEstado === "completada") {
+    el.innerHTML = `
+      <span class="status-pill status-active" title="Venta finalizada">
+        <i class="fa-solid fa-check"></i>
+      </span>
+    `;
+  } else if (nuevoEstado === "pendiente_pago") {
+    const total = parseFloat(extraData.total || 0);
+    const pagado = parseFloat(extraData.pagado_a_cuenta || 0);
+    const pendiente = total - pagado;
+    const fechaLimite = extraData.fecha_limite_pago;
+    const vencida =
+      fechaLimite && new Date(fechaLimite) < new Date().setHours(0, 0, 0, 0);
+
+    el.innerHTML = `
+      <span class="status-pill ${vencida ? "status-overdue" : "status-pending"}"
+            title="${vencida ? "PAGO VENCIDO" : "Pendiente de cobro"} (Deuda: ${pendiente.toFixed(2).replace(".", ",")}€)">
+        <i class="fa-solid ${vencida ? "fa-triangle-exclamation" : "fa-clock"}"></i>
+        ${vencida ? "VENCIDA" : "PENDIENTE"}
+      </span>
+    `;
+  } else if (nuevoEstado === "devuelta") {
     el.innerHTML = `
       <span class="status-pill" style="background: var(--red-light); color: var(--red); border-color: var(--red);" title="Venta devuelta">
         <i class="fa-solid fa-rotate-left"></i> Devuelta
@@ -2871,17 +3004,47 @@ async function guardarNuevoProducto() {
   }
 }
 
+function updateEditMargin() {
+  const price = parseFloat(document.getElementById("editPrice")?.value) || 0;
+  const cost = parseFloat(document.getElementById("editCost")?.value) || 0;
+  const margin = price - cost;
+  const marginPct = price > 0 ? (margin / price) * 100 : 0;
+
+  const display = document.getElementById("editMarginDisplay");
+  const pctDisplay = document.getElementById("editMarginPercent");
+  const container = display?.parentElement;
+
+  if (display) display.textContent = fmt(margin);
+  if (pctDisplay) pctDisplay.textContent = marginPct.toFixed(1) + "%";
+
+  if (container) {
+    if (margin > 0) {
+      container.style.color = "var(--green)";
+    } else if (margin < 0) {
+      container.style.color = "var(--red)";
+    } else {
+      container.style.color = "var(--text-muted)";
+    }
+  }
+}
+
+window.updateEditMargin = updateEditMargin;
+
 function editProduct(e, id) {
   e.stopPropagation();
   if (!requireAdmin()) return;
   const p = PRODUCTS.find((x) => x.id === id);
+  const effPrice = typeof getEffectivePrice === "function" ? getEffectivePrice(p, socioActual) : p.price;
+  window._currentEditFactor = p.price > 0.01 ? (effPrice / p.price) : 1;
+  
   document.getElementById("editId").value = p.id;
   document.getElementById("editName").value = p.name;
   document.getElementById("editSku").value = p.codigo;
-  document.getElementById("editPrice").value = p.price;
-  document.getElementById("editIva").value = p.iva || 21;
+  document.getElementById("editPrice").value = effPrice;
+  document.getElementById("editCost").value = p.precio_coste || 0;
   document.getElementById("editMesesGarantia").value = p.meses_garantia || 24;
   document.getElementById("editEmoji").value = p.icono;
+  updateEditMargin();
 
   const preview = document.getElementById("editImgPreview");
   if (p.icono && p.icono.startsWith("data:image")) {
@@ -2931,13 +3094,14 @@ async function saveEdit() {
     const id = parseInt(document.getElementById("editId")?.value);
     const name = document.getElementById("editName")?.value.trim();
     const codigo = document.getElementById("editSku")?.value.trim();
-    const price = parseFloat(document.getElementById("editPrice")?.value);
-    const iva = parseFloat(document.getElementById("editIva")?.value) || 21;
+    const modalPrice = parseFloat(document.getElementById("editPrice")?.value);
+    const priceToSave = modalPrice / (window._currentEditFactor || 1);
+    const pOrig = PRODUCTS.find((x) => x.id === id);
+    const iva = pOrig.iva || 21;
     const mesesGarantia =
       parseInt(document.getElementById("editMesesGarantia")?.value) || 24;
     const icono = document.getElementById("editEmoji")?.value.trim();
 
-    const pOrig = PRODUCTS.find((x) => x.id === id);
     const resp = await fetch("./api/gestionProducto.php", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -2946,7 +3110,7 @@ async function saveEdit() {
         id,
         nombre: name,
         referencia: codigo,
-        precio_venta: price,
+        precio_venta: priceToSave,
         precio_coste: pOrig.precio_coste || 0,
         iva,
         stock_actual: pOrig.stock || 0,
@@ -2956,6 +3120,7 @@ async function saveEdit() {
         categoria: pOrig.cat,
         descripcion: pOrig.descripcion || "",
         variantes: getVariantsFromUI("edit"),
+        motivo_cambio_precio: "Cambio rápido desde TPV"
       }),
     });
     const data = await resp.json();
@@ -2978,7 +3143,7 @@ async function saveEdit() {
     const p = PRODUCTS.find((x) => x.id === id);
     p.name = name;
     p.codigo = codigo;
-    p.price = price;
+    p.price = priceToSave;
     p.iva = iva;
     p.meses_garantia = mesesGarantia;
     p.icono = icono || p.icono;
@@ -2986,10 +3151,7 @@ async function saveEdit() {
 
     document.getElementById("editModal").classList.remove("visible");
     renderProducts();
-    const d = data._debug || {};
-    showToast(
-      `✅ Enviado IVA=${d.enviado_iva} → BD=${d.bd_iva} | Meses=${d.enviado_meses} → BD=${d.bd_meses}`,
-    );
+    showToast("✅ Producto actualizado correctamente");
   } catch (err) {
     showToast("<i class='fa-solid fa-circle-xmark'></i> " + err.message);
   }
@@ -3297,6 +3459,18 @@ function applyAdvancedFilters() {
 }
 
 // ── Reloj ──────────────────────────────────────────────────────────────────────
+function fmt(n) {
+  return new Intl.NumberFormat("es-ES", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(n) + " €";
+}
+
+// Variables globales para fidelización (Portadas de PaymentManager)
+let puntosCanjeados = 0;
+let puntosDescuentoAmt = 0;
+let clienteActualPuntos = 0;
+
 function tick() {
   const clockEl = document.getElementById("clock");
   const dateEl = document.getElementById("datestr");
@@ -3356,4 +3530,55 @@ if (productsGrid) {
 
   renderProducts();
   updatePostponeUI();
+}
+
+// ── Producto Comodín ───────────────────────────────────────────────────────────
+function abrirModalComodin() {
+  document.getElementById("comodinDesc").value = "";
+  document.getElementById("comodinPrice").value = "";
+  document.getElementById("comodinIva").value = "21";
+  document.getElementById("comodinError").classList.add("d-none");
+  document.getElementById("modalComodin").classList.add("visible");
+  document.getElementById("comodinDesc").focus();
+}
+
+function cerrarModalComodin() {
+  document.getElementById("modalComodin").classList.remove("visible");
+}
+
+function agregarComodin() {
+  const desc = document.getElementById("comodinDesc").value.trim();
+  const price = parseFloat(document.getElementById("comodinPrice").value);
+  const iva = parseFloat(document.getElementById("comodinIva").value);
+  const errorEl = document.getElementById("comodinError");
+
+  if (!desc) {
+    errorEl.textContent = I18N.customDescError || "Introduce una descripción";
+    errorEl.classList.remove("d-none");
+    return;
+  }
+  if (isNaN(price) || price < 0) {
+    errorEl.textContent = I18N.customPriceError || "Introduce un precio válido";
+    errorEl.classList.remove("d-none");
+    return;
+  }
+
+  const timestamp = new Date().getTime();
+  const cartKey = `comodin_${timestamp}`;
+
+  cart[cartKey] = {
+    id: -1,
+    name: desc,
+    codigo: "COMODIN",
+    price: price,
+    iva: iva,
+    qty: 1,
+    icono: '<i class="fa-solid fa-box-open"></i>',
+    maxStock: 999999,
+    cartKey: cartKey,
+  };
+
+  cerrarModalComodin();
+  renderCart();
+  showToast('<i class="fa-solid fa-check"></i> Producto añadido');
 }

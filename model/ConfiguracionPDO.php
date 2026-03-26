@@ -1,5 +1,5 @@
 <?php
-require_once 'DBPDO.php';
+require_once __DIR__ . '/DBPDO.php';
 
 class ConfiguracionPDO
 {
@@ -48,13 +48,18 @@ class ConfiguracionPDO
         $db->beginTransaction();
 
         try {
-            $sql = "UPDATE configuracion SET valor = :valor WHERE clave = :clave";
+            // Usamos INSERT ... ON DUPLICATE KEY UPDATE para manejar claves que no existen todavía
+            $sql = "INSERT INTO configuracion (clave, valor) VALUES (:clave, :valor) 
+                    ON DUPLICATE KEY UPDATE valor = VALUES(valor)";
             $stmt = $db->prepare($sql);
-
+ 
             foreach ($configuraciones as $clave => $valor) {
-                $stmt->execute([':valor' => $valor, ':clave' => $clave]);
+                // Solo guardar si la clave no está vacía
+                if (!empty($clave)) {
+                    $stmt->execute([':valor' => $valor, ':clave' => $clave]);
+                }
             }
-
+ 
             $db->commit();
             return true;
         } catch (Exception $e) {

@@ -1,42 +1,46 @@
-</header>
+<?php
+/**
+ * Vista: vDashboard
+ */
+?>
 <div class="main-full dashboard-wrapper">
     <div class="dashboard-card border-none shadow-lg">
 
         <div class="dashboard-header text-left ai-start pb-20 border-bottom mb-32">
             <div class="d-flex ai-center gap-12 mb-8">
                 <i class="fa-solid fa-bolt-lightning text-accent fs-32"></i>
-                <h1 class="m-0 fs-28">Panel de Control</h1>
+                <h1 class="m-0 fs-28"><?php echo L('dashboard_title'); ?></h1>
             </div>
-            <p class="fs-14 m-0 text-muted">Gestión integral del sistema · <span class="text-green font-bold">Terminal Activo</span></p>
+            <p class="fs-14 m-0 text-muted"><?php echo L('dashboard_subtitle'); ?> · <span class="text-green font-bold"><?php echo L('dashboard_status_active'); ?></span></p>
         </div>
 
         <?php if ($_SESSION['usuarioActualTPV']->getRol() === 'admin' && $avDashboard['kpis']): ?>
             <!-- KPI CARDS (Only for Admin) -->
             <div class="d-grid gap-16 mb-32" style="grid-template-columns: repeat(5, 1fr);">
                 <div class="kpi-card p-16 bg-blue-light br-16 border-2 border-blue d-flex flex-column">
-                    <div class="fs-12 text-muted tt-uppercase font-bold mb-8">Ventas Totales</div>
+                    <div class="fs-12 text-muted tt-uppercase font-bold mb-8"><?php echo L('dashboard_kpi_total_sales'); ?></div>
                     <div class="fs-24 font-mono font-bold text-accent"><?php echo number_format($avDashboard['kpis']['total_ventas'] ?? 0, 2, ',', '.'); ?> €</div>
-                    <div class="fs-11 text-muted mt-4">Últimos 7 días</div>
+                    <div class="fs-11 text-muted mt-4"><?php echo L('dashboard_kpi_last_7_days'); ?></div>
                 </div>
                 <div class="kpi-card p-16 bg-green-light br-16 border-2 border-green d-flex flex-column">
-                    <div class="fs-12 text-muted tt-uppercase font-bold mb-8">Margen Estimado</div>
+                    <div class="fs-12 text-muted tt-uppercase font-bold mb-8"><?php echo L('dashboard_kpi_margin'); ?></div>
                     <div class="fs-24 font-mono font-bold text-green"><?php echo number_format($avDashboard['kpis']['margen_estimado'] ?? 0, 2, ',', '.'); ?> €</div>
-                    <div class="fs-11 text-muted mt-4">Beneficio bruto aprox.</div>
+                    <div class="fs-11 text-muted mt-4"><?php echo L('dashboard_kpi_margin_sub'); ?></div>
                 </div>
                 <div class="kpi-card p-16 bg-surface2 br-16 border-2 d-flex flex-column">
-                    <div class="fs-12 text-muted tt-uppercase font-bold mb-8">Operaciones</div>
+                    <div class="fs-12 text-muted tt-uppercase font-bold mb-8"><?php echo L('dashboard_kpi_operations'); ?></div>
                     <div class="fs-24 font-mono font-bold"><?php echo $avDashboard['kpis']['total_tickets'] ?? 0; ?></div>
-                    <div class="fs-11 text-muted mt-4">Tickets realizados</div>
+                    <div class="fs-11 text-muted mt-4"><?php echo L('dashboard_kpi_operations_sub'); ?></div>
                 </div>
                 <div class="kpi-card p-16 bg-surface2 br-16 border-2 d-flex flex-column">
-                    <div class="fs-12 text-muted tt-uppercase font-bold mb-8">Catálogo</div>
+                    <div class="fs-12 text-muted tt-uppercase font-bold mb-8"><?php echo L('dashboard_kpi_catalog'); ?></div>
                     <div class="fs-24 font-mono font-bold"><?php echo $avDashboard['productos_count']; ?></div>
-                    <div class="fs-11 text-muted mt-4">Productos activos</div>
+                    <div class="fs-11 text-muted mt-4"><?php echo L('dashboard_kpi_catalog_sub'); ?></div>
                 </div>
                 <div class="kpi-card p-16 <?php echo ($avDashboard['bajo_stock_count'] > 0) ? 'bg-red-light border-red' : 'bg-surface2'; ?> br-16 border-2 d-flex flex-column clickable" onclick="irAProductosBajoStock()">
-                    <div class="fs-12 text-muted tt-uppercase font-bold mb-8">Bajo Stock</div>
+                    <div class="fs-12 text-muted tt-uppercase font-bold mb-8"><?php echo L('dashboard_kpi_low_stock'); ?></div>
                     <div class="fs-24 font-mono font-bold <?php echo ($avDashboard['bajo_stock_count'] > 0) ? 'text-red' : ''; ?>"><?php echo $avDashboard['bajo_stock_count']; ?></div>
-                    <div class="fs-11 text-muted mt-4">Requieren reposición</div>
+                    <div class="fs-11 text-muted mt-4"><?php echo L('dashboard_kpi_low_stock_sub'); ?></div>
                 </div>
             </div>
             <script>
@@ -64,14 +68,14 @@
                     <?php if (isset($avDashboard['cajaAbierta']) && $avDashboard['cajaAbierta']): ?>
                         <button type="submit" name="irTPV" class="dashboard-btn">
                             <i class="fa-solid fa-cart-shopping"></i>
-                            <span class="btn-title">Ventas TPV</span>
-                            <span class="btn-desc">Acceder al panel de ventas y cobro</span>
+                            <span class="btn-title"><?php echo L('dashboard_btn_tpv'); ?></span>
+                            <span class="btn-desc"><?php echo L('dashboard_btn_tpv_sub'); ?></span>
                         </button>
                     <?php else: ?>
                         <button type="submit" name="irTPV" class="dashboard-btn" style="border-color: var(--orange); background: rgba(255,165,0,0.05);">
                             <i class="fa-solid fa-cash-register text-orange"></i>
-                            <span class="btn-title text-orange">Abrir Caja</span>
-                            <span class="btn-desc">Iniciar turno para poder realizar ventas</span>
+                            <span class="btn-title text-orange"><?php echo L('dashboard_btn_open_cash'); ?></span>
+                            <span class="btn-desc"><?php echo L('dashboard_btn_open_cash_sub'); ?></span>
                         </button>
                     <?php endif; ?>
                 </form>
@@ -81,8 +85,8 @@
                     <form method="post">
                         <button type="submit" name="irUsuarios" class="dashboard-btn">
                             <i class="fa-solid fa-users-gear"></i>
-                            <span class="btn-title">Gestión de Personal</span>
-                            <span class="btn-desc">Administrar usuarios y permisos</span>
+                            <span class="btn-title"><?php echo L('dashboard_btn_users'); ?></span>
+                            <span class="btn-desc"><?php echo L('dashboard_btn_users_sub'); ?></span>
                         </button>
                     </form>
 
@@ -90,8 +94,8 @@
                     <form method="post">
                         <button type="submit" name="irClientes" class="dashboard-btn">
                             <i class="fa-solid fa-user-group"></i>
-                            <span class="btn-title">Clientes y Socios</span>
-                            <span class="btn-desc">Gestionar clientes habituales y socios del TPV</span>
+                            <span class="btn-title"><?php echo L('dashboard_btn_clients'); ?></span>
+                            <span class="btn-desc"><?php echo L('dashboard_btn_clients_sub'); ?></span>
                         </button>
                     </form>
 
@@ -99,8 +103,8 @@
                     <form method="post">
                         <button type="submit" name="irProductos" class="dashboard-btn">
                             <i class="fa-solid fa-box-archive"></i>
-                            <span class="btn-title">Gestión de Productos</span>
-                            <span class="btn-desc">Editar catálogo, precios e iconos</span>
+                            <span class="btn-title"><?php echo L('dashboard_btn_products'); ?></span>
+                            <span class="btn-desc"><?php echo L('dashboard_btn_products_sub'); ?></span>
                         </button>
                     </form>
 
@@ -108,8 +112,8 @@
                     <form method="post">
                         <button type="submit" name="irCompras" class="dashboard-btn">
                             <i class="fa-solid fa-hand-holding-dollar"></i>
-                            <span class="btn-title">Compras y Entradas</span>
-                            <span class="btn-desc">Registrar facturas y reponer stock</span>
+                            <span class="btn-title"><?php echo L('dashboard_btn_purchases'); ?></span>
+                            <span class="btn-desc"><?php echo L('dashboard_btn_purchases_sub'); ?></span>
                         </button>
                     </form>
 
@@ -117,8 +121,8 @@
                     <form method="post">
                         <button type="submit" name="irProveedores" class="dashboard-btn">
                             <i class="fa-solid fa-truck-field"></i>
-                            <span class="btn-title">Proveedores</span>
-                            <span class="btn-desc">Gestionar listín y régimen fiscal</span>
+                            <span class="btn-title"><?php echo L('dashboard_btn_providers'); ?></span>
+                            <span class="btn-desc"><?php echo L('dashboard_btn_providers_sub'); ?></span>
                         </button>
                     </form>
 
@@ -126,8 +130,8 @@
                     <form method="post">
                         <button type="submit" name="irTiposIVA" class="dashboard-btn">
                             <i class="fa-solid fa-percent"></i>
-                            <span class="btn-title">Tipos de IVA</span>
-                            <span class="btn-desc">Configurar tipos de IVA y fechas</span>
+                            <span class="btn-title"><?php echo L('dashboard_btn_iva'); ?></span>
+                            <span class="btn-desc"><?php echo L('dashboard_btn_iva_sub'); ?></span>
                         </button>
                     </form>
 
@@ -135,8 +139,8 @@
                     <form method="post">
                         <button type="submit" name="irTarifas" class="dashboard-btn">
                             <i class="fa-solid fa-arrow-up-wide-short"></i>
-                            <span class="btn-title">Tarifas de precios</span>
-                            <span class="btn-desc">Subidas/bajadas generales por fecha</span>
+                            <span class="btn-title"><?php echo L('dashboard_btn_tariffs'); ?></span>
+                            <span class="btn-desc"><?php echo L('dashboard_btn_tariffs_sub'); ?></span>
                         </button>
                     </form>
 
@@ -144,8 +148,8 @@
                     <form method="post">
                         <button type="submit" name="irPromociones" class="dashboard-btn">
                             <i class="fa-solid fa-ticket-simple"></i>
-                            <span class="btn-title">Descuentos y Promos</span>
-                            <span class="btn-desc">Cupones y reglas de descuento del TPV</span>
+                            <span class="btn-title"><?php echo L('dashboard_btn_discounts'); ?></span>
+                            <span class="btn-desc"><?php echo L('dashboard_btn_discounts_sub'); ?></span>
                         </button>
                     </form>
 
@@ -153,8 +157,8 @@
                     <form method="post">
                         <button type="submit" name="irHistorial" class="dashboard-btn">
                             <i class="fa-solid fa-clock-rotate-left"></i>
-                            <span class="btn-title">Historial de Ventas</span>
-                            <span class="btn-desc">Buscador de tickets y auditoría</span>
+                            <span class="btn-title"><?php echo L('dashboard_btn_history'); ?></span>
+                            <span class="btn-desc"><?php echo L('dashboard_btn_history_sub'); ?></span>
                         </button>
                     </form>
 
@@ -162,8 +166,8 @@
                     <form method="post">
                         <button type="submit" name="irConfiguracion" class="dashboard-btn">
                             <i class="fa-solid fa-gears"></i>
-                            <span class="btn-title">Ajustes del Sistema</span>
-                            <span class="btn-desc">Configuración global y del ticket</span>
+                            <span class="btn-title"><?php echo L('dashboard_btn_settings'); ?></span>
+                            <span class="btn-desc"><?php echo L('dashboard_btn_settings_sub'); ?></span>
                         </button>
                     </form>
 
@@ -172,15 +176,15 @@
                         <input type="hidden" name="Analitica" value="">
                         <button type="submit" class="dashboard-btn">
                             <i class="fa-solid fa-chart-line text-accent"></i>
-                            <span class="btn-title">Analítica Avanzada</span>
-                            <span class="btn-desc">Reportes de ventas, categorías y márgenes</span>
+                            <span class="btn-title"><?php echo L('dashboard_btn_analytics'); ?></span>
+                            <span class="btn-desc"><?php echo L('dashboard_btn_analytics_sub'); ?></span>
                         </button>
                     </form>
                 <?php else: ?>
                     <div class="dashboard-btn-locked">
                         <i class="fa-solid fa-lock"></i>
-                        <span class="btn-title">Administración</span>
-                        <span class="btn-desc">Acceso restringido a administradores</span>
+                        <span class="btn-title"><?php echo L('dashboard_btn_admin_locked'); ?></span>
+                        <span class="btn-desc"><?php echo L('dashboard_btn_admin_locked_sub'); ?></span>
                     </div>
                 <?php endif; ?>
             </div>
@@ -188,32 +192,32 @@
             <?php if ($_SESSION['usuarioActualTPV']->getRol() === 'admin' && !empty($avDashboard['metodos'])): ?>
                 <!-- STATS PANEL (Right side on large screens) -->
                 <div class="stats-panel bg-surface p-16 br-16 border-2">
-                    <div class="fs-13 font-bold tt-uppercase mb-16 pb-8 border-bottom">Distribución de Cobros (7d)</div>
+                    <div class="fs-13 font-bold tt-uppercase mb-16 pb-8 border-bottom"><?php echo L('dashboard_stats_payments'); ?></div>
                     <div class="d-flex flex-column gap-12">
                         <?php foreach ($avDashboard['metodos'] as $m): ?>
+                            <?php if ($m['metodo_pago'] === 'financiado') continue; ?>
                             <div class="d-flex jc-space-between ai-center">
                                 <div class="d-flex ai-center gap-8">
                                     <?php
                                     $icon = 'money-bill-1-wave text-green';
                                     if ($m['metodo_pago'] === 'tarjeta') $icon = 'credit-card text-blue';
                                     if ($m['metodo_pago'] === 'bizum') $icon = 'mobile-screen-button text-accent';
-                                    if ($m['metodo_pago'] === 'financiado') $icon = 'calendar-check text-purple';
                                     ?>
                                     <i class="fa-solid fa-<?php echo $icon; ?>"></i>
-                                    <span class="fs-13 tt-capitalize"><?php echo $m['metodo_pago']; ?></span>
+                                    <span class="fs-13 tt-capitalize"><?php echo L('tpv_method_' . $m['metodo_pago']); ?></span>
                                 </div>
                                 <div class="text-right">
                                     <div class="fs-14 font-mono font-bold"><?php echo number_format($m['total'], 2, ',', '.'); ?> €</div>
-                                    <div class="fs-10 text-muted"><?php echo $m['cantidad']; ?> tickets</div>
+                                    <div class="fs-10 text-muted"><?php echo $m['cantidad']; ?> <?php echo L('dashboard_ops_short'); ?></div>
                                 </div>
                             </div>
                         <?php endforeach; ?>
                     </div>
 
-                    <div class="fs-13 font-bold tt-uppercase mb-16 pb-8 border-bottom mt-24">Ventas por Cajero (7d)</div>
+                    <div class="fs-13 font-bold tt-uppercase mb-16 pb-8 border-bottom mt-24"><?php echo L('dashboard_stats_cashiers'); ?></div>
                     <div class="d-flex flex-column gap-12">
                         <?php if (empty($avDashboard['cajeros'])): ?>
-                            <div class="fs-12 text-muted">No hay ventas registradas.</div>
+                            <div class="fs-12 text-muted"><?php echo L('dashboard_no_sales'); ?></div>
                         <?php else: ?>
                             <?php foreach ($avDashboard['cajeros'] as $c): ?>
                                 <div class="d-flex jc-space-between ai-center">
@@ -223,7 +227,7 @@
                                     </div>
                                     <div class="text-right">
                                         <div class="fs-13 font-bold"><?php echo number_format($c['total'], 2, ',', '.'); ?> €</div>
-                                        <div class="fs-10 text-muted"><?php echo $c['cantidad']; ?> ops.</div>
+                                        <div class="fs-10 text-muted"><?php echo $c['cantidad']; ?> <?php echo L('dashboard_ops_short'); ?></div>
                                     </div>
                                 </div>
                             <?php endforeach; ?>
@@ -231,7 +235,7 @@
                     </div>
 
                     <div class="mt-24 p-12 bg-surface2 br-8 fs-11 text-muted">
-                        <i class="fa-solid fa-circle-info"></i> El margen se calcula restando el coste unitario histórico del precio cobrado en cada venta.
+                        <i class="fa-solid fa-circle-info"></i> <?php echo L('dashboard_margin_info'); ?>
                     </div>
                 </div>
             <?php endif; ?>
