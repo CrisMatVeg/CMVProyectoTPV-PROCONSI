@@ -29,10 +29,11 @@
     // Cargar tema del usuario actual (si existe)
     $themeMode = 'light';
     $themeAccent = 'blue';
+    $themeFont = 'dm-mono';
     if (isset($_SESSION['usuarioActualTPV'])) {
         try {
             $qTheme = DBPDO::ejecutarConsulta(
-                "SELECT theme_mode, theme_accent FROM usuarios WHERE id = :id",
+                "SELECT theme_mode, theme_accent, theme_font FROM usuarios WHERE id = :id",
                 [':id' => $_SESSION['usuarioActualTPV']->getId()]
             );
             $rowTheme = $qTheme->fetch(PDO::FETCH_ASSOC);
@@ -42,6 +43,9 @@
                 }
                 if (!empty($rowTheme['theme_accent'])) {
                     $themeAccent = $rowTheme['theme_accent'];
+                }
+                if (!empty($rowTheme['theme_font'])) {
+                    $themeFont = $rowTheme['theme_font'];
                 }
             }
         } catch (\Throwable $e) {
@@ -59,6 +63,7 @@
         const ESC_POS_ENABLED = true;
         const USER_THEME_MODE = <?php echo json_encode($themeMode); ?>;
         const USER_THEME_ACCENT = <?php echo json_encode($themeAccent); ?>;
+        const USER_THEME_FONT = <?php echo json_encode($themeFont); ?>;
         const I18N = {
             outOfStock: "<?php echo L('tpv_js_out_of_stock', true); ?>",
             lowStockLimit: "<?php echo L('tpv_js_low_stock_limit', true); ?>",
@@ -147,7 +152,8 @@
 
 <body data-page="<?php echo $_SESSION['paginaEnCurso'] ?? ''; ?>"
     data-theme-mode="<?php echo htmlspecialchars($themeMode, ENT_QUOTES, 'UTF-8'); ?>"
-    data-theme-accent="<?php echo htmlspecialchars($themeAccent, ENT_QUOTES, 'UTF-8'); ?>">
+    data-theme-accent="<?php echo htmlspecialchars($themeAccent, ENT_QUOTES, 'UTF-8'); ?>"
+    data-theme-font="<?php echo htmlspecialchars($themeFont, ENT_QUOTES, 'UTF-8'); ?>">
     <!-- TOPBAR -->
     <header class="topbar">
         <div class="topbar-brand">

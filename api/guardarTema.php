@@ -45,6 +45,15 @@ try {
         }
     }
 
+    if (isset($input['theme_font'])) {
+        $font = $input['theme_font'];
+        $validFonts = ['dm-mono', 'inter', 'outfit', 'roboto', 'system'];
+        if (in_array($font, $validFonts, true)) {
+            $campos[] = "theme_font = :font";
+            $params[':font'] = $font;
+        }
+    }
+
     if ($campos) {
         $sql = "UPDATE usuarios SET " . implode(', ', $campos) . " WHERE id = :id";
         DBPDO::ejecutarConsulta($sql, $params);

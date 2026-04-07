@@ -17,8 +17,9 @@ class Usuario
     private $activo;
     private $email;
     private $idioma;
+    private $themeFont;
 
-    public function __construct($id, $nombre, $login, $password, $rol, $activo, $idRol = null, $email = null, $idioma = 'es')
+    public function __construct($id, $nombre, $login, $password, $rol, $activo, $idRol = null, $email = null, $idioma = 'es', $themeFont = 'dm-mono')
     {
         $this->id = $id;
         $this->nombre = $nombre;
@@ -29,11 +30,17 @@ class Usuario
         $this->activo = $activo;
         $this->email = $email;
         $this->idioma = $idioma;
+        $this->themeFont = $themeFont;
     }
 
     // Getters
+    public function getThemeFont()
+    {
+        return $this->themeFont;
+    }
     public function getIdioma()
     {
+
         return $this->idioma;
     }
     public function getId()

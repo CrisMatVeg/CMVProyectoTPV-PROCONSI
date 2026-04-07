@@ -980,6 +980,7 @@ $translations = [
     'profile_accent_red' => 'Rojo',
     'profile_accent_purple' => 'Morado',
     'profile_accent_amber' => 'Ámbar',
+    'profile_theme_font' => 'Tipografía del Sistema',
     'profile_pass_title' => 'Cambiar Contraseña',
     'profile_pass_sub' => 'Deja en blanco si no quieres cambiarla.',
     'profile_pass_current' => 'Contraseña Actual',

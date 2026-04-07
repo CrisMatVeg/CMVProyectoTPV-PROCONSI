@@ -146,56 +146,77 @@ let totalVentaActual = 0; // [NUEVO] Para sincronizar con el modal de cobro
 let checkoutContext = 'mixto'; // [NUEVO] Contexto original del sidebar
 
 // ── Tema (modo + acento) ──────────────────────────────────────────────────────
-function applyTheme(mode, accent) {
-  const body = document.body;
-  if (!body) return;
-  if (mode) body.dataset.themeMode = mode;
-  if (accent) body.dataset.themeAccent = accent;
+function applyTheme(mode, accent, font) {
+    const body = document.body;
+    if (!body) return;
+    if (mode) body.dataset.themeMode = mode;
+    if (accent) body.dataset.themeAccent = accent;
+    if (font) body.dataset.themeFont = font;
 
-  const modeButtons = {
-    light: "themeModeLight",
-    dark: "themeModeDark",
-    black: "themeModeBlack",
-  };
-  const accentButtons = {
-    blue: "themeAccentBlue",
-    green: "themeAccentGreen",
-    red: "themeAccentRed",
-    purple: "themeAccentPurple",
-    amber: "themeAccentAmber",
-  };
+    const modeButtons = {
+        light: "themeModeLight",
+        dark: "themeModeDark",
+        black: "themeModeBlack",
+    };
+    const accentButtons = {
+        blue: "themeAccentBlue",
+        green: "themeAccentGreen",
+        red: "themeAccentRed",
+        purple: "themeAccentPurple",
+        amber: "themeAccentAmber",
+    };
+    const fontButtons = {
+        'dm-mono': "themeFontMono",
+        'inter': "themeFontInter",
+        'outfit': "themeFontOutfit",
+        'roboto': "themeFontRoboto",
+        'system': "themeFontSystem"
+    };
 
-  if (mode) {
-    Object.entries(modeButtons).forEach(([m, id]) => {
-      const btn = document.getElementById(id);
-      if (btn) btn.classList.toggle("active", m === mode);
-    });
-  }
-  if (accent) {
-    Object.entries(accentButtons).forEach(([a, id]) => {
-      const btn = document.getElementById(id);
-      if (btn) btn.classList.toggle("active", a === accent);
-    });
-  }
+    if (mode) {
+        Object.entries(modeButtons).forEach(([m, id]) => {
+            const btn = document.getElementById(id);
+            if (btn) btn.classList.toggle("active", m === mode);
+        });
+    }
+    if (accent) {
+        Object.entries(accentButtons).forEach(([a, id]) => {
+            const btn = document.getElementById(id);
+            if (btn) btn.classList.toggle("active", a === accent);
+        });
+    }
+    if (font) {
+        Object.entries(fontButtons).forEach(([f, id]) => {
+            const btn = document.getElementById(id);
+            if (btn) btn.classList.toggle("active", f === font);
+        });
+    }
 }
 
 function setThemeMode(mode) {
-  applyTheme(mode, null);
-  const input = document.getElementById("theme_mode_input");
-  if (input) input.value = mode;
+    applyTheme(mode, null, null);
+    const input = document.getElementById("theme_mode_input");
+    if (input) input.value = mode;
 }
 
 function setThemeAccent(accent) {
-  applyTheme(null, accent);
-  const input = document.getElementById("theme_accent_input");
-  if (input) input.value = accent;
+    applyTheme(null, accent, null);
+    const input = document.getElementById("theme_accent_input");
+    if (input) input.value = accent;
+}
+
+function setThemeFont(font) {
+    applyTheme(null, null, font);
+    const input = document.getElementById("theme_font_input");
+    if (input) input.value = font;
 }
 
 if (
-  typeof USER_THEME_MODE !== "undefined" ||
-  typeof USER_THEME_ACCENT !== "undefined"
+    typeof USER_THEME_MODE !== "undefined" ||
+    typeof USER_THEME_ACCENT !== "undefined" ||
+    typeof USER_THEME_FONT !== "undefined"
 ) {
-  applyTheme(USER_THEME_MODE || "light", USER_THEME_ACCENT || "blue");
+    applyTheme(USER_THEME_MODE || "light", USER_THEME_ACCENT || "blue", USER_THEME_FONT || "dm-mono");
 }
 
 // ── DOMContentLoaded ──────────────────────────────────────────────────────────

@@ -68,6 +68,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
     id_rol INT,
     theme_mode ENUM('light','dark','black') NOT NULL DEFAULT 'light',
     theme_accent VARCHAR(20) NOT NULL DEFAULT 'blue',
+    theme_font VARCHAR(50) NOT NULL DEFAULT 'dm-mono',
     activo TINYINT(1) DEFAULT 1,
     creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_usuario_rol FOREIGN KEY (id_rol) REFERENCES roles(id) ON DELETE SET NULL

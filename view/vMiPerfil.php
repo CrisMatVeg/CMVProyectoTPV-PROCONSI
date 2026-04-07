@@ -20,6 +20,7 @@
         <form method="post" class="form-grid gap-15 d-flex flex-column" novalidate>
             <input type="hidden" name="theme_mode" id="theme_mode_input">
             <input type="hidden" name="theme_accent" id="theme_accent_input">
+            <input type="hidden" name="theme_font" id="theme_font_input">
             <div class="form-group">
                 <label class="form-label"><?php echo L('profile_label_name'); ?></label>
                 <input type="text" name="nombre_completo" class="form-input" value="<?php echo htmlspecialchars($_REQUEST['nombre_completo'] ?? $avMiPerfil['usuario']->getNombreCompleto()); ?>">
@@ -76,6 +77,27 @@
                 </div>
             </div>
 
+            <div class="form-group mb-0 mt-15">
+                <label class="form-label fs-12"><?php echo L('profile_theme_font'); ?></label>
+                <div class="d-flex gap-8 fw-wrap">
+                    <button type="button" id="themeFontMono" class="cat-tab d-flex ai-center gap-8" style="font-family: 'DM Mono', monospace;" onclick="setThemeFont('dm-mono')">
+                        <i class="fa-solid fa-font"></i> DM Mono
+                    </button>
+                    <button type="button" id="themeFontInter" class="cat-tab d-flex ai-center gap-8" style="font-family: 'Inter', sans-serif;" onclick="setThemeFont('inter')">
+                        <i class="fa-solid fa-font"></i> Inter
+                    </button>
+                    <button type="button" id="themeFontOutfit" class="cat-tab d-flex ai-center gap-8" style="font-family: 'Outfit', sans-serif;" onclick="setThemeFont('outfit')">
+                        <i class="fa-solid fa-font"></i> Outfit
+                    </button>
+                    <button type="button" id="themeFontRoboto" class="cat-tab d-flex ai-center gap-8" style="font-family: 'Roboto', sans-serif;" onclick="setThemeFont('roboto')">
+                        <i class="fa-solid fa-font"></i> Roboto
+                    </button>
+                    <button type="button" id="themeFontSystem" class="cat-tab d-flex ai-center gap-8" style="font-family: system-ui, sans-serif;" onclick="setThemeFont('system')">
+                        <i class="fa-solid fa-font"></i> System Sans
+                    </button>
+                </div>
+            </div>
+
             <hr class="border-none border-top m-10-0">
             <div class="form-label"><?php echo L('profile_pass_title'); ?></div>
             <p class="fs-12 text-muted mt-neg-15"><?php echo L('profile_pass_sub'); ?></p>
@@ -129,9 +151,19 @@
         updateActiveSelectors();
     }
 
+    function setThemeFont(font) {
+        document.body.dataset.themeFont = font;
+        localStorage.setItem('tpv_theme_font', font);
+        const input = document.getElementById('theme_font_input');
+        if (input) input.value = font;
+        updateActiveSelectors();
+    }
+
     function updateActiveSelectors() {
         const mode = document.body.dataset.themeMode || 'light';
         const accent = document.body.dataset.themeAccent || 'blue';
+        const font = document.body.dataset.themeFont || 'dm-mono';
+        
         const modeIds = {
             light: 'themeModeLight',
             dark: 'themeModeDark',
@@ -143,6 +175,13 @@
             red: 'themeAccentRed',
             purple: 'themeAccentPurple',
             amber: 'themeAccentAmber'
+        };
+        const fontIds = {
+            'dm-mono': 'themeFontMono',
+            'inter': 'themeFontInter',
+            'outfit': 'themeFontOutfit',
+            'roboto': 'themeFontRoboto',
+            'system': 'themeFontSystem'
         };
 
         Object.values(modeIds).forEach(id => {
@@ -160,13 +199,23 @@
         if (accentIds[accent] && document.getElementById(accentIds[accent])) {
             document.getElementById(accentIds[accent]).classList.add('active');
         }
+
+        Object.values(fontIds).forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.classList.remove('active');
+        });
+        if (fontIds[font] && document.getElementById(fontIds[font])) {
+            document.getElementById(fontIds[font]).classList.add('active');
+        }
     }
 
     (function initThemeSelectors() {
         updateActiveSelectors();
         const modeInput = document.getElementById('theme_mode_input');
         const accentInput = document.getElementById('theme_accent_input');
+        const fontInput = document.getElementById('theme_font_input');
         if (modeInput) modeInput.value = document.body.dataset.themeMode || 'light';
         if (accentInput) accentInput.value = document.body.dataset.themeAccent || 'blue';
+        if (fontInput) fontInput.value = document.body.dataset.themeFont || 'dm-mono';
     })();
 </script>

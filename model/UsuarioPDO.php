@@ -57,7 +57,8 @@ class UsuarioPDO
             $objetoResultado['activo'],
             $objetoResultado['id_rol'] ?? null,
             $objetoResultado['email'] ?? null,
-            $objetoResultado['idioma'] ?? 'es'
+            $objetoResultado['idioma'] ?? 'es',
+            $objetoResultado['theme_font'] ?? 'dm-mono'
         );
     }
 
@@ -89,7 +90,8 @@ class UsuarioPDO
                 $row['activo'],
                 $row['id_rol'] ?? null,
                 $row['email'] ?? null,
-                $row['idioma'] ?? 'es'
+                $row['idioma'] ?? 'es',
+                $row['theme_font'] ?? 'dm-mono'
             );
         }
         return $usuarios;

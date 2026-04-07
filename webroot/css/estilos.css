@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&family=Roboto:wght@400;500;700&display=swap');
+
 :root {
   --bg: #f0f2f7;
   --surface: #ffffff;
@@ -95,6 +97,13 @@ body[data-theme-mode="black"] {
   --header-bg: #020617;
 }
 
+/* Tipografías */
+body[data-theme-font="dm-mono"] { --font-main: "DM Mono", monospace; }
+body[data-theme-font="inter"] { --font-main: "Inter", sans-serif; }
+body[data-theme-font="outfit"] { --font-main: "Outfit", sans-serif; }
+body[data-theme-font="roboto"] { --font-main: "Roboto", sans-serif; }
+body[data-theme-font="system"] { --font-main: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -102,7 +111,7 @@ body[data-theme-mode="black"] {
 }
 
 body {
-  font-family: "DM Mono", sans-serif;
+  font-family: var(--font-main);
   background: var(--bg);
   color: var(--text);
   height: 100vh;
@@ -152,7 +161,7 @@ body {
   gap: 20px;
   font-size: 12px;
   color: rgba(255, 255, 255, 0.65);
-  font-family: "DM Mono", monospace;
+  font-family: var(--font-main);
   margin-left: 40px;
 }
 
@@ -323,7 +332,7 @@ body {
   border: 1.5px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
-  font-family: "DM Mono", sans-serif;
+  font-family: var(--font-main);
   font-size: 14px;
   color: var(--text);
   outline: none;
@@ -425,12 +434,12 @@ body {
   color: var(--text);
 }
 .product-sku {
-  font-family: "DM Mono", monospace;
+  font-family: var(--font-main);
   font-size: 11px;
   color: var(--text-muted);
 }
 .product-price {
-  font-family: "DM Mono", monospace;
+  font-family: var(--font-main);
   font-size: 15px;
   font-weight: 500;
   color: var(--text);
@@ -457,7 +466,7 @@ body {
   cursor: pointer;
   font-size: 11px;
   font-weight: 600;
-  font-family: "DM Mono", sans-serif;
+  font-family: var(--font-main);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -616,7 +625,7 @@ body {
   font-weight: 600;
   padding: 2px 8px;
   border-radius: 20px;
-  font-family: "DM Mono", monospace;
+  font-family: var(--font-main);
 }
 .btn-clear {
   font-size: 12px;
@@ -624,7 +633,7 @@ body {
   background: none;
   border: none;
   cursor: pointer;
-  font-family: "DM Mono", sans-serif;
+  font-family: var(--font-main);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
@@ -720,7 +729,7 @@ body {
 .order-item-price {
   font-size: 11px;
   color: var(--text-muted);
-  font-family: "DM Mono", monospace;
+  font-family: var(--font-main);
 }
 
 .qty-ctrl {
@@ -755,7 +764,7 @@ body {
   border: none;
   background: none;
   text-align: center;
-  font-family: "DM Mono", monospace;
+  font-family: var(--font-main);
   font-size: 13px;
   font-weight: 600;
   color: var(--text);
@@ -774,14 +783,14 @@ body {
   border-radius: 4px;
 }
 .qty-val {
-  font-family: "DM Mono", monospace;
+  font-family: var(--font-main);
   font-size: 13px;
   font-weight: 500;
   min-width: 18px;
   text-align: center;
 }
 .order-item-total {
-  font-family: "DM Mono", monospace;
+  font-family: var(--font-main);
   font-size: 13px;
   font-weight: 500;
   flex-shrink: 0;
@@ -808,13 +817,13 @@ body {
   font-size: 16px;
   font-weight: 600;
   color: var(--text);
-  font-family: "DM Mono", monospace;
+  font-family: var(--font-main);
   margin-top: 4px;
   padding-top: 8px;
   border-top: 1px solid var(--border);
 }
 .total-row.main span:first-child {
-  font-family: "DM Mono", monospace;
+  font-family: var(--font-main);
   font-weight: 600;
 }
 
@@ -984,7 +993,7 @@ body {
   font-weight: 600;
 }
 .modal-amount {
-  font-family: "DM Mono", monospace;
+  font-family: var(--font-main);
   font-size: 32px;
   font-weight: 500;
 }
@@ -1016,7 +1025,7 @@ body {
   padding: 8px 10px;
   border: 1.5px solid var(--border);
   border-radius: 8px;
-  font-family: "DM Mono", monospace;
+  font-family: var(--font-main);
   font-size: 13px;
   outline: none;
   background: var(--surface2);
@@ -1512,7 +1521,7 @@ input[type="submit"].btn-clear {
 }
 
 .upsell-assistant .amount {
-  font-family: "DM Mono", monospace;
+  font-family: var(--font-main);
   font-weight: 700;
   background: rgba(255, 255, 255, 0.2);
   padding: 1px 6px;
@@ -1832,7 +1841,7 @@ input:focus + .slider {
 }
 
 .fin-profit-indicator .indicator-main span b {
-  font-family: "DM Mono", monospace;
+  font-family: var(--font-main);
   font-size: 15px;
 }
 .fin-info-panel {
@@ -2011,7 +2020,7 @@ input:focus + .slider {
 .variant-card-btn .v-sku {
   font-size: 10px;
   color: var(--text-muted);
-  font-family: "DM Mono", monospace;
+  font-family: var(--font-main);
   opacity: 0.8;
 }
 
@@ -2020,7 +2029,7 @@ input:focus + .slider {
   font-weight: 800;
   color: var(--accent);
   margin-top: 8px;
-  font-family: "DM Mono", monospace;
+  font-family: var(--font-main);
 }
 
 .variant-card-btn .v-stock-badge {

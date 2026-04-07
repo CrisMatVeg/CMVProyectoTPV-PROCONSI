@@ -967,6 +967,7 @@ $translations = [
     'profile_accent_red' => 'Red',
     'profile_accent_purple' => 'Purple',
     'profile_accent_amber' => 'Amber',
+    'profile_theme_font' => 'System Typography',
     'profile_pass_title' => 'Change Password',
     'profile_pass_sub' => 'Leave blank if you don\'t want to change it.',
     'profile_pass_current' => 'Current Password',
