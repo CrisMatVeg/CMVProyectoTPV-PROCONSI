@@ -152,7 +152,7 @@
                     <h2 class="fs-18 mb-4"><?php echo L('rates_global_title'); ?></h2>
                     <p class="fs-13 text-muted"><?php echo L('rates_global_subtitle'); ?></p>
                 </div>
-                <div class="search-input-group bg-white br-12 border shadow-sm flex-1" style="max-width: 400px; height: 44px;">
+                <div class="search-input-fancy" style="max-width: 400px;">
                     <i class="fa-solid fa-magnifying-glass"></i>
                     <input type="text" id="tarifarioSearch" onkeyup="renderTarifario()" placeholder="<?php echo L('rates_search_placeholder'); ?>">
                 </div>
@@ -207,34 +207,37 @@
 
             <!-- TAB: GENERAL -->
             <div id="tab-general" class="tab-pane active">
-                <div class="form-group mb-20">
+                <div class="form-group">
                     <label class="form-label fw-600"><?php echo L('rates_label_name'); ?></label>
                     <input type="text" id="tarifaNombre" class="form-input" placeholder="<?php echo L('rates_name_placeholder'); ?>">
                     <span class="form-error" id="err-nombre"></span>
                 </div>
-
+ 
                 <div class="d-grid grid-3 gap-16">
-                    <div class="form-group mb-0">
+                    <div class="form-group">
                         <label class="form-label fs-11 tt-uppercase fw-600"><?php echo L('rates_label_type'); ?></label>
                         <select id="tarifaTipo" class="form-input">
                             <option value="percent"><?php echo L('rates_type_percent'); ?></option>
                         </select>
                     </div>
-                    <div class="form-group mb-0">
+                    <div class="form-group">
                         <label class="form-label fs-11 tt-uppercase fw-600"><?php echo L('rates_label_value'); ?></label>
                         <input type="number" id="tarifaValor" class="form-input text-right font-mono" step="0.01">
                         <span class="form-error" id="err-valor"></span>
                     </div>
-                    <div class="form-group mb-0">
+                    <div class="form-group">
                         <label class="form-label fs-11 tt-uppercase fw-600"><?php echo L('rates_label_priority'); ?></label>
                         <input type="number" id="tarifaPrioridad" class="form-input text-right" value="0">
                     </div>
                 </div>
 
-                <div class="alert alert-info mt-24 p-16 fs-12 br-12 border">
-                    <i class="fa-solid fa-circle-info fs-16 mr-8"></i>
-                    <div>
-                        <strong><?php echo L('rates_info_title'); ?></strong> <?php echo L('rates_info_help'); ?>
+                <div class="alert-premium premium-info mt-24">
+                    <div class="alert-icon-wrap">
+                        <i class="fa-solid fa-circle-info"></i>
+                    </div>
+                    <div class="alert-content">
+                        <span class="alert-title text-uppercase"><?php echo L('rates_info_title'); ?></span>
+                        <span class="alert-desc"><?php echo L('rates_info_help'); ?></span>
                     </div>
                 </div>
             </div>
@@ -246,11 +249,11 @@
                         <i class="fa-solid fa-calendar text-accent"></i> <?php echo L('rates_label_date_range'); ?>
                     </label>
                     <div class="d-grid grid-2 gap-16">
-                        <div class="form-group mb-0">
+                        <div class="form-group">
                             <label class="form-label fs-11"><?php echo L('rates_label_start_date'); ?></label>
                             <input type="date" id="tarifaFecha" class="form-input">
                         </div>
-                        <div class="form-group mb-0">
+                        <div class="form-group">
                             <label class="form-label fs-11"><?php echo L('rates_label_end_date'); ?></label>
                             <input type="date" id="tarifaFechaFin" class="form-input">
                         </div>
@@ -287,11 +290,11 @@
                         <i class="fa-solid fa-clock text-accent"></i> <?php echo L('rates_label_time_range'); ?>
                     </label>
                     <div class="d-grid grid-2 gap-16">
-                        <div class="form-group mb-0">
+                        <div class="form-group">
                             <label class="form-label fs-11"><?php echo L('rates_label_start_time'); ?></label>
                             <input type="time" id="tarifaHoraInicio" class="form-input">
                         </div>
-                        <div class="form-group mb-0">
+                        <div class="form-group">
                             <label class="form-label fs-11"><?php echo L('rates_label_end_time'); ?></label>
                             <input type="time" id="tarifaHoraFin" class="form-input">
                         </div>
@@ -301,9 +304,13 @@
 
             <!-- TAB: CLIENTES -->
             <div id="tab-clientes" class="tab-pane">
-                <div class="alert-info d-flex ai-center gap-12 mb-20">
-                    <i class="fa-solid fa-circle-info fs-16"></i>
-                    <p class="fs-12"><?php echo L('rates_clients_help'); ?></p>
+                <div class="alert-premium premium-info mb-24">
+                    <div class="alert-icon-wrap">
+                        <i class="fa-solid fa-circle-info"></i>
+                    </div>
+                    <div class="alert-content">
+                        <span class="alert-desc"><?php echo L('rates_clients_help'); ?></span>
+                    </div>
                 </div>
 
                 <div class="d-grid grid-2 gap-24">
@@ -335,11 +342,9 @@
                         <label class="form-label fw-600 mb-0"><?php echo L('rates_label_individual'); ?></label>
                         <div class="p-16 br-12 border bg-surface2 flex-column gap-12">
                             <div class="search-box-container mb-4">
-                                <div class="search-input-group d-flex ai-center gap-12 bg-white br-12 border shadow-sm transition hover-border-accent" style="height: 48px; padding: 0 16px;">
-                                    <i class="fa-solid fa-magnifying-glass text-muted fs-14"></i>
-                                    <input type="text" id="tarifaBusquedaIndiv" class="border-0 bg-transparent p-0 fs-13 w-100 focus-outline-none"
-                                        style="width: 100%; border: none; outline: none;"
-                                        placeholder="<?php echo L('rates_search_clients'); ?>" onkeyup="filtrarClientesTarifa()">
+                                <div class="search-input-fancy">
+                                    <i class="fa-solid fa-magnifying-glass"></i>
+                                    <input type="text" id="tarifaBusquedaIndiv" placeholder="<?php echo L('rates_search_clients'); ?>" onkeyup="filtrarClientesTarifa()">
                                 </div>
                             </div>
 
@@ -395,11 +400,9 @@
 
                 <div id="tarifaProductosWrapper" style="display:none;" class="flex-column gap-16">
                     <div class="search-box-container mb-16">
-                        <div class="search-input-group d-flex ai-center gap-12 bg-white br-12 border shadow-sm transition hover-border-accent">
-                            <i class="fa-solid fa-magnifying-glass text-muted fs-16"></i>
-                            <input type="text" id="tarifaBusquedaProd" class="border-0 bg-transparent p-0 fs-15 w-100 focus-outline-none"
-                                style="width: 100%; border: none; outline: none;"
-                                placeholder="<?php echo L('rates_search_prod'); ?>" onkeyup="filtrarProductosTarifa()">
+                        <div class="search-input-fancy">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <input type="text" id="tarifaBusquedaProd" placeholder="<?php echo L('rates_search_prod'); ?>" onkeyup="filtrarProductosTarifa()">
                         </div>
                     </div>
 

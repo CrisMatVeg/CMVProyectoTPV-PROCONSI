@@ -43,12 +43,10 @@ class Language
  * @param bool $isPrint Si es true, devuelve el texto en lugar de imprimirlo
  * @param array $placeholders Array asociativo de marcadores y sus valores (ej: ['{amount}' => '10.00'])
  */
-function L($key, $isPrint = false, $placeholders = [])
+function L($key, $return = false, $placeholders = [])
 {
     $text = Language::get($key, $placeholders);
-    if ($isPrint) {
-        return $text;
-    }
-    echo $text;
+    // Aunque se pida imprimir (isPrint/return=false), devolvemos siempre para que echo L() funcione sin 'null'
+    return $text;
 }
 ?>

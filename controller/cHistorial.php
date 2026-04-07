@@ -53,8 +53,10 @@ if (isset($_REQUEST['volver']) || isset($_REQUEST['irDashboard'])) {
 // Valores por defecto para los filtros
 $fechaDesdeRaw = $_REQUEST['fechaDesde'] ?? date('Y-m-d', strtotime('-7 days'));
 $fechaHastaRaw = $_REQUEST['fechaHasta'] ?? date('Y-m-d');
-$idCajero   = isset($_REQUEST['idCajero']) && $_REQUEST['idCajero'] !== '' ? (int)$_REQUEST['idCajero'] : null;
-$numeroTicket = isset($_REQUEST['numeroTicket']) && $_REQUEST['numeroTicket'] !== '' ? (int)$_REQUEST['numeroTicket'] : null;
+$idCajero      = isset($_REQUEST['idCajero']) && $_REQUEST['idCajero'] !== '' ? (int)$_REQUEST['idCajero'] : null;
+$numeroTicket  = isset($_REQUEST['numeroTicket']) && $_REQUEST['numeroTicket'] !== '' ? (int)$_REQUEST['numeroTicket'] : null;
+$tipoDocumento = isset($_REQUEST['tipoDocumento']) && in_array($_REQUEST['tipoDocumento'], ['venta', 'abono', 'todos'])
+                 ? $_REQUEST['tipoDocumento'] : 'todos';
 
 $aErrores = [
     'fechaDesde' => validacionFormularios::validarFecha($fechaDesdeRaw, '2050-01-01', '2020-01-01', 0),
@@ -72,27 +74,28 @@ $listaCajeros = UsuarioPDO::listarUsuarios();
 
 if ($verCierres) {
     require_once 'model/CierreFiscalPDO.php';
-    $listaCierres = CierreFiscalPDO::listarCierres(); // Podríamos filtrar por fecha si fuera necesario
-    $listaVentas = [];
+    $listaCierres = CierreFiscalPDO::listarCierres();
+    $listaVentas  = [];
 } else {
-    // Obtener ventas filtradas
-    $listaVentas = VentaPDO::buscarVentas($fechaDesde, $fechaHasta, $idCajero, $numeroTicket);
+    // Obtener ventas y abonos filtrados
+    $listaVentas  = VentaPDO::buscarVentas($fechaDesde, $fechaHasta, $idCajero, $numeroTicket, $tipoDocumento);
     $listaCierres = [];
 }
 
 $avHistorial = [
-    'verCierres'   => $verCierres,
-    'ventas'       => $listaVentas,
-    'cierres'      => $listaCierres,
-    'cajeros'      => $listaCajeros,
-    'aErrores'     => $aErrores,
-    'filtros'      => [
-        'desde'   => $fechaDesde,
-        'hasta'   => $fechaHasta,
-        'cajero'  => $idCajero,
-        'ticket'  => $numeroTicket
+    'verCierres'    => $verCierres,
+    'ventas'        => $listaVentas,
+    'cierres'       => $listaCierres,
+    'cajeros'       => $listaCajeros,
+    'aErrores'      => $aErrores,
+    'filtros'       => [
+        'desde'         => $fechaDesde,
+        'hasta'         => $fechaHasta,
+        'cajero'        => $idCajero,
+        'ticket'        => $numeroTicket,
+        'tipoDocumento' => $tipoDocumento,
     ],
-    'usuario'      => $_SESSION['usuarioActualTPV']->getNombreCompleto()
+    'usuario'       => $_SESSION['usuarioActualTPV']->getNombreCompleto()
 ];
 
 require_once $view['layout'];

@@ -33,7 +33,7 @@
 
     <!-- SECCIÓN ALBARANES -->
     <div id="tab-albaranes" class="purchase-tab-content">
-        <div class="table-container container-wider">
+        <div class="table-container container-wider br-20">
             <table class="data-table">
                 <thead>
                     <tr>
@@ -77,7 +77,7 @@
 
     <!-- SECCIÓN FACTURAS -->
     <div id="tab-facturas" class="purchase-tab-content d-none">
-        <div class="table-container container-wider">
+        <div class="table-container container-wider br-20">
             <table class="data-table">
                 <thead>
                     <tr>
@@ -517,14 +517,14 @@
         // Si ya hay productos y cambiamos de proveedor, advertir
         if (albLineas.length > 0) {
             showCustomConfirm(
-                "<?php echo L('purchase_js_change_prov_title'); ?>",
-                "<?php echo L('purchase_js_change_prov_body'); ?>",
+                <?php echo json_encode(L('purchase_js_change_prov_title')); ?>,
+                <?php echo json_encode(L('purchase_js_change_prov_body')); ?>,
                 () => {
                     albLineas = [];
                     renderLineasAlbaran();
                     aplicarCambioProveedor(sel);
                 },
-                "<?php echo L('purchase_js_change_prov_btn'); ?>",
+                <?php echo json_encode(L('purchase_js_change_prov_btn')); ?>,
                 'danger'
             );
             // Revertir temporalmente la selección hasta que el usuario confirme
@@ -547,7 +547,7 @@
         const idProv = document.getElementById('albProveedor').value;
 
         if (!idProv) {
-            showCustomAlert("<?php echo L('prod_th_status'); ?>", "<?php echo L('purchase_js_select_prov_first'); ?>", "warning");
+            showCustomAlert(<?php echo json_encode(L('prod_th_status')); ?>, <?php echo json_encode(L('purchase_js_select_prov_first')); ?>, "warning");
             return dd.classList.add('d-none');
         }
 
@@ -583,7 +583,7 @@
         const nombreMostrar = `${p.nombre} (${p.referencia})`;
 
         if (albLineas.find(l => l.producto_id === p.id)) {
-            return showCustomAlert("<?php echo L('prod_th_status'); ?>", "<?php echo L('purchase_js_product_added'); ?>", 'warning');
+            return showCustomAlert(<?php echo json_encode(L('prod_th_status')); ?>, <?php echo json_encode(L('purchase_js_product_added')); ?>, 'warning');
         }
 
         let rePct = 0;
@@ -664,11 +664,11 @@
         const num = document.getElementById('albNum').value;
 
         if (!prov || !num) {
-            return showCustomAlert("<?php echo L('prod_th_status'); ?>", "<?php echo L('purchase_js_incomplete_fields'); ?>", 'warning');
+            return showCustomAlert(<?php echo json_encode(L('prod_th_status')); ?>, <?php echo json_encode(L('purchase_js_incomplete_fields')); ?>, 'warning');
         }
 
         if (albLineas.length === 0) {
-            return showCustomAlert("<?php echo L('prod_th_status'); ?>", "<?php echo L('purchase_js_empty_albaran'); ?>", 'warning');
+            return showCustomAlert(<?php echo json_encode(L('prod_th_status')); ?>, <?php echo json_encode(L('purchase_js_empty_albaran')); ?>, 'warning');
         }
 
         // Validar que no haya precios a 0
@@ -676,10 +676,10 @@
         if (preciosCero.length > 0) {
             const nombres = preciosCero.map(l => l.nombre).join(', ');
             showCustomConfirm(
-                "<?php echo L('purchase_js_zero_cost_title'); ?>",
-                "<?php echo L('purchase_js_zero_cost_body'); ?>".replace('{productos}', nombres),
+                <?php echo json_encode(L('purchase_js_zero_cost_title')); ?>,
+                <?php echo json_encode(L('purchase_js_zero_cost_body', true)); ?>.replace('{productos}', nombres),
                 () => ejecutarGuardarAlbaran(prov, num),
-                "<?php echo L('purchase_js_zero_cost_btn'); ?>",
+                <?php echo json_encode(L('purchase_js_zero_cost_btn')); ?>,
                 'danger'
             );
             return;
@@ -708,10 +708,10 @@
                 sessionStorage.setItem('tpv_refresh_stock', Date.now());
                 window.location.reload();
             } else {
-                showCustomAlert("<?php echo L('prod_js_error'); ?>", res.error || "<?php echo L('prod_js_error'); ?>", 'error');
+                showCustomAlert(<?php echo json_encode(L('prod_js_error')); ?>, res.error || <?php echo json_encode(L('prod_js_error')); ?>, 'error');
             }
         } catch (e) {
-            showCustomAlert("<?php echo L('prod_js_error'); ?>", "<?php echo L('prod_js_error'); ?>", 'error');
+            showCustomAlert(<?php echo json_encode(L('prod_js_error')); ?>, <?php echo json_encode(L('prod_js_error')); ?>, 'error');
         } finally {
             btn.disabled = false;
         }
@@ -785,7 +785,7 @@
 
     async function guardarFactura() {
         const num = document.getElementById('facNum').value;
-        if (!num) return showCustomAlert("<?php echo L('prod_th_status'); ?>", "<?php echo L('purchase_js_incomplete_fields'); ?>", 'warning');
+        if (!num) return showCustomAlert(<?php echo json_encode(L('prod_th_status')); ?>, <?php echo json_encode(L('purchase_js_incomplete_fields')); ?>, 'warning');
         const btn = document.getElementById('btnGuardarFactura');
         btn.disabled = true;
         try {
@@ -804,7 +804,7 @@
             if (res.success) window.location.reload();
             else showCustomAlert('Error', res.error, 'error');
         } catch (e) {
-            showCustomAlert("<?php echo L('warning'); ?>", "<?php echo L('tpv_js_conn_error'); ?>", 'error');
+            showCustomAlert(<?php echo json_encode(L('warning')); ?>, <?php echo json_encode(L('tpv_js_conn_error')); ?>, 'error');
         } finally {
             btn.disabled = false;
         }
@@ -814,7 +814,7 @@
     async function verDetalleAlbaran(id) {
         const r = await fetch('api/compras.php?type=albaran&id=' + id);
         const a = await r.json();
-        document.getElementById('detalleTitulo').innerText = "<?php echo L('purchase_th_albaran'); ?> " + a.numero_albaran;
+        document.getElementById('detalleTitulo').innerText = <?php echo json_encode(L('purchase_th_albaran')); ?> + " " + a.numero_albaran;
         document.getElementById('detalleContent').innerHTML = `
             <div class="mb-16"><b><?php echo L('purchase_modal_details_vendor'); ?>:</b> ${a.proveedor_nombre} <br> <b><?php echo L('purchase_modal_details_date'); ?>:</b> ${new Date(a.fecha).toLocaleDateString()}</div>
             <table class="data-table">
@@ -829,7 +829,7 @@
     async function verDetalleFactura(id) {
         const r = await fetch('api/compras.php?type=factura&id=' + id);
         const f = await r.json();
-        document.getElementById('detalleTitulo').innerText = "<?php echo L('purchase_th_invoice_num'); ?> " + f.numero_factura;
+        document.getElementById('detalleTitulo').innerText = <?php echo json_encode(L('purchase_th_invoice_num')); ?> + " " + f.numero_factura;
         document.getElementById('detalleContent').innerHTML = `
             <div class="mb-16">
                 <b><?php echo L('purchase_modal_details_vendor'); ?>:</b> ${f.proveedor_nombre} <br> 
@@ -899,11 +899,11 @@
 
         const tieneCero = albLineas.some(l => parseFloat(l.precio_coste_neto) <= 0);
         let bannerMsg = tieneCero ?
-            "<?php echo L('purchase_auto_banner_zero'); ?>".replace('{prov}', pedido.proveedor_nombre) :
-            "<?php echo L('purchase_auto_banner_ok'); ?>".replace('{prov}', pedido.proveedor_nombre);
+            <?php echo json_encode(L('purchase_auto_banner_zero')); ?>.replace('{prov}', pedido.proveedor_nombre) :
+            <?php echo json_encode(L('purchase_auto_banner_ok')); ?>.replace('{prov}', pedido.proveedor_nombre);
 
         if (data.length > 1) {
-            bannerMsg += "<?php echo L('purchase_auto_banner_multi'); ?>".replace('{count}', data.length);
+            bannerMsg += <?php echo json_encode(L('purchase_auto_banner_multi')); ?>.replace('{count}', data.length);
         }
 
         // Insertar banner al inicio del modal

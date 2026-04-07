@@ -17,27 +17,27 @@
         <?php if ($_SESSION['usuarioActualTPV']->getRol() === 'admin' && $avDashboard['kpis']): ?>
             <!-- KPI CARDS (Only for Admin) -->
             <div class="d-grid gap-16 mb-32" style="grid-template-columns: repeat(5, 1fr);">
-                <div class="kpi-card p-16 bg-blue-light br-16 border-2 border-blue d-flex flex-column">
+                <div class="kpi-card p-20 bg-blue-light br-20 border-2 border-blue d-flex flex-column shadow-sm hover-translate-y">
                     <div class="fs-12 text-muted tt-uppercase font-bold mb-8"><?php echo L('dashboard_kpi_total_sales'); ?></div>
                     <div class="fs-24 font-mono font-bold text-accent"><?php echo number_format($avDashboard['kpis']['total_ventas'] ?? 0, 2, ',', '.'); ?> €</div>
                     <div class="fs-11 text-muted mt-4"><?php echo L('dashboard_kpi_last_7_days'); ?></div>
                 </div>
-                <div class="kpi-card p-16 bg-green-light br-16 border-2 border-green d-flex flex-column">
+                <div class="kpi-card p-20 bg-green-light br-20 border-2 border-green d-flex flex-column shadow-sm hover-translate-y">
                     <div class="fs-12 text-muted tt-uppercase font-bold mb-8"><?php echo L('dashboard_kpi_margin'); ?></div>
                     <div class="fs-24 font-mono font-bold text-green"><?php echo number_format($avDashboard['kpis']['margen_estimado'] ?? 0, 2, ',', '.'); ?> €</div>
                     <div class="fs-11 text-muted mt-4"><?php echo L('dashboard_kpi_margin_sub'); ?></div>
                 </div>
-                <div class="kpi-card p-16 bg-surface2 br-16 border-2 d-flex flex-column">
+                <div class="kpi-card p-20 bg-surface2 br-20 border-2 d-flex flex-column shadow-sm hover-translate-y">
                     <div class="fs-12 text-muted tt-uppercase font-bold mb-8"><?php echo L('dashboard_kpi_operations'); ?></div>
                     <div class="fs-24 font-mono font-bold"><?php echo $avDashboard['kpis']['total_tickets'] ?? 0; ?></div>
                     <div class="fs-11 text-muted mt-4"><?php echo L('dashboard_kpi_operations_sub'); ?></div>
                 </div>
-                <div class="kpi-card p-16 bg-surface2 br-16 border-2 d-flex flex-column">
+                <div class="kpi-card p-20 bg-surface2 br-20 border-2 d-flex flex-column shadow-sm hover-translate-y">
                     <div class="fs-12 text-muted tt-uppercase font-bold mb-8"><?php echo L('dashboard_kpi_catalog'); ?></div>
                     <div class="fs-24 font-mono font-bold"><?php echo $avDashboard['productos_count']; ?></div>
                     <div class="fs-11 text-muted mt-4"><?php echo L('dashboard_kpi_catalog_sub'); ?></div>
                 </div>
-                <div class="kpi-card p-16 <?php echo ($avDashboard['bajo_stock_count'] > 0) ? 'bg-red-light border-red' : 'bg-surface2'; ?> br-16 border-2 d-flex flex-column clickable" onclick="irAProductosBajoStock()">
+                <div class="kpi-card p-20 <?php echo ($avDashboard['bajo_stock_count'] > 0) ? 'bg-red-light border-red' : 'bg-surface2'; ?> br-20 border-2 d-flex flex-column clickable shadow-sm hover-translate-y" onclick="irAProductosBajoStock()">
                     <div class="fs-12 text-muted tt-uppercase font-bold mb-8"><?php echo L('dashboard_kpi_low_stock'); ?></div>
                     <div class="fs-24 font-mono font-bold <?php echo ($avDashboard['bajo_stock_count'] > 0) ? 'text-red' : ''; ?>"><?php echo $avDashboard['bajo_stock_count']; ?></div>
                     <div class="fs-11 text-muted mt-4"><?php echo L('dashboard_kpi_low_stock_sub'); ?></div>
@@ -191,7 +191,7 @@
 
             <?php if ($_SESSION['usuarioActualTPV']->getRol() === 'admin' && !empty($avDashboard['metodos'])): ?>
                 <!-- STATS PANEL (Right side on large screens) -->
-                <div class="stats-panel bg-surface p-16 br-16 border-2">
+                <div class="stats-panel bg-surface p-24 br-20 border-2 shadow-sm">
                     <div class="fs-13 font-bold tt-uppercase mb-16 pb-8 border-bottom"><?php echo L('dashboard_stats_payments'); ?></div>
                     <div class="d-flex flex-column gap-12">
                         <?php foreach ($avDashboard['metodos'] as $m): ?>

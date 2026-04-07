@@ -9,11 +9,11 @@
             <p class="text-muted fs-14"><?php echo L('roles_subtitle'); ?></p>
         </div>
         <div class="d-flex gap-12 ai-center">
-            <a href="index.php?irUsuarios=1" class="btn-back">
-                <?php echo L('login_back'); ?>
-            </a>
             <a href="index.php?irDashboard=1" class="btn-back">
                 <i class="fa-solid fa-house"></i> <?php echo L('roles_btn_dashboard'); ?>
+            </a>
+            <a href="index.php?irUsuarios=1" class="btn-back">
+                <i class="fa-solid fa-users"></i> <?php echo L('login_back'); ?>
             </a>
         </div>
     </div>
@@ -75,12 +75,12 @@
                 <input type="hidden" name="accion" value="guardarRol">
                 <input type="hidden" name="idRol" id="idRol" value="0">
 
-                <div class="form-group mb-16">
+                <div class="form-group">
                     <label class="fs-12 font-bold mb-8 d-block text-muted tt-uppercase"><?php echo L('roles_label_name'); ?></label>
                     <input type="text" name="nombreRol" id="roleName" class="form-input" placeholder="<?php echo L('roles_name_placeholder'); ?>" required>
                 </div>
-
-                <div class="form-group mb-20">
+ 
+                <div class="form-group">
                     <label class="fs-12 font-bold mb-8 d-block text-muted tt-uppercase"><?php echo L('roles_th_desc'); ?></label>
                     <textarea name="descRol" id="roleDesc" class="form-input" style="height: 80px; resize: none;" placeholder="<?php echo L('roles_desc_placeholder'); ?>"></textarea>
                 </div>
@@ -100,11 +100,11 @@
                     </div>
                 </div>
 
-                <div class="d-flex gap-12 mt-32 border-top pt-20">
-                    <button type="submit" class="btn-filter flex-1 jc-center">
-                        <i class="fa-solid fa-floppy-disk"></i> <?php echo L('roles_btn_save'); ?>
+                <div class="modal-footer p-0 mt-32 border-top pt-20 d-flex gap-12">
+                    <button type="button" class="btn-cancel flex-1" onclick="limpiarForm()"><?php echo L('modal_cancel'); ?></button>
+                    <button type="submit" class="btn-save flex-2 jc-center">
+                        <i class="fa-solid fa-floppy-disk mr-8"></i> <?php echo L('roles_btn_save'); ?>
                     </button>
-                    <button type="button" class="btn-cancel w-auto" onclick="limpiarForm()"><?php echo L('modal_cancel'); ?></button>
                 </div>
             </form>
         </div>

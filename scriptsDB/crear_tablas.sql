@@ -256,16 +256,19 @@ CREATE TABLE IF NOT EXISTS ventas (
     iva_amt DECIMAL(10,2) NOT NULL,
     total DECIMAL(10,2) NOT NULL,
     efectivo_recibido DECIMAL(10,2) DEFAULT 0,
-    estado ENUM('completada', 'devuelta', 'anulada', 'pendiente_pago') DEFAULT 'completada',
+    estado ENUM('completada', 'devuelta', 'anulada', 'pendiente_pago', 'parcialmente_devuelta') DEFAULT 'completada',
     pagado_a_cuenta DECIMAL(10,2) DEFAULT 0,
     fecha_limite_pago DATE NULL,
     es_factura TINYINT(1) DEFAULT 0,
     num_z INT DEFAULT NULL,
     id_turno INT DEFAULT NULL,
+    tipo_documento ENUM('venta', 'abono') NOT NULL DEFAULT 'venta',
+    id_venta_origen INT NULL DEFAULT NULL,
     CONSTRAINT fk_ventas_usr FOREIGN KEY (id_usuario) REFERENCES usuarios(id) ON DELETE SET NULL,
     CONSTRAINT fk_ventas_clie FOREIGN KEY (id_cliente) REFERENCES clientes(id) ON DELETE SET NULL,
     CONSTRAINT fk_ventas_z FOREIGN KEY (num_z) REFERENCES cierres_fiscales(id),
-    CONSTRAINT fk_ventas_turn FOREIGN KEY (id_turno) REFERENCES caja_turnos(id)
+    CONSTRAINT fk_ventas_turn FOREIGN KEY (id_turno) REFERENCES caja_turnos(id),
+    CONSTRAINT fk_ventas_origen FOREIGN KEY (id_venta_origen) REFERENCES ventas(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS lineas_venta (

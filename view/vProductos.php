@@ -75,27 +75,41 @@
     </div>
 
     <!-- PANEL DE FILTROS -->
-    <div class="filters-panel container-wider">
-        <div class="search-bar-wrap flex-1">
-            <i class="fa-solid fa-magnifying-glass search-icon"></i>
-            <input type="text" id="prodSearch" placeholder="<?php echo L('prod_search_placeholder'); ?>" class="search-input">
+    <div class="filters-panel-new container-wider mb-24">
+        <div class="flex-1">
+            <div class="search-input-fancy">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" id="prodSearch" placeholder="<?php echo L('prod_search_placeholder'); ?>">
+            </div>
         </div>
-        <div class="d-flex gap-8" id="filtersPrecios">
-            <input type="number" id="filterPriceMin" placeholder="<?php echo L('prod_filter_price_min'); ?>" class="form-input fs-12" style="width: 125px;">
-            <input type="number" id="filterPriceMax" placeholder="<?php echo L('prod_filter_price_max'); ?>" class="form-input fs-12" style="width: 125px;">
+
+        <div class="filter-item">
+            <span class="filter-label"><?php echo L('tpv_total'); ?></span>
+            <div class="d-flex gap-8">
+                <input type="number" id="filterPriceMin" placeholder="<?php echo L('prod_filter_price_min'); ?>" class="filter-control" style="width: 100px; min-width: 100px;">
+                <input type="number" id="filterPriceMax" placeholder="<?php echo L('prod_filter_price_max'); ?>" class="filter-control" style="width: 100px; min-width: 100px;">
+            </div>
         </div>
-        <select id="filterCat" class="filter-input p-10 br-8" onchange="applyFilters()">
-            <option value="all"><?php echo L('prod_filter_cat_all'); ?></option>
-            <?php foreach ($avProductos['categorias'] as $c): ?>
-                <option value="<?php echo htmlspecialchars($c['codigo']); ?>"><?php echo htmlspecialchars($c['nombre']); ?></option>
-            <?php endforeach; ?>
-        </select>
-        <select id="filterEstado" class="filter-input p-10 br-8" onchange="applyFilters()">
-            <option value="all"><?php echo L('prod_filter_status_all'); ?></option>
-            <option value="1"><?php echo L('prod_status_active'); ?></option>
-            <option value="0"><?php echo L('prod_status_inactive'); ?></option>
-            <option value="bajo_stock"><?php echo L('prod_status_low_stock'); ?></option>
-        </select>
+
+        <div class="filter-item">
+            <span class="filter-label"><?php echo L('prod_label_category'); ?></span>
+            <select id="filterCat" class="filter-control" onchange="applyFilters()" style="min-width: 180px;">
+                <option value="all"><?php echo L('prod_filter_cat_all'); ?></option>
+                <?php foreach ($avProductos['categorias'] as $c): ?>
+                    <option value="<?php echo htmlspecialchars($c['codigo']); ?>"><?php echo htmlspecialchars($c['nombre']); ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+
+        <div class="filter-item">
+            <span class="filter-label"><?php echo L('prod_th_status'); ?></span>
+            <select id="filterEstado" class="filter-control" onchange="applyFilters()" style="min-width: 150px;">
+                <option value="all"><?php echo L('prod_filter_status_all'); ?></option>
+                <option value="1"><?php echo L('prod_status_active'); ?></option>
+                <option value="0"><?php echo L('prod_status_inactive'); ?></option>
+                <option value="bajo_stock"><?php echo L('prod_status_low_stock'); ?></option>
+            </select>
+        </div>
     </div>
 
     <!-- TABLA DE PRODUCTOS (PESTAÑA 1) -->
@@ -2789,7 +2803,7 @@
 
 <!-- MODAL GESTIÓN CATEGORÍAS -->
 <div id="modalCategorias" class="modal-overlay-bg">
-    <div class="modal-content" style="max-width: 1100px; width: 95%; padding: 0; overflow: hidden; border-radius: 24px; box-shadow: 0 40px 80px rgba(0,0,0,0.45); border: 1px solid var(--border);">
+    <div class="modal-content" style="max-width: 1100px; width: 95%; padding: 0; overflow: hidden; border-radius: 20px; box-shadow: 0 40px 80px rgba(0,0,0,0.45); border: 1px solid var(--border);">
         <div class="modal-header p-24 bg-surface2 border-bottom" style="background: linear-gradient(135deg, var(--surface) 0%, var(--surface2) 100%);">
             <div class="d-flex ai-center gap-15">
                 <div class="p-12 br-12 bg-accent-soft text-accent" style="box-shadow: 0 8px 20px rgba(var(--accent-rgb), 0.15); font-size: 24px;">
@@ -2834,7 +2848,7 @@
                 </div>
             </div>
 
-            <div class="table-container border br-16 overflow-hidden" style="max-height: 500px; overflow-y: auto; background: var(--surface); box-shadow: var(--shadow-sm);">
+            <div class="table-container border br-20 overflow-hidden" style="max-height: 500px; overflow-y: auto; background: var(--surface); box-shadow: var(--shadow-sm);">
                 <table class="fs-13" style="width: 100%; border-collapse: collapse;">
                     <thead style="position: sticky; top: 0; z-index: 10;">
                         <tr class="text-left bg-surface2 border-bottom">
@@ -2847,9 +2861,9 @@
                         <?php foreach ($avProductos['categorias'] as $c): ?>
                             <tr class="hover-bg-surface2 transition-all">
                                 <td class="p-20">
-                                    <div class="d-flex ai-center gap-15">
-                                        <div class="p-10 br-10 bg-surface2 text-muted border">
-                                            <i class="fa-solid fa-folder-open"></i>
+                                    <div class="d-flex ai-center gap-20">
+                                        <div class="p-12 br-12 bg-surface2 text-muted border" style="width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;">
+                                            <i class="fa-solid fa-folder-open fs-18"></i>
                                         </div>
                                         <div>
                                             <div class="font-bold fs-15" style="color: var(--text);"><?php echo htmlspecialchars($c['nombre']); ?></div>

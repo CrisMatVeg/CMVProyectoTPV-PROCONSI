@@ -282,7 +282,9 @@
 
             <div class="ticket-meta">
                 <span id="tkTipoDoc" class="doc-type"><?php echo L('ticket_type_sale'); ?></span>
-                <span class="label"><?php echo L('ticket_label_number'); ?></span> <span id="tkNumero" class="value">—</span>
+                <span class="label"><?php echo L('ticket_label_number'); ?></span>
+                <span id="tkNumero" class="value">—</span>
+                <span id="tkBadgeAbono" style="display:none;background:var(--red);color:#fff;font-size:9px;font-weight:800;padding:2px 7px;border-radius:4px;letter-spacing:.5px;margin-left:4px;vertical-align:middle;">ABONO</span>
                 <span class="label"><?php echo L('ticket_label_date'); ?></span> <span id="tkFecha">—</span>
                 <span id="tkLabelClienteMeta" class="label d-none"><?php echo L('client_label_client'); ?></span>
                 <span id="tkClienteMeta" class="value d-none">—</span>
@@ -335,7 +337,11 @@
             <div id="tkCommentsSection" class="d-none mt-16 p-12 br-8 border-2 bg-surface2 italic fs-12 text-muted" style="border-style: dashed;">
                 <i class="fa-solid fa-quote-left mr-4 opacity-50"></i>
                 <span id="tkCommentsText"></span>
-            </div>
+            </div> <!-- End tkCommentsSection -->
+
+            <!-- SECCIÓN ABONOS / DEVOLUCIONES (se rellena desde JS) -->
+            <div id="tkAbonosSection" class="d-none"></div>
+
             </div> <!-- End tkSummaryTab -->
 
             <!-- SECCIÓN PUNTOS FIDELIDAD -->

@@ -23,12 +23,16 @@ class VentaPDO
     }
 
     /**
-     * Formatea el número de ticket/factura según las reglas de negocio.
-     * Ejemplo: T-2532026-1234
+     * Formatea el número de ticket/factura/abono según las reglas de negocio.
+     * Ejemplo: T-2532026-1234 / F-2532026-1234 / A-2532026-1234
      */
-    public static function formatTicketNumber($numero, $fecha, $esFactura): string
+    public static function formatTicketNumber($numero, $fecha, $esFactura, string $tipoDocumento = 'venta'): string
     {
-        $prefix = $esFactura ? 'F' : 'T';
+        if ($tipoDocumento === 'abono') {
+            $prefix = 'A';
+        } else {
+            $prefix = $esFactura ? 'F' : 'T';
+        }
         $time = is_numeric($fecha) ? $fecha : strtotime($fecha);
         $datePart = date('jnY', $time); // j=dia sin ceros, n=mes sin ceros, Y=año 4 digitos
         return "{$prefix}-{$datePart}-{$numero}";
@@ -389,13 +393,27 @@ class VentaPDO
         require_once 'PagoPDO.php';
         $venta['pagos'] = PagoPDO::obtenerPagosPorVenta((int)$venta['id']);
 
+        // --- FETCH ABONOS ASOCIADOS (tickets de devolución vinculados a esta venta) ---
+        if (($venta['tipo_documento'] ?? 'venta') === 'venta') {
+            $sqlAbonos = "SELECT v.id, v.numero_ticket, v.fecha, v.total, v.estado
+                          FROM ventas v
+                          WHERE v.id_venta_origen = :idv AND v.tipo_documento = 'abono'
+                          ORDER BY v.fecha ASC";
+            $qA = DBPDO::ejecutarConsulta($sqlAbonos, [':idv' => $venta['id']]);
+            $venta['abonos'] = $qA->fetchAll(PDO::FETCH_ASSOC);
+        } else {
+            $venta['abonos'] = [];
+        }
+
         return $venta;
     }
-    public static function buscarVentas(string $desde, string $hasta, ?int $idUsuario = null, ?int $numTicket = null): array
+    public static function buscarVentas(string $desde, string $hasta, ?int $idUsuario = null, ?int $numTicket = null, string $tipoDocumento = 'todos'): array
     {
-        $sql = "SELECT v.*, u.nombre as nombre_cajero 
+        $sql = "SELECT v.*, u.nombre as nombre_cajero,
+                    vo.numero_ticket as numero_ticket_origen
             FROM ventas v
             LEFT JOIN usuarios u ON v.id_usuario = u.id
+            LEFT JOIN ventas vo ON v.id_venta_origen = vo.id
             WHERE 1=1";
 
         $params = [];
@@ -413,6 +431,13 @@ class VentaPDO
             $sql .= " AND v.id_usuario = :usuario";
             $params[':usuario'] = $idUsuario;
         }
+
+        // Filtrar por tipo de documento
+        if ($tipoDocumento === 'venta') {
+            $sql .= " AND v.tipo_documento = 'venta'";
+        } elseif ($tipoDocumento === 'abono') {
+            $sql .= " AND v.tipo_documento = 'abono'";
+        } // 'todos' => sin filtro
 
         $sql .= " ORDER BY v.fecha DESC";
         $q = DBPDO::ejecutarConsulta($sql, $params);
@@ -847,5 +872,227 @@ class VentaPDO
         ]);
 
         return true;
+    }
+
+    /**
+     * Crea un ticket de abono (devolución) independiente vinculado a la venta original.
+     * No modifica el ticket de origen. El abono tiene importes negativos.
+     *
+     * @param int    $idVentaOrigen  ID de la venta a la que se asocia el abono
+     * @param array  $lineasDevolver Array de ['id_linea' => X, 'cantidad' => Y] a devolver
+     * @param string $motivo         Motivo de la devolución
+     * @param string $metodoReembolso  'efectivo', 'vale', 'reemplazo'
+     * @param int    $idUsuario      ID del usuario que procesa la devolución
+     * @return int  Número de ticket del abono generado
+     */
+    public static function crearAbono(int $idVentaOrigen, array $lineasDevolver, string $motivo, string $metodoReembolso, int $idUsuario): int
+    {
+        // 1. Obtener datos de la venta original
+        $sqlV = "SELECT * FROM ventas WHERE id = :id";
+        $qV   = DBPDO::ejecutarConsulta($sqlV, [':id' => $idVentaOrigen]);
+        $ventaOrigen = $qV->fetch(PDO::FETCH_ASSOC);
+        if (!$ventaOrigen) throw new \Exception('Venta de origen no encontrada.');
+
+        // 2. Calcular totales del abono a partir de las líneas a devolver
+        $totalBaseAbono = 0;
+        $totalIvaAbono  = 0;
+        $totalAbono     = 0;
+        $lineasAbono    = []; // Enriquecidas con datos completos de la línea original
+
+        foreach ($lineasDevolver as $item) {
+            $idLinea  = (int)$item['id_linea'];
+            $cantidad = (int)$item['cantidad'];
+
+            $sqlL = "SELECT * FROM lineas_venta WHERE id = :id AND id_venta = :iv";
+            $qL   = DBPDO::ejecutarConsulta($sqlL, [':id' => $idLinea, ':iv' => $idVentaOrigen]);
+            $linea = $qL->fetch(PDO::FETCH_ASSOC);
+            if (!$linea) continue;
+
+            $cantidadMaxima = (int)$linea['cantidad'];
+            if ($cantidad <= 0) $cantidad = $cantidadMaxima;
+            if ($cantidad > $cantidadMaxima) $cantidad = $cantidadMaxima;
+
+            $precioUnit  = (float)$linea['precio_unitario'];
+            $ivaRate     = (float)$linea['iva_aplicado'];
+            $totalLinea  = round($precioUnit * $cantidad, 2);
+            $base        = $totalLinea / (1 + $ivaRate / 100);
+            $iva         = $totalLinea - $base;
+
+            $totalBaseAbono += $base;
+            $totalIvaAbono  += $iva;
+            $totalAbono     += $totalLinea;
+
+            $lineasAbono[] = [
+                'linea_origen' => $linea,
+                'cantidad'     => $cantidad,
+                'total_linea'  => $totalLinea,
+            ];
+        }
+
+        if (empty($lineasAbono) || $totalAbono <= 0) {
+            throw new \Exception('No hay líneas válidas para el abono.');
+        }
+
+        $totalBaseAbono = round($totalBaseAbono, 2);
+        $totalIvaAbono  = round($totalIvaAbono, 2);
+        $totalAbono     = round($totalAbono, 2);
+
+        // 3. Obtener siguiente número de ticket
+        $numTicket = self::obtenerSiguienteTicket();
+
+        // 4. INSERT en ventas (importe NEGATIVO para el abono)
+        $sqlAbono = "INSERT INTO ventas
+            (numero_ticket, fecha, id_usuario, id_cliente, tipo_cliente, nombre_cliente, nif_cliente,
+             metodo_pago, subtotal, descuento_pct, descuento_amt, descuento_label,
+             base_imponible, iva_pct, iva_amt, total, efectivo_recibido,
+             estado, pagado_a_cuenta, fecha_limite_pago, es_factura, comentarios, id_turno,
+             puntos_ganados, puntos_canjeados, puntos_descuento_amt,
+             tipo_documento, id_venta_origen)
+        VALUES
+            (:ticket, NOW(), :usuario, :cliente, :tipo, :nombre, :nif,
+             :metodo, :subtotal, 0, 0, NULL,
+             :base, 21.00, :iva, :total, 0,
+             'completada', 0, NULL, :esFactura, :comentarios, :idTurno,
+             0, 0, 0,
+             'abono', :ventaOrigen)";
+
+        require_once __DIR__ . '/CajaTurnoPDO.php';
+        $turno   = CajaTurnoPDO::obtenerTurnoAbierto();
+        $idTurno = $turno ? (int)$turno['id'] : null;
+
+        $paramsAbono = [
+            ':ticket'      => $numTicket,
+            ':usuario'     => $idUsuario,
+            ':cliente'     => $ventaOrigen['id_cliente'],
+            ':tipo'        => $ventaOrigen['tipo_cliente'],
+            ':nombre'      => $ventaOrigen['nombre_cliente'],
+            ':nif'         => $ventaOrigen['nif_cliente'],
+            ':metodo'      => $metodoReembolso === 'reemplazo' ? 'efectivo' : $metodoReembolso,
+            ':subtotal'    => -$totalAbono,
+            ':base'        => -$totalBaseAbono,
+            ':iva'         => -$totalIvaAbono,
+            ':total'       => -$totalAbono,
+            ':esFactura'   => (int)$ventaOrigen['es_factura'],
+            ':comentarios' => 'Abono por devolución. Motivo: ' . mb_substr($motivo, 0, 200),
+            ':idTurno'     => $idTurno,
+            ':ventaOrigen' => $idVentaOrigen,
+        ];
+
+        // Precaución: ProductoPDO::init() contiene sentencias ALTER TABLE que rompen la transacción
+        // provocando un commit implícito, por lo que debemos inicializarlo ANTES.
+        require_once __DIR__ . '/ProductoPDO.php';
+        ProductoPDO::init();
+        require_once __DIR__ . '/MovimientoStockPDO.php';
+
+        $db = DBPDO::getPDO();
+        $db->beginTransaction();
+
+        try {
+            DBPDO::ejecutarConsulta($sqlAbono, $paramsAbono);
+            $idAbono = (int)$db->lastInsertId();
+
+            // 5. Insertar líneas del abono (cantidades NEGATIVAS)
+            foreach ($lineasAbono as $la) {
+                $lo    = $la['linea_origen'];
+                $qty   = $la['cantidad'];
+                $total = $la['total_linea'];
+
+                $sqlLinea = "INSERT INTO lineas_venta
+                    (id_venta, id_producto, nombre_producto, codigo_producto,
+                     precio_unitario, precio_base_snapshot, precio_coste_unitario,
+                     iva_aplicado, cantidad, meses_garantia, total_linea,
+                     devuelta, motivo_devolucion, fecha_devolucion, metodo_reembolso)
+                VALUES
+                    (:venta, :prod, :nombre, :codigo,
+                     :precio, :base_snap, :coste,
+                     :iva, :qty, :garantia, :total,
+                     1, :motivo, NOW(), :metodo)";
+
+                DBPDO::ejecutarConsulta($sqlLinea, [
+                    ':venta'     => $idAbono,
+                    ':prod'      => $lo['id_producto'],
+                    ':nombre'    => $lo['nombre_producto'],
+                    ':codigo'    => $lo['codigo_producto'],
+                    ':precio'    => -$lo['precio_unitario'],
+                    ':base_snap' => -$lo['precio_base_snapshot'],
+                    ':coste'     => -$lo['precio_coste_unitario'],
+                    ':iva'       => $lo['iva_aplicado'],
+                    ':qty'       => -$qty,
+                    ':garantia'  => $lo['meses_garantia'],
+                    ':total'     => -$total,
+                    ':motivo'    => mb_substr($motivo, 0, 255),
+                    ':metodo'    => $metodoReembolso,
+                ]);
+
+                // 6. Reponer stock del producto devuelto
+                if ($lo['id_producto']) {
+                    $prod = ProductoPDO::obtenerProductoPorId((int)$lo['id_producto']);
+                    if (!empty($prod['es_pack'])) {
+                        $componentes = ProductoPDO::obtenerComponentesPack((int)$lo['id_producto']);
+                        foreach ($componentes as $comp) {
+                            $qtyComp = $qty * (int)$comp['cantidad'];
+                            ProductoPDO::aumentarStock((int)$comp['id_producto'], $qtyComp);
+                            MovimientoStockPDO::registrarMovimiento((int)$comp['id_producto'], 'devolucion', $qtyComp, $idUsuario, "Abono #$numTicket (devolución Pack)", $db);
+                        }
+                    } else {
+                        ProductoPDO::aumentarStock((int)$lo['id_producto'], $qty);
+                        MovimientoStockPDO::registrarMovimiento((int)$lo['id_producto'], 'devolucion', $qty, $idUsuario, "Abono #$numTicket (devolución)", $db);
+                    }
+                }
+            }
+
+            // 7. Gestionar REEMBOLSO
+            if ($metodoReembolso === 'vale') {
+                require_once __DIR__ . '/ValePDO.php';
+                $idCliente = $ventaOrigen['id_cliente'] ? (int)$ventaOrigen['id_cliente'] : null;
+                $codigoVale = ValePDO::crearVale($idCliente, $idVentaOrigen, $totalAbono);
+                require_once __DIR__ . '/LogPDO.php';
+                LogPDO::addLog('GENERACION_VALE', "Vale generado (#$codigoVale) por $totalAbono€ - Abono #$numTicket");
+            } elseif ($metodoReembolso === 'efectivo') {
+                if ($turno) {
+                    CajaTurnoPDO::registrarRetiro(
+                        (int)$turno['id'],
+                        $idUsuario,
+                        $totalAbono,
+                        "Reembolso efectivo - Abono #$numTicket"
+                    );
+                }
+            }
+            // 'reemplazo': solo se repone stock (ya hecho arriba); no hay reembolso dinerario
+
+            // 8. Actualizar estado de la venta original
+            // Calcular el total ya abonado para esta venta
+            $sqlSumAbonos = "SELECT COALESCE(SUM(ABS(total)), 0) AS total_abonado
+                             FROM ventas
+                             WHERE id_venta_origen = :idv AND tipo_documento = 'abono'";
+            $qSum = DBPDO::ejecutarConsulta($sqlSumAbonos, [':idv' => $idVentaOrigen]);
+            $rowSum = $qSum->fetch(PDO::FETCH_ASSOC);
+            $totalAbonado = (float)($rowSum['total_abonado'] ?? 0);
+            $totalVentaOriginal = abs((float)$ventaOrigen['total']);
+
+            if ($totalAbonado >= $totalVentaOriginal - 0.01) {
+                $nuevoEstado = 'devuelta';
+            } else {
+                $nuevoEstado = 'parcialmente_devuelta';
+            }
+            DBPDO::ejecutarConsulta(
+                "UPDATE ventas SET estado = :estado WHERE id = :id",
+                [':estado' => $nuevoEstado, ':id' => $idVentaOrigen]
+            );
+
+            $db->commit();
+            return $numTicket;
+
+        } catch (\Throwable $e) {
+            if ($db->inTransaction()) {
+                try {
+                    $db->rollBack();
+                } catch (\Throwable $eRollback) {
+                    error_log("Error al hacer rollBack en crearAbono: " . $eRollback->getMessage());
+                }
+            }
+            error_log("Error original en crearAbono: " . $e->getMessage() . " \nTraza: " . $e->getTraceAsString());
+            throw $e;
+        }
     }
 }

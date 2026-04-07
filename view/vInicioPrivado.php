@@ -2,10 +2,9 @@
     <!-- CATALOG PANEL -->
     <div class="catalog-panel">
         <div class="search-bar">
-            <div class="search-input-wrap">
+            <div class="search-input-fancy">
                 <i class="fa-solid fa-magnifying-glass"></i>
                 <input
-                    class="search-input"
                     type="text"
                     id="searchInput"
                     oninput="handleSearch(this.value)"
@@ -41,15 +40,15 @@
             }
             ?>
             <div class="grid-4 gap-12 ai-end">
-                <div class="form-group mb-0">
+                <div class="form-group">
                     <label class="form-label fs-11 tt-uppercase opacity-70"><?php echo L('tpv_price_min'); ?></label>
                     <input type="number" id="filterPriceMin" class="form-input fs-13" placeholder="0.00" oninput="applyAdvancedFilters()">
                 </div>
-                <div class="form-group mb-0">
+                <div class="form-group">
                     <label class="form-label fs-11 tt-uppercase opacity-70"><?php echo L('tpv_price_max'); ?></label>
                     <input type="number" id="filterPriceMax" class="form-input fs-13" placeholder="999.99" oninput="applyAdvancedFilters()">
                 </div>
-                <div class="form-group mb-0">
+                <div class="form-group">
                     <label class="form-label fs-11 tt-uppercase opacity-70"><?php echo L('tpv_stock'); ?></label>
                     <select id="filterStock" class="form-input fs-13" onchange="applyAdvancedFilters()">
                         <option value="all"><?php echo L('tpv_all'); ?></option>
@@ -57,7 +56,7 @@
                         <option value="low-stock"><?php echo L('tpv_low_stock'); ?></option>
                     </select>
                 </div>
-                <div class="form-group mb-0">
+                <div class="form-group">
                     <label class="form-label fs-11 tt-uppercase opacity-70"><?php echo L('tpv_sort_by'); ?></label>
                     <select id="filterSort" class="form-input fs-13" onchange="applyAdvancedFilters()">
                         <option value="name-asc"><?php echo L('tpv_sort_name_asc'); ?></option>
@@ -88,16 +87,21 @@
 
 
         <div class="cat-tabs" id="catTabs">
-            <button class="cat-tab active" data-cat="all"><?php echo L('tpv_cat_all'); ?></button>
+            <button class="cat-tab active" data-cat="all">
+                <i class="fa-solid fa-border-all"></i>
+                <span><?php echo L('tpv_cat_all'); ?></span>
+            </button>
             <?php if (isset($avInicioPrivado) && is_array($avInicioPrivado) && isset($avInicioPrivado['categorias']) && is_array($avInicioPrivado['categorias'])): ?>
                 <?php foreach ($avInicioPrivado['categorias'] as $c): ?>
                     <button class="cat-tab" data-cat="<?php echo htmlspecialchars($c['codigo']); ?>">
-                        <?php echo htmlspecialchars($c['nombre']); ?>
+                        <i class="fa-solid fa-layer-group"></i>
+                        <span><?php echo htmlspecialchars($c['nombre']); ?></span>
                     </button>
                 <?php endforeach; ?>
             <?php endif; ?>
-            <button class="cat-tab d-inline-flex ai-center gap-6 text-red border-red-light bg-red-light" data-cat="baja">
-                <i class="fa-solid fa-arrow-trend-down"></i> <?php echo L('tpv_cat_discontinued'); ?>
+            <button class="cat-tab" data-cat="baja" style="color: var(--red); border-color: rgba(192, 57, 43, 0.2);">
+                <i class="fa-solid fa-arrow-trend-down"></i>
+                <span><?php echo L('tpv_cat_discontinued'); ?></span>
             </button>
         </div>
 

@@ -14,6 +14,14 @@
                 <i class="fa-solid fa-truck-field"></i> <?php echo L('prov_btn_new'); ?>
             </button>
         </div>
+    <!-- Barra de Búsqueda -->
+    <div class="filters-bar-new container-wider mb-24 br-20 shadow-sm" style="background: var(--surface2); padding: 16px; border: 1px solid var(--border);">
+        <div class="filter-item flex-1">
+            <div class="search-input-fancy" style="border-radius: 12px; background: var(--surface); padding-left: 15px;">
+                <i class="fa-solid fa-magnifying-glass opacity-50"></i>
+                <input type="text" id="provSearch" placeholder="<?php echo L('prod_search_placeholder'); ?>" onkeyup="filtrarProveedores()" style="height: 48px; border: none; background: transparent; width: 100%; padding-left: 10px;">
+            </div>
+        </div>
     </div>
 
     <!-- TABLA DE PROVEEDORES -->
@@ -82,7 +90,7 @@
     </div>
 </div><!-- MODAL PROVEEDOR (Integrado con estilos de la app) -->
 <div id="modalProveedor" class="modal-overlay-bg">
-    <div class="modal-content w-modal-lg" style="max-width: 900px; border-radius: 20px; overflow: hidden; display: flex; flex-direction: column; max-height: 90vh;">
+    <div class="modal-content w-modal-lg" style="max-width: 900px; border-radius: 20px; overflow: hidden; display: flex; flex-direction: column; max-height: 90vh; border: 1px solid var(--border); box-shadow: var(--shadow-lg);">
         <div class="modal-header">
             <h2 id="modalProveedorTitle"><?php echo L('prov_modal_new_title'); ?></h2>
             <button class="btn-close-modal" onclick="cerrarModalProveedor()">&times;</button>
@@ -104,33 +112,33 @@
                 <form id="formProveedor" onsubmit="guardarProveedor(event)">
                     <input type="hidden" id="provId">
 
-                    <div class="form-group mb-16">
+                    <div class="form-group">
                         <label class="form-label"><?php echo L('prov_label_name'); ?> *</label>
                         <input type="text" id="provNombre" class="form-input" required placeholder="<?php echo L('prov_placeholder_name'); ?>">
                     </div>
-
-                    <div class="d-grid grid-2 gap-16 mb-16">
-                        <div class="form-group mb-0">
+ 
+                    <div class="d-grid grid-2 gap-16">
+                        <div class="form-group">
                             <label class="form-label"><?php echo L('client_label_nif'); ?> *</label>
                             <input type="text" id="provCif" class="form-input font-mono" required placeholder="<?php echo L('prov_placeholder_cif'); ?>">
                         </div>
-                        <div class="form-group mb-0">
+                        <div class="form-group">
                             <label class="form-label"><?php echo L('client_label_phone'); ?></label>
                             <input type="text" id="provTel" class="form-input" placeholder="<?php echo L('prov_placeholder_tel'); ?>">
                         </div>
                     </div>
-
-                    <div class="form-group mb-16">
+ 
+                    <div class="form-group">
                         <label class="form-label"><?php echo L('prov_label_email'); ?></label>
                         <input type="email" id="provEmail" class="form-input" placeholder="<?php echo L('prov_placeholder_email'); ?>">
                     </div>
-
-                    <div class="form-group mb-16">
+ 
+                    <div class="form-group">
                         <label class="form-label"><?php echo L('prov_label_address'); ?></label>
                         <input type="text" id="provDireccion" class="form-input" placeholder="<?php echo L('prov_placeholder_address'); ?>">
                     </div>
-
-                    <div class="form-group mb-16 d-flex ai-center gap-8" id="divProvActivo" style="display:none;">
+ 
+                    <div class="form-group d-flex ai-center gap-8" id="divProvActivo" style="display:none;">
                         <input type="checkbox" id="provActivo" checked style="width: 18px; height: 18px;">
                         <label class="form-label mb-0 fs-14"><?php echo L('prov_label_active'); ?></label>
                     </div>
@@ -195,186 +203,14 @@
     </div>
 </div>
 
-<style>
-    .d-none {
-        display: none !important;
+    function filtrarProveedores() {
+        const term = document.getElementById('provSearch').value.toLowerCase().trim();
+        const rows = document.querySelectorAll('.data-table tbody tr:not(.empty-row)');
+        rows.forEach(row => {
+            const text = row.innerText.toLowerCase();
+            row.style.display = text.includes(term) ? '' : 'none';
+        });
     }
-
-    .d-grid {
-        display: grid !important;
-    }
-
-    .grid-2 {
-        grid-template-columns: repeat(2, 1fr) !important;
-    }
-
-    .gap-16 {
-        gap: 16px !important;
-    }
-
-    .gap-24 {
-        gap: 24px !important;
-    }
-
-    .ai-start {
-        align-items: flex-start !important;
-    }
-
-    .ai-center {
-        align-items: center !important;
-    }
-
-    .jc-between {
-        justify-content: space-between !important;
-    }
-
-    .pos-rel {
-        position: relative !important;
-    }
-
-    .pos-abs {
-        position: absolute !important;
-    }
-
-    .left-12 {
-        left: 12px !important;
-    }
-
-    .top-12 {
-        top: 12px !important;
-    }
-
-    .pl-36 {
-        padding-left: 36px !important;
-    }
-
-    .modal-overlay-bg {
-        position: fixed;
-        inset: 0;
-        background: rgba(0, 0, 0, 0.5);
-        z-index: 9999;
-        display: none;
-        align-items: center;
-        justify-content: center;
-        backdrop-filter: blur(4px);
-    }
-
-    .tab-btn {
-        background: none;
-        border: none;
-        padding: 16px 24px;
-        font-weight: 600;
-        cursor: pointer;
-        color: var(--text-muted);
-        border-bottom: 2px solid transparent;
-        transition: all 0.2s;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
-
-    .tab-btn:hover {
-        background: rgba(0, 0, 0, 0.02);
-        color: var(--text);
-    }
-
-    .tab-btn.active {
-        color: var(--accent);
-        border-bottom-color: var(--accent);
-        background: var(--surface1);
-    }
-
-    .tab-pane {
-        width: 100%;
-        height: 100%;
-        display: block;
-    }
-
-    .panel-selection,
-    .panel-associated {
-        display: flex;
-        flex-direction: column;
-        height: 480px;
-        background: var(--surface1);
-        border-radius: 16px;
-        padding: 16px;
-        border: 1px solid var(--border);
-    }
-
-    /* SCROLL EN PANEL DERECHO */
-    .panel-associated .table-container {
-        flex: 1;
-        overflow-y: auto;
-        min-height: 0;
-    }
-
-    #checklistCont {
-        flex: 1;
-        overflow-y: auto;
-        border: 1px solid var(--border);
-        border-radius: 12px;
-        background: white;
-        margin-bottom: 12px;
-        min-height: 0;
-    }
-
-    #checklistCont .item-check {
-        padding: 12px 16px;
-        border-bottom: 1px solid var(--border-light);
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        cursor: pointer;
-        transition: background 0.1s;
-    }
-
-    #checklistCont .item-check:hover {
-        background: var(--blue-light);
-    }
-
-    #checklistCont .item-check:last-child {
-        border-bottom: none;
-    }
-
-    #checklistCont .item-check input[type="checkbox"] {
-        width: 18px;
-        height: 18px;
-        cursor: pointer;
-        margin: 0;
-    }
-
-    #checklistCont .item-check .item-info {
-        flex: 1;
-    }
-
-    #checklistCont .item-check.selected {
-        background: #f0f7ff;
-    }
-
-    .btn-vincular {
-        background: var(--green);
-        color: white;
-        border: none;
-        padding: 10px 20px;
-        border-radius: 10px;
-        font-weight: 700;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        transition: transform 0.1s, background 0.2s;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    }
-
-    .btn-vincular:hover {
-        background: var(--green-dark);
-        transform: translateY(-1px);
-    }
-
-    .btn-vincular:active {
-        transform: translateY(0);
-    }
-</style>
 
 <script>
     let selectedForLinking = [];

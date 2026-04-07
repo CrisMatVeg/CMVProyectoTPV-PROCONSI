@@ -27,8 +27,13 @@ const PROMOS = typeof DB_PROMOS !== "undefined" ? DB_PROMOS : [];
 const TARIFAS = typeof DB_TARIFAS !== "undefined" ? DB_TARIFAS : [];
 let valeAplicado = null;
 
-function formatTicketNumber(numero, fecha, esFactura) {
-  const prefix = esFactura ? "F" : "T";
+function formatTicketNumber(numero, fecha, esFactura, tipoDocumento) {
+  let prefix;
+  if (tipoDocumento === 'abono') {
+    prefix = 'A';
+  } else {
+    prefix = esFactura ? "F" : "T";
+  }
   const d = new Date(fecha);
   const datePart = `${d.getDate()}${d.getMonth() + 1}${d.getFullYear()}`;
   return `${prefix}-${datePart}-${numero}`;
@@ -2374,7 +2379,11 @@ function mostrarTicket(v, isFromTPV = true) {
   const el_tkNumero = document.getElementById("tkNumero");
   if (el_tkNumero) {
     const esFactura = v.tipo_cliente === 'empresa' || v.es_factura == 1;
-    el_tkNumero.textContent = window.formatTicketNumber ? window.formatTicketNumber(v.numero_ticket, v.fecha, esFactura) : v.numero_ticket;
+    const tipoDoc   = v.tipo_documento || 'venta';
+    el_tkNumero.textContent = window.formatTicketNumber ? window.formatTicketNumber(v.numero_ticket, v.fecha, esFactura, tipoDoc) : v.numero_ticket;
+    // Mostrar badge visual para abonos
+    const badgeAbono = document.getElementById('tkBadgeAbono');
+    if (badgeAbono) badgeAbono.style.display = tipoDoc === 'abono' ? 'inline-flex' : 'none';
   }
   const el_tkFecha = document.getElementById("tkFecha");
   if (el_tkFecha) el_tkFecha.textContent = fechaStr;
@@ -2394,6 +2403,12 @@ function mostrarTicket(v, isFromTPV = true) {
       commentsSec.classList.add("d-none");
     }
   }
+
+  // Ocultar botones de devolución si el ticket es ya un abono
+  const esAbono = (v.tipo_documento || 'venta') === 'abono';
+  document.querySelectorAll('.btn-devolucion-ticket').forEach(b => {
+    b.style.display = esAbono ? 'none' : '';
+  });
 
   const tkCajero = document.getElementById("tkCajero");
   if (tkCajero) {
@@ -2629,8 +2644,68 @@ function mostrarTicket(v, isFromTPV = true) {
 
   document.getElementById("ticketModal").classList.add("visible");
 
+  // Sección de abonos asociados a esta venta
+  renderAbonosSection(v);
+
   // Sincronizar estado en la UI de fondo (Historial)
   updateVentaStatusUI(v.numero_ticket, v.estado, v);
+}
+
+/**
+ * Renderiza la sección de abonos/devoluciones en el modal del ticket.
+ * @param {Object} venta - Objeto de la venta con array 'abonos'
+ */
+function renderAbonosSection(venta) {
+  const seccion = document.getElementById('tkAbonosSection');
+  if (!seccion) return;
+
+  const abonos = venta.abonos || [];
+  const tipoDoc = venta.tipo_documento || 'venta';
+
+  // Si es un abono, mostrar enlace a la venta de origen
+  if (tipoDoc === 'abono') {
+    seccion.innerHTML = `
+      <div style="margin-top:16px;padding:12px 16px;border-radius:10px;background:rgba(192,57,43,0.06);border:1px solid rgba(192,57,43,0.2);">
+        <div style="font-size:11px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">
+          <i class="fa-solid fa-rotate-left" style="margin-right:6px;"></i>TICKET DE ABONO
+        </div>
+        <div style="font-size:12px;color:var(--text-muted);">
+          Este documento es una nota de abono. Genera un reembolso sobre la venta original.
+        </div>
+      </div>
+    `;
+    seccion.classList.remove('d-none');
+    return;
+  }
+
+  if (abonos.length === 0) {
+    seccion.classList.add('d-none');
+    return;
+  }
+
+  const fmt = (n) => new Intl.NumberFormat('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n) + ' €';
+
+  seccion.innerHTML = `
+    <div style="margin-top:16px;padding:12px 16px;border-radius:10px;background:rgba(192,57,43,0.06);border:1px solid rgba(192,57,43,0.2);">
+      <div style="font-size:11px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">
+        <i class="fa-solid fa-rotate-left" style="margin-right:6px;"></i>ABONOS / DEVOLUCIONES (${abonos.length})
+      </div>
+      ${abonos.map(a => {
+        const fStr = new Date(a.fecha.replace(' ','T')).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' });
+        const numFmt = formatTicketNumber(a.numero_ticket, a.fecha, false, 'abono');
+        return `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(192,57,43,0.1);gap:8px;">
+            <div>
+              <button onclick="verTicket(${a.numero_ticket})" style="font-size:12px;font-weight:700;color:var(--red);background:none;border:none;cursor:pointer;padding:0;text-decoration:underline;">${numFmt}</button>
+              <span style="font-size:11px;color:var(--text-muted);margin-left:8px;">${fStr}</span>
+            </div>
+            <span style="font-size:13px;font-weight:700;color:var(--red);font-family:'DM Mono',monospace;white-space:nowrap;">${fmt(Math.abs(parseFloat(a.total)))}</span>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+  seccion.classList.remove('d-none');
 }
 
 async function imprimirTicket() {
@@ -2760,8 +2835,9 @@ async function confirmarAnulacionTicket(numTicket) {
     const r = await resp.json();
     if (r.ok) {
       document.getElementById("returnModal").classList.remove("visible");
+      const numAbono = r.numTicketAbono;
       showToast(
-        "<i class='fa-solid fa-check'></i> Ticket completado devuelto correctamente",
+        `<i class='fa-solid fa-check'></i> Abono <strong>A-${numAbono}</strong> generado correctamente`,
       );
       const v = await cargarVenta(numTicket);
       mostrarTicket(v, false);
@@ -3365,6 +3441,8 @@ async function confirmarDevolucion(idLinea, numTicket) {
   const metodoReembolso =
     document.querySelector('input[name="metodoReembolso"]:checked')?.value ||
     "efectivo";
+  const cantidadEl = document.getElementById("returnQty");
+  const cantidad = cantidadEl ? parseInt(cantidadEl.value) || null : null;
   const finalMotivo = nota ? `${motivo}: ${nota}` : motivo;
 
   try {
@@ -3374,6 +3452,7 @@ async function confirmarDevolucion(idLinea, numTicket) {
       body: JSON.stringify({
         accion: "devolverLinea",
         idLinea,
+        cantidad,
         motivo: finalMotivo,
         metodoReembolso,
       }),
@@ -3383,8 +3462,9 @@ async function confirmarDevolucion(idLinea, numTicket) {
       throw new Error(data.error || "No se pudo realizar la devolución");
 
     document.getElementById("returnModal").classList.remove("visible");
+    const numAbono = data.numTicketAbono;
     showToast(
-      "<i class='fa-solid fa-check'></i> Devolución procesada correctamente",
+      `<i class='fa-solid fa-check'></i> Abono <strong>A-${numAbono}</strong> generado correctamente`,
     );
     const ventaActualizada = await cargarVenta(numTicket);
     mostrarTicket(ventaActualizada, false);

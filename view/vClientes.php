@@ -40,45 +40,49 @@
     </div>
 
     <!-- BUSCADOR Y FILTROS -->
-    <!-- BUSCADOR Y FILTROS -->
-    <div class="filters-panel container-wider mb-24">
-        <div class="d-flex ai-center gap-16 flex-wrap w-100">
-            <div style="position:relative; flex:2; min-width:220px;">
-                <i class="fa-solid fa-magnifying-glass" style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--text-muted); pointer-events:none;"></i>
-                <input type="text" id="filtroNombre" class="form-input" placeholder="<?php echo L('client_search_placeholder'); ?>" oninput="filtrarClientes()" style="padding-left:38px;">
+    <div class="filters-panel-new container-wider mb-24 br-20 shadow-sm" style="background: var(--surface2); padding: 20px; border: 1px solid var(--border);">
+        <div class="flex-1">
+            <div class="search-input-fancy" style="border-radius: 12px; background: var(--surface); padding-left: 15px;">
+                <i class="fa-solid fa-magnifying-glass opacity-50"></i>
+                <input type="text" id="filtroNombre" placeholder="<?php echo L('client_search_placeholder'); ?>" oninput="filtrarClientes()" style="height: 48px; border: none; background: transparent; width: 100%; padding-left: 10px;">
             </div>
-            <div class="d-flex ai-center gap-8" style="flex-shrink:0;">
-                <span class="fs-12 text-muted font-bold tt-uppercase" style="white-space:nowrap;"><?php echo L('client_label_type'); ?></span>
-                <select id="filtroTipo" class="form-input" onchange="filtrarClientes()" style="width:140px;">
-                    <option value=""><?php echo L('prod_filter_cat_all'); ?></option>
-                    <option value="particular"><?php echo L('client_type_particular'); ?></option>
-                    <option value="empresa"><?php echo L('client_type_empresa'); ?></option>
-                </select>
-            </div>
-            <div class="d-flex ai-center gap-8" style="flex-shrink:0;">
-                <span class="fs-12 text-muted font-bold tt-uppercase" style="white-space:nowrap;"><?php echo L('user_th_rol'); ?></span>
-                <select id="filtroRol" class="form-input" onchange="filtrarClientes()" style="width:160px;">
-                    <option value=""><?php echo L('prod_filter_cat_all'); ?></option>
-                    <option value="socio"><?php echo L('client_rol_socio'); ?></option>
-                    <option value="mayorista"><?php echo L('client_rol_mayorista'); ?></option>
-                    <option value="general"><?php echo L('client_rol_general'); ?></option>
-                    <?php foreach ($avClientes['roles'] as $r): ?>
-                        <?php if (!in_array(strtolower($r['nombre']), ['socio', 'mayorista', 'general'])): ?>
-                            <option value="<?php echo htmlspecialchars(strtolower($r['nombre'])); ?>">
-                                <?php echo htmlspecialchars(ucfirst($r['nombre'])); ?>
-                            </option>
-                        <?php endif; ?>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <button onclick="limpiarFiltrosClientes()" class="btn-cancel d-flex ai-center gap-8" style="height:46px; padding:0 16px; flex-shrink:0;">
-                <i class="fa-solid fa-rotate-left"></i> <?php echo L('prod_filter_btn_clear'); ?>
-            </button>
-            <span class="fs-12 text-muted ml-8" id="contadorClientes" style="flex-shrink:0;"></span>
         </div>
+
+        <div class="filter-item">
+            <span class="filter-label"><?php echo L('client_label_type'); ?></span>
+            <select id="filtroTipo" class="filter-control" onchange="filtrarClientes()" style="min-width: 150px;">
+                <option value=""><?php echo L('prod_filter_cat_all'); ?></option>
+                <option value="particular"><?php echo L('client_type_particular'); ?></option>
+                <option value="empresa"><?php echo L('client_type_empresa'); ?></option>
+            </select>
+        </div>
+
+        <div class="filter-item">
+            <span class="filter-label"><?php echo L('user_th_rol'); ?></span>
+            <select id="filtroRol" class="filter-control" onchange="filtrarClientes()" style="min-width: 180px;">
+                <option value=""><?php echo L('prod_filter_cat_all'); ?></option>
+                <option value="socio"><?php echo L('client_rol_socio'); ?></option>
+                <option value="mayorista"><?php echo L('client_rol_mayorista'); ?></option>
+                <option value="general"><?php echo L('client_rol_general'); ?></option>
+                <?php foreach ($avClientes['roles'] as $r): ?>
+                    <?php if (!in_array(strtolower($r['nombre']), ['socio', 'mayorista', 'general'])): ?>
+                        <option value="<?php echo htmlspecialchars(strtolower($r['nombre'])); ?>">
+                            <?php echo htmlspecialchars(ucfirst($r['nombre'])); ?>
+                        </option>
+                    <?php endif; ?>
+                <?php endforeach; ?>
+            </select>
+        </div>
+
+        <button onclick="limpiarFiltrosClientes()" class="btn-cancel">
+            <i class="fa-solid fa-rotate-left"></i> 
+            <span><?php echo L('prod_filter_btn_clear'); ?></span>
+        </button>
+
+        <span class="fs-12 text-muted fw-600" id="contadorClientes"></span>
     </div>
 
-    <div class="table-container container-wider">
+    <div class="table-container container-wider br-20">
         <table class="data-table" id="tablaClientes">
             <thead>
                 <tr>
@@ -162,14 +166,14 @@
 
 <!-- MODAL ALTA/EDICIÓN CLIENTE -->
 <div class="modal-overlay" id="clienteAdminModal">
-    <div class="modal modal-content gap-16 ai-stretch w-modal-md" style="max-width: 800px; border-radius: 20px; overflow: hidden;">
+    <div class="modal modal-content gap-16 ai-stretch w-modal-md" style="max-width: 800px; border-radius: 20px; overflow: hidden; border: 1px solid var(--border); box-shadow: var(--shadow-lg);">
         <div class="modal-header mb-0">
             <h2 class="m-0 fs-18" id="client_modal_new_title"><?php echo L('client_modal_new_title'); ?></h2>
             <button onclick="cerrarAdminModalCliente()" class="btn-close-modal">&times;</button>
         </div>
         <form id="clienteForm" class="modal-body p-20">
             <input type="hidden" id="clienteId">
-            <div class="form-group mb-0">
+            <div class="form-group">
                 <label class="form-label"><?php echo L('client_label_type'); ?></label>
                 <select id="clienteTipo" class="form-input">
                     <option value="particular"><?php echo L('client_type_particular'); ?></option>
@@ -226,7 +230,7 @@
 
 <!-- MODAL HISTORIAL CLIENTE -->
 <div class="modal-overlay" id="historialClienteModal">
-    <div class="modal modal-content gap-16 ai-stretch w-900" style="max-width: 900px; border-radius: 20px; overflow: hidden;">
+    <div class="modal modal-content gap-16 ai-stretch w-900" style="max-width: 900px; border-radius: 20px; overflow: hidden; border: 1px solid var(--border); box-shadow: var(--shadow-lg);">
         <div class="modal-header mb-0">
             <h2 class="m-0 fs-18" id="historialTitle"><?php echo L('client_modal_history_title'); ?></h2>
             <button onclick="cerrarAdminHistorialModal()" class="btn-close-modal">&times;</button>
@@ -288,7 +292,7 @@
 
             <!-- Contenido Puntos -->
             <div id="contentPuntos" class="p-20 d-none">
-                <div class="d-flex ai-center jc-space-between p-16 br-12 bg-surface1 border-2 mb-16">
+                <div class="d-flex ai-center jc-space-between p-16 br-20 bg-surface1 border-2 mb-16">
                     <div class="d-flex ai-center gap-12">
                         <div class="br-12 bg-accent-light p-12 text-accent">
                             <i class="fa-solid fa-star fs-24"></i>

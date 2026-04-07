@@ -79,8 +79,9 @@
             if(window.updateProdCountPromo) updateProdCountPromo();
 
             const cats = promo.categoria_code ? promo.categoria_code.split(',') : [];
-            const selCats = document.getElementById('promoCategoria');
-            if (selCats) Array.from(selCats.options).forEach(opt => opt.selected = cats.includes(opt.value));
+            document.querySelectorAll('.promo-cat-checkbox').forEach(cb => {
+                cb.checked = cats.includes(cb.value);
+            });
             setVal('promoFechaInicio', promo.fecha_inicio ? promo.fecha_inicio.replace(' ', 'T') : '');
             setVal('promoFechaFin', promo.fecha_fin ? promo.fecha_fin.replace(' ', 'T') : '');
             const roles = promo.roles_segmento ? promo.roles_segmento.split(',') : [];
@@ -103,7 +104,7 @@
             setVal('promoMin', '');
             setVal('promoBuyQty', '');
             setVal('promoPayQty', '');
-            setVal('promoCategoria', '');
+            document.querySelectorAll('.promo-cat-checkbox').forEach(cb => cb.checked = false);
             setVal('promoFechaInicio', '');
             setVal('promoFechaFin', '');
             const selRoles = document.getElementById('promoRoles');
@@ -123,11 +124,30 @@
     };
 
     window.filtrarProductosPromo = function() {
-        const val = document.getElementById('promoBusquedaProd').value.toLowerCase();
+        const input = document.getElementById('promoBusquedaProd');
+        if (!input) return;
+        const val = input.value.toLowerCase().trim();
         const rows = document.querySelectorAll('.promo-product-row');
+        
         rows.forEach(row => {
-            const name = row.dataset.name || '';
-            row.style.display = name.includes(val) ? 'flex' : 'none';
+            const name = (row.dataset.name || '').toLowerCase();
+            const ref = (row.dataset.ref || '').toLowerCase();
+            const matches = name.includes(val) || ref.includes(val);
+            row.classList.toggle('hidden-filter-row', !matches);
+        });
+    };
+
+    window.filtrarCategoriasPromo = function() {
+        const input = document.getElementById('promoBusquedaCat');
+        if (!input) return;
+        const val = input.value.toLowerCase().trim();
+        const rows = document.querySelectorAll('.promo-category-row');
+        
+        rows.forEach(row => {
+            const name = (row.dataset.name || '').toLowerCase();
+            const code = (row.dataset.code || '').toLowerCase();
+            const matches = name.includes(val) || code.includes(val);
+            row.classList.toggle('hidden-filter-row', !matches);
         });
     };
 
@@ -139,6 +159,10 @@
     window.unselectAllProductsPromo = function() {
         document.querySelectorAll('.promo-prod-checkbox').forEach(cb => cb.checked = false);
         updateProdCountPromo();
+    };
+
+    window.unselectAllCatsPromo = function() {
+        document.querySelectorAll('.promo-cat-checkbox').forEach(cb => cb.checked = false);
     };
 
     window.switchTabPromo = function(btn, tabId) {
@@ -171,7 +195,7 @@
             bundle_pay_qty: document.getElementById('promoPayQty')?.value || '',
             id_producto: null, // Now using producto_ids
             producto_ids: selectedProducts.length > 0 ? selectedProducts : null,
-            categoria_code: Array.from(document.getElementById('promoCategoria')?.selectedOptions || []).map(o => o.value).filter(v => v !== '').join(','),
+            categoria_code: Array.from(document.querySelectorAll('.promo-cat-checkbox:checked')).map(cb => cb.value).join(','),
             fecha_inicio: document.getElementById('promoFechaInicio')?.value || null,
             fecha_fin: document.getElementById('promoFechaFin')?.value || null,
             roles_segmento: Array.from(document.getElementById('promoRoles')?.selectedOptions || []).map(o => o.value),
@@ -315,12 +339,35 @@
         background: var(--surface2) !important;
     }
 
-    /* Tabs Styles */
+    /* Form and Tab Scoped Scrolling */
+    #promoForm {
+        overflow: hidden !important;
+        display: flex;
+        flex-direction: column;
+        height: 680px; /* Increased height to accommodate all elements without squashing */
+    }
+
     .tab-pane {
         display: none;
+        overflow-y: auto;
+        flex: 1;
+        padding-bottom: 20px;
     }
+
     .tab-pane.active {
         display: block;
+    }
+
+    /* Special rule for Filters Tab: internally scrollable lists, not the container */
+    #tab-promo-filtros {
+        display: none;
+        overflow: hidden !important;
+        flex-direction: column;
+        height: 100%;
+        gap: 16px; /* Uniform gap for the tab components */
+    }
+    #tab-promo-filtros.active {
+        display: flex;
     }
 
     /* List and Selection Styles */
@@ -354,7 +401,7 @@
     /* Modal Spacing & Components */
     .w-modal-lg {
         width: 90vw !important;
-        max-width: 1000px !important;
+        max-width: 1100px !important;
     }
 
     .search-box-container .search-input-wrap {
@@ -362,10 +409,19 @@
     }
 
     .checkbox-list {
-        background: var(--surface);
+        background: var(--surface1);
         border: 1.5px solid var(--border);
-        border-radius: 12px;
+        border-radius: 16px;
         overflow: hidden;
+        box-shadow: inset 0 2px 4px rgba(0,0,0,0.03);
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .hidden-filter-row {
+        display: none !important;
     }
 
     .ls-1 {
@@ -410,6 +466,12 @@
     select[multiple] option:checked {
         background: var(--accent) !important;
         color: white;
+    }
+
+    /* Selection container fixed size */
+    .products-selection-container, .categories-selection-container {
+        height: 450px !important;
+        min-height: 450px !important;
     }
 </style>
 
@@ -521,7 +583,8 @@
                                 </span>
                             <?php endif; ?>
                         </td>
-                        <td class                            <div class="d-flex jc-center gap-8 pr-20">
+                        <td class="text-center pr-20">
+                            <div class="d-flex jc-center gap-8">
                                 <button onclick="window.abrirModalPromo(<?php echo htmlspecialchars(json_encode($p), ENT_QUOTES, 'UTF-8'); ?>)" title="<?php echo L('modal_edit'); ?>" class="btn-icon">
                                     <i class="fa-solid fa-pen"></i>
                                 </button>
@@ -532,13 +595,12 @@
                                     <i class="fa-solid fa-trash"></i>
                                 </button>
                             </div>
-         </div>
                         </td>
                     </tr>
                 <?php endforeach; ?>
                 <?php if (empty($avPromos['lista'])): ?>
                     <tr>
-                        <td colspan="8">
+                        <td colspan="9">
                             <div class="empty-state">
                                 <i class="fa-solid fa-ticket"></i>
                                 <?php echo L('promos_no_promos'); ?>
@@ -579,7 +641,7 @@
             </div>
         </div>
 
-        <form id="promoForm" class="modal-body p-24" style="overflow-y: auto; max-height: 70vh;">
+        <form id="promoForm" class="modal-body p-24">
             <input type="hidden" id="promoId">
 
             <!-- TAB: GENERAL -->
@@ -661,61 +723,94 @@
 
             <!-- TAB: FILTROS -->
             <div id="tab-promo-filtros" class="tab-pane">
-                <div class="alert alert-info mb-20">
-                    <i class="fa-solid fa-circle-info fs-16"></i>
-                    <div>
-                        <strong><?php echo L('promos_filter_scope'); ?></strong> <?php echo L('promos_filter_scope_help'); ?>
+                <div class="alert-premium premium-info mb-24">
+                    <div class="alert-icon-wrap">
+                        <i class="fa-solid fa-circle-info"></i>
+                    </div>
+                    <div class="alert-content">
+                        <span class="alert-title text-uppercase"><?php echo L('promos_filter_scope'); ?></span>
+                        <span class="alert-desc"><?php echo L('promos_filter_scope_help'); ?></span>
                     </div>
                 </div>
 
-                <div class="d-grid grid-2 gap-24 ai-start">
-                    <div class="form-group">
-                        <label class="form-label fw-700 d-flex ai-center gap-8 mb-12">
+                <div class="d-grid grid-2 gap-32 flex-1 min-h-0">
+                    <!-- Column 1: Products -->
+                    <div class="filter-column d-flex flex-column gap-12 min-h-0">
+                        <label class="form-label fw-800 d-flex ai-center gap-8 mb-4 flex-shrink-0">
                             <i class="fa-solid fa-box-open text-accent"></i> <?php echo L('promos_filter_products'); ?>
                         </label>
                         
-                        <div class="search-box-container mb-12">
-                            <div class="search-input-wrap">
+                        <div class="search-box-container flex-shrink-0">
+                            <div class="search-input-wrap shadow-sm">
                                 <i class="fa-solid fa-magnifying-glass"></i>
                                 <input type="text" id="promoBusquedaProd" class="search-input"
-                                    placeholder="<?php echo L('promos_search_placeholder'); ?>" onkeyup="filtrarProductosPromo()">
+                                    placeholder="<?php echo L('promos_search_placeholder'); ?>" oninput="filtrarProductosPromo()">
                             </div>
                         </div>
 
-                        <div class="products-selection-container border br-12 overflow-hidden bg-white shadow-sm">
-                            <div class="d-flex ai-center jc-between p-12-20 border-bottom bg-surface1 gap-12">
-                                <span class="fs-12 tt-uppercase fw-800 text-accent ls-1" id="promoCountSelectedProd">0 <?php echo L('promos_selected'); ?></span>
-                                <button type="button" class="btn-clean px-12 py-6 fs-12 fw-600 transition br-8 border-0 bg-transparent text-muted hover-text-accent cp" onclick="unselectAllProductsPromo()">
+                        <div class="products-selection-container border br-16 overflow-hidden bg-white shadow-sm d-flex flex-column flex-1 min-h-0">
+                            <div class="d-flex ai-center jc-between p-12-20 border-bottom bg-surface1 flex-shrink-0">
+                                <span class="fs-11 tt-uppercase fw-800 text-accent ls-1" id="promoCountSelectedProd">0 <?php echo L('promos_selected'); ?></span>
+                                <button type="button" class="btn-clean px-12 py-6 fs-11 fw-700 transition br-8 border-0 bg-transparent text-muted hover-text-accent cp" onclick="unselectAllProductsPromo()">
                                     <i class="fa-solid fa-eraser mr-4"></i> <?php echo L('promos_btn_clean'); ?>
                                 </button>
                             </div>
-                            <div class="checkbox-list p-4" style="max-height: 250px; overflow-y: auto;" id="listadoProductosPromo">
-                                <?php foreach ($avPromos['productos'] as $prod): ?>
-                                    <label class="checkbox-item d-flex ai-center gap-12 p-8-12 cp hover-bg-surface2 br-8 transition promo-product-row"
-                                        data-name="<?php echo htmlspecialchars(strtolower($prod->getNombre())); ?>">
-                                        <input type="checkbox" class="promo-prod-checkbox" value="<?php echo $prod->getId(); ?>" onchange="updateProdCountPromo()">
-                                        <div class="flex-1">
-                                            <div class="fs-13 fw-600"><?php echo htmlspecialchars($prod->getNombre()); ?></div>
-                                            <div class="fs-11 text-muted"><?php echo htmlspecialchars($prod->getReferencia()); ?></div>
-                                        </div>
-                                        <div class="fs-12 font-mono fw-700 text-accent"><?php echo number_format($prod->getPrecioVenta(), 2, ',', '.'); ?> €</div>
-                                    </label>
-                                <?php endforeach; ?>
+                            <div class="checkbox-list-container p-8" style="overflow-y: auto; flex: 1;">
+                                <div class="checkbox-list border-0" id="listadoProductosPromo">
+                                    <?php foreach ($avPromos['productos'] as $prod): ?>
+                                        <label class="checkbox-item d-flex ai-center gap-12 p-8-12 cp hover-bg-surface2 br-12 transition promo-product-row"
+                                            data-name="<?php echo htmlspecialchars(strtolower($prod->getNombre())); ?>"
+                                            data-ref="<?php echo htmlspecialchars(strtolower($prod->getReferencia())); ?>">
+                                            <input type="checkbox" class="promo-prod-checkbox" value="<?php echo $prod->getId(); ?>" onchange="updateProdCountPromo()">
+                                            <div class="flex-1">
+                                                <div class="fs-13 fw-600 text-main"><?php echo htmlspecialchars($prod->getNombre()); ?></div>
+                                                <div class="fs-11 text-muted"><?php echo htmlspecialchars($prod->getReferencia()); ?></div>
+                                            </div>
+                                            <div class="fs-12 font-mono fw-700 text-accent"><?php echo number_format($prod->getPrecioVenta(), 2, ',', '.'); ?> €</div>
+                                        </label>
+                                    <?php endforeach; ?>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="form-group">
-                        <label class="form-label fw-700 d-flex ai-center gap-8 mb-12">
+                    <!-- Column 2: Categories -->
+                    <div class="filter-column d-flex flex-column gap-12 min-h-0">
+                        <label class="form-label fw-800 d-flex ai-center gap-8 mb-4 flex-shrink-0">
                             <i class="fa-solid fa-tags text-accent"></i> <?php echo L('promos_filter_cats'); ?>
                         </label>
-                        <select id="promoCategoria" class="form-input" multiple style="height: 338px;">
-                            <option value=""><?php echo L('promos_all_cats'); ?></option>
-                            <?php foreach ($avPromos['categorias'] as $cat): ?>
-                                <option value="<?php echo htmlspecialchars($cat['codigo']); ?>"><?php echo htmlspecialchars($cat['nombre']); ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                        <p class="fs-11 text-muted mt-12 italic"><i class="fa-solid fa-circle-info mr-4"></i> <?php echo L('promos_multi_select_help'); ?></p>
+
+                        <div class="search-box-container flex-shrink-0">
+                            <div class="search-input-wrap shadow-sm">
+                                <i class="fa-solid fa-magnifying-glass"></i>
+                                <input type="text" id="promoBusquedaCat" class="search-input"
+                                    placeholder="<?php echo L('promos_search_placeholder_cat') ?: 'Buscar categoría...'; ?>" oninput="filtrarCategoriasPromo()">
+                            </div>
+                        </div>
+
+                        <div class="categories-selection-container border br-16 overflow-hidden bg-white shadow-sm d-flex flex-column flex-1 min-h-0">
+                            <div class="d-flex ai-center jc-between p-12-20 border-bottom bg-surface1 flex-shrink-0">
+                                <span class="fs-11 tt-uppercase fw-800 text-accent ls-1"><?php echo L('tpv_all'); ?></span>
+                                <button type="button" class="btn-clean px-12 py-6 fs-11 fw-700 transition br-8 border-0 bg-transparent text-muted hover-text-accent cp" onclick="unselectAllCatsPromo()">
+                                    <i class="fa-solid fa-eraser mr-4"></i> <?php echo L('promos_btn_clean'); ?>
+                                </button>
+                            </div>
+                            <div class="checkbox-list-container p-8" style="overflow-y: auto; flex: 1;">
+                                <div class="checkbox-list border-0">
+                                    <?php foreach ($avPromos['categorias'] as $cat): ?>
+                                        <label class="checkbox-item d-flex ai-center gap-12 p-8-12 cp hover-bg-surface2 br-12 transition promo-category-row"
+                                            data-name="<?php echo htmlspecialchars(strtolower($cat['nombre'])); ?>"
+                                            data-code="<?php echo htmlspecialchars(strtolower($cat['codigo'])); ?>">
+                                            <input type="checkbox" class="promo-cat-checkbox" value="<?php echo htmlspecialchars($cat['codigo']); ?>">
+                                            <div class="flex-1">
+                                                <div class="fs-13 fw-600 text-main"><?php echo htmlspecialchars($cat['nombre']); ?></div>
+                                                <div class="fs-11 text-muted"><?php echo htmlspecialchars($cat['codigo']); ?></div>
+                                            </div>
+                                        </label>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -785,10 +880,13 @@
                     </div>
                 </div>
 
-                <div class="alert alert-warning mt-24">
-                    <i class="fa-solid fa-triangle-exclamation fs-16"></i>
-                    <div>
-                        <strong><?php echo L('promos_priority_title'); ?></strong> <?php echo L('promos_priority_help'); ?>
+                <div class="alert-premium premium-warning mt-24">
+                    <div class="alert-icon-wrap">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                    </div>
+                    <div class="alert-content">
+                        <span class="alert-title text-uppercase"><?php echo L('promos_priority_title'); ?></span>
+                        <span class="alert-desc"><?php echo L('promos_priority_help'); ?></span>
                     </div>
                 </div>
             </div>

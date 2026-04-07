@@ -16,7 +16,7 @@
         </div>
     </div>
 
-    <div class="table-container container-wider">
+    <div class="table-container container-wider br-20">
         <table class="data-table">
             <thead>
                 <tr>
@@ -110,18 +110,18 @@
                 </div>
             </div>
 
-            <div class="d-grid grid-3 gap-20 mt-16">
-                <div class="form-group mb-0">
+            <div class="d-grid grid-3 gap-20">
+                <div class="form-group">
                     <label class="form-label fs-11 tt-uppercase"><?php echo L('tax_label_percent'); ?></label>
                     <input type="number" id="ivaPorcentaje" class="form-input text-right" step="0.01" min="0">
                     <span class="form-error" id="err-porcentaje"></span>
                 </div>
-                <div class="form-group mb-0">
+                <div class="form-group">
                     <label class="form-label fs-11 tt-uppercase"><?php echo L('tax_label_start'); ?></label>
                     <input type="date" id="ivaFechaInicio" class="form-input">
                     <span class="form-error" id="err-fecha_inicio"></span>
                 </div>
-                <div class="form-group mb-0">
+                <div class="form-group">
                     <label class="form-label fs-11 tt-uppercase"><?php echo L('tax_label_end'); ?></label>
                     <input type="date" id="ivaFechaFin" class="form-input">
                     <span class="form-error" id="err-fecha_fin"></span>

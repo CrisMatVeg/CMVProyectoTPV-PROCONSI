@@ -25,7 +25,7 @@
         <?php endif; ?>
 
         <!-- Formulario de Configuración Unificado -->
-        <form id="formConfig" method="post" action="index.php?irConfiguracion=1" class="bg-surface br-16 border-1 shadow-lg p-32" onsubmit="return validarConfiguracion(event)">
+        <form id="formConfig" method="post" action="index.php?irConfiguracion=1" class="bg-surface br-20 border-1 shadow-lg p-32" onsubmit="return validarConfiguracion(event)">
             <input type="hidden" name="seccion_activa" id="seccion_activa" value="">
 
             <script>
@@ -322,7 +322,7 @@
 
         <!-- SECCIÓN: MANTENIMIENTO Y SEGURIDAD -->
         <div class="mt-48 config-section">
-            <div class="bg-surface br-16 border-1 shadow-lg p-32" style="border-left: 5px solid var(--red);">
+            <div class="bg-surface br-20 border-1 shadow-lg p-32" style="border-left: 5px solid var(--red);">
                 <div class="section-header ai-center jc-space-between mb-24 pr-0">
                     <div class="section-title">
                         <div class="d-flex ai-center gap-12 mb-8">
@@ -353,7 +353,7 @@
         </div>
 
         <!-- SECCIÓN: LOGS DEL SISTEMA -->
-        <div class="mt-48 bg-surface br-16 border-1 shadow-lg p-32">
+        <div class="mt-48 bg-surface br-20 border-1 shadow-lg p-32">
             <div class="section-header ai-center jc-space-between mb-24 pr-0">
                 <div class="section-title">
                     <h3 class="fs-18 font-bold text-accent d-flex ai-center gap-12">

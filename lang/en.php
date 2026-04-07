@@ -826,6 +826,7 @@ $translations = [
     'history_filter_cashier' => 'Cashier',
     'history_filter_all_cashiers' => 'All cashiers',
     'history_filter_btn' => 'Filter',
+    'history_filter_type' => 'Type',
     'history_th_ticket' => 'Receipt',
     'history_th_datetime' => 'Date and Time',
     'history_th_cashier' => 'Cashier',

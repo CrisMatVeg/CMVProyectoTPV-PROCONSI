@@ -63,6 +63,14 @@
                         <?php endforeach; ?>
                     </select>
                 </div>
+                <div class="filter-group w-160">
+                    <label><?php echo L('history_filter_type'); ?></label>
+                    <select name="tipoDocumento" class="filter-input">
+                        <option value="todos" <?php echo $avHistorial['filtros']['tipoDocumento'] === 'todos' ? 'selected' : ''; ?>>Todos</option>
+                        <option value="venta" <?php echo $avHistorial['filtros']['tipoDocumento'] === 'venta' ? 'selected' : ''; ?>>Solo ventas</option>
+                        <option value="abono" <?php echo $avHistorial['filtros']['tipoDocumento'] === 'abono' ? 'selected' : ''; ?>>Solo abonos</option>
+                    </select>
+                </div>
                 <button type="submit" class="btn-filter">
                     <i class="fa-solid fa-magnifying-glass"></i> <?php echo L('history_filter_btn'); ?>
                 </button>
@@ -88,7 +96,7 @@
                 <tbody>
                     <?php if (empty($avHistorial['ventas'])): ?>
                         <tr>
-                            <td colspan="8" class="empty-state">
+                            <td colspan="9" class="empty-state">
                                 <i class="fa-solid fa-folder-open"></i>
                                 <?php echo L('history_no_sales'); ?>
                             </td>
@@ -96,9 +104,17 @@
                     <?php endif; ?>
 
                     <?php foreach ($avHistorial['ventas'] as $v): ?>
-                        <tr>
+                        <?php $esAbono = ($v['tipo_documento'] ?? 'venta') === 'abono'; ?>
+                        <tr <?php echo $esAbono ? 'style="background: rgba(192,57,43,0.03);"' : ''; ?>>
                             <td class="ticket-num">
-                                <?php echo VentaPDO::formatTicketNumber($v['numero_ticket'], $v['fecha'], !empty($v['es_factura'])); ?>
+                                <?php if ($esAbono): ?>
+                                    <span style="display:inline-flex;align-items:center;gap:5px;">
+                                        <span style="background:var(--red);color:#fff;font-size:9px;font-weight:800;padding:2px 6px;border-radius:4px;letter-spacing:.5px;">ABONO</span>
+                                        <?php echo VentaPDO::formatTicketNumber($v['numero_ticket'], $v['fecha'], false, 'abono'); ?>
+                                    </span>
+                                <?php else: ?>
+                                    <?php echo VentaPDO::formatTicketNumber($v['numero_ticket'], $v['fecha'], !empty($v['es_factura'])); ?>
+                                <?php endif; ?>
                             </td>
                             <td class="text-muted fs-13">
                                 <?php echo date('d/m/Y H:i', strtotime($v['fecha'])); ?>
@@ -130,23 +146,31 @@
                                     </span>
                                 <?php endif; ?>
                             </td>
-                            <td class="text-right font-mono">
+                            <td class="text-right font-mono <?php echo $esAbono ? 'text-red' : ''; ?>">
                                 <?php echo number_format($v['base_imponible'], 2, ',', '.'); ?> €
                             </td>
-                            <td class="text-right font-mono text-muted">
+                            <td class="text-right font-mono text-muted <?php echo $esAbono ? 'text-red' : ''; ?>">
                                 <?php echo number_format($v['iva_amt'], 2, ',', '.'); ?> €
                             </td>
-                            <td class="text-right font-bold font-mono">
+                            <td class="text-right font-bold font-mono <?php echo $esAbono ? 'text-red' : ''; ?>">
                                 <?php echo number_format($v['total'], 2, ',', '.'); ?> €
                             </td>
                             <td class="text-center" id="status-venta-<?php echo $v['numero_ticket']; ?>">
-                                <?php if ($v['estado'] === 'completada'): ?>
+                                <?php if ($esAbono): ?>
+                                    <span class="status-pill" style="background:var(--red-light);color:var(--red);border-color:var(--red);" title="Ticket de abono / devolución">
+                                        <i class="fa-solid fa-rotate-left"></i> Abono
+                                    </span>
+                                <?php elseif ($v['estado'] === 'completada'): ?>
                                     <span class="status-pill status-active" title="<?php echo L('history_status_completed'); ?>">
                                         <i class="fa-solid fa-check"></i>
                                     </span>
+                                <?php elseif ($v['estado'] === 'parcialmente_devuelta'): ?>
+                                    <span class="status-pill" style="background:#fff3e0;color:#e65100;border-color:#e65100;" title="Devolución parcial registrada">
+                                        <i class="fa-solid fa-rotate-left"></i> Parcial
+                                    </span>
                                 <?php elseif ($v['estado'] === 'pendiente_pago'): ?>
                                     <?php
-                                    $vencida = (!empty($v['fecha_limite_pago']) && strtotime($v['fecha_limite_pago']) < strtotime(date('Y-m-d')));
+                                    $vencida  = (!empty($v['fecha_limite_pago']) && strtotime($v['fecha_limite_pago']) < strtotime(date('Y-m-d')));
                                     $pendiente = (float)$v['total'] - (float)$v['pagado_a_cuenta'];
                                     ?>
                                     <span class="status-pill <?php echo $vencida ? 'status-overdue' : 'status-pending'; ?>"
@@ -166,12 +190,20 @@
                             </td>
                             <td>
                                 <div class="d-flex gap-8 jc-center">
-                                    <button title="<?php echo L('history_btn_view_ticket'); ?>" class="btn-icon" onclick="verTicket(<?php echo $v['numero_ticket']; ?>)">
-                                        <i class="fa-solid fa-receipt"></i>
+                                    <button title="Ver detalle" class="btn-icon" onclick="verTicket(<?php echo $v['numero_ticket']; ?>)">
+                                        <i class="fa-solid <?php echo $esAbono ? 'fa-file-circle-minus' : 'fa-receipt'; ?>"></i>
                                     </button>
-                                    <button title="<?php echo !empty($v['es_factura']) ? L('history_btn_view_invoice', true) : L('history_btn_gen_invoice', true); ?>" class="btn-icon <?php echo !empty($v['es_factura']) ? 'text-accent' : ''; ?>" onclick="abrirModalFactura(<?php echo $v['id']; ?>, <?php echo $v['numero_ticket']; ?>, '<?php echo addslashes(htmlspecialchars($v['nombre_cliente'] ?? '')); ?>', '<?php echo addslashes(htmlspecialchars($v['nif_cliente'] ?? '')); ?>', <?php echo !empty($v['es_factura']) ? 'true' : 'false'; ?>)">
-                                        <i class="fa-solid fa-file-invoice"></i>
-                                    </button>
+                                    <?php if (!$esAbono): ?>
+                                        <button title="<?php echo !empty($v['es_factura']) ? L('history_btn_view_invoice', true) : L('history_btn_gen_invoice', true); ?>" class="btn-icon <?php echo !empty($v['es_factura']) ? 'text-accent' : ''; ?>" onclick="abrirModalFactura(<?php echo $v['id']; ?>, <?php echo $v['numero_ticket']; ?>, '<?php echo addslashes(htmlspecialchars($v['nombre_cliente'] ?? '')); ?>', '<?php echo addslashes(htmlspecialchars($v['nif_cliente'] ?? '')); ?>', <?php echo !empty($v['es_factura']) ? 'true' : 'false'; ?>)">
+                                            <i class="fa-solid fa-file-invoice"></i>
+                                        </button>
+                                    <?php else: ?>
+                                        <?php if (!empty($v['numero_ticket_origen'])): ?>
+                                        <button title="Ver venta origen: T-<?php echo $v['numero_ticket_origen']; ?>" class="btn-icon text-accent" onclick="verTicket(<?php echo (int)$v['numero_ticket_origen']; ?>)">
+                                            <i class="fa-solid fa-link"></i>
+                                        </button>
+                                        <?php endif; ?>
+                                    <?php endif; ?>
                                 </div>
                             </td>
                         </tr>
@@ -200,7 +232,7 @@
                 <tbody>
                     <?php if (empty($avHistorial['cierres'])): ?>
                         <tr>
-                            <td colspan="7" class="empty-state">
+                            <td colspan="10" class="empty-state">
                                 <i class="fa-solid fa-file-circle-xmark"></i>
                                 <?php echo L('history_no_closings'); ?>
                             </td>
