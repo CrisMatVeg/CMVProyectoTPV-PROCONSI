@@ -95,8 +95,27 @@ try {
         }
 
         $cantidadOriginal = (int)$l['cantidad'];
-        if ($cantidad === null || $cantidad <= 0) $cantidad = $cantidadOriginal;
-        if ($cantidad > $cantidadOriginal) throw new Exception("Cantidad inválida para devolver (Máximo: $cantidadOriginal)");
+        
+        // Calcular historial previo de devoluciones para este producto en la misma venta de origen
+        $qAbonos = DBPDO::ejecutarConsulta(
+            "SELECT COALESCE(SUM(ABS(lv.cantidad)), 0) as devueltos
+             FROM lineas_venta lv
+             JOIN ventas v ON lv.id_venta = v.id
+             WHERE v.id_venta_origen = :idv AND v.tipo_documento = 'abono' AND lv.id_producto = :idp",
+            [':idv' => $l['id_venta'], ':idp' => $l['id_producto']]
+        );
+        $qtyDevolucionesPrevias = (int)($qAbonos->fetch(PDO::FETCH_ASSOC)['devueltos'] ?? 0);
+        $cantidadDisponible = $cantidadOriginal - $qtyDevolucionesPrevias;
+
+        if ($cantidadDisponible <= 0) {
+            throw new Exception("Ya se ha devuelto la totalidad de este producto.");
+        }
+
+        if ($cantidad === null || $cantidad <= 0) $cantidad = $cantidadDisponible;
+        if ($cantidad > $cantidadDisponible) {
+            throw new Exception("Cantidad inválida para devolver (Solo tienes disponibles $cantidadDisponible unidades para devolver)");
+        }
+
 
         $validarPlazos($l['fecha_venta'], (int)$l['meses_garantia'], $metodo);
 

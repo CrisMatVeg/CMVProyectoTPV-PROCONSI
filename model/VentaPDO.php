@@ -368,7 +368,52 @@ class VentaPDO
                       WHERE lv.id_venta = :v 
                       ORDER BY lv.id ASC";
         $qL = DBPDO::ejecutarConsulta($sqlLineas, [':v' => $venta['id']]);
-        $lineas = $qL->fetchAll(PDO::FETCH_ASSOC);
+        $lineasRaw = $qL->fetchAll(PDO::FETCH_ASSOC);
+
+        // Map already returned quantities from Abonos without mutating original lines
+        $devueltosPorProducto = [];
+        if (($venta['tipo_documento'] ?? 'venta') === 'venta') {
+            $sqlTodosAbonos = "SELECT lv.id_producto, COALESCE(SUM(ABS(lv.cantidad)), 0) as devueltos
+                               FROM lineas_venta lv
+                               JOIN ventas v ON lv.id_venta = v.id
+                               WHERE v.id_venta_origen = :idv AND v.tipo_documento = 'abono'
+                               GROUP BY lv.id_producto";
+            $qAb = DBPDO::ejecutarConsulta($sqlTodosAbonos, [':idv' => $venta['id']]);
+            while($row = $qAb->fetch(PDO::FETCH_ASSOC)) {
+                $devueltosPorProducto[$row['id_producto']] = (int)$row['devueltos'];
+            }
+        }
+
+        $lineas = [];
+        foreach ($lineasRaw as $l) {
+            $pid = $l['id_producto'];
+            $cd = $devueltosPorProducto[$pid] ?? 0;
+            $devueltos = min((int)$l['cantidad'], $cd);
+            
+            if ($devueltos > 0 && $devueltos < (int)$l['cantidad']) {
+                $lDevuelta = $l;
+                $lDevuelta['cantidad'] = $devueltos;
+                $lDevuelta['total_linea'] = $devueltos * (float)$l['precio_unitario'];
+                $lDevuelta['devuelta'] = 1;
+
+                $lNormal = $l;
+                $lNormal['cantidad'] = (int)$l['cantidad'] - $devueltos;
+                $lNormal['total_linea'] = $lNormal['cantidad'] * (float)$l['precio_unitario'];
+                $lNormal['devuelta'] = 0;
+
+                $lineas[] = $lNormal;
+                $lineas[] = $lDevuelta;
+                
+                $devueltosPorProducto[$pid] -= $devueltos;
+            } elseif ($devueltos >= (int)$l['cantidad']) {
+                $l['devuelta'] = 1;
+                $lineas[] = $l;
+                $devueltosPorProducto[$pid] -= $devueltos;
+            } else {
+                $l['devuelta'] = 0;
+                $lineas[] = $l;
+            }
+        }
 
         // --- FETCH DISCOUNTS FOR EACH LINE WITH NAMES ---
         foreach ($lineas as &$l) {
