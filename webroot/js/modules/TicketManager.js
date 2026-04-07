@@ -91,7 +91,13 @@ export const TicketManager = {
             ivaGrupos[rate].tax += tax;
         });
 
-        const displayTotal = Object.values(ivaGrupos).reduce((acc, g) => acc + g.base + g.tax, 0);
+        let displayTotal = Object.values(ivaGrupos).reduce((acc, g) => acc + g.base + g.tax, 0);
+
+        // [NUEVO] Aplicar descuento de puntos si existe
+        const puntosDescuentoAmt = parseFloat(v.puntos_descuento_amt || 0);
+        if (puntosDescuentoAmt > 0) {
+            displayTotal = Math.max(0, displayTotal - puntosDescuentoAmt);
+        }
 
         if (el_tkTotal) el_tkTotal.textContent = fmt2(displayTotal);
         if (el_tkSubtotalRow) el_tkSubtotalRow.style.display = "none";

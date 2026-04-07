@@ -741,8 +741,9 @@ function updateTotals(initialSubtotal) {
       ? (subtotalAfterBundles - generalDiscount) * (SOCIO_DISCOUNT / 100)
       : 0;
 
-  const totalDiscount = bundleDiscountTotal + generalDiscount + socioAmt;
-  const subtotalFinal = subtotal - totalDiscount;
+  const puntosAmt = typeof puntosDescuentoAmt !== "undefined" ? puntosDescuentoAmt : 0;
+  const totalDiscount = bundleDiscountTotal + generalDiscount + socioAmt + puntosAmt;
+  const subtotalFinal = Math.max(0, subtotal - totalDiscount);
 
   // Factor de prorrateo para el IVA (si el total tiene descuento, el IVA baja proporcionalmente)
   const discountFactor = subtotal > 0 ? subtotalFinal / subtotal : 1;
@@ -1497,7 +1498,7 @@ async function processPayment() {
     const existing = currentPayments.find(p => p.metodo === selectedPayment);
     if (existing) {
         existing.importe = pendiente;
-        existing.recibido = selectedPayment === 'efectivo' ? pendiente : pendiente;
+        existing.recibido = selectedPayment === 'efectivo' ? 0 : pendiente;
     } else {
         // Si es a_cuenta, solo lo pre-añadimos si hay un cliente seleccionado
         const tieneCliente = !!(clienteSeleccionado || socioActual);
@@ -1506,7 +1507,7 @@ async function processPayment() {
           currentPayments.push({
             metodo: selectedPayment,
             importe: pendiente,
-            recibido: selectedPayment === 'efectivo' ? pendiente : pendiente,
+            recibido: selectedPayment === 'efectivo' ? 0 : pendiente,
             label: selectedPayment.charAt(0).toUpperCase() + selectedPayment.slice(1).replace('_', ' ')
           });
         }
@@ -1540,6 +1541,7 @@ async function processPayment() {
       if (el_gestionArea) el_gestionArea.classList.remove("d-none");
       if (el_labelMonto) el_labelMonto.textContent = "Importe a añadir (€)";
       forceShow(el_pagoMontoArea);
+      if (el_btnAnadir) el_btnAnadir.classList.remove("d-none");
   } else {
       // Es un método individual: ocultar selector de métodos del modal
       if (el_selector) el_selector.classList.add("d-none");
@@ -1580,15 +1582,24 @@ async function processPayment() {
 
  // ── Pagos Mixtos (Split Payments) ─────────────────────────────────────────────
 function updateMixSummary() {
-  const totalPagado = currentPayments.reduce((acc, p) => acc + p.importe, 0);
-  const pendiente = Math.max(0, totalVentaActual - totalPagado);
+  const puntosPago = currentPayments.find(p => p.metodo === "puntos");
+  const descuentoPuntos = puntosPago ? parseFloat(puntosPago.importe) : 0;
+  
+  const displayTotal = totalVentaActual - descuentoPuntos;
+
+  // Calculamos lo pagado con todo EXCEPTO puntos (porque puntos ya redujo el total a pagar)
+  const totalPagadoSinPuntos = currentPayments
+    .filter(p => p.metodo !== "puntos")
+    .reduce((acc, p) => acc + p.importe, 0);
+
+  const pendiente = Math.max(0, displayTotal - totalPagadoSinPuntos);
 
   const el_Total = document.getElementById("mixTotalVenta");
   const el_Pagado = document.getElementById("mixTotalPagado");
   const el_Pendiente = document.getElementById("mixTotalPendiente");
 
-  if (el_Total) el_Total.textContent = fmt(totalVentaActual);
-  if (el_Pagado) el_Pagado.textContent = fmt(totalPagado);
+  if (el_Total) el_Total.textContent = fmt(displayTotal);
+  if (el_Pagado) el_Pagado.textContent = fmt(totalPagadoSinPuntos);
   
   const el_PendienteRow = el_Pendiente?.parentElement;
   const el_Lista = document.getElementById("mixListaPagos");
@@ -1790,6 +1801,23 @@ function addPagoMixto() {
 }
 
 function removePagoMixto(index) {
+  const pago = currentPayments[index];
+  if (pago && pago.metodo === "puntos") {
+    // Restaurar los globales de puntos si el usuario lo cancela
+    window.puntosCanjeados = 0;
+    window.puntosDescuentoAmt = 0;
+    
+    const area = document.getElementById("puntosCanjeArea");
+    const res = document.getElementById("puntosAplicadosResumen");
+    if (area) area.classList.remove("d-none");
+    if (res) res.classList.add("d-none");
+    
+    // Si quitarPuntosCanjeados existe globalmente (definido en PaymentManager o similar)
+    if (typeof quitarPuntosCanjeados === "function") {
+        quitarPuntosCanjeados();
+    }
+  }
+
   currentPayments.splice(index, 1);
   updateMixSummary();
 }
@@ -2493,10 +2521,16 @@ function mostrarTicket(v, isFromTPV = true) {
 
   // TOTAL coherente: suma exacta del desglose (base+tax de cada grupo)
   // Esto evita que un v.total incorrecto en BD cause inconsistencias visuales
-  const displayTotal = Object.values(ivaGrupos).reduce(
+  let displayTotal = Object.values(ivaGrupos).reduce(
     (acc, g) => acc + g.base + g.tax,
     0,
   );
+
+  // [NUEVO] Restar el descuento de puntos si existe
+  const puntosDescuentoAmt = parseFloat(v.puntos_descuento_amt || 0);
+  if (puntosDescuentoAmt > 0) {
+      displayTotal = Math.max(0, displayTotal - puntosDescuentoAmt);
+  }
 
   // Actualizar TOTAL derivado del desglose
   if (el_tkTotal) el_tkTotal.textContent = fmt(displayTotal);
@@ -2575,9 +2609,6 @@ function mostrarTicket(v, isFromTPV = true) {
           tkPagosLista.innerHTML =
             '<div class="text-muted fs-11">No hay abonos registrados aún.</div>';
         } else {
-          // Factor de corrección: si total en BD difiere del displayTotal (ventas con datos corruptos)
-          // escalamos los importes para que sean coherentes con el desglose
-          const pagoFactor = vTotal > 0 ? displayTotal / vTotal : 1;
           tkPagosLista.innerHTML = v.pagos
             .map((p) => {
               const fStr = new Date(p.fecha).toLocaleString("es-ES", {
@@ -2589,7 +2620,7 @@ function mostrarTicket(v, isFromTPV = true) {
               return `
               <div style="display: flex; justify-content: space-between; font-size: 11px; border-bottom: 1px solid rgba(0,0,0,0.05); padding-bottom: 2px;">
                 <span><span class="text-muted">${fStr}</span> · ${mtd} ${p.nombre_usuario ? "(" + p.nombre_usuario + ")" : ""}</span>
-                <span class="font-mono text-success fw-bold">+${fmt(parseFloat(p.importe) * pagoFactor)}</span>
+                <span class="font-mono text-success fw-bold">+${fmt(parseFloat(p.importe))}</span>
               </div>
             `;
             })
@@ -2598,7 +2629,12 @@ function mostrarTicket(v, isFromTPV = true) {
       }
 
       if (tkAbonarParteContainer) {
-        if (v.estado === "pendiente_pago") {
+        // [NUEVO] Recalcular estado pendiente basado en displayTotal corregido 
+        // para evitar mostrar botón en tickets legacy erroneos
+        const sumPagos = (v.pagos || []).reduce((acc, p) => acc + parseFloat(p.importe), 0);
+        const pendienteReal = Math.max(0, displayTotal - sumPagos);
+        
+        if (pendienteReal > 0.01 || v.estado === "pendiente_pago" && displayTotal > sumPagos) {
           tkAbonarParteContainer.classList.remove("d-none");
         } else {
           tkAbonarParteContainer.classList.add("d-none");
@@ -2609,7 +2645,47 @@ function mostrarTicket(v, isFromTPV = true) {
     }
   }
 
-  // Duplicated block removed
+  // [NUEVO] Mostrar Abonos Asociados si existen
+  let tkAbonosAsociadosSection = document.getElementById("tkAbonosAsociadosSection");
+  if (!tkAbonosAsociadosSection && tkPagosSection) {
+    tkAbonosAsociadosSection = document.createElement("div");
+    tkAbonosAsociadosSection.id = "tkAbonosAsociadosSection";
+    tkAbonosAsociadosSection.style.marginTop = "16px";
+    tkAbonosAsociadosSection.style.padding = "12px";
+    tkAbonosAsociadosSection.style.border = "1px solid var(--red-light)";
+    tkAbonosAsociadosSection.style.borderRadius = "8px";
+    tkAbonosAsociadosSection.style.background = "rgba(192,57,43,0.03)";
+    tkPagosSection.parentNode.insertBefore(tkAbonosAsociadosSection, tkPagosSection.nextSibling);
+  }
+
+  if (tkAbonosAsociadosSection) {
+    if (v.abonos_asociados && v.abonos_asociados.length > 0) {
+      tkAbonosAsociadosSection.classList.remove("d-none");
+      tkAbonosAsociadosSection.innerHTML = `
+        <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; margin-bottom: 8px; color: var(--red);">
+          <i class="fa-solid fa-arrow-rotate-left"></i> Devoluciones Asociadas
+        </div>
+        <div style="display:flex; flex-direction:column; gap:6px;">
+          ${v.abonos_asociados.map(a => {
+            const dateStr = new Date(a.fecha.replace(" ", "T")).toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" });
+            return `
+            <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; border-bottom:1px solid rgba(192,57,43,0.1); padding-bottom:4px;">
+              <span>
+                <span style="background:var(--red);color:#fff;font-size:9px;font-weight:800;padding:2px 4px;border-radius:4px;">ABONO</span>
+                <span class="text-muted" style="margin-left:4px;">${dateStr}</span> 
+                <a href="#" onclick="event.preventDefault(); window.verTicket(${a.numero_ticket});" style="text-decoration:underline; cursor:pointer;">
+                  #${String(a.numero_ticket).padStart(4, '0')}
+                </a>
+              </span>
+              <span class="font-mono fw-bold text-red">${fmt(parseFloat(a.total))}</span>
+            </div>`;
+          }).join("")}
+        </div>
+      `;
+    } else {
+      tkAbonosAsociadosSection.classList.add("d-none");
+    }
+  }
 
   const descRow = document.getElementById("tkDescRow");
   if (descRow) {
