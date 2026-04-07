@@ -2101,3 +2101,52 @@ body[data-page="inicioPrivado"] .modal-footer .btn-save {
 #modalCategorias .modal-content {
   width: 500px;
 }
+
+/* Pagination Controls */
+.pagination-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    padding: 1rem 0;
+}
+
+.pagination-btn {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border-color);
+    background: var(--bg-surface);
+    color: var(--text-color);
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+}
+
+.pagination-btn:hover:not(:disabled) {
+    background: var(--bg-surface-hover, rgba(0,0,0,0.05));
+    border-color: var(--text-muted);
+}
+
+.pagination-btn.active {
+    background: var(--primary-color, #3b82f6);
+    color: white;
+    border-color: var(--primary-color, #3b82f6);
+    cursor: default;
+}
+
+.pagination-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.pagination-ellipsis {
+    color: var(--text-muted);
+    padding: 0 0.5rem;
+}
+
+/* Pagination Hidden State */
+tr[data-page-hidden="true"] {
+    display: none !important;
+}

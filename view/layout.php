@@ -727,6 +727,7 @@
     <script src="./webroot/js/validaciones.js?v=2"></script>
     <script src="./webroot/js/utils_global.js?v=16"></script>
     <script src="./webroot/js/main.js?v=22"></script>
+    <script src="./webroot/js/pagination.js?v=1"></script>
     <!-- SISTEMA DE MODALES GLOBALES (ALERTAS Y CONFIRMACIONES) -->
     <div class="modal-overlay" id="globalAlertModal" style="z-index: 15000;">
         <div class="modal modal-content gap-16 ai-center w-400 text-center p-32">
