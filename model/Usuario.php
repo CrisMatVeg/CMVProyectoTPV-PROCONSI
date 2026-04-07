@@ -121,4 +121,8 @@ class Usuario
     {
         $this->idioma = $idioma;
     }
+    public function setThemeFont($font)
+    {
+        $this->themeFont = $font;
+    }
 }

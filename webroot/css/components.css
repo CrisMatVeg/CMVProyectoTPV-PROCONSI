@@ -1675,7 +1675,7 @@
 
 .ticket-num {
   font-weight: 700;
-  font-family: "DM Mono", monospace;
+  font-family: var(--font-main);
   color: var(--accent);
 }
 
@@ -1745,7 +1745,7 @@
 }
 
 .ticket-meta .value {
-  font-family: "DM Mono", monospace;
+  font-family: var(--font-main);
   font-weight: 600;
 }
 

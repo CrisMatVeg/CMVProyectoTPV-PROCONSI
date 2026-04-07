@@ -108,6 +108,7 @@ body[data-theme-font="system"] { --font-main: system-ui, -apple-system, BlinkMac
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  font-family: inherit;
 }
 
 body {
@@ -863,7 +864,7 @@ body {
   font-weight: 500;
   color: var(--text-muted);
   transition: all 0.15s;
-  font-family: "DM Mono", sans-serif;
+  font-family: var(--font-main);
 }
 .pay-btn.locked {
   pointer-events: none !important;
@@ -901,7 +902,7 @@ body {
   color: var(--accent-fg);
   border: none;
   border-radius: var(--radius);
-  font-family: "DM Mono", sans-serif;
+  font-family: var(--font-main);
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
@@ -1009,7 +1010,7 @@ body {
   color: var(--accent-fg);
   border: none;
   border-radius: 8px;
-  font-family: "DM Mono", sans-serif;
+  font-family: var(--font-main);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -1044,7 +1045,7 @@ body {
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  font-family: "DM Mono", sans-serif;
+  font-family: var(--font-main);
   transition: all 0.15s;
   white-space: nowrap;
 }
@@ -1060,7 +1061,7 @@ body {
   padding: 8px 10px;
   border: 1.5px solid var(--border);
   border-radius: 8px;
-  font-family: "DM Mono", sans-serif;
+  font-family: var(--font-main);
   font-size: 14px;
   outline: none;
   background: var(--surface2);
@@ -1099,7 +1100,7 @@ body {
 }
 
 .hero-title {
-  font-family: "DM Sans", sans-serif;
+  font-family: var(--font-main);
   font-size: 28px;
   font-weight: 700;
   color: var(--text);
@@ -1153,7 +1154,7 @@ input[type="submit"].btn-clear {
   border: none;
   cursor: pointer;
   text-decoration: underline;
-  font-family: "DM Mono", sans-serif;
+  font-family: var(--font-main);
   color: var(--text-muted);
 }
 
@@ -2228,4 +2229,4 @@ input:focus + .slider {
   }
 }
 
-.ticket-num { font-size: 0.85rem !important; white-space: nowrap !important; font-family: 'DM Mono', monospace; color: var(--primary); }
+.ticket-num { font-size: 0.85rem !important; white-space: nowrap !important; font-family: var(--font-main); color: var(--primary); }

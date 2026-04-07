@@ -80,19 +80,19 @@
             <div class="form-group mb-0 mt-15">
                 <label class="form-label fs-12"><?php echo L('profile_theme_font'); ?></label>
                 <div class="d-flex gap-8 fw-wrap">
-                    <button type="button" id="themeFontMono" class="cat-tab d-flex ai-center gap-8" style="font-family: 'DM Mono', monospace;" onclick="setThemeFont('dm-mono')">
+                    <button type="button" id="themeFontMono" class="cat-tab d-flex ai-center gap-8" style="font-family: 'DM Mono', monospace;" onclick="setThemeFont('dm-mono'); document.getElementById('theme_font_input').value='dm-mono';">
                         <i class="fa-solid fa-font"></i> DM Mono
                     </button>
-                    <button type="button" id="themeFontInter" class="cat-tab d-flex ai-center gap-8" style="font-family: 'Inter', sans-serif;" onclick="setThemeFont('inter')">
+                    <button type="button" id="themeFontInter" class="cat-tab d-flex ai-center gap-8" style="font-family: 'Inter', sans-serif;" onclick="setThemeFont('inter'); document.getElementById('theme_font_input').value='inter';">
                         <i class="fa-solid fa-font"></i> Inter
                     </button>
-                    <button type="button" id="themeFontOutfit" class="cat-tab d-flex ai-center gap-8" style="font-family: 'Outfit', sans-serif;" onclick="setThemeFont('outfit')">
+                    <button type="button" id="themeFontOutfit" class="cat-tab d-flex ai-center gap-8" style="font-family: 'Outfit', sans-serif;" onclick="setThemeFont('outfit'); document.getElementById('theme_font_input').value='outfit';">
                         <i class="fa-solid fa-font"></i> Outfit
                     </button>
-                    <button type="button" id="themeFontRoboto" class="cat-tab d-flex ai-center gap-8" style="font-family: 'Roboto', sans-serif;" onclick="setThemeFont('roboto')">
+                    <button type="button" id="themeFontRoboto" class="cat-tab d-flex ai-center gap-8" style="font-family: 'Roboto', sans-serif;" onclick="setThemeFont('roboto'); document.getElementById('theme_font_input').value='roboto';">
                         <i class="fa-solid fa-font"></i> Roboto
                     </button>
-                    <button type="button" id="themeFontSystem" class="cat-tab d-flex ai-center gap-8" style="font-family: system-ui, sans-serif;" onclick="setThemeFont('system')">
+                    <button type="button" id="themeFontSystem" class="cat-tab d-flex ai-center gap-8" style="font-family: system-ui, sans-serif;" onclick="setThemeFont('system'); document.getElementById('theme_font_input').value='system';">
                         <i class="fa-solid fa-font"></i> System Sans
                     </button>
                 </div>
@@ -139,78 +139,15 @@
 </div>
 
 <script>
-    function setThemeMode(mode) {
-        document.body.dataset.themeMode = mode;
-        localStorage.setItem('tpv_theme_mode', mode);
-        updateActiveSelectors();
-    }
-
-    function setThemeAccent(accent) {
-        document.body.dataset.themeAccent = accent;
-        localStorage.setItem('tpv_theme_accent', accent);
-        updateActiveSelectors();
-    }
-
-    function setThemeFont(font) {
-        document.body.dataset.themeFont = font;
-        localStorage.setItem('tpv_theme_font', font);
-        const input = document.getElementById('theme_font_input');
-        if (input) input.value = font;
-        updateActiveSelectors();
-    }
-
-    function updateActiveSelectors() {
-        const mode = document.body.dataset.themeMode || 'light';
-        const accent = document.body.dataset.themeAccent || 'blue';
-        const font = document.body.dataset.themeFont || 'dm-mono';
-        
-        const modeIds = {
-            light: 'themeModeLight',
-            dark: 'themeModeDark',
-            black: 'themeModeBlack'
-        };
-        const accentIds = {
-            blue: 'themeAccentBlue',
-            green: 'themeAccentGreen',
-            red: 'themeAccentRed',
-            purple: 'themeAccentPurple',
-            amber: 'themeAccentAmber'
-        };
-        const fontIds = {
-            'dm-mono': 'themeFontMono',
-            'inter': 'themeFontInter',
-            'outfit': 'themeFontOutfit',
-            'roboto': 'themeFontRoboto',
-            'system': 'themeFontSystem'
-        };
-
-        Object.values(modeIds).forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.classList.remove('active');
-        });
-        if (modeIds[mode] && document.getElementById(modeIds[mode])) {
-            document.getElementById(modeIds[mode]).classList.add('active');
-        }
-
-        Object.values(accentIds).forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.classList.remove('active');
-        });
-        if (accentIds[accent] && document.getElementById(accentIds[accent])) {
-            document.getElementById(accentIds[accent]).classList.add('active');
-        }
-
-        Object.values(fontIds).forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.classList.remove('active');
-        });
-        if (fontIds[font] && document.getElementById(fontIds[font])) {
-            document.getElementById(fontIds[font]).classList.add('active');
-        }
-    }
 
     (function initThemeSelectors() {
-        updateActiveSelectors();
+        if (typeof applyTheme === 'function') {
+            const mode = document.body.dataset.themeMode || 'light';
+            const accent = document.body.dataset.themeAccent || 'blue';
+            const font = document.body.dataset.themeFont || 'dm-mono';
+            applyTheme(mode, accent, font);
+        }
+        
         const modeInput = document.getElementById('theme_mode_input');
         const accentInput = document.getElementById('theme_accent_input');
         const fontInput = document.getElementById('theme_font_input');

@@ -287,7 +287,7 @@
                 <span id="tkLabelClienteMeta" class="label d-none"><?php echo L('client_label_client'); ?></span>
                 <span id="tkClienteMeta" class="value d-none">—</span>
                 <span id="tkLabelNifMeta" class="label d-none"><?php echo L('client_label_cif'); ?></span>
-                <span id="tkNifMeta" class="value d-none" style="font-family: monospace;">—</span>
+                <span id="tkNifMeta" class="value d-none" style="font-family: inherit;">—</span>
                 <span class="label"><?php echo L('ticket_label_cashier'); ?></span> <span id="tkCajero">—</span>
                 <span class="label"><?php echo L('tpv_payment_method'); ?></span> <span id="tkMetodo">—</span>
             </div>

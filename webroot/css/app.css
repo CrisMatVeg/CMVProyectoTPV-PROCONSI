@@ -80,7 +80,7 @@ body[data-theme-mode="black"] {
    2. RESET & BASE
    ========================================================================== */
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: "DM Mono", sans-serif; background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+body { font-family: var(--font-main); background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
 a { text-decoration: none; color: inherit; }
 button { font-family: inherit; cursor: pointer; border: none; outline: none; transition: all 0.2s; }
 input, select, textarea { font-family: inherit; outline: none; }
@@ -153,7 +153,7 @@ input, select, textarea { font-family: inherit; outline: none; }
 .fs-14 { font-size: 14px !important; }
 .fs-16 { font-size: 16px !important; }
 .fs-18 { font-size: 18px !important; }
-.font-mono { font-family: "DM Mono", monospace !important; }
+.font-mono { font-family: var(--font-main) !important; }
 .font-bold { font-weight: 700 !important; }
 
 .grid-2 { display: grid !important; grid-template-columns: 1fr 1fr !important; }
@@ -242,7 +242,7 @@ input, select, textarea { font-family: inherit; outline: none; }
 .product-icon { aspect-ratio: 1; background: #fff; border-radius: 8px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
 .product-icon img { max-width: 100%; max-height: 100%; object-fit: contain; }
 .product-name { font-size: 13px; font-weight: 600; line-height: 1.2; }
-.product-price { font-family: "DM Mono", monospace; font-weight: 700; color: var(--text); margin-top: auto; }
+.product-price { font-family: var(--font-main); font-weight: 700; color: var(--text); margin-top: auto; }
 
 /* Order Panel & Cart */
 .order-panel { background: var(--surface); border-left: 1.5px solid var(--border); display: flex; flex-direction: column; overflow: hidden; width: var(--sidebar-width); }

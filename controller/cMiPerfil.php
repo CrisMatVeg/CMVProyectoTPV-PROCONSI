@@ -89,6 +89,14 @@ if (isset($_REQUEST['guardarCambios'])) {
                     $params[':accent'] = $accent;
                 }
             }
+            if (!empty($_REQUEST['theme_font'])) {
+                $font = $_REQUEST['theme_font'];
+                if (in_array($font, ['dm-mono', 'inter', 'outfit', 'roboto', 'system'], true)) {
+                    $campos[] = "theme_font = :font";
+                    $params[':font'] = $font;
+                    $_SESSION['usuarioActualTPV']->setThemeFont($font);
+                }
+            }
             if ($campos) {
                 $sql = "UPDATE usuarios SET " . implode(', ', $campos) . " WHERE id = :id";
                 DBPDO::ejecutarConsulta($sql, $params);

@@ -1028,9 +1028,9 @@
                                 ${fecha.toLocaleDateString()}<br>
                                 <strong>${fecha.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</strong>
                             </td>
-                            <td style="padding: 14px 20px; text-align: right; font-family: monospace; text-decoration: line-through; opacity: 0.5;">${anterior.toFixed(2)} €</td>
-                            <td style="padding: 14px 20px; text-align: right; font-family: monospace; font-weight: bold;">${nuevo.toFixed(2)} €</td>
-                            <td style="padding: 14px 20px; text-align: right; font-family: monospace; font-weight: bold; ${diffColor}">${diffStr} €</td>
+                            <td style="padding: 14px 20px; text-align: right; font-family: var(--font-main); text-decoration: line-through; opacity: 0.5;">${anterior.toFixed(2)} €</td>
+                            <td style="padding: 14px 20px; text-align: right; font-family: var(--font-main); font-weight: bold;">${nuevo.toFixed(2)} €</td>
+                            <td style="padding: 14px 20px; text-align: right; font-family: var(--font-main); font-weight: bold; ${diffColor}">${diffStr} €</td>
                             <td style="padding: 14px 20px; font-size: 13px; font-style: italic; opacity: 0.75;">${h.motivo || '<span style="opacity:0.3">' + <?php echo json_encode(L('prod_hist_no_reason', true)); ?> + '</span>'}</td>
                             <td style="padding: 14px 20px; font-size: 12px;">
                                 <div style="display: flex; align-items: center; gap: 8px;">
