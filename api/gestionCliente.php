@@ -99,7 +99,7 @@ try {
             $sql .= " AND tipo = :tipo";
             $params[':tipo'] = $tipoFiltro;
         }
-        $sql .= " AND (nombre LIKE :t OR apellidos LIKE :t OR nif LIKE :t) ORDER BY nombre, apellidos LIMIT 20";
+        $sql .= " AND (LOWER(nombre) LIKE LOWER(:t) OR LOWER(apellidos) LIKE LOWER(:t) OR LOWER(nif) LIKE LOWER(:t)) ORDER BY nombre, apellidos LIMIT 20";
         $params[':t'] = '%' . $term . '%';
 
         $q = DBPDO::ejecutarConsulta($sql, $params);

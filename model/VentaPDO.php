@@ -452,7 +452,16 @@ class VentaPDO
 
         return $venta;
     }
-    public static function buscarVentas(string $desde, string $hasta, ?int $idUsuario = null, ?int $numTicket = null, string $tipoDocumento = 'todos'): array
+    public static function obtenerVentaPorId(int $id): ?array
+    {
+        $sql = "SELECT numero_ticket FROM ventas WHERE id = :id";
+        $q = DBPDO::ejecutarConsulta($sql, [':id' => $id]);
+        $row = $q->fetch(PDO::FETCH_ASSOC);
+        if (!$row) return null;
+        return self::obtenerVentaPorTicket((int)$row['numero_ticket']);
+    }
+
+    public static function buscarVentas(string $desde, string $hasta, ?int $idUsuario = null, ?string $numTicket = null, string $tipoDocumento = 'todos'): array
     {
         $sql = "SELECT v.*, u.nombre as nombre_cajero,
                     vo.numero_ticket as numero_ticket_origen
@@ -464,8 +473,8 @@ class VentaPDO
         $params = [];
 
         if ($numTicket) {
-            $sql .= " AND v.numero_ticket = :ticket";
-            $params[':ticket'] = $numTicket;
+            $sql .= " AND LOWER(v.numero_ticket) LIKE LOWER(:ticket)";
+            $params[':ticket'] = '%' . $numTicket . '%';
         } else {
             $sql .= " AND DATE(v.fecha) BETWEEN :desde AND :hasta";
             $params[':desde'] = $desde;

@@ -134,11 +134,13 @@ function getEffectivePrice(p, socio = null) {
 
   activas.forEach((t) => {
     const val = parseFloat(t.valor);
+    let variation = 0;
     if (t.tipo === "percent") {
-      finalPrice *= 1 + val / 100;
+      variation = Math.round(finalPrice * (val / 100) * 100) / 100;
     } else {
-      finalPrice += val;
+      variation = val;
     }
+    finalPrice += variation;
   });
 
   return Math.max(0, finalPrice);
@@ -390,6 +392,9 @@ function renderProducts() {
           <div class="product-price" style="margin-top:auto">
             ${(() => {
               const eff = getEffectivePrice(p, socioActual);
+              if (Math.abs(eff - p.price) > 0.01) {
+                  return `<span style="text-decoration:line-through; font-size:0.8em; opacity:0.6; margin-right:4px;">${fmt(p.price)}</span> ${fmt(eff)}`;
+              }
               return fmt(eff);
             })()}
           </div>
@@ -2328,8 +2333,9 @@ function mostrarTicket(v, isFromTPV = true) {
 
   const btnAnular = document.getElementById("btnAnularTicket");
   if (btnAnular) {
+    const isAbono = (v.tipo_documento || 'venta') === 'abono';
     btnAnular.style.display =
-      !isFromTPV && v.estado === "completada" ? "" : "none";
+      !isFromTPV && v.estado === "completada" && !isAbono ? "" : "none";
     btnAnular.onclick = () =>
       abrirModalAnulacionTicket(v.numero_ticket, v.fecha, v.id_cliente);
   }
@@ -2353,9 +2359,12 @@ function mostrarTicket(v, isFromTPV = true) {
     date.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
 
   const isFactura = v.tipo_cliente === "empresa" || v.es_factura == 1;
+  const isAbonoDocType = (v.tipo_documento || 'venta') === 'abono';
   const el_tkTipoDoc = document.getElementById("tkTipoDoc");
-  if (el_tkTipoDoc)
-    el_tkTipoDoc.textContent = isFactura ? I18N.invoice : I18N.ticket;
+  if (el_tkTipoDoc) {
+      if (isAbonoDocType) el_tkTipoDoc.textContent = I18N.ticket_type_abono || "TICKET DE ABONO";
+      else el_tkTipoDoc.textContent = isFactura ? I18N.invoice : I18N.ticket;
+  }
 
   const ticketWrapper = document.getElementById("ticketContenido");
   if (ticketWrapper) {
@@ -2415,6 +2424,21 @@ function mostrarTicket(v, isFromTPV = true) {
   }
   const el_tkFecha = document.getElementById("tkFecha");
   if (el_tkFecha) el_tkFecha.textContent = fechaStr;
+  
+  // Mostrar ticket origen si existe (abonos)
+  const el_tkLabelNumOrig = document.getElementById("tkLabelNumOrig");
+  const el_tkNumOrig = document.getElementById("tkNumOrig");
+  if (el_tkLabelNumOrig && el_tkNumOrig) {
+      if (v.numero_ticket_origen) {
+          el_tkNumOrig.textContent = v.numero_ticket_origen;
+          el_tkLabelNumOrig.classList.remove("d-none");
+          el_tkNumOrig.classList.remove("d-none");
+      } else {
+          el_tkLabelNumOrig.classList.add("d-none");
+          el_tkNumOrig.classList.add("d-none");
+      }
+  }
+
   const el_tkMetodo = document.getElementById("tkMetodo");
   if (el_tkMetodo)
     el_tkMetodo.textContent =
@@ -2432,11 +2456,14 @@ function mostrarTicket(v, isFromTPV = true) {
     }
   }
 
-  // Ocultar botones de devolución si el ticket es ya un abono
+  // Ocultar botones de devolución y pestaña de puntos si el ticket es ya un abono
   const esAbono = (v.tipo_documento || 'venta') === 'abono';
   document.querySelectorAll('.btn-devolucion-ticket').forEach(b => {
     b.style.display = esAbono ? 'none' : '';
   });
+  const el_tkTabPoints = document.getElementById('tkTabPoints');
+  const el_tkTabsContainer = document.getElementById('tkTabsContainer');
+  if (el_tkTabsContainer) el_tkTabsContainer.style.display = esAbono ? 'none' : 'flex';
 
   const tkCajero = document.getElementById("tkCajero");
   if (tkCajero) {
@@ -2508,8 +2535,9 @@ function mostrarTicket(v, isFromTPV = true) {
 
   // Agrupar base e IVA por tipo, usando total_linea y excluyendo devueltas
   const ivaGrupos = {};
+  const isAbonoDoc = (v.tipo_documento || 'venta') === 'abono';
   v.lineas.forEach((l) => {
-    if (l.devuelta) return;
+    if (l.devuelta && !isAbonoDoc) return;
     const rate = parseFloat(l.iva_aplicado ?? 21);
     const pvpDesc = parseFloat(l.total_linea) * factorDesc;
     const base = pvpDesc / (1 + rate / 100);
@@ -2529,11 +2557,20 @@ function mostrarTicket(v, isFromTPV = true) {
   // [NUEVO] Restar el descuento de puntos si existe
   const puntosDescuentoAmt = parseFloat(v.puntos_descuento_amt || 0);
   if (puntosDescuentoAmt > 0) {
-      displayTotal = Math.max(0, displayTotal - puntosDescuentoAmt);
+      if (isAbonoDoc) {
+          // En abonos, el descuento de puntos se resta del valor absoluto
+          displayTotal = -(Math.abs(displayTotal) - puntosDescuentoAmt);
+      } else {
+          displayTotal = Math.max(0, displayTotal - puntosDescuentoAmt);
+      }
   }
 
   // Actualizar TOTAL derivado del desglose
-  if (el_tkTotal) el_tkTotal.textContent = fmt(displayTotal);
+  if (el_tkTotal) {
+      const isAbonoTotal = (v.tipo_documento || 'venta') === 'abono';
+      // Forzamos signo negativo en abonos por si las líneas ya vienen negativas (evitar doble negativo)
+      el_tkTotal.textContent = fmt(isAbonoTotal ? -Math.abs(displayTotal) : displayTotal);
+  }
 
   // Ocultar fila Subtotal genérica (queda reemplazada por el desglose)
   if (el_tkSubtotalRow) el_tkSubtotalRow.style.display = "none";

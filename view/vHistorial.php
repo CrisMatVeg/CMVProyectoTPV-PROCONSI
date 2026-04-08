@@ -35,21 +35,21 @@
             <form method="get" action="index.php" class="filters-form" novalidate>
                 <div class="filter-group">
                     <label><?php echo L('history_filter_since'); ?></label>
-                    <input type="text" name="fechaDesde" value="<?php echo $avHistorial['filtros']['desde']; ?>" class="filter-input" placeholder="YYYY-MM-DD">
+                    <input type="date" name="fechaDesde" value="<?php echo $avHistorial['filtros']['desde']; ?>" class="filter-input">
                     <?php if (isset($avHistorial['aErrores']['fechaDesde']) && $avHistorial['aErrores']['fechaDesde'] != null) { ?>
                         <span class="form-error"><?php echo $avHistorial['aErrores']['fechaDesde']; ?></span>
                     <?php } ?>
                 </div>
                 <div class="filter-group">
                     <label><?php echo L('history_filter_until'); ?></label>
-                    <input type="text" name="fechaHasta" value="<?php echo $avHistorial['filtros']['hasta']; ?>" class="filter-input" placeholder="YYYY-MM-DD">
+                    <input type="date" name="fechaHasta" value="<?php echo $avHistorial['filtros']['hasta']; ?>" class="filter-input">
                     <?php if (isset($avHistorial['aErrores']['fechaHasta']) && $avHistorial['aErrores']['fechaHasta'] != null) { ?>
                         <span class="form-error"><?php echo $avHistorial['aErrores']['fechaHasta']; ?></span>
                     <?php } ?>
                 </div>
                 <div class="filter-group w-120">
                     <label><?php echo L('history_filter_ticket'); ?></label>
-                    <input type="number" name="numeroTicket" value="<?php echo $avHistorial['filtros']['ticket']; ?>" class="filter-input" placeholder="Ej: 1">
+                    <input type="text" name="numeroTicket" value="<?php echo $avHistorial['filtros']['ticket']; ?>" class="filter-input" placeholder="Ej: 1002">
                 </div>
 
                 <div class="filter-group w-200">
@@ -82,15 +82,15 @@
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th class="w-100"><?php echo L('history_th_ticket'); ?></th>
-                        <th class="w-180"><?php echo L('history_th_datetime'); ?></th>
+                        <th class="w-150"><?php echo L('history_th_ticket'); ?></th>
+                        <th class="w-150"><?php echo L('history_th_datetime'); ?></th>
                         <th><?php echo L('history_th_cashier'); ?></th>
                         <th><?php echo L('history_th_payment'); ?></th>
                         <th class="text-right"><?php echo L('history_th_base'); ?></th>
                         <th class="text-right"><?php echo L('history_th_iva'); ?></th>
                         <th class="text-right"><?php echo L('history_th_total'); ?></th>
                         <th class="text-center"><?php echo L('history_th_status'); ?></th>
-                        <th class="text-center"><?php echo L('history_th_actions'); ?></th>
+                        <th class="text-center w-80"><?php echo L('history_th_actions'); ?></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -193,16 +193,13 @@
                                     <button title="Ver detalle" class="btn-icon" onclick="verTicket(<?php echo $v['numero_ticket']; ?>)">
                                         <i class="fa-solid <?php echo $esAbono ? 'fa-file-circle-minus' : 'fa-receipt'; ?>"></i>
                                     </button>
-                                    <?php if (!$esAbono): ?>
-                                        <button title="<?php echo !empty($v['es_factura']) ? L('history_btn_view_invoice', true) : L('history_btn_gen_invoice', true); ?>" class="btn-icon <?php echo !empty($v['es_factura']) ? 'text-accent' : ''; ?>" onclick="abrirModalFactura(<?php echo $v['id']; ?>, <?php echo $v['numero_ticket']; ?>, '<?php echo addslashes(htmlspecialchars($v['nombre_cliente'] ?? '')); ?>', '<?php echo addslashes(htmlspecialchars($v['nif_cliente'] ?? '')); ?>', <?php echo !empty($v['es_factura']) ? 'true' : 'false'; ?>)">
-                                            <i class="fa-solid fa-file-invoice"></i>
-                                        </button>
-                                    <?php else: ?>
-                                        <?php if (!empty($v['numero_ticket_origen'])): ?>
+                                    <button title="<?php echo !empty($v['es_factura']) ? L('history_btn_view_invoice', true) : L('history_btn_gen_invoice', true); ?>" class="btn-icon <?php echo !empty($v['es_factura']) ? 'text-accent' : ''; ?>" onclick="abrirModalFactura(<?php echo $v['id']; ?>, <?php echo $v['numero_ticket']; ?>, '<?php echo addslashes(htmlspecialchars($v['nombre_cliente'] ?? '')); ?>', '<?php echo addslashes(htmlspecialchars($v['nif_cliente'] ?? '')); ?>', <?php echo !empty($v['es_factura']) ? 'true' : 'false'; ?>)">
+                                        <i class="fa-solid fa-file-invoice"></i>
+                                    </button>
+                                    <?php if ($esAbono && !empty($v['numero_ticket_origen'])): ?>
                                         <button title="Ver venta origen: T-<?php echo $v['numero_ticket_origen']; ?>" class="btn-icon text-accent" onclick="verTicket(<?php echo (int)$v['numero_ticket_origen']; ?>)">
                                             <i class="fa-solid fa-link"></i>
                                         </button>
-                                        <?php endif; ?>
                                     <?php endif; ?>
                                 </div>
                             </td>
@@ -217,16 +214,16 @@
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th class="w-100"><?php echo L('history_th_id_z'); ?></th>
-                        <th class="w-180"><?php echo L('history_th_date_z'); ?></th>
+                        <th style="width: 85px;"><?php echo L('history_th_id_z'); ?></th>
+                        <th style="width: 150px;"><?php echo L('history_th_date_z'); ?></th>
                         <th><?php echo L('history_th_cashier_z'); ?></th>
-                        <th class="text-right"><?php echo L('history_th_tickets_z'); ?></th>
-                        <th class="text-right"><?php echo L('history_th_cash_z'); ?></th>
-                        <th class="text-right"><?php echo L('history_th_card_z'); ?></th>
-                        <th class="text-right"><?php echo L('history_th_bizum_z'); ?></th>
-                        <th class="text-right"><?php echo L('history_th_total_z'); ?></th>
-                        <th class="text-right"><?php echo L('history_th_debt_z'); ?></th>
-                        <th class="text-center"><?php echo L('history_th_actions'); ?></th>
+                        <th class="text-right" style="padding-left: 10px; padding-right: 10px;"><?php echo L('history_th_tickets_z'); ?></th>
+                        <th class="text-right" style="padding-left: 10px; padding-right: 10px;"><?php echo L('history_th_cash_z'); ?></th>
+                        <th class="text-right" style="padding-left: 10px; padding-right: 10px;"><?php echo L('history_th_card_z'); ?></th>
+                        <th class="text-right" style="padding-left: 10px; padding-right: 10px;"><?php echo L('history_th_bizum_z'); ?></th>
+                        <th class="text-right" style="padding-left: 10px; padding-right: 10px;"><?php echo L('history_th_total_z'); ?></th>
+                        <th class="text-right" style="padding-left: 10px; padding-right: 10px;"><?php echo L('history_th_debt_z'); ?></th>
+                        <th class="text-center" style="width: 80px;"><?php echo L('history_th_actions'); ?></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -253,22 +250,22 @@
                                     <?php echo htmlspecialchars($c['nombre_usuario'] ?? L('system', true)); ?>
                                 </span>
                             </td>
-                            <td class="text-right font-mono">
+                            <td class="text-right font-mono" style="white-space: nowrap; padding-left: 10px; padding-right: 10px;">
                                 <?php echo (int)($c['num_tickets'] ?? 0); ?>
                             </td>
-                            <td class="text-right font-mono">
+                            <td class="text-right font-mono" style="white-space: nowrap; padding-left: 10px; padding-right: 10px;">
                                 <?php echo number_format($c['total_efectivo'], 2, ',', '.'); ?> €
                             </td>
-                            <td class="text-right font-mono">
+                            <td class="text-right font-mono" style="white-space: nowrap; padding-left: 10px; padding-right: 10px;">
                                 <?php echo number_format($c['total_tarjeta'], 2, ',', '.'); ?> €
                             </td>
-                            <td class="text-right font-mono">
+                            <td class="text-right font-mono" style="white-space: nowrap; padding-left: 10px; padding-right: 10px;">
                                 <?php echo number_format($c['total_bizum'] ?? 0, 2, ',', '.'); ?> €
                             </td>
-                            <td class="text-right font-bold font-mono">
+                            <td class="text-right font-bold font-mono" style="white-space: nowrap; padding-left: 10px; padding-right: 10px;">
                                 <?php echo number_format($c['total_general'], 2, ',', '.'); ?> €
                             </td>
-                            <td class="text-right font-mono <?php echo ($c['deuda_generada'] ?? 0) > 0 ? 'text-red' : 'text-muted'; ?>">
+                            <td class="text-right font-mono <?php echo ($c['deuda_generada'] ?? 0) > 0 ? 'text-red' : 'text-muted'; ?>" style="white-space: nowrap; padding-left: 10px; padding-right: 10px;">
                                 <?php echo number_format($c['deuda_generada'] ?? 0, 2, ',', '.'); ?> €
                             </td>
                             <td>
@@ -334,9 +331,9 @@
     </div>
 </div>
 
-<div id="modalReporteZ" class="modal-overlay-bg" style="display: none; align-items: start; justify-content: center; padding: 40px 20px; overflow-y: auto; z-index: 10000;">
-    <div class="modal-content shadow-2xl" style="max-width: 1000px; width: 100%; padding: 0; overflow: hidden; border-radius: 20px; border: none; display: flex; flex-direction: column; margin-bottom: 40px;">
-        <div class="modal-header p-24 bg-surface2 border-bottom" style="border-radius: 20px 20px 0 0; background: linear-gradient(135deg, var(--surface2) 0%, #f1f5f9 100%); flex-shrink: 0;">
+<div id="modalReporteZ" class="modal-overlay-bg" style="display: none; align-items: center; justify-content: center; padding: 20px; z-index: 10000;">
+    <div class="modal-content shadow-2xl" style="max-width: 1000px; width: 100%; padding: 0; overflow: hidden; border-radius: 20px; border: none; display: flex; flex-direction: column; max-height: 90vh;">
+        <div class="modal-header p-24 bg-surface2 border-bottom shadow-sm" style="border-radius: 20px 20px 0 0; background: linear-gradient(135deg, var(--surface2) 0%, #f1f5f9 100%); flex-shrink: 0; position: relative; z-index: 10;">
             <div class="d-flex ai-center gap-16">
                 <div class="w-48 h-48 br-12 bg-accent text-white d-flex ai-center jc-center shadow-md">
                     <i class="fa-solid fa-receipt fs-24"></i>
@@ -349,7 +346,7 @@
             <button onclick="cerrarModalZ()" class="btn-close-modal" style="top: 28px; right: 24px; background: rgba(0,0,0,0.05); width: 32px; height: 32px; border-radius: 50%; opacity: 0.6; transition: all 0.2s;">&times;</button>
         </div>
 
-        <div class="p-32 bg-surface" id="printZ" style="flex: 1;">
+        <div class="p-32 bg-surface" id="printZ" style="flex: 1; overflow-y: auto;">
 
             <!-- ID + meta -->
             <div class="text-center pb-24 mb-24 border-bottom">
@@ -445,7 +442,7 @@
             </div>
         </div>
 
-        <div class="modal-footer p-24 border-top no-print" style="border-radius: 0 0 20px 20px; background: var(--surface2);">
+        <div class="modal-footer p-24 border-top no-print" style="border-radius: 0 0 20px 20px; background: var(--surface2); flex-shrink: 0; position: relative; z-index: 10;">
             <button onclick="window.open('api/imprimirCierreZ.php?id=' + window._currentZId, '_blank')"
                 class="btn-cancel d-flex ai-center gap-8 h-48 px-24">
                 <i class="fa-solid fa-print"></i> <?php echo L('history_report_z_btn_print'); ?>
@@ -457,9 +454,9 @@
 </div>
 
 <!-- Modal Detalle Turno (Segundo Nivel) -->
-<div id="modalTurnoDetalle" class="modal-overlay-bg" style="display: none; z-index: 20000 !important; align-items: start; justify-content: center; padding: 60px 20px; overflow-y: auto; background: rgba(0,0,0,0.7);">
-    <div class="modal-content br-20 shadow-2xl animate-scale-up" style="max-width: 650px; width: 100%; background: var(--surface); border: none; overflow: hidden; display: flex; flex-direction: column;">
-        <div class="modal-header p-24 bg-surface2 border-bottom d-flex ai-center jc-space-between" style="background: linear-gradient(135deg, var(--surface2) 0%, #fdfdfd 100%);">
+<div id="modalTurnoDetalle" class="modal-overlay-bg" style="display: none; z-index: 20000 !important; align-items: center; justify-content: center; padding: 20px; background: rgba(0,0,0,0.7);">
+    <div class="modal-content br-20 shadow-2xl animate-scale-up" style="max-width: 650px; width: 100%; background: var(--surface); border: none; overflow: hidden; display: flex; flex-direction: column; max-height: 85vh;">
+        <div class="modal-header p-24 bg-surface2 border-bottom d-flex ai-center jc-space-between" style="background: linear-gradient(135deg, var(--surface2) 0%, #fdfdfd 100%); flex-shrink: 0;">
             <div style="display: flex; align-items: center; gap: 20px;">
                 <div style="width: 56px; height: 56px; border-radius: 16px; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, var(--accent) 0%, #4338ca 100%); color: white; box-shadow: 0 4px 12px rgba(26, 47, 191, 0.25); border: 2px solid rgba(255,255,255,0.2);">
                     <i class="fa-solid fa-clock-rotate-left fs-26"></i>
@@ -523,7 +520,7 @@
             </div>
         </div>
         
-        <div class="modal-footer p-24 border-top d-flex jc-end bg-surface2">
+        <div class="modal-footer p-24 border-top d-flex jc-end bg-surface2" style="flex-shrink: 0;">
             <button onclick="cerrarTurnoDetalle()" class="btn-save h-48 px-40 font-bold shadow-md hover-scale"><?php echo L('history_modal_shift_btn_close'); ?></button>
         </div>
     </div>

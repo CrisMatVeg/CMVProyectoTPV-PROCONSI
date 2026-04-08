@@ -54,7 +54,7 @@ if (isset($_REQUEST['volver']) || isset($_REQUEST['irDashboard'])) {
 $fechaDesdeRaw = $_REQUEST['fechaDesde'] ?? date('Y-m-d', strtotime('-7 days'));
 $fechaHastaRaw = $_REQUEST['fechaHasta'] ?? date('Y-m-d');
 $idCajero      = isset($_REQUEST['idCajero']) && $_REQUEST['idCajero'] !== '' ? (int)$_REQUEST['idCajero'] : null;
-$numeroTicket  = isset($_REQUEST['numeroTicket']) && $_REQUEST['numeroTicket'] !== '' ? (int)$_REQUEST['numeroTicket'] : null;
+$numeroTicket  = isset($_REQUEST['numeroTicket']) && $_REQUEST['numeroTicket'] !== '' ? $_REQUEST['numeroTicket'] : null;
 $tipoDocumento = isset($_REQUEST['tipoDocumento']) && in_array($_REQUEST['tipoDocumento'], ['venta', 'abono', 'todos'])
                  ? $_REQUEST['tipoDocumento'] : 'todos';
 

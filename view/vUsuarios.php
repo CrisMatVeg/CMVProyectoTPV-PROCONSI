@@ -52,7 +52,7 @@
             </thead>
             <tbody id="usersTableBody">
                 <?php foreach ($listaUsuarios as $u): ?>
-                    <tr class="user-row">
+                    <tr class="user-row" data-search="<?php echo htmlspecialchars(strtolower($u->getNombreCompleto() . ' ' . $u->getUsername() . ' ' . ($u->getEmail() ?? ''))); ?>">
                         <td><?php echo $u->getNombreCompleto(); ?></td>
                         <td class="username-cell font-mono text-muted"><?php echo $u->getUsername(); ?></td>
                         <td class="email-cell fs-12 text-muted italic"><?php echo $u->getEmail() ?? '<span class="text-red-light">'.L('user_no_email', true).'</span>'; ?></td>
@@ -239,8 +239,8 @@
         let hasResults = false;
 
         rows.forEach(row => {
-            const username = row.querySelector('.username-cell').textContent.toLowerCase();
-            if (username.includes(term)) {
+            const searchText = row.getAttribute('data-search') || '';
+            if (searchText.includes(term)) {
                 row.style.display = '';
                 hasResults = true;
             } else {
