@@ -76,6 +76,8 @@ foreach ($oProductos as $oProd) {
         'atributos'      => $oProd->getAtributos(),
         'es_pack'        => $oProd->getEsPack(),
         'id_proveedor'   => $oProd->getIdProveedor(),
+        'precio_proveedor' => (float)$oProd->getPrecioProveedor(),
+        'margen'         => (float)$oProd->getMargen(),
         'componentes_pack' => $oProd->getEsPack() ? ProductoPDO::obtenerComponentesPack($oProd->getId()) : []
     ];
 }

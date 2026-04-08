@@ -1265,9 +1265,8 @@ input[type="submit"].btn-clear {
 }
 
 .kpi-card {
-  transition:
-    transform 0.2s,
-    box-shadow 0.2s;
+  transition: transform 0.2s, box-shadow 0.2s;
+  border-radius: 12px;
 }
 
 .kpi-card:hover {
@@ -1286,7 +1285,10 @@ input[type="submit"].btn-clear {
 }
 
 .stats-panel {
-  height: auto;
+  height: 467px;
+  border-radius: 12px;
+  overflow-y: scroll;
+  margin-top: 40px;
 }
 
 .pb-8 {
@@ -2133,6 +2135,94 @@ input:focus + .slider {
 .w-modal-xl {
   width: 1000px !important;
   max-width: 98% !important;
+}
+
+
+/* ==========================================================================
+   CONFIGURATION SIDEBAR LAYOUT
+   ========================================================================== */
+.config-layout {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 32px;
+  align-items: start;
+}
+
+.config-sidebar {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 20px;
+  padding: 16px;
+  position: sticky;
+  top: 24px;
+  box-shadow: var(--shadow-sm);
+}
+
+.config-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.config-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1.5px solid transparent;
+}
+
+.config-nav-item i {
+  width: 20px;
+  font-size: 16px;
+  display: flex;
+  justify-content: center;
+}
+
+.config-nav-item:hover {
+  background: var(--surface2);
+  color: var(--text);
+}
+
+.config-nav-item.active {
+  background: var(--blue-light);
+  color: var(--accent);
+  border-color: var(--accent-soft);
+  box-shadow: 0 4px 12px rgba(26, 47, 191, 0.08);
+}
+
+.config-panel {
+  display: none;
+  animation: slideUpFade 0.3s ease-out;
+}
+
+.config-panel.active {
+  display: block;
+}
+
+@keyframes slideUpFade {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.scale-12 {
+  transform: scale(1.2);
+}
+
+.config-panels-container {
+  min-height: 600px;
 }
 
 /* ==========================================================================

@@ -77,7 +77,7 @@ if (isset($_REQUEST['guardarCambios'])) {
             $params = [':id' => $id];
             if (!empty($_REQUEST['theme_mode'])) {
                 $mode = $_REQUEST['theme_mode'];
-                if (in_array($mode, ['light', 'dark', 'black'], true)) {
+                if (in_array($mode, ['light', 'dark'], true)) {
                     $campos[] = "theme_mode = :mode";
                     $params[':mode'] = $mode;
                 }

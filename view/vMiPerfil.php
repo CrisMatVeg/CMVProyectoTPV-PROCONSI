@@ -49,9 +49,6 @@
                         <button type="button" id="themeModeDark" class="cat-tab" onclick="setThemeMode('dark'); document.getElementById('theme_mode_input').value='dark';">
                             <i class="fa-solid fa-moon"></i> <?php echo L('profile_mode_dark'); ?>
                         </button>
-                        <button type="button" id="themeModeBlack" class="cat-tab" onclick="setThemeMode('black'); document.getElementById('theme_mode_input').value='black';">
-                            <i class="fa-solid fa-moon"></i> <?php echo L('profile_mode_black'); ?>
-                        </button>
                     </div>
                 </div>
 

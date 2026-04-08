@@ -12,8 +12,9 @@
             </a>
             <button onclick="abrirModalProveedor()" class="btn-add">
                 <i class="fa-solid fa-truck-field"></i> <?php echo L('prov_btn_new'); ?>
-            </button>
         </div>
+    </div>
+
     <!-- Barra de Búsqueda -->
     <div class="filters-bar-new container-wider mb-24 br-20 shadow-sm" style="background: var(--surface2); padding: 16px; border: 1px solid var(--border);">
         <div class="filter-item flex-1">
@@ -38,8 +39,8 @@
             </thead>
             <tbody>
                 <?php if (empty($avInicioPrivado['proveedores'])): ?>
-                    <tr>
-                        <td colspan="6" class="p-40 text-center">
+                    <tr class="empty-row">
+                        <td colspan="5" class="p-40 text-center">
                             <div class="empty-state">
                                 <i class="fa-solid fa-truck-ramp-box opacity-20 fs-48 mb-16"></i>
                                 <p class="text-muted"><?php echo L('prov_no_providers'); ?></p>
@@ -203,6 +204,7 @@
     </div>
 </div>
 
+<script>
     function filtrarProveedores() {
         const term = document.getElementById('provSearch').value.toLowerCase().trim();
         const rows = document.querySelectorAll('.data-table tbody tr:not(.empty-row)');
@@ -212,7 +214,6 @@
         });
     }
 
-<script>
     let selectedForLinking = [];
 
     function abrirModalProveedor() {

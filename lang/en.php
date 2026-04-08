@@ -621,7 +621,7 @@ $translations = [
     'config_placeholder_registry' => 'Mercantile Reg. of...',
     'config_section_fiscal' => 'Fiscal Regime and Taxes',
     'config_label_re' => 'Equivalence Surcharge (RE)',
-    'config_label_re_sub' => 'Does the business tax under equivalence surcharge?',
+    'config_label_re_sub' => 'The business tax under equivalence surcharge',
     'config_th_iva_type' => 'VAT Type',
     'config_re_info' => 'The <b>Equivalence Surcharge</b> is mandatory for individual retailers. If active, your suppliers will charge you VAT + RE on purchase invoices.',
     'config_section_tickets' => 'Receipt Customization',
@@ -700,7 +700,9 @@ $translations = [
     // Ticket / Invoice
     'ticket_type_sale' => 'SALE RECEIPT',
     'ticket_type_invoice' => 'INVOICE',
+    'ticket_type_abono' => 'CREDIT NOTE',
     'ticket_label_number' => 'Document No.',
+    'ticket_label_origin' => 'Origin Doc.',
     'ticket_label_date' => 'Date',
     'ticket_label_cashier' => 'Cashier',
     'ticket_label_voucher_paid' => 'Paid with vouchers',
@@ -960,8 +962,7 @@ $translations = [
     'profile_themes_sub' => 'Customize the interface mode and accent color. They are applied in real time and saved for your user.',
     'profile_theme_mode' => 'Mode',
     'profile_mode_light' => 'Light',
-    'profile_mode_dark' => 'Dark blue/gray',
-    'profile_mode_black' => 'Pure black',
+    'profile_mode_dark' => 'Dark',
     'profile_theme_accent' => 'Accent color',
     'profile_accent_blue' => 'Blue',
     'profile_accent_green' => 'Green',
@@ -1294,5 +1295,6 @@ $translations = [
     'purchase_method_efectivo' => 'Cash',
     'purchase_method_tarjeta' => 'Card',
     'purchase_method_transferencia' => 'Transfer',
+    'prod_label_price_filter' => 'Price',
 ];
 ?>

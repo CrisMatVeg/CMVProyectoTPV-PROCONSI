@@ -84,7 +84,7 @@
         </div>
 
         <div class="filter-item">
-            <span class="filter-label"><?php echo L('tpv_total'); ?></span>
+            <span class="filter-label"><?php echo L('prod_label_price_filter'); ?></span>
             <div class="d-flex gap-8">
                 <input type="number" id="filterPriceMin" placeholder="<?php echo L('prod_filter_price_min'); ?>" class="filter-control" style="width: 100px; min-width: 100px;">
                 <input type="number" id="filterPriceMax" placeholder="<?php echo L('prod_filter_price_max'); ?>" class="filter-control" style="width: 100px; min-width: 100px;">
@@ -92,7 +92,7 @@
         </div>
 
         <div class="filter-item">
-            <span class="filter-label"><?php echo L('prod_label_category'); ?></span>
+            <span class="filter-label"><?php echo L('prod_th_category'); ?></span>
             <select id="filterCat" class="filter-control" onchange="applyFilters()" style="min-width: 180px;">
                 <option value="all"><?php echo L('prod_filter_cat_all'); ?></option>
                 <?php foreach ($avProductos['categorias'] as $c): ?>
@@ -446,52 +446,61 @@
         gap: 8px;
     }
 
-    .tab-section .form-group+.form-group {
-        margin-top: 16px;
-    }
 
     /* --- Tabla de Tarifas --- */
-    #listaTarifasProductoBody tr td,
-    #listaTarifasProductoBody tr+tr th {
-        padding: 10px 12px;
+    .tarifas-table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: auto;
+        margin: 0;
+        background: transparent;
+    }
+
+    .tarifas-table th,
+    .tarifas-table td {
+        padding: 14px 16px;
         vertical-align: middle;
+        font-size: 13px;
+        border-bottom: 1px solid var(--surface2);
+        color: var(--text);
     }
 
     .tarifas-table th {
-        padding: 10px 12px;
-        white-space: nowrap;
         font-size: 11px;
         text-transform: uppercase;
         letter-spacing: 0.04em;
         font-weight: 700;
         color: var(--text-muted);
         background: var(--surface2);
+        white-space: normal; /* Permitir que el texto respire y no se solape */
+        line-height: 1.4;
     }
 
-    .tarifas-table th:first-child {
-        min-width: 180px;
-    }
+    /* Distribución equilibrada */
+    .tarifas-table th:nth-child(1), .tarifas-table td:nth-child(1) { width: 35%; min-width: 160px; text-align: left; }
+    .tarifas-table th:nth-child(2), .tarifas-table td:nth-child(2) { width: 16%; min-width: 90px; text-align: center; }
+    .tarifas-table th:nth-child(3), .tarifas-table td:nth-child(3) { width: 16%; min-width: 90px; text-align: center; }
+    .tarifas-table th:nth-child(4), .tarifas-table td:nth-child(4) { width: 16%; min-width: 90px; text-align: center; }
+    .tarifas-table th:nth-child(5), .tarifas-table td:nth-child(5) { width: 17%; min-width: 90px; text-align: center; }
 
-    .tarifas-table th:nth-child(2) {
-        min-width: 90px;
+    .tarifas-table .btn-icon {
+        width: 32px;
+        height: 32px;
+        background: transparent;
+        border: none;
+        box-shadow: none;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--red);
+        cursor: pointer;
+        transition: all 0.2s;
+        border-radius: 50%;
     }
-
-    .tarifas-table th:nth-child(3) {
-        min-width: 90px;
-    }
-
-    .tarifas-table th:nth-child(4) {
-        min-width: 80px;
-    }
-
-    .tarifas-table th:last-child {
-        min-width: 70px;
-    }
-
-    .tarifas-table td {
-        padding: 10px 12px;
-        vertical-align: middle;
-        font-size: 13px;
+    .tarifas-table .btn-icon:hover {
+        background: var(--red-light);
+        transform: scale(1.1);
     }
 </style>
 
@@ -527,7 +536,7 @@
                         <div class="d-flex flex-column gap-20">
                             <div class="form-group mb-0">
                                 <label class="form-label mb-8"><?php echo L('prod_modal_label_image'); ?></label>
-                                <div class="d-flex flex-column ai-center gap-16 p-20 bg-surface2 br-16 border-2">
+                                <div class="d-flex flex-column ai-center gap-16 p-20 bg-surface2 border-2" style="border-radius: 10px;">
                                     <div id="imgPreview" class="prod-img-preview m-0" style="width: 140px; height: 140px;">
                                         <i class="fa-solid fa-image fs-40 opacity-20"></i>
                                     </div>
@@ -565,7 +574,7 @@
                         </div>
                     </div>
 
-                    <div class="form-group mb-32">
+                    <div class="form-group mb-32" style="margin-top: 15px;">
                         <label class="form-label mb-4"><?php echo L('prod_modal_label_desc'); ?></label>
                         <textarea id="prodDesc" placeholder="<?php echo L('prod_placeholder_desc'); ?>" class="form-input" rows="2"></textarea>
                     </div>
@@ -612,26 +621,36 @@
                         </div>
                         <div class="d-grid gap-16 mt-12" style="grid-template-columns: 1fr 1fr;">
                             <div class="form-group mb-0">
-                                <label class="form-label fs-11 tt-uppercase d-flex ai-center jc-between mb-4">
-                                    <span><?php echo L('prod_modal_label_cost'); ?> <span class="opacity-50">(<?php echo L('optional'); ?>)</span></span>
-                                    <button type="button" id="btnHistorialCostes" onclick="abrirModalHistorialCostes()" class="btn-icon p-0 fs-11 text-accent" title="<?php echo L('prod_modal_tip_cost_history'); ?>" style="display:none;">
-                                        <?php echo L('prod_modal_btn_history'); ?>
+                                <div class="d-flex ai-center mb-4" style="height: 16px;">
+                                    <label class="form-label fs-10 tt-uppercase m-0" style="white-space: nowrap;">
+                                        <?php echo L('prod_modal_label_cost_base'); ?> <span class="opacity-50">(<?php echo L('optional'); ?>)</span>
+                                    </label>
+                                </div>
+                                <input type="text" id="prodPrecioProveedor" placeholder="<?php echo L('prod_placeholder_price'); ?>"
+                                    class="form-input text-right font-mono"
+                                    oninput="calcularTotalDesdeBase()"
+                                    title="<?php echo L('prod_modal_tip_cost_base'); ?>">
+                            </div>
+                            <div class="form-group mb-0">
+                                <div class="d-flex ai-center jc-between mb-4 w-100" style="height: 16px;">
+                                    <label class="form-label fs-10 tt-uppercase m-0" style="white-space: nowrap;"><?php echo L('prod_modal_label_cost_total'); ?></label>
+                                    <button type="button" id="btnHistorialCostes" onclick="abrirModalHistorialCostes()" class="btn-icon p-0 fs-10 text-accent d-inline-flex ai-center ml-auto" title="<?php echo L('prod_modal_tip_cost_history'); ?>" style="display:none; width: auto; height: auto;">
+                                        <i class="fa-solid fa-clock-rotate-left mr-4"></i> <?php echo L('prod_modal_btn_history'); ?>
                                     </button>
-                                </label>
+                                </div>
                                 <input type="text" id="prodPrecioCoste" placeholder="<?php echo L('prod_placeholder_price'); ?>"
                                     class="form-input text-right font-mono"
-                                    readonly
-                                    tabindex="-1"
+                                    oninput="calcularBaseDesdeTotal(); calcularPrecioDesdeMargen();"
                                     title="<?php echo L('prod_modal_tip_cost_auto'); ?>">
                                 <span class="form-error" id="err-precio_coste"></span>
                             </div>
-                            <div class="form-group mb-0">
-                                <label class="form-label fs-11 tt-uppercase mb-4"><?php echo L('prod_modal_label_margin'); ?></label>
-                                <input type="number" id="prodMargen" placeholder="<?php echo L('prod_placeholder_margin'); ?>" step="0.01"
-                                    class="form-input text-right font-mono"
-                                    oninput="calcularPrecioDesdeMargen()"
-                                    title="<?php echo L('prod_modal_tip_margin_calc'); ?>">
-                            </div>
+                        </div>
+                        <div class="form-group mt-16">
+                            <label class="form-label fs-11 tt-uppercase mb-4"><?php echo L('prod_modal_label_margin'); ?></label>
+                            <input type="number" id="prodMargen" placeholder="<?php echo L('prod_placeholder_margin'); ?>" step="0.01"
+                                class="form-input text-right font-mono"
+                                oninput="calcularPrecioDesdeMargen()"
+                                title="<?php echo L('prod_modal_tip_margin_calc'); ?>">
                         </div>
                     </div>
 
@@ -700,7 +719,7 @@
                                     <tr>
                                         <th class="text-left"><?php echo L('prod_modal_th_rule'); ?></th>
                                         <th class="text-center"><?php echo L('prod_modal_th_type'); ?></th>
-                                        <th class="text-right"><?php echo L('prod_modal_th_variation'); ?></th>
+                                        <th class="text-center"><?php echo L('prod_modal_th_variation'); ?></th>
                                         <th class="text-center"><?php echo L('prod_modal_th_priority'); ?></th>
                                         <th class="text-center"><?php echo L('prod_modal_th_action'); ?></th>
                                     </tr>
@@ -925,8 +944,8 @@
             <button type="button" onclick="cerrarModalHistorial()" class="btn-close-modal" style="position: absolute; top: 32px; right: 32px; background: var(--surface2); width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--border); transition: all 0.2s;">&times;</button>
         </div>
 
-        <div class="modal-body" style="padding: 0; background: var(--surface); min-height: 400px;">
-            <div class="table-container" style="max-height: 550px; overflow-y: auto; border-radius: 0;">
+        <div class="modal-body" style="padding: 24px 32px; background: var(--surface); min-height: 400px;">
+            <div class="table-container" style="max-height: 550px; overflow-y: auto; border-radius: 12px; border: 1px solid var(--border);">
                 <table class="stock-log-table">
                     <thead>
                         <tr>
@@ -967,8 +986,8 @@
             </div>
             <button type="button" onclick="cerrarModalHistorialPrecios()" class="btn-close-modal" style="position: absolute; top: 28px; right: 28px; background: var(--surface2); width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--border);">&times;</button>
         </div>
-        <div class="modal-body" style="padding: 0; min-height: 300px;">
-            <div style="max-height: 500px; overflow-y: auto;">
+        <div class="modal-body" style="padding: 24px 32px; min-height: 300px;">
+            <div style="max-height: 500px; overflow-y: auto; border: 1px solid var(--border); border-radius: 12px; overflow: hidden;">
                 <table class="data-table" style="width: 100%;">
                     <thead>
                         <tr>
@@ -1084,6 +1103,49 @@
     // --- Lógica de cálculo de precios ---
     // El coste ahora es manual o CMP automático de albaranes, no depende de un precio fijo de proveedor.
 
+    function getDatoIVA() {
+        const selIva = document.getElementById('prodIvaTipo');
+        const opt = selIva.options[selIva.selectedIndex];
+        return {
+            iva: parseFloat(opt.dataset.porcentaje || 21),
+            re: parseFloat(opt.dataset.re || 0)
+        };
+    }
+
+    function getAplicaRE() {
+        const selProv = document.getElementById('prodProveedor');
+        if (!selProv.value) return false;
+        const opt = selProv.options[selProv.selectedIndex];
+        return opt.dataset.re == "1";
+    }
+
+    function calcularTotalDesdeBase() {
+        let base = document.getElementById('prodPrecioProveedor').value.replace(',', '.');
+        base = parseFloat(base) || 0;
+        
+        const infoIVA = getDatoIVA();
+        const aplicaRE = getAplicaRE();
+        const pctRE = aplicaRE ? infoIVA.re : 0;
+
+        const total = base * (1 + (infoIVA.iva / 100) + (pctRE / 100));
+        document.getElementById('prodPrecioCoste').value = total.toFixed(4);
+        
+        // Al cambiar el coste, recalculamos PVP si hay margen
+        calcularPrecioDesdeMargen();
+    }
+
+    function calcularBaseDesdeTotal() {
+        let total = document.getElementById('prodPrecioCoste').value.replace(',', '.');
+        total = parseFloat(total) || 0;
+
+        const infoIVA = getDatoIVA();
+        const aplicaRE = getAplicaRE();
+        const pctRE = aplicaRE ? infoIVA.re : 0;
+
+        const base = total / (1 + (infoIVA.iva / 100) + (pctRE / 100));
+        document.getElementById('prodPrecioProveedor').value = base.toFixed(4);
+    }
+
     function calcularPrecioDesdeMargen() {
         const coste = parseFloat(document.getElementById('prodPrecioCoste').value) || 0;
         const margen = parseFloat(document.getElementById('prodMargen').value) || 0;
@@ -1149,17 +1211,18 @@
             inputStock.value = producto.stock !== undefined ? producto.stock : (producto.stock_actual || '0');
             document.getElementById('prodStockMin').value = producto.stock_minimo || '0';
             document.getElementById('prodMargen').value = producto.margen || '0.00';
+            document.getElementById('prodPrecioProveedor').value = parseFloat(producto.precio_proveedor || 0).toFixed(4);
 
             if (parseFloat(producto.margen || 0) <= 0) calcularMargenDesdePrecio();
 
-            // Bloquear edición manual de stock y coste para productos existentes
-            inputCoste.readOnly = true;
+            // Bloquear edición manual de stock y coste para productos existentes (solo permitimos si el usuario quiere forzar)
             inputStock.readOnly = true;
-            inputCoste.style.opacity = '0.7';
             inputStock.style.opacity = '0.7';
-            inputCoste.classList.add('input-readonly-cmp');
-            inputCoste.title = <?php echo json_encode(L('prod_modal_tip_cost_auto', true)); ?>;
             inputStock.title = <?php echo json_encode(L('prod_modal_tip_stock_auto', true)); ?>;
+            
+            // El coste total se puede editar pero avisamos que es CMP
+            inputCoste.classList.add('input-readonly-cmp'); 
+            inputCoste.title = <?php echo json_encode(L('prod_modal_tip_cost_auto', true)); ?>;
 
             if (btnRetirada) btnRetirada.classList.remove('d-none');
             if (btnTabTarifas) btnTabTarifas.style.display = 'block';
@@ -1195,6 +1258,7 @@
             inputCoste.classList.remove('input-readonly-cmp');
             inputCoste.title = <?php echo json_encode(L('prod_modal_tip_margin_calc', true)); ?>;
             inputStock.title = <?php echo json_encode(L('prod_modal_label_stock', true)); ?>;
+            document.getElementById('prodPrecioProveedor').value = '0.00';
 
             if (btnRetirada) btnRetirada.classList.add('d-none');
             if (btnTabTarifas) btnTabTarifas.style.display = 'none';
@@ -1475,11 +1539,11 @@
             data.reglas.forEach(r => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td class="p-8 font-bold">${r.nombre}</td>
-                    <td class="p-8 text-center"><span class="px-6 py-2 br-4 fs-10 bg-surface1 text-muted border">${r.tipo_regla === 'tarifa' ? <?php echo json_encode(L('prod_modal_pill_tariff', true)); ?> : <?php echo json_encode(L('prod_modal_pill_promo', true)); ?>}</span></td>
-                    <td class="p-8 text-right font-mono ${r.valor > 0 ? 'text-green' : 'text-red'}">${r.valor > 0 ? '+' : ''}${r.valor}${r.tipo === 'percent' ? '%' : '€'}</td>
-                    <td class="p-8 text-center text-muted">${r.prioridad}</td>
-                    <td class="p-8 text-right">
+                    <td class="font-bold">${r.nombre}</td>
+                    <td class="text-center"><span class="px-6 py-2 br-4 fs-10 bg-surface1 text-muted border">${r.tipo_regla === 'tarifa' ? <?php echo json_encode(L('prod_modal_pill_tariff', true)); ?> : <?php echo json_encode(L('prod_modal_pill_promo', true)); ?>}</span></td>
+                    <td class="text-center font-mono ${r.valor > 0 ? 'text-green' : 'text-red'}">${r.valor > 0 ? '+' : ''}${r.valor}${r.tipo === 'percent' ? '%' : '€'}</td>
+                    <td class="text-center text-muted">${r.prioridad}</td>
+                    <td class="text-center">
                         <button type="button" onclick="excluirDeRegla(${idProducto}, ${r.id}, '${r.tipo_regla}')" class="btn-icon text-red" title="Excluir producto de esta regla">
                             <i class="fa-solid fa-ban"></i>
                         </button>
@@ -1718,20 +1782,19 @@
                 value: null
             }).value || null,
             codigo_iva: codigoIva,
-            precio_proveedor: 0,
             id_proveedor: document.getElementById('prodProveedor').value || null,
             aplica_re: 0,
             es_pack: 0,
-            componentes_pack: null,
-            margen: document.getElementById('prodMargen').value || 0
+            componentes_pack: null
         };
 
-        // El stock y el precio de coste (CMP) solo se envían al añadir un producto nuevo.
-        // Al editar, se gestionan mediante Albaranes/Compras para evitar sobrescribir con datos obsoletos del DOM.
-        if (!id) {
-            datos.precio_coste = document.getElementById('prodPrecioCoste').value;
-            datos.stock_actual = document.getElementById('prodStock').value;
-        }
+        // Enviamos siempre el precio de coste y stock actual para permitir ajustes manuales tanto al añadir como al editar
+        // Sanitizamos comas por puntos para evitar errores de persistencia en PHP
+        datos.precio_proveedor = (document.getElementById('prodPrecioProveedor').value || '0').replace(',', '.');
+        datos.precio_coste = (document.getElementById('prodPrecioCoste').value || '0').replace(',', '.');
+        datos.stock_actual = (document.getElementById('prodStock').value || '0').replace(',', '.');
+        datos.precio_venta = (document.getElementById('prodPrecioVenta').value || '0').replace(',', '.');
+        datos.margen = (document.getElementById('prodMargen').value || '0').replace(',', '.');
 
         try {
             const resp = await fetch('api/gestionProducto.php', {
@@ -2345,6 +2408,14 @@
 
         input.value = '';
     }
+
+    // Eventos globales para recálculo de precios
+    document.addEventListener('DOMContentLoaded', () => {
+        const selIva = document.getElementById('prodIvaTipo');
+        const selProv = document.getElementById('prodProveedor');
+        if (selIva) selIva.addEventListener('change', calcularTotalDesdeBase);
+        if (selProv) selProv.addEventListener('change', calcularTotalDesdeBase);
+    });
 
     // Mini-toast local para esta página (puede no tener el global de main.js)
     function showNotification(html, type = 'info') {

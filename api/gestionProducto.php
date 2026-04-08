@@ -45,10 +45,16 @@ try {
     $accion = $datos['accion'] ?? '';
 
     if ($accion === 'añadir' || $accion === 'editar') {
-        // Sanitizar campos opcionales para evitar errores en la librería de validación con strings vacíos
-        $datos['precio_venta'] = (isset($datos['precio_venta']) && $datos['precio_venta'] !== '') ? $datos['precio_venta'] : 0;
-        $datos['precio_coste'] = (isset($datos['precio_coste']) && $datos['precio_coste'] !== '') ? $datos['precio_coste'] : 0;
-        $datos['stock_actual'] = (isset($datos['stock_actual']) && $datos['stock_actual'] !== '') ? $datos['stock_actual'] : 0;
+        // Sanitizar campos solo si están presentes pero vacíos. Si no vienen, se respetan los valores actuales del modelo.
+        if (isset($datos['precio_venta']) && ($datos['precio_venta'] === '' || $datos['precio_venta'] === null)) {
+            $datos['precio_venta'] = 0;
+        }
+        if (isset($datos['precio_coste']) && ($datos['precio_coste'] === '' || $datos['precio_coste'] === null)) {
+            $datos['precio_coste'] = 0;
+        }
+        if (isset($datos['stock_actual']) && ($datos['stock_actual'] === '' || $datos['stock_actual'] === null)) {
+            $datos['stock_actual'] = 0;
+        }
 
         $aErrores = [
             'icono' => null,

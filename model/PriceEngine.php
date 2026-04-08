@@ -33,10 +33,10 @@ class PriceEngine
         $precioActual = $precioBase;
         $descuentos = [];
 
-        // 1. Aplicar Tarifa (Prioridad)
+        // 1. Aplicar Tarifas (Acumulativas por prioridad)
         $tarifas = self::obtenerTarifasAplicables($idProducto, $idCliente);
-        if (!empty($tarifas)) {
-            $t = $tarifas[0];
+        foreach ($tarifas as $t) {
+            $importeVariacion = 0;
             if ($t['tipo'] === 'percent') {
                 $importeVariacion = round($precioActual * ($t['valor'] / 100), 2);
             } else {
@@ -127,6 +127,7 @@ class PriceEngine
         // Si ignoramos filtros de contexto, al menos deben seguir siendo vigentes por fecha
         $sql = "SELECT t.* FROM tarifas_precios t 
                 WHERE t.activo = 1 
+                AND t.aplicada = 0
                 AND t.fecha_aplicacion <= :hoy 
                 AND (t.fecha_fin IS NULL OR t.fecha_fin >= :hoy)";
 

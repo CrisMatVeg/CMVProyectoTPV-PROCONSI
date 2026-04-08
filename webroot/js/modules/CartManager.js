@@ -56,11 +56,13 @@ export const CartManager = {
 
     activeTariffs.forEach((t) => {
       const val = parseFloat(t.valor);
+      let variation = 0;
       if (t.tipo === "percent") {
-        finalPrice *= 1 + val / 100;
+        variation = Math.round(finalPrice * (val / 100) * 100) / 100;
       } else {
-        finalPrice += val;
+        variation = val;
       }
+      finalPrice += variation;
     });
 
     return Math.max(0, finalPrice);

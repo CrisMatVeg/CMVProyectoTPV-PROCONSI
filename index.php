@@ -1,5 +1,7 @@
 <?php
 ob_start();
+date_default_timezone_set('Europe/Madrid');
+
 require_once("./config/confAPP.php");
 require_once("./config/confDBPDO.php");
 require_once("./model/Usuario.php");
@@ -7,7 +9,7 @@ require_once("./core/Language.php");
 session_start();
 
 // Determinar idioma (Prioridad: URL > Session > Usuario Logueado > Default 'es')
-if (isset($_GET['lang']) && in_array($_GET['lang'], ['es', 'en'])) {
+if (isset($_GET['lang']) && in_array($_GET['lang'], ['es', 'en', 'fr'])) {
     $_SESSION['lang'] = $_GET['lang'];
     if (isset($_SESSION['usuarioActualTPV'])) {
         require_once("./model/UsuarioPDO.php");

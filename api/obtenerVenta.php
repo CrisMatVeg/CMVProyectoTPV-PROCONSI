@@ -22,14 +22,30 @@ try {
         exit;
     }
 
-    $input = json_decode(file_get_contents('php://input'), true);
-    $numTicket = isset($input['numTicket']) ? (int)$input['numTicket'] : null;
+    $numTicket = null;
+    $idVenta   = null;
 
-    if (!$numTicket) {
-        throw new Exception('Número de ticket faltante');
+    // 1. Intentar obtener desde GET (uso común en enlaces y redirecciones)
+    if (isset($_GET['num'])) $numTicket = (int)$_GET['num'];
+    if (isset($_GET['id']))  $idVenta   = (int)$_GET['id'];
+
+    // 2. Intentar obtener desde POST JSON (uso común en llamadas fetch asíncronas)
+    if (!$numTicket && !$idVenta) {
+        $input = json_decode(file_get_contents('php://input'), true);
+        if (isset($input['numTicket'])) $numTicket = (int)$input['numTicket'];
+        if (isset($input['idVenta']))   $idVenta   = (int)$input['idVenta'];
     }
 
-    $venta = VentaPDO::obtenerVentaPorTicket($numTicket);
+    if (!$numTicket && !$idVenta) {
+        throw new Exception('Número de ticket o ID de venta faltante');
+    }
+
+    if ($numTicket) {
+        $venta = VentaPDO::obtenerVentaPorTicket($numTicket);
+    } else {
+        $venta = VentaPDO::obtenerVentaPorId($idVenta);
+    }
+
     if (!$venta) {
         throw new Exception('Venta no encontrada');
     }

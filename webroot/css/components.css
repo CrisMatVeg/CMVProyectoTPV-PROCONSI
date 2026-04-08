@@ -167,10 +167,12 @@
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  text-align: center;
 }
 .table-premium td {
   padding: 20px;
   vertical-align: middle;
+  text-align: center;
 }
 .guide-banner i {
   font-size: 18px;
@@ -209,13 +211,13 @@
 
 .filter-toolbar {
   background: var(--surface2);
-  padding: 12px 20px;
-  border-radius: 12px;
+  padding: 16px 24px;
+  border-radius: 16px;
   border: 1px solid var(--border);
   display: flex;
   align-items: center;
-  gap: 20px;
-  flex-wrap: wrap;
+  gap: 24px;
+  flex-wrap: nowrap;
 }
 
 .filter-group {
@@ -557,6 +559,9 @@
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);
+  display: flex;
+  align-items: stretch;
+  flex-direction: column;
 }
 
 .data-table {
@@ -1091,7 +1096,7 @@
   width: 80px !important;
 }
 .w-100 {
-  width: 100px !important;
+  width: 100% !important;
 }
 .w-180 {
   width: 180px !important;
@@ -1687,8 +1692,9 @@
 }
 
 .btn-cancel {
-  flex: 1;
-  padding: 14px;
+  width: fit-content;
+  min-width: 140px;
+  padding: 14px 28px;
   border-radius: 12px;
   border: 1.5px solid var(--border);
   background: var(--surface);
@@ -1697,6 +1703,10 @@
   cursor: pointer;
   font-family: inherit;
   transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
 }
 
 .btn-cancel:hover {
@@ -1704,8 +1714,9 @@
 }
 
 .btn-save {
-  flex: 2;
-  padding: 14px;
+  width: fit-content;
+  min-width: 160px;
+  padding: 14px 32px;
   border-radius: 12px;
   border: none;
   background: var(--accent);
@@ -1715,6 +1726,10 @@
   box-shadow: 0 4px 15px rgba(26, 47, 191, 0.2);
   font-family: inherit;
   transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
 }
 
 .btn-save:hover {
@@ -1785,13 +1800,25 @@
   margin-top: 4px;
 }
 
+.ticket-tabs {
+  display: flex !important; /* Valor por defecto */
+  background: var(--surface2);
+}
+
+/* Ocultar específicamente si tiene la clase d-none o si se fuerza por ID */
+#tkTabsContainer[style*="display: none"] {
+    display: none !important;
+}
+
 .ticket-meta {
   padding: 16px 24px;
   border-bottom: 1px dashed var(--border);
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4px;
-  font-size: 12px;
+  grid-template-columns: auto 1fr;
+  column-gap: 20px;
+  row-gap: 6px;
+  font-size: 13px;
+  align-items: center;
 }
 
 .ticket-meta .doc-type {
@@ -1803,11 +1830,14 @@
 
 .ticket-meta .label {
   color: var(--text-muted);
+  font-weight: 500;
+  white-space: nowrap;
 }
 
 .ticket-meta .value {
-  font-family: var(--font-main);
-  font-weight: 600;
+  font-weight: 700;
+  text-align: right;
+  color: var(--text);
 }
 
 .ticket-items {
@@ -2150,3 +2180,6 @@ body[data-page="inicioPrivado"] .modal-footer .btn-save {
 tr[data-page-hidden="true"] {
     display: none !important;
 }
+
+.w-120 { width: 120px !important; }
+.w-150 { width: 150px !important; }

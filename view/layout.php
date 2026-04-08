@@ -121,6 +121,7 @@
             noPayments: "<?php echo L('tpv_js_no_payments', true); ?>",
             invoice: "<?php echo L('ticket_type_invoice', true); ?>",
             ticket: "<?php echo L('ticket_type_sale', true); ?>",
+            ticket_type_abono: "<?php echo L('ticket_type_abono', true); ?>",
             charge: "<?php echo L('tpv_charge', true); ?>",
             pointsApplied: "<?php echo L('points_applied', true); ?>",
             pointsInvalidAmount: "<?php echo L('points_invalid_amount', true); ?>",
@@ -212,6 +213,10 @@
                         <a href="index.php?lang=en" class="btn-lang <?php echo $lang === 'en' ? 'active' : ''; ?>" title="English" style="text-decoration:none; color:inherit; opacity:<?php echo $lang==='en'?'1':'0.4'; ?>;">
                             <img src="https://flagcdn.com/16x12/us.png" alt="EN" style="width:16px;">
                         </a>
+                        <div class="v-divider" style="height:12px; margin:0 4px;"></div>
+                        <a href="index.php?lang=fr" class="btn-lang <?php echo $lang === 'fr' ? 'active' : ''; ?>" title="Français" style="text-decoration:none; color:inherit; opacity:<?php echo $lang==='fr'?'1':'0.4'; ?>;">
+                            <img src="https://flagcdn.com/16x12/fr.png" alt="FR" style="width:16px;">
+                        </a>
                     </div>
 
                     <form method="post" action="index.php">
@@ -267,11 +272,11 @@
             </div>
 
             <!-- TABS POR PUNTOS -->
-            <div class="ticket-tabs d-flex border-bottom">
+            <div id="tkTabsContainer" class="ticket-tabs border-bottom">
                 <button class="ticket-tab active flex-1 py-12 fw-700 fs-12 tt-uppercase ls-1 cursor-pointer transition-all" onclick="switchTicketTab('summary')">
                     <i class="fa-solid fa-receipt mr-6 opacity-70"></i> <?php echo L('ticket_tab_summary'); ?>
                 </button>
-                <button class="ticket-tab flex-1 py-12 fw-700 fs-12 tt-uppercase ls-1 cursor-pointer transition-all" onclick="switchTicketTab('points')">
+                <button id="tkTabPoints" class="ticket-tab flex-1 py-12 fw-700 fs-12 tt-uppercase ls-1 cursor-pointer transition-all" onclick="switchTicketTab('points')">
                     <i class="fa-solid fa-star mr-6 opacity-70"></i> <?php echo L('ticket_tab_points'); ?>
                 </button>
             </div>
@@ -282,9 +287,16 @@
 
             <div class="ticket-meta">
                 <span id="tkTipoDoc" class="doc-type"><?php echo L('ticket_type_sale'); ?></span>
+                
                 <span class="label"><?php echo L('ticket_label_number'); ?></span>
-                <span id="tkNumero" class="value">—</span>
-                <span id="tkBadgeAbono" style="display:none;background:var(--red);color:#fff;font-size:9px;font-weight:800;padding:2px 7px;border-radius:4px;letter-spacing:.5px;margin-left:4px;vertical-align:middle;">ABONO</span>
+                <div class="d-flex ai-center">
+                    <span id="tkNumero" class="value">—</span>
+                    <span id="tkBadgeAbono" style="display:none;background:var(--red);color:#fff;font-size:9px;font-weight:800;padding:2px 7px;border-radius:4px;letter-spacing:.5px;margin-left:8px;vertical-align:middle;">ABONO</span>
+                </div>
+
+                <span id="tkLabelNumOrig" class="label d-none"><?php echo L('ticket_label_origin'); ?></span>
+                <span id="tkNumOrig" class="value d-none">—</span>
+
                 <span class="label"><?php echo L('ticket_label_date'); ?></span> <span id="tkFecha">—</span>
                 <span id="tkLabelClienteMeta" class="label d-none"><?php echo L('client_label_client'); ?></span>
                 <span id="tkClienteMeta" class="value d-none">—</span>
@@ -385,19 +397,18 @@
                 <span id="err-email" class="form-error"></span>
             </div>
 
-            <div class="modal-footer p-0-24-20">
-                <button onclick="imprimirTicket()" class="btn-cancel d-flex ai-center jc-center gap-8">
+            <div class="modal-footer p-24 bg-surface2 d-flex ai-center gap-12">
+                <button onclick="imprimirTicket()" class="btn-secondary flex-1 ai-center jc-center gap-8 px-16">
                     <i class="fa-solid fa-print"></i> <?php echo L('ticket_btn_print'); ?>
                 </button>
-                <button onclick="descargarPDFTicket()" class="btn-cancel d-flex ai-center jc-center gap-8" style="background: var(--blue-light); color: var(--blue); border-color: var(--blue);">
+                <button onclick="descargarPDFTicket()" class="btn-secondary flex-1 ai-center jc-center gap-8 px-16" style="background: var(--blue-light); color: var(--blue); border-color: var(--blue);">
                     <i class="fa-solid fa-file-pdf"></i> <?php echo L('tk_btn_pdf'); ?>
                 </button>
-
-
-                <button id="btnNuevaVenta" onclick="nuevaVenta()" class="btn-save"><?php echo L('ticket_btn_new_sale'); ?></button>
-                <button id="btnAnularTicket" class="btn-cancel" style="background: var(--red); color: white; border-color: var(--red); display: none;">
+                <button id="btnAnularTicket" class="btn-secondary flex-1 ai-center jc-center gap-8 px-16" style="background: var(--red-light); color: var(--red); border-color: var(--red); display: none;">
                     <i class="fa-solid fa-ban"></i> <?php echo L('ticket_btn_void'); ?>
                 </button>
+                
+                <button id="btnNuevaVenta" onclick="nuevaVenta()" class="btn-save flex-1 ai-center jc-center px-16"><?php echo L('ticket_btn_new_sale'); ?></button>
             </div>
         </div>
     </div>

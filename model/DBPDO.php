@@ -30,7 +30,8 @@ class DBPDO
                 self::$instancia->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
                 date_default_timezone_set('Europe/Madrid');
-                self::$instancia->exec("SET time_zone = '+01:00'");
+                $offset = (new DateTime())->format('P'); 
+                self::$instancia->exec("SET time_zone = '$offset'");
             } catch (PDOException $e) {
                 // Manejo de error de conexión inicial
                 die("Error de conexión a la base de datos: " . $e->getMessage());

@@ -57,17 +57,7 @@ body[data-theme-mode="dark"] {
   --red-light: #7f1d1d;
 }
 
-body[data-theme-mode="black"] {
-  --bg: #000000;
-  --surface: #020617;
-  --surface2: #020617;
-  --border: #111827;
-  --text: #f9fafb;
-  --text-muted: #6b7280;
-  --blue-light: #020617;
-  --green-light: #052e16;
-  --red-light: #450a0a;
-}
+
 
 /* Accent Colors */
 [data-theme-accent="blue"] { --accent: #1d4ed8; --accent2: #0ea5e9; --header-bg: linear-gradient(135deg, #0f1c8c 0%, #1d4ed8 60%, #1890d0 100%); }
@@ -270,16 +260,15 @@ input, select, textarea { font-family: inherit; outline: none; }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  padding: 12px 24px; 
+  gap: 12px;
+  padding: 14px 32px; 
   background: var(--accent); 
   color: white; 
   border: none; 
   border-radius: 12px; 
   font-weight: 700; 
-  height: 44px;
+  height: 48px;
   width: fit-content;
-  max-width: 200px;
   white-space: nowrap;
   box-shadow: 0 4px 12px rgba(26, 47, 191, 0.2);
   transition: all 0.2s;
@@ -295,13 +284,13 @@ input, select, textarea { font-family: inherit; outline: none; }
   align-items: center;
   justify-content: center;
   gap: 10px;
-  padding: 12px 24px; 
+  padding: 14px 28px; 
   background: var(--surface); 
   border: 1.5px solid var(--border); 
   color: var(--text); 
   border-radius: 12px; 
   font-weight: 600; 
-  height: 44px;
+  height: 48px;
   width: fit-content;
   transition: all 0.2s;
 }
@@ -454,6 +443,6 @@ input, select, textarea { font-family: inherit; outline: none; }
 /* ==========================================================================
    8. DASHBOARD
    ========================================================================== */
-.dashboard-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 24px; }
+.dashboard-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 24px; margin-top: 40px;}
 .stat-card { background: var(--surface); border: 1px solid var(--border); padding: 20px; border-radius: 12px; transition: transform 0.2s; }
 .stat-card:hover { transform: translateY(-3px); box-shadow: var(--shadow); }

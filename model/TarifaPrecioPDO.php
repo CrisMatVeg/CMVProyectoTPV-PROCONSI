@@ -73,7 +73,7 @@ class TarifaPrecioPDO
 
     public static function listarActivas(): array
     {
-        $sql = "SELECT * FROM tarifas_precios WHERE activo = 1 ORDER BY prioridad DESC, id DESC";
+        $sql = "SELECT * FROM tarifas_precios WHERE activo = 1 AND aplicada = 0 ORDER BY prioridad DESC, id DESC";
         $q = DBPDO::ejecutarConsulta($sql);
         return $q->fetchAll(PDO::FETCH_ASSOC);
     }

@@ -29,6 +29,8 @@ class Producto implements JsonSerializable
             'aplica_re'      => $this->aplica_re,
             'id_proveedor'   => $this->id_proveedor,
             'iva'            => $this->iva,
+            'margen'         => $this->margen,
+            'precio_proveedor' => $this->precio_proveedor,
         ];
     }
     private $id;
@@ -49,8 +51,10 @@ class Producto implements JsonSerializable
     private $aplica_re;
     private $id_proveedor;
     private $iva;
+    private $margen;
+    private $precio_proveedor;
 
-    public function __construct($id, $referencia, $nombre, $descripcion, $precio_coste, $precio_venta, $stock_actual, $stock_minimo, $meses_garantia, $icono, $categoria, $atributos, $activo, $codigo_iva = 'GENERAL', $es_pack = 0, $aplica_re = 0, $id_proveedor = null, $iva = 21.00)
+    public function __construct($id, $referencia, $nombre, $descripcion, $precio_coste, $precio_venta, $stock_actual, $stock_minimo, $meses_garantia, $icono, $categoria, $atributos, $activo, $codigo_iva = 'GENERAL', $es_pack = 0, $aplica_re = 0, $id_proveedor = null, $iva = 21.00, $margen = 0.00, $precio_proveedor = 0.0000)
     {
         $this->id = $id;
         $this->referencia = $referencia;
@@ -70,6 +74,8 @@ class Producto implements JsonSerializable
         $this->aplica_re = (int)$aplica_re;
         $this->id_proveedor = $id_proveedor;
         $this->iva = (float)$iva;
+        $this->margen = (float)$margen;
+        $this->precio_proveedor = (float)$precio_proveedor;
     }
 
     // Getters
@@ -150,5 +156,15 @@ class Producto implements JsonSerializable
     public function isPack(): bool
     {
         return (bool)$this->es_pack;
+    }
+
+    public function getPrecioProveedor()
+    {
+        return $this->precio_proveedor;
+    }
+
+    public function getMargen()
+    {
+        return $this->margen;
     }
 }
