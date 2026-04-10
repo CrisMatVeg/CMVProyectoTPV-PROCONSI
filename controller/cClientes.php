@@ -48,9 +48,23 @@ if (isset($_REQUEST['volver']) || isset($_REQUEST['irDashboard'])) {
 require_once 'model/ClientePDO.php';
 require_once 'model/RolClientePDO.php';
 
+// Paginación
+$pag = isset($_GET['p']) ? max(1, (int)$_GET['p']) : 1;
+$limit = 50;
+$offset = ($pag - 1) * $limit;
+
+$totalClientes = ClientePDO::contarTodos();
+$totalPaginas = ceil($totalClientes / $limit);
+
 $avClientes = [
-    'lista' => ClientePDO::listarTodos(),
+    'lista' => ClientePDO::listarTodos($limit, $offset),
     'roles' => RolClientePDO::listarRoles(),
+    'paginacion' => [
+        'actual' => $pag,
+        'total' => $totalPaginas,
+        'totalRegistros' => $totalClientes,
+        'limit' => $limit
+    ]
 ];
 
 require_once $view['layout'];

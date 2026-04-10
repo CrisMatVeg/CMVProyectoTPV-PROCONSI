@@ -24,12 +24,12 @@
                 </div>
                 <div class="kpi-card p-20 bg-green-light br-20 border-2 border-green d-flex flex-column shadow-sm hover-translate-y">
                     <div class="fs-12 text-muted tt-uppercase font-bold mb-8"><?php echo L('dashboard_kpi_margin'); ?></div>
-                    <div class="fs-24 font-mono font-bold text-green"><?php echo number_format($avDashboard['kpis']['margen_estimado'] ?? 0, 2, ',', '.'); ?> €</div>
+                    <div class="fs-24 font-mono font-bold text-green"><?php echo number_format($avDashboard['kpis']['beneficio_estimado'] ?? 0, 2, ',', '.'); ?> €</div>
                     <div class="fs-11 text-muted mt-4"><?php echo L('dashboard_kpi_margin_sub'); ?></div>
                 </div>
                 <div class="kpi-card p-20 bg-surface2 br-20 border-2 d-flex flex-column shadow-sm hover-translate-y">
                     <div class="fs-12 text-muted tt-uppercase font-bold mb-8"><?php echo L('dashboard_kpi_operations'); ?></div>
-                    <div class="fs-24 font-mono font-bold"><?php echo $avDashboard['kpis']['total_tickets'] ?? 0; ?></div>
+                    <div class="fs-24 font-mono font-bold"><?php echo $avDashboard['kpis']['total_operaciones'] ?? 0; ?></div>
                     <div class="fs-11 text-muted mt-4"><?php echo L('dashboard_kpi_operations_sub'); ?></div>
                 </div>
                 <div class="kpi-card p-20 bg-surface2 br-20 border-2 d-flex flex-column shadow-sm hover-translate-y">
@@ -173,8 +173,7 @@
 
                     <!-- Analítica -->
                     <form method="post">
-                        <input type="hidden" name="Analitica" value="">
-                        <button type="submit" class="dashboard-btn">
+                        <button type="submit" name="irAnalitica" class="dashboard-btn">
                             <i class="fa-solid fa-chart-line text-accent"></i>
                             <span class="btn-title"><?php echo L('dashboard_btn_analytics'); ?></span>
                             <span class="btn-desc"><?php echo L('dashboard_btn_analytics_sub'); ?></span>

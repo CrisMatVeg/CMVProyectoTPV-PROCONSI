@@ -58,14 +58,29 @@ class CierreFiscalPDO
         $sqlUpdateResto = "UPDATE caja_turnos SET num_z = :idZ WHERE num_z IS NULL AND estado = 'cerrado'";
         DBPDO::ejecutarConsulta($sqlUpdateResto, [':idZ' => $idZ]);
 
+        // 4. Recalcular analítica del día
+        try {
+            require_once __DIR__ . '/AnaliticaPDO.php';
+            AnaliticaPDO::recalcularDia(date('Y-m-d'));
+        } catch (Exception $e) {
+            // No bloqueamos el cierre si falla la analítica, pero lo registramos
+            error_log("Error al recalcular analítica en cierre: " . $e->getMessage());
+        }
+
         return $idZ;
     }
 
     /**
      * Lista históricos de cierres.
      */
-    public static function listarCierres(): array
+    public static function listarCierres(string $desde, string $hasta, string $ordenPor = 'fecha', string $ordenDir = 'DESC', int $limit = 50, int $offset = 0): array
     {
+        // Whitelist
+        $cols = ['fecha', 'total_general', 'id'];
+        $ordenPor = in_array($ordenPor, $cols) ? $ordenPor : 'fecha';
+        $ordenDir = strtoupper($ordenDir) === 'ASC' ? 'ASC' : 'DESC';
+
+        // Técnica: Late Row Lookup. Primero obtenemos los IDs de los cierres que cumplen los filtros.
         $sql = "SELECT 
                 cf.*,
                 u.nombre as nombre_usuario,
@@ -74,13 +89,43 @@ class CierreFiscalPDO
                 COALESCE(MAX(v.fecha), cf.fecha) as ultima_venta,
                 COALESCE(SUM(d.importe), 0) as deuda_generada,
                 COALESCE(SUM(CASE WHEN v.metodo_pago = 'a_cuenta' THEN v.total ELSE 0 END), 0) as total_a_cuenta
-            FROM cierres_fiscales cf
+            FROM (
+                SELECT id 
+                FROM cierres_fiscales 
+                WHERE fecha >= :desde AND fecha <= :hasta
+                ORDER BY $ordenPor $ordenDir
+                LIMIT :limit OFFSET :offset
+            ) AS sub
+            JOIN cierres_fiscales cf ON cf.id = sub.id
             JOIN usuarios u ON cf.id_usuario = u.id
             LEFT JOIN ventas v ON v.num_z = cf.id
             LEFT JOIN caja_deudas d ON d.id_cierre_fiscal = cf.id
             GROUP BY cf.id
-            ORDER BY cf.fecha DESC";
-        $q = DBPDO::ejecutarConsulta($sql);
+            ORDER BY cf.$ordenPor $ordenDir";
+            
+        $params = [
+            ':desde' => $desde . ' 00:00:00',
+            ':hasta' => $hasta . ' 23:59:59'
+        ];
+
+        $sql = str_replace([':limit', ':offset'], [(int)$limit, (int)$offset], $sql);
+
+        $q = DBPDO::ejecutarConsulta($sql, $params);
         return $q->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Cuenta el total de cierres para paginación.
+     */
+    public static function contarCierres(string $desde, string $hasta): int
+    {
+        $sql = "SELECT COUNT(*) as total FROM cierres_fiscales WHERE fecha >= :desde AND fecha <= :hasta";
+        $params = [
+            ':desde' => $desde . ' 00:00:00',
+            ':hasta' => $hasta . ' 23:59:59'
+        ];
+        $q = DBPDO::ejecutarConsulta($sql, $params);
+        $res = $q->fetch(PDO::FETCH_ASSOC);
+        return (int)($res['total'] ?? 0);
     }
 }

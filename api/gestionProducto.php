@@ -21,11 +21,8 @@ try {
     // session_start(); // Handled by csrf_check.php
 
     // Solo POST
-    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        http_response_code(405);
-        echo json_encode(['ok' => false, 'error' => 'Método no permitido']);
-        exit;
-    }
+    $datos = json_decode(file_get_contents('php://input'), true) ?? [];
+    $accion = $datos['accion'] ?? $_GET['accion'] ?? '';
 
     // Solo usuarios autenticados
     if (!isset($_SESSION['usuarioActualTPV'])) {
@@ -41,8 +38,6 @@ try {
         exit;
     }
 
-    $datos = json_decode(file_get_contents('php://input'), true);
-    $accion = $datos['accion'] ?? '';
 
     if ($accion === 'añadir' || $accion === 'editar') {
         // Sanitizar campos solo si están presentes pero vacíos. Si no vienen, se respetan los valores actuales del modelo.
@@ -104,6 +99,38 @@ try {
     }
 
     switch ($accion) {
+        case 'listar':
+            $limit = isset($datos['limit']) ? (int)$datos['limit'] : 50;
+            $offset = isset($datos['offset']) ? (int)$datos['offset'] : 0;
+            $term = isset($datos['term']) ? trim($datos['term']) : '';
+
+            $lista = ProductoPDO::listarProductos(false, $limit, $offset, $term);
+            $total = ProductoPDO::contarProductos(false, $term);
+
+            $formatted = array_map(function($p) {
+                $icono = $p->getIcono();
+                if ($icono && strlen($icono) > 10) {
+                    $icono = 'data:image/png;base64,' . base64_encode($icono);
+                }
+
+                return [
+                    'id' => $p->getId(),
+                    'nombre' => $p->getNombre(),
+                    'referencia' => $p->getReferencia(),
+                    'icono' => $icono,
+                    'es_pack' => (int)$p->isPack(),
+                    'precio_venta' => (float)$p->getPrecioVenta(),
+                    'categoria' => $p->getCategoria(),
+                    'stock' => (int)$p->getStockActual(),
+                    'stock_minimo' => (int)$p->getStockMinimo(),
+                    'activo' => (int)$p->getActivo(),
+                    'atributos' => $p->getAtributos(),
+                    'componentes_pack' => $p->isPack() ? ProductoPDO::obtenerComponentesPack($p->getId()) : []
+                ];
+            }, $lista);
+            echo json_encode(['ok' => true, 'productos' => $formatted, 'total' => $total]);
+            break;
+
         case 'añadir':
             $nuevo = ProductoPDO::añadirProducto($datos);
             echo json_encode([
@@ -144,16 +171,24 @@ try {
             echo json_encode(['ok' => true, 'activo' => $activo]);
             break;
 
-        case 'retirada_stock':
+        case 'ajuste_stock':
             $id = (int)($datos['id'] ?? 0);
             $cantidad = (int)($datos['cantidad'] ?? 0);
-            $motivo = $datos['motivo'] ?? 'Retirada manual';
+            $motivo = trim($datos['motivo'] ?? '');
+            
             if (!$id) throw new InvalidArgumentException('ID de producto inválido');
-            if ($cantidad <= 0) throw new InvalidArgumentException('La cantidad debe ser mayor que 0');
+            if ($cantidad === 0) throw new InvalidArgumentException('La cantidad no puede ser 0');
+            if (empty($motivo)) throw new InvalidArgumentException('El motivo es obligatorio para ajustes manuales');
 
             $idUsuario = $_SESSION['usuarioActualTPV']->getId();
-            ProductoPDO::reducirStock($id, $cantidad);
-            MovimientoStockPDO::registrarMovimiento($id, 'ajuste', -$cantidad, $idUsuario, $motivo);
+            
+            if ($cantidad > 0) {
+                ProductoPDO::aumentarStock($id, $cantidad);
+            } else {
+                ProductoPDO::reducirStock($id, abs($cantidad));
+            }
+            
+            MovimientoStockPDO::registrarMovimiento($id, 'ajuste', $cantidad, $idUsuario, $motivo);
             echo json_encode(['ok' => true]);
             break;
 

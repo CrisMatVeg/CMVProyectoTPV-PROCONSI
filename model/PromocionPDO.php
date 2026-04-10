@@ -33,13 +33,27 @@ class PromocionPDO
                   AND (fecha_fin IS NULL OR fecha_fin >= :ahora)
                 ORDER BY prioridad DESC, id DESC";
         $q = DBPDO::ejecutarConsulta($sql, [':ahora' => $ahora]);
-        $rows = $q->fetchAll(PDO::FETCH_ASSOC);
+        return self::formatRows($q->fetchAll(PDO::FETCH_ASSOC));
+    }
 
+    /**
+     * Devuelve TODAS las promociones marcadas como activas, 
+     * ignorando restricciones de fecha/hora (para administración/edición).
+     */
+    public static function listarTodasActivas(): array
+    {
+        $sql = "SELECT * FROM promociones WHERE activo = 1 ORDER BY prioridad DESC, id DESC";
+        $q = DBPDO::ejecutarConsulta($sql);
+        return self::formatRows($q->fetchAll(PDO::FETCH_ASSOC));
+    }
+
+    private static function formatRows(array $rows): array
+    {
         $out = [];
         foreach ($rows as $r) {
             $out[] = [
                 'id'             => (int)$r['id'],
-                'codigo'         => $r['codigo'],          // JS uses p.codigo for coupon matching
+                'codigo'         => $r['codigo'],
                 'tipo'           => $r['tipo'],
                 'valor'          => (float)$r['valor'],
                 'min_subtotal'   => (float)$r['min_subtotal'],

@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="csrf-token" content="<?= $_SESSION['csrf_token'] ?? '' ?>" />
     <title>TPV · ElectroBazar</title>
+    <link rel="icon" type="image/x-icon" href="./favicon.ico">
     <link rel="stylesheet" href="./webroot/css/estilos.css?v=1" />
     <link rel="stylesheet" href="./webroot/css/components.css?v=1" />
     <link rel="stylesheet" href="./webroot/css/app.css?v=1" />
@@ -149,6 +150,105 @@
             };
         })();
     </script>
+    <style>
+        /* Language Dropdown Styles */
+        .lang-dropdown {
+            position: relative;
+            display: inline-block;
+        }
+
+        .lang-trigger {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 16px;
+        }
+
+        .lang-trigger:hover {
+            background: var(--accent);
+            color: white;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(var(--accent-rgb), 0.3);
+        }
+
+        .lang-menu {
+            position: absolute;
+            top: calc(100% + 8px);
+            right: 0;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            min-width: 140px;
+            padding: 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(10px);
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 1000;
+        }
+
+        .lang-dropdown:hover .lang-menu {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .lang-link {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 12px;
+            text-decoration: none;
+            color: #1a1a1a;
+            font-size: 13px;
+            font-weight: 500;
+            border-radius: 8px;
+            transition: all 0.15s ease;
+        }
+
+        .lang-link:hover {
+            background: rgba(var(--accent-rgb), 0.08);
+            color: var(--accent);
+        }
+
+        .lang-link.active {
+            background: rgba(var(--accent-rgb), 0.1);
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .lang-link img {
+            width: 18px;
+            border-radius: 2px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+
+        /* Dark mode adjustments */
+        [data-theme-mode="dark"] .lang-menu {
+            background: rgba(30, 30, 35, 0.98);
+            border-color: rgba(255, 255, 255, 0.1);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+        }
+        [data-theme-mode="dark"] .lang-link {
+            color: #eeeeee;
+        }
+        [data-theme-mode="dark"] .lang-link.active {
+            color: var(--accent);
+        }
+    </style>
 </head>
 
 <body data-page="<?php echo $_SESSION['paginaEnCurso'] ?? ''; ?>"
@@ -204,19 +304,33 @@
                 <div class="v-divider"></div>
 
                 <nav class="topbar-nav">
-                    <!-- Selector de Idioma -->
-                    <div class="lang-switcher d-flex ai-center gap-4 mr-12 px-8 br-8 border-2" style="background:rgba(0,0,0,0.03);">
-                        <a href="index.php?lang=es" class="btn-lang <?php echo $lang === 'es' ? 'active' : ''; ?>" title="Español" style="text-decoration:none; color:inherit; opacity:<?php echo $lang==='es'?'1':'0.4'; ?>;">
-                            <img src="https://flagcdn.com/16x12/es.png" alt="ES" style="width:16px;">
-                        </a>
-                        <div class="v-divider" style="height:12px; margin:0 4px;"></div>
-                        <a href="index.php?lang=en" class="btn-lang <?php echo $lang === 'en' ? 'active' : ''; ?>" title="English" style="text-decoration:none; color:inherit; opacity:<?php echo $lang==='en'?'1':'0.4'; ?>;">
-                            <img src="https://flagcdn.com/16x12/us.png" alt="EN" style="width:16px;">
-                        </a>
-                        <div class="v-divider" style="height:12px; margin:0 4px;"></div>
-                        <a href="index.php?lang=fr" class="btn-lang <?php echo $lang === 'fr' ? 'active' : ''; ?>" title="Français" style="text-decoration:none; color:inherit; opacity:<?php echo $lang==='fr'?'1':'0.4'; ?>;">
-                            <img src="https://flagcdn.com/16x12/fr.png" alt="FR" style="width:16px;">
-                        </a>
+                    <!-- Selector de Idioma (Dropdown) -->
+                    <div class="lang-dropdown mr-12">
+                        <div class="lang-trigger" title="<?php echo L('menu_idioma') ?? 'Idioma'; ?>">
+                            <i class="fa-solid fa-globe"></i>
+                        </div>
+                        <div class="lang-menu">
+                            <a href="index.php?lang=es" class="lang-link <?php echo $lang === 'es' ? 'active' : ''; ?>">
+                                <img src="https://flagcdn.com/16x12/es.png" alt="ES">
+                                <span>Español</span>
+                            </a>
+                            <a href="index.php?lang=en" class="lang-link <?php echo $lang === 'en' ? 'active' : ''; ?>">
+                                <img src="https://flagcdn.com/16x12/us.png" alt="EN">
+                                <span>English</span>
+                            </a>
+                            <a href="index.php?lang=fr" class="lang-link <?php echo $lang === 'fr' ? 'active' : ''; ?>">
+                                <img src="https://flagcdn.com/16x12/fr.png" alt="FR">
+                                <span>Français</span>
+                            </a>
+                            <a href="index.php?lang=it" class="lang-link <?php echo $lang === 'it' ? 'active' : ''; ?>">
+                                <img src="https://flagcdn.com/16x12/it.png" alt="IT">
+                                <span>Italiano</span>
+                            </a>
+                            <a href="index.php?lang=de" class="lang-link <?php echo $lang === 'de' ? 'active' : ''; ?>">
+                                <img src="https://flagcdn.com/16x12/de.png" alt="DE">
+                                <span>Deutsch</span>
+                            </a>
+                        </div>
                     </div>
 
                     <form method="post" action="index.php">

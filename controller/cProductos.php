@@ -50,8 +50,16 @@ if (isset($_REQUEST['volver']) || isset($_REQUEST['irDashboard'])) {
     exit;
 }
 
-// Obtener la lista completa de productos (activos e inactivos para gestión)
-$oProductos = ProductoPDO::listarProductos(false);
+// Paginación
+$pag = isset($_GET['p']) ? max(1, (int)$_GET['p']) : 1;
+$limit = 50;
+$offset = ($pag - 1) * $limit;
+
+$totalProductos = ProductoPDO::contarProductos(false);
+$totalPaginas = ceil($totalProductos / $limit);
+
+// Obtener la lista de productos paginada
+$oProductos = ProductoPDO::listarProductos(false, $limit, $offset);
 $listaProductos = [];
 foreach ($oProductos as $oProd) {
     $icono = $oProd->getIcono();
@@ -62,8 +70,8 @@ foreach ($oProductos as $oProd) {
     $listaProductos[] = [
         'id'             => $oProd->getId(),
         'nombre'         => $oProd->getNombre(),
-        'codigo'         => $oProd->getReferencia(),
-        'precio'         => (float)$oProd->getPrecioVenta(),
+        'referencia'     => $oProd->getReferencia(),
+        'precio_venta'   => (float)$oProd->getPrecioVenta(),
         'precio_coste'   => (float)$oProd->getPrecioCoste(),
         'iva'            => (float)$oProd->getIva(),
         'meses_garantia' => (int)$oProd->getMesesGarantia(),
@@ -99,6 +107,12 @@ $avProductos = [
     'ivaGeneral' => $ivaGeneralActual,
     'tipos_iva'  => $tiposIva,
     'categorias' => $listaCategorias,
+    'paginacion' => [
+        'actual' => $pag,
+        'total'  => $totalPaginas,
+        'limit'  => $limit,
+        'totalRegistros' => $totalProductos
+    ],
     'proveedores' => array_map(function ($p) {
         return [
             'id' => $p->getId(),

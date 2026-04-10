@@ -1,6 +1,50 @@
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+    /* CSS para Skeleton Loaders y Estética Premium */
+    .skeleton-text {
+        height: 1.5rem;
+        background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+        background-size: 200% 100%;
+        animation: skeleton-loading 1.5s infinite;
+        border-radius: 4px;
+        width: 100%;
+    }
+    .skeleton-kpi { height: 2.5rem; width: 80%; margin: 4px 0; }
+    .skeleton-chart { height: 300px; width: 100%; }
+    .skeleton-table-row { height: 40px; width: 100%; margin: 8px 0; }
+    
+    @keyframes skeleton-loading {
+        0% { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
+    }
+    
+    .card-section { 
+        transition: all 0.3s ease; 
+        border-radius: 20px;
+        overflow: hidden;
+        border: 1px solid var(--border) !important;
+        box-shadow: 0px 4px 16px rgba(0, 0, 0, 0.05) !important;
+        background: var(--bg-surface);
+    }
+    .card-section:hover { transform: translateY(-2px); box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1) !important; }
+    
+    .fade-in { animation: fadeIn 0.5s ease-out forwards; opacity: 0; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+    .analitica-table { width: 100%; border-collapse: collapse; }
+    .analitica-table thead th { 
+        padding: 12px 16px; font-size: 11px; font-weight: 700; text-transform: uppercase; 
+        color: #64748b; background: #f8fafc; border-bottom: 2px solid #e2e8f0; text-align: left;
+    }
+    .analitica-table td { padding: 12px 16px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+    .analitica-table tr:last-child td { border-bottom: none; }
+    .analitica-table tr:hover { background: #f8fafc; }
+    
+    .opacity-50 { opacity: 0.5; }
+</style>
+
 <div class="main-full p-24">
-    <!-- CABECERA DE SECCIÓN -->
+    <!-- CABECERA -->
     <div class="section-header container-wider">
         <div class="section-title">
             <div class="d-flex ai-center gap-12 mb-4">
@@ -11,264 +55,169 @@
         </div>
         <form method="post">
             <button type="submit" name="volver" class="btn-back">
-                    <?php echo L('analytics_btn_back'); ?>
+                <i class="fa-solid fa-arrow-left mr-8"></i> <?php echo L('analytics_btn_back'); ?>
             </button>
         </form>
     </div>
+    
+    <!-- BANNER DE OPTIMIZACIÓN -->
+    <div id="optimizerBanner" class="container-wider mb-24 fade-in" style="display: none;">
+        <div class="card-section p-20 d-flex ai-center jc-space-between" style="background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border-color: #3b82f6 !important;">
+            <div class="d-flex ai-center gap-16">
+                <div class="bg-blue p-12 br-12 shadow-sm">
+                    <i class="fa-solid fa-gauge-high text-white fs-24"></i>
+                </div>
+                <div>
+                    <h3 class="m-0 fs-16 text-blue-dark">Base de datos no optimizada</h3>
+                    <p class="m-0 fs-13 text-muted">Las consultas históricas pueden tardar. Aplica índices de rendimiento para cargar "Todo el historial" al instante.</p>
+                </div>
+            </div>
+            <button id="btnOptimize" onclick="ejecutarOptimizacion()" class="btn-primary shadow-sm" style="background: var(--accent); border: none; padding: 10px 20px; border-radius: 10px; cursor: pointer; color: white; display: flex; ai-center gap-8;">
+                <i class="fa-solid fa-wand-magic-sparkles"></i> Optimizar ahora
+            </button>
+        </div>
+    </div>
 
     <!-- FILTROS -->
-    <div class="container-wider mb-32">
-        <div class="filters-panel p-20 bg-surface br-16 border">
-            <form method="get" action="index.php" class="d-flex ai-center gap-20 flex-wrap" novalidate>
-                <input type="hidden" name="Analitica" value="">
-                <div class="filter-group flex-1" style="min-width: 160px;">
-                    <label class="fs-11 font-bold mb-6 d-block text-muted tt-uppercase" style="letter-spacing: 0.5px;"><?php echo L('analytics_filter_start'); ?></label>
-                    <input type="date" name="fechaDesde" value="<?php echo $avAnalitica['filtros']['desde']; ?>" class="form-input h-44">
-                    <?php if (isset($avAnalitica['aErrores']['fechaDesde'])) { ?><span class="form-error"><?php echo $avAnalitica['aErrores']['fechaDesde']; ?></span><?php } ?>
+    <div class="filters-panel container-wider mb-32">
+        <form id="formFiltros" method="get" action="index.php" class="filters-form" style="display: flex; gap: 20px; align-items: flex-end; flex-wrap: wrap; background: var(--bg-surface); padding: 20px; border-radius: 16px; border: 1px solid var(--border);">
+            <input type="hidden" name="menu" value="Analitica">
+            
+            <div class="filter-group">
+                <label class="fs-11 font-bold mb-6 d-block text-muted tt-uppercase"><?php echo L('history_filter_period'); ?></label>
+                <select name="periodo" id="filterPeriodo" class="filter-input form-input" style="height: 44px; min-width: 140px;">
+                    <option value="hoy" <?php echo $avAnalitica['filtros']['periodo'] === 'hoy' ? 'selected' : ''; ?>><?php echo L('history_period_today'); ?></option>
+                    <option value="semana" <?php echo $avAnalitica['filtros']['periodo'] === 'semana' ? 'selected' : ''; ?>><?php echo L('history_period_week'); ?></option>
+                    <option value="mes" <?php echo $avAnalitica['filtros']['periodo'] === 'mes' ? 'selected' : ''; ?>><?php echo L('history_period_month'); ?></option>
+                    <option value="todo" <?php echo $avAnalitica['filtros']['periodo'] === 'todo' ? 'selected' : ''; ?>><?php echo L('history_period_all'); ?></option>
+                    <option value="personalizado" <?php echo $avAnalitica['filtros']['periodo'] === 'personalizado' ? 'selected' : ''; ?>><?php echo L('history_period_custom'); ?></option>
+                </select>
+            </div>
+
+            <div id="customDates" class="d-flex gap-20" style="<?php echo $avAnalitica['filtros']['periodo'] !== 'personalizado' ? 'display:none !important' : 'display:flex !important'; ?>">
+                <div class="filter-group">
+                    <label class="fs-11 font-bold mb-6 d-block text-muted tt-uppercase"><?php echo L('history_filter_since'); ?></label>
+                    <input type="date" name="fechaDesde" value="<?php echo $avAnalitica['filtros']['desde']; ?>" class="filter-input form-input" style="height: 44px;">
                 </div>
-                <div class="filter-group flex-1" style="min-width: 160px;">
-                    <label class="fs-11 font-bold mb-6 d-block text-muted tt-uppercase" style="letter-spacing: 0.5px;"><?php echo L('analytics_filter_end'); ?></label>
-                    <input type="date" name="fechaHasta" value="<?php echo $avAnalitica['filtros']['hasta']; ?>" class="form-input h-44">
-                    <?php if (isset($avAnalitica['aErrores']['fechaHasta'])) { ?><span class="form-error"><?php echo $avAnalitica['aErrores']['fechaHasta']; ?></span><?php } ?>
+                <div class="filter-group">
+                    <label class="fs-11 font-bold mb-6 d-block text-muted tt-uppercase"><?php echo L('history_filter_until'); ?></label>
+                    <input type="date" name="fechaHasta" value="<?php echo $avAnalitica['filtros']['hasta']; ?>" class="filter-input form-input" style="height: 44px;">
                 </div>
-                <button type="submit" class="btn-filter h-44 px-28 d-flex ai-center gap-8" style="align-self: flex-end;">
-                    <i class="fa-solid fa-arrows-rotate"></i> <?php echo L('analytics_filter_update'); ?>
+            </div>
+
+            <div class="filter-group">
+                <button type="submit" class="btn-filter h-44 px-28 d-flex ai-center gap-8">
+                    <i class="fa-solid fa-arrows-rotate"></i> <?php echo L('analytics_btn_filter'); ?>
                 </button>
-            </form>
-        </div>
+            </div>
+        </form>
     </div>
 
     <!-- KPI CARDS -->
-    <div class="container-wider mb-32">
-        <?php
-        $kpis = $avAnalitica['kpis'];
-        $totalVentas   = (float)($kpis['total_ventas'] ?? 0);
-        $margen        = (float)($kpis['margen_estimado'] ?? 0);
-        $totalTickets  = (int)($kpis['total_tickets'] ?? 0);
-        $pctMargen     = $totalVentas > 0 ? round(($margen / $totalVentas) * 100, 1) : 0;
-        $ticketMedio   = $totalTickets > 0 ? round($totalVentas / $totalTickets, 2) : 0;
-        ?>
-        <div class="d-grid gap-20" style="grid-template-columns: repeat(4, 1fr);">
-            <!-- Ventas -->
-            <div class="card-section p-24 bg-white shadow-sm border d-flex flex-column gap-12">
+    <div class="container-wider" style="margin-bottom: 25px;">
+        <div class="d-grid gap-24" style="grid-template-columns: repeat(4, 1fr);">
+            <div class="card-section p-24 d-flex flex-column gap-12" id="kpiSalesContainer">
                 <div class="d-flex ai-center jc-between">
-                    <span class="fs-11 text-muted tt-uppercase font-bold" style="letter-spacing: 0.5px;"><?php echo L('analytics_kpis_sales'); ?></span>
-                    <div class="w-40 h-40 br-12 d-flex ai-center jc-center" style="background: #eff6ff;">
-                        <i class="fa-solid fa-euro-sign" style="color: #2563eb; font-size: 16px;"></i>
-                    </div>
+                    <span class="fs-11 text-muted tt-uppercase font-bold"><?php echo L('analytics_kpis_sales'); ?></span>
+                    <i class="fa-solid fa-cart-shopping text-blue fs-16" style="margin-left: 12px;"></i>
                 </div>
-                <div class="fs-30 font-mono font-bold" style="color: #0f172a; letter-spacing: -1px;"><?php echo number_format($totalVentas, 2, ',', '.'); ?> €</div>
-                <div class="fs-12 text-muted"><?php echo L('tpv_tax_included'); ?></div>
+                <div id="val_kpiSales" class="fs-30 font-mono font-bold"><div class="skeleton-text skeleton-kpi"></div></div>
+                <div id="sub_kpiSales" class="fs-12 text-muted"><div class="skeleton-text" style="width:60%"></div></div>
             </div>
-
-            <!-- Beneficio -->
-            <div class="card-section p-24 bg-white shadow-sm border d-flex flex-column gap-12">
+            <div class="card-section p-24 d-flex flex-column gap-12" id="kpiProfitContainer">
                 <div class="d-flex ai-center jc-between">
-                    <span class="fs-11 text-muted tt-uppercase font-bold" style="letter-spacing: 0.5px;"><?php echo L('analytics_kpis_profit'); ?></span>
-                    <div class="w-40 h-40 br-12 d-flex ai-center jc-center" style="background: #f0fdf4;">
-                        <i class="fa-solid fa-sack-dollar" style="color: #16a34a; font-size: 16px;"></i>
-                    </div>
+                    <span class="fs-11 text-muted tt-uppercase font-bold"><?php echo L('analytics_kpis_profit'); ?></span>
+                    <i class="fa-solid fa-sack-dollar text-green fs-16" style="margin-left: 12px;"></i>
                 </div>
-                <div class="fs-30 font-mono font-bold" style="color: #16a34a; letter-spacing: -1px;"><?php echo number_format($margen, 2, ',', '.'); ?> €</div>
-                <div class="fs-12 text-muted"><?php echo L('analytics_kpis_margin'); ?>: <strong><?php echo $pctMargen; ?>%</strong> <?php echo L('analytics_kpis_on_sales'); ?></div>
+                <div id="val_kpiProfit" class="fs-30 font-mono font-bold"><div class="skeleton-text skeleton-kpi"></div></div>
+                <div id="sub_kpiProfit" class="fs-12 text-muted"><div class="skeleton-text" style="width:60%"></div></div>
             </div>
-
-            <!-- Tickets -->
-            <div class="card-section p-24 bg-white shadow-sm border d-flex flex-column gap-12">
+            <div class="card-section p-24 d-flex flex-column gap-12" id="kpiOpsContainer">
                 <div class="d-flex ai-center jc-between">
-                    <span class="fs-11 text-muted tt-uppercase font-bold" style="letter-spacing: 0.5px;"><?php echo L('analytics_kpis_ops'); ?></span>
-                    <div class="w-40 h-40 br-12 d-flex ai-center jc-center" style="background: #fff7ed;">
-                        <i class="fa-solid fa-ticket" style="color: #ea580c; font-size: 16px;"></i>
-                    </div>
+                    <span class="fs-11 text-muted tt-uppercase font-bold"><?php echo L('analytics_kpis_ops'); ?></span>
+                    <i class="fa-solid fa-ticket text-orange fs-16" style="margin-left: 12px;"></i>
                 </div>
-                <div class="fs-30 font-mono font-bold" style="color: #0f172a; letter-spacing: -1px;"><?php echo number_format($totalTickets, 0, ',', '.'); ?></div>
-                <div class="fs-12 text-muted"><?php echo L('analytics_kpis_sales_made'); ?></div>
+                <div id="val_kpiOps" class="fs-30 font-mono font-bold"><div class="skeleton-text skeleton-kpi"></div></div>
+                <div id="sub_kpiOps" class="fs-12 text-muted"><div class="skeleton-text" style="width:60%"></div></div>
             </div>
-
-            <!-- Ticket Medio -->
-            <div class="card-section p-24 bg-white shadow-sm border d-flex flex-column gap-12">
+            <div class="card-section p-24 d-flex flex-column gap-12" id="kpiAverageContainer">
                 <div class="d-flex ai-center jc-between">
-                    <span class="fs-11 text-muted tt-uppercase font-bold" style="letter-spacing: 0.5px;"><?php echo L('analytics_kpis_average_ticket'); ?></span>
-                    <div class="w-40 h-40 br-12 d-flex ai-center jc-center" style="background: #f5f3ff;">
-                        <i class="fa-solid fa-chart-simple" style="color: #7c3aed; font-size: 16px;"></i>
-                    </div>
+                    <span class="fs-11 text-muted tt-uppercase font-bold"><?php echo L('analytics_kpis_average_ticket'); ?></span>
+                    <i class="fa-solid fa-chart-simple text-accent fs-16" style="margin-left: 12px;"></i>
                 </div>
-                <div class="fs-30 font-mono font-bold" style="color: #7c3aed; letter-spacing: -1px;"><?php echo number_format($ticketMedio, 2, ',', '.'); ?> €</div>
-                <div class="fs-12 text-muted"><?php echo L('analytics_kpis_per_op'); ?></div>
+                <div id="val_kpiAverage" class="fs-30 font-mono font-bold"><div class="skeleton-text skeleton-kpi"></div></div>
+                <div id="sub_kpiAverage" class="fs-12 text-muted"><div class="skeleton-text" style="width:60%"></div></div>
             </div>
         </div>
     </div>
 
-    <div class="container-wider d-flex flex-column gap-24" style="margin-top: 32px;">
-
-        <!-- FILA 1: TOP PRODUCTOS + VENTAS POR CATEGORÍA -->
-        <div class="d-grid gap-24" style="grid-template-columns: 2fr 1fr; align-items: start;">
-
-            <!-- TOP 10 PRODUCTOS -->
-            <div class="card-section bg-white shadow-sm border">
-                <div class="p-20 border-bottom d-flex jc-between ai-center" style="background: #fffbeb;">
-                    <div class="d-flex ai-center gap-10">
-                        <div class="w-36 h-36 br-10 d-flex ai-center jc-center" style="background: #fef3c7;">
-                            <i class="fa-solid fa-crown" style="color: #d97706; font-size: 15px;"></i>
-                        </div>
-                        <div>
-                            <h3 class="m-0 fs-15 font-bold"><?php printf(L('analytics_top_products_title', true), count($avAnalitica['topProductos'])); ?></h3>
-                            <span class="fs-11 text-muted"><?php echo L('analytics_top_products_sub'); ?></span>
-                        </div>
+    <!-- MAIN CONTENT -->
+    <div class="container-wider d-flex flex-column gap-24">
+        <!-- TOP + CATEGORIAS -->
+        <div class="d-grid gap-24" style="grid-template-columns: 2fr 1fr;">
+            <div class="card-section">
+                <div class="p-20 border-bottom d-flex ai-center gap-10" style="background: #fffbeb;">
+                    <i class="fa-solid fa-crown text-orange"></i>
+                    <h3 class="m-0 fs-15 font-bold"><?php echo L('analytics_top_products_title_simple'); ?></h3>
+                </div>
+                <div id="topProductsTableContainer" class="p-0">
+                    <div class="p-20">
+                        <div class="skeleton-text skeleton-table-row"></div>
+                        <div class="skeleton-text skeleton-table-row"></div>
+                        <div class="skeleton-text skeleton-table-row"></div>
                     </div>
                 </div>
-                <table class="analitica-table mb-0">
-                    <thead>
-                        <tr>
-                            <th class="pl-20" style="width: 40px;"><?php echo L('analytics_th_rank'); ?></th>
-                            <th><?php echo L('analytics_th_product'); ?></th>
-                            <th class="text-right"><?php echo L('analytics_th_units'); ?></th>
-                            <th class="text-right pr-20"><?php echo L('analytics_th_revenue'); ?></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php if (empty($avAnalitica['topProductos'])): ?>
-                            <tr>
-                                <td colspan="4" class="empty-state p-40"><?php echo L('analytics_no_data'); ?></td>
-                            </tr>
-                        <?php endif; ?>
-                        <?php foreach ($avAnalitica['topProductos'] as $idx => $p): ?>
-                            <tr>
-                                <td class="pl-20">
-                                    <?php if ($idx === 0): ?>
-                                        <span class="rank-medal" style="background: linear-gradient(135deg, #f59e0b, #fbbf24); color: white; width: 28px; height: 28px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800;">1</span>
-                                    <?php elseif ($idx === 1): ?>
-                                        <span class="rank-medal" style="background: linear-gradient(135deg, #94a3b8, #cbd5e1); color: white; width: 28px; height: 28px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800;">2</span>
-                                    <?php elseif ($idx === 2): ?>
-                                        <span class="rank-medal" style="background: linear-gradient(135deg, #b45309, #d97706); color: white; width: 28px; height: 28px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800;">3</span>
-                                    <?php else: ?>
-                                        <span style="color: #94a3b8; font-size: 13px; font-weight: 600; padding-left: 4px;"><?php echo $idx + 1; ?></span>
-                                    <?php endif; ?>
-                                </td>
-                                <td>
-                                    <div class="font-bold fs-13"><?php echo htmlspecialchars($p['nombre_producto_limpio'] ?? L('tpv_unknown', true)); ?></div>
-                                    <div class="fs-11 text-muted"><?php echo htmlspecialchars($p['codigo_producto'] ?? ''); ?></div>
-                                </td>
-                                <td class="text-right font-mono font-bold fs-14"><?php echo $p['unidades']; ?></td>
-                                <td class="text-right pr-20 font-mono text-accent fs-13"><?php echo number_format($p['total_recaudado'], 2, ',', '.'); ?> €</td>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
             </div>
-
-            <!-- VENTAS POR CATEGORÍA -->
-            <div class="card-section bg-white shadow-sm border d-flex flex-column">
-                <div class="p-20 border-bottom" style="background: #f0f9ff;">
-                    <div class="d-flex ai-center gap-10">
-                        <div class="w-36 h-36 br-10 d-flex ai-center jc-center" style="background: #e0f2fe;">
-                            <i class="fa-solid fa-chart-pie" style="color: #0284c7; font-size: 15px;"></i>
-                        </div>
-                        <div>
-                            <h3 class="m-0 fs-15 font-bold"><?php echo L('analytics_cat_sales_title'); ?></h3>
-                            <span class="fs-11 text-muted"><?php echo L('analytics_cat_sales_sub'); ?></span>
-                        </div>
-                    </div>
+            <div class="card-section">
+                <div class="p-20 border-bottom d-flex ai-center gap-10" style="background: #f0f9ff;">
+                    <i class="fa-solid fa-chart-pie text-blue"></i>
+                    <h3 class="m-0 fs-15 font-bold"><?php echo L('analytics_cat_sales_title'); ?></h3>
                 </div>
-                <div class="p-24 flex-1 d-flex ai-center jc-center position-relative">
-                    <?php if (empty($avAnalitica['porCategoria'])): ?>
-                        <div class="empty-state w-100"><?php echo L('analytics_no_cat_data'); ?></div>
-                    <?php else: ?>
-                        <div style="width: 100%; max-width: 300px; margin: auto;">
-                            <canvas id="catChart"></canvas>
-                        </div>
-                    <?php endif; ?>
+                <div id="catChartContainer" class="p-24 d-flex ai-center jc-center" style="min-height: 300px;">
+                    <div class="skeleton-text" style="height: 200px; width: 200px; border-radius: 50%;"></div>
                 </div>
             </div>
         </div>
 
-        <!-- FILA 2: DESGLOSE IVA + RENTABILIDAD DIARIA -->
-        <div class="d-grid gap-24" style="grid-template-columns: 1fr 2fr; align-items: start;">
-
-            <!-- DESGLOSE IVA -->
-            <div class="card-section bg-white shadow-sm border">
-                <div class="p-20 border-bottom" style="background: #fdf4ff;">
-                    <div class="d-flex ai-center gap-10">
-                        <div class="w-36 h-36 br-10 d-flex ai-center jc-center" style="background: #fae8ff;">
-                            <i class="fa-solid fa-percent" style="color: #9333ea; font-size: 15px;"></i>
-                        </div>
-                        <div>
-                            <h3 class="m-0 fs-15 font-bold"><?php echo L('analytics_iva_title'); ?></h3>
-                            <span class="fs-11 text-muted"><?php echo L('analytics_iva_sub'); ?></span>
-                        </div>
+        <!-- IVA + EVOLUCION -->
+        <div class="d-grid gap-24" style="grid-template-columns: 1fr 2fr;">
+            <div class="card-section">
+                <div class="p-20 border-bottom d-flex ai-center gap-10" style="background: #fdf4ff;">
+                    <i class="fa-solid fa-percent text-purple"></i>
+                    <h3 class="m-0 fs-15 font-bold"><?php echo L('analytics_iva_title'); ?></h3>
+                </div>
+                <div id="ivaTableContainer" class="p-0">
+                    <div class="p-20">
+                        <div class="skeleton-text skeleton-table-row"></div>
+                        <div class="skeleton-text skeleton-table-row"></div>
                     </div>
                 </div>
-                <table class="analitica-table mb-0">
-                    <thead>
-                        <tr>
-                            <th class="pl-20"><?php echo L('analytics_th_iva_type'); ?></th>
-                            <th class="text-right"><?php echo L('analytics_th_base_amount'); ?><br><span style="font-weight:400;font-size:10px;"><?php echo L('analytics_th_base_sub'); ?></span></th>
-                            <th class="text-right pr-20"><?php echo L('analytics_th_iva_quota'); ?><br><span style="font-weight:400;font-size:10px;"><?php echo L('analytics_th_iva_sub'); ?></span></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php if (empty($avAnalitica['desgloseIva'])): ?>
-                            <tr>
-                                <td colspan="3" class="empty-state p-32"><?php echo L('analytics_no_data'); ?></td>
-                            </tr>
-                        <?php endif; ?>
-                        <?php foreach ($avAnalitica['desgloseIva'] as $iva):
-                            $base = round($iva['total'] - $iva['cuota'], 2);
-                        ?>
-                            <tr>
-                                <td class="pl-20">
-                                    <span class="fs-13 px-10 py-4 br-6 font-bold" style="background: #fae8ff; color: #9333ea;"><?php echo $iva['porcentaje']; ?>%</span>
-                                </td>
-                                <td class="text-right font-mono fs-13"><?php echo number_format($base, 2, ',', '.'); ?> €</td>
-                                <td class="text-right pr-20 font-mono font-bold fs-13" style="color: #9333ea;"><?php echo number_format($iva['cuota'], 2, ',', '.'); ?> €</td>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
             </div>
-
-            <!-- RENTABILIDAD DIARIA -->
-            <div class="card-section bg-white shadow-sm border d-flex flex-column" style="min-width: 0;">
-                <div class="p-20 border-bottom d-flex jc-between ai-center" style="background: #f0fdf4;">
-                    <div class="d-flex ai-center gap-10">
-                        <div class="w-36 h-36 br-10 d-flex ai-center jc-center" style="background: #dcfce7;">
-                            <i class="fa-solid fa-chart-line" style="color: #16a34a; font-size: 15px;"></i>
-                        </div>
-                        <div>
-                            <h3 class="m-0 fs-15 font-bold"><?php echo L('analytics_evo_title'); ?></h3>
-                            <span class="fs-11 text-muted"><?php echo L('analytics_evo_sub'); ?></span>
-                        </div>
-                    </div>
+            <div class="card-section">
+                <div class="p-20 border-bottom d-flex ai-center gap-10" style="background: #f0fdf4;">
+                    <i class="fa-solid fa-chart-line text-green"></i>
+                    <h3 class="m-0 fs-15 font-bold"><?php echo L('analytics_evo_title'); ?></h3>
                 </div>
-                <div class="p-20" style="position: relative; height: 320px; width: 100%; box-sizing: border-box;">
-                    <?php if (empty($avAnalitica['margenes'])): ?>
-                        <div class="empty-state"><?php echo L('analytics_no_history'); ?></div>
-                    <?php else: ?>
-                        <canvas id="rentabilidadChart"></canvas>
-                    <?php endif; ?>
+                <div id="evolutionChartContainer" class="p-20" style="height: 300px;">
+                    <div class="skeleton-text skeleton-chart"></div>
                 </div>
             </div>
         </div>
 
-        <!-- FILA 3: RANKING COMPLETO -->
-        <div class="card-section bg-white shadow-sm border overflow-hidden mb-24">
-            <div class="p-20 border-bottom d-flex jc-between ai-center" style="background: #f8fafc;">
+        <!-- RANKING COMPLETO -->
+        <div class="card-section">
+            <div class="p-20 border-bottom d-flex jc-between ai-center gap-20" style="background: #f8fafc;">
                 <div class="d-flex ai-center gap-10">
-                    <div class="w-36 h-36 br-10 d-flex ai-center jc-center" style="background: #f1f5f9;">
-                        <i class="fa-solid fa-list-ol text-accent" style="font-size: 15px;"></i>
-                    </div>
-                    <div>
-                        <h3 class="m-0 fs-15 font-bold"><?php echo L('analytics_ranking_title'); ?></h3>
-                        <span class="fs-11 text-muted"><?php echo L('analytics_ranking_sub'); ?></span>
-                    </div>
+                    <i class="fa-solid fa-list-ol text-accent"></i>
+                    <h3 class="m-0 fs-15 font-bold"><?php echo L('analytics_ranking_title'); ?></h3>
                 </div>
-                <button onclick="exportRankingToExcel()" class="btn-icon p-4-12 fs-12" style="background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0;">
-                    <i class="fa-solid fa-file-excel"></i> <?php echo L('analytics_btn_export'); ?>
+                <button onclick="exportRanking()" class="btn-icon p-4-12 fs-12" style="background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; white-space: nowrap; flex-shrink: 0;">
+                    <i class="fa-solid fa-file-excel mr-4"></i> <?php echo L('analytics_btn_export'); ?>
                 </button>
             </div>
-            <div style="max-height: 480px; overflow-y: auto;">
-                <table class="analitica-table mb-0" id="rankingTable">
-                    <thead style="position: sticky; top: 0; z-index: 10; background: var(--bg);">
+            <div style="max-height: 500px; overflow-y: auto;">
+                <table class="analitica-table" id="rankingTable">
+                    <thead style="position: sticky; top: 0; z-index: 5;">
                         <tr>
                             <th class="pl-20" style="width: 50px;"><?php echo L('analytics_th_pos'); ?></th>
                             <th><?php echo L('analytics_th_product'); ?></th>
@@ -277,315 +226,366 @@
                             <th class="text-right pr-20"><?php echo L('analytics_th_revenue'); ?></th>
                         </tr>
                     </thead>
-                    <tbody>
-                        <?php foreach ($avAnalitica['rankingProductos'] as $idx => $rp): ?>
-                            <tr class="<?php echo $rp['unidades'] == 0 ? 'opacity-50' : ''; ?>">
-                                <td class="pl-20 font-mono text-muted fs-12"><?php echo $idx + 1; ?></td>
-                                <td>
-                                    <div class="font-bold fs-13"><?php echo htmlspecialchars($rp['nombre_producto_limpio']); ?></div>
-                                    <div class="fs-11 text-muted"><?php echo htmlspecialchars($rp['codigo_producto']); ?></div>
-                                </td>
-                                <td class="text-right">
-                                    <span class="fs-10 px-6 py-2 br-4 font-bold tt-uppercase" style="background: #f1f5f9; color: #64748b;"><?php echo htmlspecialchars($rp['categoria'] ?: 'N/A'); ?></span>
-                                </td>
-                                <td class="text-right font-mono <?php echo $rp['unidades'] > 0 ? 'font-bold' : 'text-muted'; ?>"><?php echo $rp['unidades']; ?></td>
-                                <td class="text-right pr-20 font-mono <?php echo $rp['unidades'] > 0 ? 'text-accent font-bold' : 'text-muted'; ?> fs-13">
-                                    <?php echo number_format($rp['total_recaudado'], 2, ',', '.'); ?> €
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
+                    <tbody id="rankingTableBody">
+                        <tr><td colspan="5" class="p-40"><div class="skeleton-text skeleton-table-row"></div><div class="skeleton-text skeleton-table-row"></div></td></tr>
                     </tbody>
                 </table>
             </div>
+            <div class="p-16 border-top d-flex jc-center" id="loadMoreRankingContainer" style="display: none;">
+                <button type="button" id="btnLoadMoreRanking" onclick="loadMoreRanking()" class="btn-filter" style="background: #f8fafc; color: #64748b; border: 1px solid #e2e8f0; padding: 8px 24px;">
+                    <i class="fa-solid fa-plus-circle mr-8"></i> <?php echo L('analytics_ranking_load_more'); ?>
+                </button>
+            </div>
         </div>
+    </div>
+</div>
 
-    </div><!-- end container-wider -->
+<script>
+    const activeLocale = '<?php echo $_SESSION['lang'] ?? 'es'; ?>';
 
-    <script>
-        // Data extraction for JS charts
-        <?php
-        $catLabels = [];
-        $catData = [];
-        if(!empty($avAnalitica['porCategoria'])) {
-            foreach($avAnalitica['porCategoria'] as $c) {
-                $catLabels[] = $c['categoria'] ?: L('tpv_no_category', true);
-                $catData[] = (float)$c['total'];
-            }
-        }
-
-        $diaLabels = [];
-        $diaIngresos = [];
-        $diaCostes = [];
-        $diaBeneficios = [];
-        if(!empty($avAnalitica['margenes'])) {
-            // Sort margins by date ASC (oldest to newest) to display correctly left-to-right
-            $margenes = $avAnalitica['margenes'];
-            usort($margenes, function($a, $b) {
-                return strtotime($a['fecha']) - strtotime($b['fecha']);
+    async function checkDatabaseHealth() {
+        try {
+            const response = await fetch(`index.php?menu=Analitica&ajax=checkHealth`, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
             });
-
-            foreach($margenes as $m) {
-                $diaLabels[] = date('d/m/Y', strtotime($m['fecha']));
-                $diaIngresos[] = (float)$m['ingresos'];
-                $diaCostes[] = (float)$m['costes'];
-                $diaBeneficios[] = (float)$m['beneficio'];
+            const data = await response.json();
+            if (data.optimized === false) {
+                document.getElementById('optimizerBanner').style.display = 'block';
             }
+        } catch (e) { console.error("Error checking health", e); }
+    }
+
+    async function ejecutarOptimizacion() {
+        const btn = document.getElementById('btnOptimize');
+        if (!btn) return;
+        const oldHtml = btn.innerHTML;
+        btn.disabled = true;
+        
+        try {
+            const commonHeaders = { 'X-Requested-With': 'XMLHttpRequest' };
+            // Paso 1
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Optimizando Fechas (1/3)...';
+            await fetch(`index.php?menu=Analitica&ajax=runOptimization&step=step1`, { headers: commonHeaders }).then(r => r.json());
+            
+            // Paso 2
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Optimizando Rendimiento (2/3)...';
+            await fetch(`index.php?menu=Analitica&ajax=runOptimization&step=step2`, { headers: commonHeaders }).then(r => r.json());
+            
+            // Paso 3
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Optimizando Catálogo (3/3)...';
+            await fetch(`index.php?menu=Analitica&ajax=runOptimization&step=step3`, { headers: commonHeaders }).then(r => r.json());
+
+            document.getElementById('optimizerBanner').innerHTML = `
+                <div class="card-section p-20 d-flex ai-center gap-16" style="background: #f0fdf4; border-color: #22c55e !important;">
+                    <i class="fa-solid fa-circle-check text-green fs-24"></i>
+                    <div>
+                        <h3 class="m-0 fs-16 text-green">¡Optimización completada!</h3>
+                        <p class="m-0 fs-13 text-muted">La base de datos ya está lista. El historial completo cargará mucho más rápido.</p>
+                    </div>
+                </div>
+            `;
+            setTimeout(() => {
+                document.getElementById('optimizerBanner').style.display = 'none';
+                window.location.reload(); 
+            }, 3000);
+        } catch (e) {
+            btn.disabled = false;
+            btn.innerHTML = oldHtml;
+            alert("Error al optimizar. Es posible que el servidor haya cortado la conexión por el tamaño de la tabla. Por favor, vuelve a intentarlo; el proceso continuará donde se quedó.");
         }
-        ?>
+    }
 
-        document.addEventListener('DOMContentLoaded', () => {
-            // Initialize Doughnut Category Chart
-            const ctxCat = document.getElementById('catChart');
-            if (ctxCat) {
-                new Chart(ctxCat, {
-                    type: 'doughnut',
-                    data: {
-                        labels: <?php echo json_encode($catLabels); ?>,
-                        datasets: [{
-                            data: <?php echo json_encode($catData); ?>,
-                            backgroundColor: [
-                                '#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#64748b', '#06b6d4'
-                            ],
-                            borderWidth: 2,
-                            borderColor: '#ffffff',
-                            hoverOffset: 6
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        cutout: '65%',
-                        plugins: {
-                            legend: {
-                                position: 'bottom',
-                                labels: {
-                                    font: { family: "'Inter', sans-serif" },
-                                    boxWidth: 12,
-                                    padding: 15
-                                }
-                            },
-                            tooltip: {
-                                callbacks: {
-                                    label: function(context) {
-                                        let val = context.raw || 0;
-                                        return ' ' + val.toLocaleString('<?php echo $_SESSION['lang'] === 'en' ? 'en-GB' : 'es-ES'; ?>', {minimumFractionDigits: 2}) + ' €';
-                                    }
-                                }
-                            }
-                        }
-                    }
-                });
-            }
+    document.addEventListener('DOMContentLoaded', () => {
+        const activeLocale = '<?php echo $_SESSION['lang'] ?? 'es'; ?>';
+        const searchParams = {
+            fechaDesde: '<?php echo $avAnalitica['filtros']['desde']; ?>',
+            fechaHasta: '<?php echo $avAnalitica['filtros']['hasta']; ?>',
+            idCajero: '',
+            tipoDocumento: 'todos'
+        };
 
-            // Initialize Line Evolution Chart
-            const ctxEvo = document.getElementById('rentabilidadChart');
-            if (ctxEvo) {
-                new Chart(ctxEvo, {
-                    type: 'line',
-                    data: {
-                        labels: <?php echo json_encode($diaLabels); ?>,
-                        datasets: [
-                            {
-                                label: '<?php echo L('analytics_chart_income'); ?>',
-                                data: <?php echo json_encode($diaIngresos); ?>,
-                                borderColor: '#3b82f6',
-                                backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                                borderWidth: 3,
-                                tension: 0.4,
-                                fill: true,
-                                pointRadius: 4,
-                                pointBackgroundColor: '#ffffff'
-                            },
-                            {
-                                label: '<?php echo L('analytics_chart_cost'); ?>',
-                                data: <?php echo json_encode($diaCostes); ?>,
-                                borderColor: '#64748b',
-                                borderWidth: 2,
-                                borderDash: [5, 5],
-                                tension: 0.4,
-                                fill: false,
-                                pointRadius: 2
-                            },
-                            {
-                                label: '<?php echo L('analytics_chart_profit'); ?>',
-                                data: <?php echo json_encode($diaBeneficios); ?>,
-                                borderColor: '#10b981',
-                                borderWidth: 2,
-                                tension: 0.4,
-                                fill: false,
-                                pointRadius: 3
-                            }
-                        ]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        interaction: {
-                            mode: 'index',
-                            intersect: false,
-                        },
-                        plugins: {
-                            legend: {
-                                position: 'top',
-                                labels: { font: { family: "'Inter', sans-serif" } }
-                            },
-                            tooltip: {
-                                callbacks: {
-                                    label: function(context) {
-                                        let val = context.raw || 0;
-                                        return context.dataset.label + ': ' + val.toLocaleString('<?php echo $_SESSION['lang'] === 'en' ? 'en-GB' : 'es-ES'; ?>', {minimumFractionDigits: 2}) + ' €';
-                                    }
-                                }
-                            }
-                        },
-                        scales: {
-                            y: {
-                                beginAtZero: true,
-                                grid: { borderDash: [4, 4], color: '#e2e8f0' },
-                                ticks: {
-                                    callback: function(val) { return val + ' €'; }
-                                }
-                            },
-                            x: {
-                                grid: { display: false }
-                            }
-                        }
-                    }
+        // Router Auxiliar
+        function fetchAnalytics(action, callback) {
+            const params = new URLSearchParams({ menu: 'Analitica', ajax: action, ...searchParams });
+            fetch('index.php?' + params.toString(), {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
+                .then(r => {
+                    if (!r.ok) return r.json().then(err => Promise.reject(err.message || 'Error ' + r.status));
+                    return r.json();
+                })
+                .then(callback)
+                .catch(err => {
+                    console.error(`Error loading ${action}:`, err);
+                    showErrorInContainer(action, err);
                 });
-            }
+        }
+
+        function fetchRanking(offset, callback, errorCallback) {
+            const params = new URLSearchParams({ menu: 'Analitica', ajax: 'loadRanking', limit: 50, offset: offset, ...searchParams });
+            fetch('index.php?' + params.toString(), {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
+                .then(r => r.ok ? r.json() : Promise.reject('Error ' + r.status))
+                .then(callback)
+                .catch(err => {
+                    console.error('Error loading ranking:', err);
+                    if (errorCallback) errorCallback(err);
+                });
+        }
+
+        // --- Cargas Paralelas ---
+        
+        // Ejecutar al inicio
+    checkDatabaseHealth();
+
+    // 2. KPIs e IVA
+        fetchAnalytics('loadKPIs', (data) => {
+            updateKPI('kpiSales', data.total_ventas, '€');
+            updateKPI('kpiProfit', data.beneficio_estimado, '€', true);
+            updateKPI('kpiOps', data.total_operaciones, '');
+            updateKPI('kpiAverage', data.ticket_medio, '€');
         });
 
-        function exportRankingToExcel() {
-            const table = document.getElementById("rankingTable");
-            let csv = [];
-            const rows = table.querySelectorAll("tr");
-            for (let i = 0; i < rows.length; i++) {
-                const row = [],
-                    cols = rows[i].querySelectorAll("td, th");
-                for (let j = 0; j < cols.length; j++) {
-                    let text = cols[j].innerText.replace(/(\r\n|\n|\r)/gm, " ").replace(/,/g, ".");
-                    row.push('"' + text.trim() + '"');
-                }
-                csv.push(row.join(","));
+        // 2. Charts (Top y Categorias)
+        fetchAnalytics('loadCharts', (data) => {
+            renderTopProductsTable(data.topProductos);
+            renderCategoryChart(data.categorias);
+            renderEvolutionChart(data.evolucion, data.agrupacion);
+        });
+
+        // 3. IVA
+        fetchAnalytics('loadIVA', data => {
+            renderIVATable(data);
+            // 4. Ranking (Diferido para dar prioridad a los KPIs y Gráficos)
+            setTimeout(loadRankingInitial, 500);
+        });
+
+        // Helpers
+        function updateKPI(id, val, suffix, colorize = false) {
+            const valEl = document.getElementById('val_' + id);
+            const subEl = document.getElementById('sub_' + id);
+            if (!valEl) return;
+            
+            let num = parseFloat(val);
+            if (isNaN(num)) num = 0;
+
+            const formatted = num.toLocaleString(activeLocale, { minimumFractionDigits: 2 });
+            valEl.innerHTML = `<span class="fade-in">${formatted}${suffix ? ' ' + suffix : ''}</span>`;
+            if (colorize) valEl.style.color = num >= 0 ? '#16a34a' : '#dc2626';
+            if (subEl) subEl.innerHTML = `<span class="fade-in"><?php echo L('analytics_kpis_on_sales'); ?></span>`;
+        }
+
+        function renderTopProductsTable(data) {
+            const container = document.getElementById('topProductsTableContainer');
+            if (!data || data.length === 0) {
+                container.innerHTML = `<div class="p-40 text-center text-muted italic"><?php echo L('analytics_no_data'); ?></div>`;
+                return;
             }
-            const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + csv.join("\n");
-            const encodedUri = encodeURI(csvContent);
-            const link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
-            link.setAttribute("download", "<?php echo L('analytics_filename_export'); ?>");
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        }
-    </script>
-
-    <style>
-        .card-section {
-            border-radius: 20px;
-            overflow: hidden;
-            border: 1px solid #e2e8f0 !important;
-            box-shadow: 0px 4px 16px rgba(0, 0, 0, 0.06) !important;
+            let html = `<table class="analitica-table"><thead><tr><th>#</th><th><?php echo L('analytics_th_product'); ?></th><th class="text-right"><?php echo L('analytics_th_units'); ?></th><th class="text-right"><?php echo L('analytics_th_revenue'); ?></th></tr></thead><tbody>`;
+            data.forEach((p, i) => {
+                html += `<tr class="fade-in"><td>${i+1}</td><td><div class="font-bold">${escapeHTML(p.nombre_producto_limpio)}</div><div class="fs-11 text-muted">${p.codigo_producto}</div></td><td class="text-right">${p.unidades}</td><td class="text-right text-accent font-bold">${parseFloat(p.total_recaudado).toLocaleString(activeLocale, {minimumFractionDigits:2})}€</td></tr>`;
+            });
+            container.innerHTML = html + `</tbody></table>`;
         }
 
-        /* ── Analytics Table Borders & Clarity ── */
-        .analitica-table {
-            width: 100%;
-            border-collapse: collapse;
-            border: 1px solid #e2e8f0;
+        function renderIVATable(data) {
+            const container = document.getElementById('ivaTableContainer');
+            if (!data || data.length === 0) {
+                container.innerHTML = `<div class="p-40 text-center text-muted italic"><?php echo L('analytics_no_data'); ?></div>`;
+                return;
+            }
+            let html = `<table class="analitica-table"><thead><tr><th><?php echo L('analytics_th_iva_type'); ?></th><th class="text-right"><?php echo L('analytics_th_base_amount'); ?></th><th class="text-right"><?php echo L('analytics_th_iva_quota'); ?></th></tr></thead><tbody>`;
+            data.forEach(iva => {
+                const base = parseFloat(iva.total) - parseFloat(iva.cuota);
+                html += `<tr class="fade-in"><td><span class="badge bg-green-light text-green">${iva.porcentaje}%</span></td><td class="text-right">${base.toLocaleString(activeLocale, {minimumFractionDigits:2})}€</td><td class="text-right font-bold text-purple">${parseFloat(iva.cuota).toLocaleString(activeLocale, {minimumFractionDigits:2})}€</td></tr>`;
+            });
+            container.innerHTML = html + `</tbody></table>`;
         }
 
-        .analitica-table thead tr {
-            background: #f1f5f9;
+        window.rankingOffset = 0;
+
+        function loadRankingInitial() {
+            loadMoreRanking(true);
         }
 
-        .analitica-table thead th {
-            padding: 12px 16px;
-            font-size: 11px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: #64748b;
-            border-bottom: 2px solid #cbd5e1;
-            border-right: 1px solid #cbd5e1;
+        window.loadMoreRanking = function(reset = false) {
+            const btn = document.getElementById('btnLoadMoreRanking');
+            const tbody = document.getElementById('rankingTableBody');
+            const container = document.getElementById('loadMoreRankingContainer');
+            
+            if (reset) {
+                window.rankingOffset = 0;
+                tbody.innerHTML = '';
+            }
+
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-8"></i> ' + (reset ? 'Cargando...' : 'Buscando más...');
+            }
+
+            fetchRanking(window.rankingOffset, data => {
+                // Función auxiliar para resetear el botón
+                const resetBtn = () => {
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="fa-solid fa-plus-circle mr-8"></i> <?php echo L('analytics_ranking_load_more'); ?>';
+                    }
+                };
+
+                if (!data || data.length === 0) {
+                    if (reset) tbody.innerHTML = '<tr><td colspan="5" class="text-center p-40 text-muted italic"><?php echo L('analytics_no_data'); ?></td></tr>';
+                    if (container) container.style.display = 'none';
+                    resetBtn();
+                    return;
+                }
+
+                appendRankingRows(data);
+                window.rankingOffset += data.length;
+
+                resetBtn();
+                
+                // Si devolvemos menos del límite, es que ya no hay más
+                if (data.length < 50) {
+                    if (container) container.style.display = 'none';
+                } else {
+                    if (container) container.style.display = 'flex';
+                }
+            }, (err) => {
+                // Manejo de error en la llamada
+                if (btn) {
+                    btn.disabled = false;
+                    btn.className = 'btn btn-outline border-red text-red';
+                    btn.innerHTML = '<i class="fa-solid fa-triangle-exclamation mr-8"></i> Error al cargar. Reintentar';
+                }
+            });
+        };
+
+        function appendRankingRows(data) {
+            const tbody = document.getElementById('rankingTableBody');
+            data.forEach((p, i) => {
+                const tr = document.createElement('tr');
+                tr.className = 'fade-in ' + (p.unidades == 0 ? 'opacity-50' : '');
+                tr.innerHTML = `
+                    <td class="pl-20 font-mono text-muted">${window.rankingOffset + i + 1}</td>
+                    <td><div class="font-bold">${escapeHTML(p.nombre_producto_limpio)}</div><div class="fs-11 text-muted">${p.codigo_producto}</div></td>
+                    <td class="text-right"><span class="fs-10 px-6 py-2 br-4 bg-surface2 text-muted">${escapeHTML(p.categoria || 'N/A')}</span></td>
+                    <td class="text-right font-bold">${p.unidades}</td>
+                    <td class="text-right pr-20 text-accent font-bold">${parseFloat(p.total_recaudado).toLocaleString(activeLocale, {minimumFractionDigits:2})}€</td>
+                `;
+                tbody.appendChild(tr);
+            });
         }
 
-        .analitica-table thead th:last-child {
-            border-right: none;
+        function renderCategoryChart(data) {
+            const canvas = document.createElement('canvas');
+            canvas.id = 'catChart';
+            const container = document.getElementById('catChartContainer');
+            container.innerHTML = '';
+            container.appendChild(canvas);
+            
+            new Chart(canvas, {
+                type: 'doughnut',
+                data: {
+                    labels: data.map(c => c.categoria || 'Sin categoría'),
+                    datasets: [{
+                        data: data.map(c => parseFloat(c.total)),
+                        backgroundColor: ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#64748b']
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, cutout: '70%', plugins: { legend: { position: 'bottom' } } }
+            });
         }
 
-        .analitica-table tbody tr {
-            border-bottom: 1px solid #e9ecef;
-            transition: background 0.15s;
+        function renderEvolutionChart(data, agrupacion = 'dia') {
+            const canvas = document.createElement('canvas');
+            const container = document.getElementById('evolutionChartContainer');
+            container.innerHTML = '';
+            container.appendChild(canvas);
+            
+            const labels = data.map(d => {
+                const date = new Date(d.fecha);
+                if (agrupacion === 'mes') {
+                    return date.toLocaleDateString(activeLocale, { month: 'short', year: 'numeric' });
+                } else if (agrupacion === 'año') {
+                    return date.getFullYear();
+                }
+                return date.toLocaleDateString(activeLocale, { day: '2-digit', month: '2-digit' });
+            });
+
+            new Chart(canvas, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { 
+                            label: '<?php echo L('analytics_chart_income'); ?>', 
+                            data: data.map(d => d.ingresos), 
+                            borderColor: '#3b82f6', 
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            fill: true,
+                            tension: 0.4 
+                        },
+                        { 
+                            label: '<?php echo L('analytics_chart_profit'); ?>', 
+                            data: data.map(d => d.beneficio), 
+                            borderColor: '#10b981', 
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            fill: true,
+                            tension: 0.4 
+                        }
+                    ]
+                },
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false, 
+                    interaction: { intersect: false, mode: 'index' },
+                    scales: { 
+                        y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } },
+                        x: { grid: { display: false } }
+                    },
+                    plugins: {
+                        legend: { position: 'top', align: 'end' }
+                    }
+                }
+            });
         }
 
-        .analitica-table tbody tr:last-child {
-            border-bottom: none;
+        window.exportRanking = function() {
+            const params = new URLSearchParams({ ...searchParams });
+            window.location.href = 'api/exportarAnalitica.php?' + params.toString();
+        };
+
+        function escapeHTML(str) {
+            if (!str) return '';
+            const p = document.createElement('p');
+            p.textContent = str;
+            return p.innerHTML;
         }
 
-        .analitica-table tbody tr:nth-child(even) {
-            background: #f8fafc;
+        function showErrorInContainer(action, errorMsg) {
+            const mappings = {
+                'loadKPIs': ['val_kpiSales', 'val_kpiProfit', 'val_kpiOps', 'val_kpiAverage'],
+                'loadCharts': ['topProductsTableContainer', 'catChartContainer', 'evolutionChartContainer'],
+                'loadIVA': ['ivaTableContainer']
+            };
+            
+            const targets = mappings[action] || [];
+            targets.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.innerHTML = `<div class="fs-12 text-red py-10" title="${escapeHTML(errorMsg)}"><i class="fa-solid fa-triangle-exclamation mr-4"></i> Error</div>`;
+            });
         }
 
-        .analitica-table tbody tr:hover {
-            background: #eff6ff !important;
-        }
-
-        .analitica-table tbody tr.opacity-50 {
-            opacity: 0.45;
-        }
-
-        .analitica-table td {
-            padding: 10px 16px;
-            border-right: 1px solid #e9ecef;
-            vertical-align: middle;
-        }
-
-        .analitica-table td:last-child {
-            border-right: none;
-        }
-
-        .rank-medal {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 8px;
-            font-weight: 800;
-        }
-
-        .text-orange {
-            color: #ea580c;
-        }
-
-        .text-blue {
-            color: #2563eb;
-        }
-
-        .text-green {
-            color: #16a34a;
-        }
-
-        .bg-orange-light {
-            background: #fff7ed;
-        }
-
-        .bg-blue-light {
-            background: #eff6ff;
-        }
-
-        .bg-green-light {
-            background: #f0fdf4;
-        }
-
-        .bg-accent {
-            background-color: var(--accent);
-        }
-
-        .opacity-50 {
-            opacity: 0.45;
-        }
-
-        .h-44 {
-            height: 44px;
-        }
-    </style>
-</div>
+        // Toggle fechas
+        document.getElementById('filterPeriodo').addEventListener('change', function() {
+            const custom = document.getElementById('customDates');
+            if (this.value === 'personalizado') {
+                custom.style.setProperty('display', 'flex', 'important');
+            } else {
+                custom.style.setProperty('display', 'none', 'important');
+                document.getElementById('formFiltros').submit();
+            }
+        });
+    });
+</script>

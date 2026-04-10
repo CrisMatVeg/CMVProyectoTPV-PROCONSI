@@ -82,7 +82,7 @@ if ($_SESSION['usuarioActualTPV']->getRol() === 'admin') {
     $avDashboard['kpis'] = VentaPDO::obtenerKPIs($desde, $hasta);
     $avDashboard['metodos'] = VentaPDO::obtenerVentasPorMetodo($desde, $hasta);
     $avDashboard['cajeros'] = VentaPDO::obtenerVentasPorCajero($desde, $hasta);
-    $avDashboard['productos_count'] = count(ProductoPDO::listarProductos(false));
+    $avDashboard['productos_count'] = ProductoPDO::contarProductos(true);
     $avDashboard['bajo_stock_count'] = ProductoPDO::contarBajoStock();
     $avDashboard['cajaAbierta'] = (bool)$turnoCaja;
 }

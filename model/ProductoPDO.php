@@ -52,11 +52,22 @@ class ProductoPDO
      * @param bool $soloActivos Si es true, solo devuelve productos con activo=1. Default true.
      * @return Producto[]
      */
-    public static function listarProductos(bool $soloActivos = true): array
+    public static function listarProductos(bool $soloActivos = true, int $limit = 50, int $offset = 0, string $term = ''): array
     {
         self::init();
         $hoy = date('Y-m-d');
-        $sql = "SELECT p.*, ti.codigo as codigo_iva_calculado, ti.porcentaje, pr.aplica_re
+        $where = $soloActivos ? " WHERE p.activo = 1 " : " WHERE 1=1 ";
+        $params = [];
+        
+        if ($term !== '') {
+            $where .= " AND (p.nombre LIKE :term OR p.referencia LIKE :term) ";
+            $params[':term'] = '%' . $term . '%';
+        }
+
+        $sql = "SELECT p.id, p.referencia, p.nombre, p.descripcion, p.precio_coste, p.precio_venta, 
+                       p.stock_actual, p.stock_minimo, p.meses_garantia, p.icono, p.categoria, 
+                       p.atributos, p.activo, p.codigo_iva, p.es_pack, p.id_proveedor, p.margen, p.precio_proveedor,
+                       ti.codigo as codigo_iva_calculado, ti.porcentaje, pr.aplica_re
                 FROM productos p
                 LEFT JOIN tipos_iva ti ON ti.id = (
                     SELECT id FROM tipos_iva t2
@@ -68,9 +79,13 @@ class ProductoPDO
                     LIMIT 1
                 )
                 LEFT JOIN proveedores pr ON p.id_proveedor = pr.id
-                " . ($soloActivos ? " WHERE p.activo = 1 " : "") . "
-                GROUP BY p.id";
-        $consulta = DBPDO::ejecutarConsulta($sql);
+                $where
+                GROUP BY p.id
+                ORDER BY p.id ASC
+                LIMIT :limit OFFSET :offset";
+        
+        $sql = str_replace([':limit', ':offset'], [(int)$limit, (int)$offset], $sql);
+        $consulta = DBPDO::ejecutarConsulta($sql, $params);
 
         $productos = [];
         while ($registro = $consulta->fetch(PDO::FETCH_ASSOC)) {
@@ -107,6 +122,21 @@ class ProductoPDO
         }
 
         return $productos;
+    }
+
+    public static function contarProductos(bool $soloActivos = true, string $term = ''): int
+    {
+        $where = $soloActivos ? " WHERE activo = 1" : " WHERE 1=1";
+        $params = [];
+        
+        if ($term !== '') {
+            $where .= " AND (nombre LIKE :term OR referencia LIKE :term)";
+            $params[':term'] = '%' . $term . '%';
+        }
+
+        $sql = "SELECT COUNT(*) FROM productos $where";
+        $q = DBPDO::ejecutarConsulta($sql, $params);
+        return (int)$q->fetchColumn();
     }
 
     /**
@@ -722,6 +752,78 @@ class ProductoPDO
         $omitidos = (int)$qOmit->fetchColumn();
 
         return ['actualizados' => $actualizados, 'omitidos' => $omitidos];
+    }
+
+    public static function ajustePrecioMasivo(float $valor, string $tipo, ?string $categoria = null, array $excepciones = []): array
+    {
+        self::init();
+        $where = "es_pack = 0 AND activo = 1";
+        $params = [];
+        
+        if ($categoria !== null && $categoria !== '') {
+            $where .= " AND categoria = ?";
+            $params[] = $categoria;
+        }
+
+        if (!empty($excepciones)) {
+            $ids = [];
+            $refs = [];
+            foreach ($excepciones as $ex) {
+                if (is_numeric($ex)) $ids[] = $ex;
+                $refs[] = $ex;
+            }
+            $conds = [];
+            if (!empty($ids)) {
+                $phs = implode(',', array_fill(0, count($ids), '?'));
+                $conds[] = "id IN ($phs)";
+            }
+            if (!empty($refs)) {
+                $phs = implode(',', array_fill(0, count($refs), '?'));
+                $conds[] = "referencia IN ($phs)";
+            }
+            if (!empty($conds)) {
+                $where .= " AND NOT (" . implode(" OR ", $conds) . ")";
+                if (!empty($ids)) foreach ($ids as $id) $params[] = $id;
+                if (!empty($refs)) foreach ($refs as $ref) $params[] = $ref;
+            }
+        }
+
+        $q = DBPDO::ejecutarConsulta("SELECT id, precio_venta FROM productos WHERE {$where}", $params);
+        $productos = $q->fetchAll(PDO::FETCH_ASSOC);
+
+        $actualizados = 0;
+        $idUsuario = isset($_SESSION['usuarioActualTPV']) ? $_SESSION['usuarioActualTPV']->getId() : null;
+
+        foreach ($productos as $p) {
+            $pvpActual = (float)$p['precio_venta'];
+            if ($tipo === 'percent') {
+                $pvpNuevo = round($pvpActual * (1 + ($valor / 100.0)), 2);
+            } else {
+                $pvpNuevo = round($pvpActual + $valor, 2);
+            }
+
+            if ($pvpNuevo === $pvpActual) continue;
+
+            DBPDO::ejecutarConsulta(
+                "UPDATE productos SET precio_venta = :pvp WHERE id = :id",
+                [':pvp' => $pvpNuevo, ':id' => $p['id']]
+            );
+
+            // Auditoría
+            DBPDO::ejecutarConsulta(
+                "INSERT INTO historicos_precios (id_producto, id_usuario, precio_anterior, precio_nuevo, origen, fecha) 
+                 VALUES (:id, :user, :ant, :new, 'ajuste_masivo', :fecha)",
+                [
+                    ':id'    => $p['id'],
+                    ':user'  => $idUsuario,
+                    ':ant'   => $pvpActual,
+                    ':new'   => $pvpNuevo,
+                    ':fecha' => date('Y-m-d H:i:s')
+                ]
+            );
+            $actualizados++;
+        }
+        return ['actualizados' => $actualizados];
     }
 
     public static function contarBajoStock()

@@ -38,6 +38,11 @@ try {
                 echo json_encode(['ok' => false, 'aErrores' => $err]);
                 break;
             }
+            // Validar que sea condicional
+            if (!esTarifaCondicional($input)) {
+                echo json_encode(['ok' => false, 'error' => 'Las tarifas deben ser condicionales (filtros de cliente, fechas o días). Para cambios generales permanentes usa el Ajuste Masivo de Precios.']);
+                break;
+            }
             TarifaPrecioPDO::añadir($input, $_SESSION['usuarioActualTPV']->getId());
             echo json_encode(['ok' => true]);
             break;
@@ -50,6 +55,10 @@ try {
                 echo json_encode(['ok' => false, 'aErrores' => $err]);
                 break;
             }
+            if (!esTarifaCondicional($input)) {
+                echo json_encode(['ok' => false, 'error' => 'La tarifa debe tener al menos un filtro condicional.']);
+                break;
+            }
             TarifaPrecioPDO::editar($id, $input);
             echo json_encode(['ok' => true]);
             break;
@@ -57,6 +66,8 @@ try {
         case 'eliminar':
             $id = (int)($input['id'] ?? 0);
             if ($id <= 0) throw new Exception('ID de tarifa inválido');
+            $tarifa = TarifaPrecioPDO::obtenerPorId($id);
+            if ($tarifa && $tarifa['aplicada']) throw new Exception('No se puede eliminar una tarifa que ya ha sido aplicada permanentemente');
             TarifaPrecioPDO::eliminar($id);
             echo json_encode(['ok' => true]);
             break;
@@ -68,14 +79,6 @@ try {
             echo json_encode(['ok' => true, 'activo' => $activo]);
             break;
 
-        case 'aplicar':
-            $id = (int)($input['id'] ?? 0);
-            if ($id <= 0) {
-                throw new Exception('ID de tarifa inválido');
-            }
-            TarifaPrecioPDO::aplicar($id);
-            echo json_encode(['ok' => true]);
-            break;
 
         case 'reordenar':
             $ids = $input['ids'] ?? [];
@@ -128,4 +131,15 @@ function validarTarifa(array $d): array
     }
 
     return array_filter($err, fn($v) => $v !== '');
+}
+
+function esTarifaCondicional(array $d): bool
+{
+    return (!empty($d['tipo_cliente']) || 
+            !empty($d['roles_segmento']) || 
+            !empty($d['dias_semana']) || 
+            !empty($d['hora_inicio']) || 
+            !empty($d['hora_fin']) || 
+            !empty($d['fecha_aplicacion']) || 
+            !empty($d['fecha_fin']));
 }

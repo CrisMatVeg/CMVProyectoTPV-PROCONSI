@@ -16,6 +16,13 @@ class TarifaPrecioPDO
         return $q->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    public static function obtenerPorId(int $id): ?array
+    {
+        $sql = "SELECT * FROM tarifas_precios WHERE id = :id";
+        $q = DBPDO::ejecutarConsulta($sql, [':id' => $id]);
+        return $q->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+
     public static function añadir(array $d, int $idUsuario): void
     {
         $sql = "INSERT INTO tarifas_precios

@@ -25,54 +25,24 @@ try {
     $action = $_POST['action'] ?? $_GET['action'] ?? 'csv';
     $fechaDesde = $_POST['fechaDesde'] ?? $_GET['fechaDesde'] ?? date('Y-m-d', strtotime('-30 days'));
     $fechaHasta = $_POST['fechaHasta'] ?? $_GET['fechaHasta'] ?? date('Y-m-d');
+    $idCajero = isset($_REQUEST['idCajero']) && $_REQUEST['idCajero'] !== '' ? (int)$_REQUEST['idCajero'] : null;
+    $tipoDocumento = $_REQUEST['tipoDocumento'] ?? 'todos';
 
     if (!strtotime($fechaDesde) || !strtotime($fechaHasta)) {
         echo json_encode(['ok' => false, 'error' => 'Fechas inválidas']);
         exit;
     }
 
-    // KPIs
-    $sql = "SELECT 
-                COUNT(DISTINCT numero_ticket) as total_tickets,
-                SUM(total) as total_ventas,
-                SUM(total - base_imponible) as iva_recaudado,
-                SUM(base_imponible) as base_total
-            FROM ventas 
-            WHERE DATE(fecha) BETWEEN :desde AND :hasta";
-    
     $q = DBPDO::ejecutarConsulta($sql, [':desde' => $fechaDesde, ':hasta' => $fechaHasta]);
-    $kpis = $q->fetch(PDO::FETCH_ASSOC);
+    $kpis = VentaPDO::obtenerKPIs($fechaDesde, $fechaHasta, $idCajero, $tipoDocumento);
 
     // Top Products
-    $sqlTop = "SELECT 
-                lv.nombre_producto,
-                lv.codigo_producto,
-                SUM(lv.cantidad) as unidades,
-                SUM(lv.total_linea) as total_recaudado
-            FROM lineas_venta lv
-            JOIN ventas v ON lv.id_venta = v.id
-            WHERE DATE(v.fecha) BETWEEN :desde AND :hasta
-            GROUP BY lv.nombre_producto, lv.codigo_producto
-            ORDER BY unidades DESC
-            LIMIT 10";
-    
-    $qTop = DBPDO::ejecutarConsulta($sqlTop, [':desde' => $fechaDesde, ':hasta' => $fechaHasta]);
-    $topProductos = $qTop->fetchAll(PDO::FETCH_ASSOC);
+    $topProductos = VentaPDO::obtenerTopProductos($fechaDesde, $fechaHasta, 10, $idCajero, $tipoDocumento);
 
-    // IVA Breakdown
-    $sqlIva = "SELECT 
-                ROUND(lv.iva_aplicado) as pct,
-                SUM(lv.total_linea / (1 + lv.iva_aplicado/100)) as base,
-                SUM(lv.total_linea - (lv.total_linea / (1 + lv.iva_aplicado/100))) as cuota,
-                SUM(lv.total_linea) as total
-            FROM lineas_venta lv
-            JOIN ventas v ON lv.id_venta = v.id
-            WHERE DATE(v.fecha) BETWEEN :desde AND :hasta
-            GROUP BY ROUND(lv.iva_aplicado)
-            ORDER BY pct DESC";
-    
-    $qIva = DBPDO::ejecutarConsulta($sqlIva, [':desde' => $fechaDesde, ':hasta' => $fechaHasta]);
-    $desgloseIva = $qIva->fetchAll(PDO::FETCH_ASSOC);
+    $desgloseIva = VentaPDO::obtenerDesgloseIVA($fechaDesde, $fechaHasta, $idCajero, $tipoDocumento);
+
+    // Full Ranking (Only for export)
+    $ranking = VentaPDO::obtenerRankingCompletoProductos($fechaDesde, $fechaHasta, 10000, 0, $idCajero, $tipoDocumento);
 
     if ($action === 'json') {
         header('Content-Type: application/json; charset=utf-8');
@@ -82,6 +52,7 @@ try {
             'kpis' => $kpis,
             'topProductos' => $topProductos,
             'desgloseIva' => $desgloseIva,
+            'ranking' => $ranking,
             'generado' => date('Y-m-d H:i:s')
         ]);
     } else {
@@ -114,7 +85,13 @@ try {
             $totalCuota += $iva['cuota'];
             $totalFinal += $iva['total'];
         }
-        $csv .= "TOTAL,". number_format($totalBase, 2, '.', '') . "," . number_format($totalCuota, 2, '.', '') . "," . number_format($totalFinal, 2, '.', '') . "\n";
+        $csv .= "TOTAL,". number_format($totalBase, 2, '.', '') . "," . number_format($totalCuota, 2, '.', '') . "," . number_format($totalFinal, 2, '.', '') . "\n\n";
+
+        $csv .= "RANKING COMPLETO DE PRODUCTOS\n";
+        $csv .= "Posición,Producto,Código,Categoría,Unidades,Ingresos\n";
+        foreach ($ranking as $idx => $rp) {
+            $csv .= ($idx + 1) . ",\"" . addslashes($rp['nombre_producto_limpio']) . "\",\"" . $rp['codigo_producto'] . "\",\"" . addslashes($rp['categoria']) . "\"," . $rp['unidades'] . "," . number_format($rp['total_recaudado'], 2, '.', '') . "\n";
+        }
 
         header('Content-Type: text/csv; charset=utf-8');
         header('Content-Disposition: attachment; filename="analitica_' . date('Y-m-d') . '.csv"');

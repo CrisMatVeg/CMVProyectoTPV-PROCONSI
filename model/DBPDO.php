@@ -55,8 +55,10 @@ class DBPDO
             $consulta->execute($parametros);
             return $consulta;
         } catch (PDOException $e) {
-            // Si es una petición API o AJAX, relanzamos la excepción para que el controlador la maneje (p.ej. devolver JSON)
-            if (strpos($_SERVER['SCRIPT_NAME'], '/api/') !== false || (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && $_SERVER['HTTP_X_REQUESTED_WITH'] === 'XMLHttpRequest')) {
+            // Si es una petición API, AJAX o un script de mantenimiento (scratch), relanzamos la excepción
+            if (strpos($_SERVER['SCRIPT_NAME'], '/api/') !== false || 
+                strpos($_SERVER['SCRIPT_NAME'], '/scratch/') !== false || 
+                (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && $_SERVER['HTTP_X_REQUESTED_WITH'] === 'XMLHttpRequest')) {
                 throw $e;
             }
 

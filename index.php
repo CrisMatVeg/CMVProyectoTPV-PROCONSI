@@ -9,7 +9,7 @@ require_once("./core/Language.php");
 session_start();
 
 // Determinar idioma (Prioridad: URL > Session > Usuario Logueado > Default 'es')
-if (isset($_GET['lang']) && in_array($_GET['lang'], ['es', 'en', 'fr'])) {
+if (isset($_GET['lang']) && in_array($_GET['lang'], ['es', 'en', 'fr', 'it', 'de'])) {
     $_SESSION['lang'] = $_GET['lang'];
     if (isset($_SESSION['usuarioActualTPV'])) {
         require_once("./model/UsuarioPDO.php");
@@ -118,6 +118,14 @@ if (isset($_SESSION['usuarioActualTPV'])) {
     if (isset($_REQUEST['irUsuarios']) && $_SESSION['usuarioActualTPV']->getRol() === 'admin') {
         if ($_SESSION['paginaEnCurso'] !== 'Usuarios') {
             $_SESSION['paginaEnCurso'] = 'Usuarios';
+            header('Location: index.php');
+            exit;
+        }
+    }
+
+    if (isset($_REQUEST['irAnalitica']) && $_SESSION['usuarioActualTPV']->getRol() === 'admin') {
+        if ($_SESSION['paginaEnCurso'] !== 'Analitica') {
+            $_SESSION['paginaEnCurso'] = 'Analitica';
             header('Location: index.php');
             exit;
         }

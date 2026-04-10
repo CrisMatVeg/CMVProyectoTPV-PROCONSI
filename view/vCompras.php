@@ -222,7 +222,7 @@
             <button class="btn-close-modal" onclick="cerrarModalNuevoAlbaran()">&times;</button>
         </div>
 
-        <div class="p-24 overflow-y-auto" style="max-height: 80vh;">
+        <div class="p-24 overflow-y-auto" style="max-height: calc(100vh - 220px);">
             <!-- Cabecera del albarán -->
             <div class="d-grid grid-3 gap-16 mb-20 p-16 bg-surface2 br-12 border-2">
                 <div class="form-group mb-0">
@@ -496,6 +496,10 @@
 
     // --- LÓGICA ALBARANES ---
     function abrirModalNuevoAlbaran() {
+        // Limpiar banner de pedidos automáticos si existe
+        const oldBanner = document.getElementById('autoPedidoBanner');
+        if (oldBanner) oldBanner.remove();
+
         albLineas = [];
         albAplicaRE = false;
         document.getElementById('albProveedor').value = '';
@@ -906,13 +910,21 @@
             bannerMsg += <?php echo json_encode(L('purchase_auto_banner_multi')); ?>.replace('{count}', data.length);
         }
 
+        // Limpiar banner previo si sigue ahí
+        const oldBanner = document.getElementById('autoPedidoBanner');
+        if (oldBanner) oldBanner.remove();
+
         // Insertar banner al inicio del modal
         const bannerEl = document.createElement('div');
+        bannerEl.id = 'autoPedidoBanner';
         bannerEl.style.cssText = 'background:#fef9c3;border:1px solid #f59e0b;color:#92400e;padding:12px 16px;font-size:13px;margin-bottom:16px;border-radius:8px;';
         bannerEl.innerHTML = bannerMsg;
         const lineasContainer = document.getElementById('albLineas');
-        if (lineasContainer && lineasContainer.parentNode) {
-            lineasContainer.parentNode.insertBefore(bannerEl, lineasContainer);
+        if (lineasContainer) {
+            const tableContainer = lineasContainer.closest('.table-container');
+            if (tableContainer && tableContainer.parentNode) {
+                tableContainer.parentNode.insertBefore(bannerEl, tableContainer);
+            }
         }
 
         // Manejo secuencial: Si hay más proveedores, actualizar sessionStorage para el siguiente

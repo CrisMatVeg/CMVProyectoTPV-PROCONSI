@@ -126,21 +126,32 @@ class PriceEngine
         // Obtenemos todas las activas hoy basándose solo en el estado 'activo' y fechas globales
         // Si ignoramos filtros de contexto, al menos deben seguir siendo vigentes por fecha
         $sql = "SELECT t.* FROM tarifas_precios t 
-                WHERE t.activo = 1 
-                AND t.aplicada = 0
-                AND t.fecha_aplicacion <= :hoy 
-                AND (t.fecha_fin IS NULL OR t.fecha_fin >= :hoy)";
+                WHERE t.activo = 1";
+        
+        if (!$ignoreContextFilters) {
+            $sql .= " AND t.aplicada = 0";
+        }
+        
+        $params = [];
+        if (!$ignoreContextFilters) {
+            $sql .= " AND t.fecha_aplicacion <= :hoy 
+                      AND (t.fecha_fin IS NULL OR t.fecha_fin >= :hoy)";
+            $params[':hoy'] = $ahora;
+        }
 
-        $q = DBPDO::ejecutarConsulta($sql, [':hoy' => $ahora]);
+        $q = DBPDO::ejecutarConsulta($sql, $params);
         $todas = $q->fetchAll(PDO::FETCH_ASSOC);
 
         $aplicables = [];
         foreach ($todas as $t) {
             $aplica = false;
             
+            // Defensive: ensure product exists
+            if (!$pro) return [];
+
             // 0. Verificar exclusión explícita
             $excluidos = json_decode($t['excluidos'] ?? '[]', true) ?: [];
-            if (in_array($idProducto, $excluidos)) {
+            if (in_array((int)$idProducto, array_map('intval', $excluidos))) {
                 continue;
             }
 
@@ -151,8 +162,8 @@ class PriceEngine
                 $aplica = true;
             } elseif ($t['scope'] === 'productos') {
                 $check = DBPDO::ejecutarConsulta("SELECT 1 FROM tarifa_productos WHERE id_tarifa = :t AND id_producto = :p", [
-                    ':t' => $t['id'],
-                    ':p' => $idProducto
+                    ':t' => (int)$t['id'],
+                    ':p' => (int)$idProducto
                 ])->fetch();
                 if ($check) $aplica = true;
             }
@@ -176,7 +187,7 @@ class PriceEngine
 
     private static function obtenerPromocionesAplicables(int $idProducto, ?int $idCliente, int $cantidad, bool $ignoreContextFilters = false): array
     {
-        $todas = PromocionPDO::listarActivas();
+        $todas = $ignoreContextFilters ? PromocionPDO::listarTodasActivas() : PromocionPDO::listarActivas();
         $pro = ProductoPDO::obtenerProductoPorId($idProducto);
         $cat = $pro['categoria'] ?? '';
 
@@ -194,11 +205,11 @@ class PriceEngine
             $aplica = false;
             if (!$p['id_producto'] && !$p['producto_ids'] && !$p['categoria_code']) {
                 $aplica = true; // General
-            } elseif ($p['id_producto'] == $idProducto) {
+            } elseif ((int)$p['id_producto'] === (int)$idProducto) {
                 $aplica = true;
             } elseif ($p['producto_ids']) {
                 $ids = json_decode($p['producto_ids'], true) ?: [];
-                if (in_array((int)$idProducto, $ids)) $aplica = true;
+                if (in_array((int)$idProducto, array_map('intval', $ids))) $aplica = true;
             } elseif ($p['categoria_code'] == $cat) {
                 $aplica = true;
             }
@@ -323,6 +334,10 @@ class PriceEngine
         // Reutilizamos la lógica de obtención pero devolviendo objetos descriptivos
         // Para el panel de administración (gestión de exclusiones), ignoramos filtros de contexto
         // para que se vean todas las reglas que *podrían* aplicar al producto.
+        $debug_totals = [
+            'tarifas_activas_global' => (int)DBPDO::ejecutarConsulta("SELECT COUNT(*) FROM tarifas_precios WHERE activo = 1")->fetchColumn(),
+            'promos_activas_global' => (int)DBPDO::ejecutarConsulta("SELECT COUNT(*) FROM promociones WHERE activo = 1")->fetchColumn()
+        ];
         $tarifas = self::obtenerTarifasAplicables($idProducto, null, true);
         $promos  = self::obtenerPromocionesAplicables($idProducto, null, 1, true);
 
@@ -334,7 +349,14 @@ class PriceEngine
                 'tipo_regla' => 'tarifa',
                 'tipo'       => $t['tipo'],
                 'valor'      => (float)$t['valor'],
-                'prioridad'  => (int)$t['prioridad']
+                'prioridad'  => (int)$t['prioridad'],
+                'aplicada'   => (int)($t['aplicada'] ?? 0),
+                'is_permanent' => ((int)($t['aplicada'] ?? 0) === 1 && 
+                                   empty($t['tipo_cliente']) && 
+                                   empty($t['roles_segmento']) && 
+                                   empty($t['dias_semana']) && 
+                                   empty($t['hora_inicio']) && 
+                                   empty($t['hora_fin']))
             ];
         }
         foreach ($promos as $p) {
@@ -344,13 +366,15 @@ class PriceEngine
                 'tipo_regla' => 'promocion',
                 'tipo'       => $p['tipo'],
                 'valor'      => (float)$p['valor'],
-                'prioridad'  => (int)$p['prioridad']
+                'prioridad'  => (int)$p['prioridad'],
+                'aplicada'   => 0,
+                'is_permanent' => false // Promociones are dynamic
             ];
         }
 
-        // Ordenar por prioridad DESC
-        usort($res, fn($a, $b) => $b['prioridad'] <=> $a['prioridad']);
-        
-        return $res;
+        return [
+            'reglas' => $res,
+            'debug_stats' => $debug_totals
+        ];
     }
 }

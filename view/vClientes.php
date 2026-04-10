@@ -78,15 +78,20 @@
             <i class="fa-solid fa-rotate-left"></i> 
             <span><?php echo L('prod_filter_btn_clear'); ?></span>
         </button>
+    </div>
 
-        <span class="fs-12 text-muted fw-600" id="contadorClientes"></span>
+    <div class="d-flex ai-center jc-between mb-24 container-wider pl-40">
+        <button onclick="document.getElementById('formNuevoCliente').style.display='flex'" class="btn-save h-44 px-20 shadow-sm" style="border-radius: 12px; font-weight: 600;">
+            <i class="fa-solid fa-plus mr-8"></i> <?php echo L('client_btn_new'); ?>
+        </button>
     </div>
 
     <div class="table-container container-wider br-20">
-        <table class="data-table" id="tablaClientes">
+        <table class="data-table exclude-pagination" id="tablaClientes">
             <thead>
                 <tr>
-                    <th class="pl-20"><?php echo L('prod_th_name'); ?></th>
+                    <th class="w-60 pl-20"><?php echo L('prod_th_id'); ?></th>
+                    <th><?php echo L('prod_th_name'); ?></th>
                     <th><?php echo L('client_label_type'); ?></th>
                     <th><?php echo L('client_th_nif'); ?></th>
                     <th><?php echo L('user_th_email'); ?></th>
@@ -96,7 +101,7 @@
                     <th class="text-center pr-20"><?php echo L('prod_th_actions'); ?></th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="tbodyClientes">
                 <?php foreach ($avClientes['lista'] as $c): ?>
                     <tr data-id="<?php echo $c['id']; ?>"
                         data-nombre="<?php echo htmlspecialchars(strtolower(trim($c['nombre'] . ' ' . ($c['apellidos'] ?? '')))); ?>"
@@ -104,7 +109,8 @@
                         data-email="<?php echo htmlspecialchars(strtolower($c['email'] ?? '')); ?>"
                         data-tipo="<?php echo htmlspecialchars(strtolower($c['tipo'] ?? '')); ?>"
                         data-rol="<?php echo htmlspecialchars(strtolower($c['rol'] ?? '')); ?>">
-                        <td class="pl-20">
+                        <td class="font-mono text-muted pl-20"><?php echo $c['id']; ?></td>
+                        <td class="">
                             <?php echo htmlspecialchars(trim($c['nombre'] . ' ' . ($c['apellidos'] ?? ''))); ?>
                         </td>
                         <td>
@@ -132,7 +138,10 @@
                             </div>
                         </td>
                         <td class="text-center font-mono fs-12">
-                            <?php echo date('d/m/Y', strtotime($c['fecha_alta'])); ?>
+                            <?php 
+                            $fechaAlta = $c['fecha_alta'] ?? null;
+                            echo ($fechaAlta && strtotime($fechaAlta)) ? date('d/m/Y', strtotime($fechaAlta)) : '-'; 
+                            ?>
                         </td>
                         <td class="text-center">
                             <div class="d-flex jc-center gap-8 pr-20">
@@ -151,7 +160,7 @@
                 <?php endforeach; ?>
                 <?php if (empty($avClientes['lista'])): ?>
                     <tr>
-                        <td colspan="8">
+                        <td colspan="9">
                             <div class="empty-state">
                                 <i class="fa-solid fa-user-group"></i>
                                 <?php echo L('client_no_clients'); ?>
@@ -161,6 +170,34 @@
                 <?php endif; ?>
             </tbody>
         </table>
+
+        <!-- Paginación -->
+        <div class="pagination-footer mt-20 d-flex ai-center jc-between">
+            <div class="pagination-info fs-12 text-muted">
+                <?php 
+                    $from = $avClientes['paginacion']['totalRegistros'] > 0 ? ($avClientes['paginacion']['actual'] - 1) * $avClientes['paginacion']['limit'] + 1 : 0;
+                    $to = min($avClientes['paginacion']['actual'] * $avClientes['paginacion']['limit'], $avClientes['paginacion']['totalRegistros']);
+                    echo str_replace(['{from}', '{to}', '{total}'], (array)[$from, $to, $avClientes['paginacion']['totalRegistros']], L('page_showing')); 
+                ?>
+            </div>
+            <div class="pagination-controls d-flex gap-8">
+                <button class="btn-icon" onclick="loadClients(1)" <?php echo $avClientes['paginacion']['actual'] == 1 ? 'disabled' : ''; ?> title="<?php echo L('page_first'); ?>">
+                    <i class="fa-solid fa-angles-left"></i>
+                </button>
+                <button class="btn-secondary" onclick="loadClients(<?php echo $avClientes['paginacion']['actual'] - 1; ?>)" <?php echo $avClientes['paginacion']['actual'] == 1 ? 'disabled' : ''; ?>>
+                    <i class="fa-solid fa-chevron-left"></i> <?php echo L('page_prev'); ?>
+                </button>
+                <span class="pagination-current fw-600 fs-13 d-flex ai-center px-12 br-8" style="background: var(--bg-secondary); border: 1px solid var(--border-color);">
+                    <?php echo str_replace(['{current}', '{total}'], [$avClientes['paginacion']['actual'], $avClientes['paginacion']['total']], L('page_info')); ?>
+                </span>
+                <button class="btn-secondary" onclick="loadClients(<?php echo $avClientes['paginacion']['actual'] + 1; ?>)" <?php echo $avClientes['paginacion']['actual'] >= $avClientes['paginacion']['total'] ? 'disabled' : ''; ?>>
+                    <?php echo L('page_next'); ?> <i class="fa-solid fa-chevron-right"></i>
+                </button>
+                <button class="btn-icon" onclick="loadClients(<?php echo $avClientes['paginacion']['total']; ?>)" <?php echo $avClientes['paginacion']['actual'] >= $avClientes['paginacion']['total'] ? 'disabled' : ''; ?> title="<?php echo L('page_last'); ?>">
+                    <i class="fa-solid fa-angles-right"></i>
+                </button>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -564,45 +601,175 @@
         );
     }
 
-    function filtrarClientes() {
-        const texto = document.getElementById('filtroNombre').value.toLowerCase().trim();
-        const tipo = document.getElementById('filtroTipo').value.toLowerCase();
-        const rol = document.getElementById('filtroRol').value.toLowerCase();
+    let paginationData = <?php echo json_encode($avClientes['paginacion']); ?>;
+    let currentFilters = {
+        term: '',
+        tipo: '',
+        rol: ''
+    };
 
-        const filas = document.querySelectorAll('#tablaClientes tbody tr[data-id]');
-        let visibles = 0;
+    function debounce(func, timeout = 300) {
+        let timer;
+        return (...args) => {
+            clearTimeout(timer);
+            timer = setTimeout(() => { func.apply(this, args); }, timeout);
+        };
+    }
 
-        filas.forEach(fila => {
-            const nombre = (fila.dataset.nombre || '').toLowerCase();
-            const nif = (fila.dataset.nif || '').toLowerCase();
-            const email = (fila.dataset.email || '').toLowerCase();
-            const tipoRow = (fila.dataset.tipo || '').toLowerCase();
-            const rolRow = (fila.dataset.rol || '').toLowerCase();
+    const filtrarClientes = debounce(async () => {
+        currentFilters.term = document.getElementById('filtroNombre').value.toLowerCase().trim();
+        currentFilters.tipo = document.getElementById('filtroTipo').value;
+        currentFilters.rol = document.getElementById('filtroRol').value;
+        
+        await loadClients(1);
+    }, 400);
 
-            const coincideTexto = !texto || nombre.includes(texto) || nif.includes(texto) || email.includes(texto);
-            const coincideTipo = !tipo || tipoRow === tipo;
-            const coincideRol = !rol || rolRow === rol;
+    async function loadClients(page) {
+        if (page < 1 || (paginationData.total > 0 && page > paginationData.total)) return;
 
-            const mostrar = coincideTexto && coincideTipo && coincideRol;
-            fila.style.display = mostrar ? '' : 'none';
-            if (mostrar) visibles++;
+        const limit = paginationData.limit;
+        const offset = (page - 1) * limit;
+        
+        // Mostrar Loading
+        const tbody = document.getElementById('tbodyClientes');
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center py-40"><i class="fa-solid fa-circle-notch fa-spin fa-2x text-muted"></i></td></tr>';
+
+        try {
+            const resp = await fetch('api/gestionCliente.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    accion: 'buscarTexto',
+                    term: currentFilters.term,
+                    tipo: currentFilters.tipo,
+                    rol: currentFilters.rol,
+                    limit: limit,
+                    offset: offset,
+                    force: true // Para que permita búsqueda vacía
+                })
+            });
+            const data = await resp.json();
+            
+            if (!data.ok) throw new Error(data.error);
+
+            // Re-calcular total si ha cambiado por el filtro
+            // Nota: En la API buscarTexto no devolvemos el total real de la búsqueda, 
+            // idealmente deberíamos modificar la API para devolverlo.
+            // Por ahora, si hay filtro, estimamos o simplemente mostramos.
+            // Para ser rigurosos, usaré el 'total' que devuelve la API si lo implementamos.
+            
+            // Actualizar tabla
+            renderTable(data.lista);
+            
+            // Actualizar metadata de paginación
+            // Simulamos total para que la UI no se rompa si la API no lo da aún
+            // (En el próximo paso me aseguro de que la API lo dé)
+            const totalRecords = data.total !== undefined ? data.total : (currentFilters.term ? data.lista.length : paginationData.totalRegistros);
+            const totalPaginas = Math.max(1, Math.ceil(totalRecords / limit));
+            
+            paginationData.actual = page;
+            paginationData.total = totalPaginas;
+            paginationData.totalRegistros = totalRecords;
+
+            updatePaginationUI();
+
+        } catch (e) {
+            console.error(e);
+            tbody.innerHTML = `<tr><td colspan="9" class="text-center text-danger py-40">${e.message || "<?php echo L('prod_js_error'); ?>"}</td></tr>`;
+        }
+    }
+
+    function renderTable(lista) {
+        const tbody = document.getElementById('tbodyClientes');
+        if (lista.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="9" class="text-center py-40 text-muted"><?php echo L('user_no_results'); ?></td></tr>';
+            return;
+        }
+
+        let html = '';
+        lista.forEach(c => {
+            const nombreCompleto = (c.nombre || '') + ' ' + (c.apellidos || '');
+            const rolPill = getRolPill(c.rol);
+            const tipoIcon = c.tipo === 'empresa' ? 'fa-building' : 'fa-user';
+            const fechaAlta = new Date(c.fecha_alta).toLocaleDateString();
+
+            html += `
+                <tr data-id="${c.id}" 
+                    data-nombre="${nombreCompleto.toLowerCase()}" 
+                    data-nif="${(c.nif || '').toLowerCase()}" 
+                    data-email="${(c.email || '').toLowerCase()}"
+                    data-tipo="${(c.tipo || '').toLowerCase()}"
+                    data-rol="${(c.rol || '').toLowerCase()}">
+                    <td class="font-mono text-muted pl-20">${c.id}</td>
+                    <td class="">${nombreCompleto}</td>
+                    <td><span class="status-pill"><i class="fa-solid ${tipoIcon}"></i> ${capitalizeFirst(c.tipo)}</span></td>
+                    <td class="font-mono">${c.nif || ''}</td>
+                    <td>${c.email || ''}</td>
+                    <td>${c.telefono || ''}</td>
+                    <td class="text-center">${rolPill}</td>
+                    <td class="text-center font-mono fs-12">${fechaAlta}</td>
+                    <td class="text-center">
+                        <div class="d-flex jc-center gap-8 pr-20">
+                            <button class="btn-icon text-primary" onclick="abrirHistorialCliente(${c.id})"><i class="fa-solid fa-file-invoice-dollar"></i></button>
+                            <button class="btn-icon" onclick='editarCliente(${JSON.stringify(c)})'><i class="fa-solid fa-pen"></i></button>
+                            <button class="btn-icon text-danger" onclick="eliminarCliente(${c.id})"><i class="fa-solid fa-trash"></i></button>
+                        </div>
+                    </td>
+                </tr>
+            `;
         });
+        tbody.innerHTML = html;
+    }
 
-        const showingPrefix = "<?php echo L('client_js_showing_prefix'); ?>";
-        const clientLabel = "<?php echo L('client_js_client'); ?>";
-        const clientsLabel = "<?php echo L('client_js_clients'); ?>";
+    function getRolPill(rol) {
+        rol = (rol || 'general').toLowerCase();
+        if (rol === 'socio') return '<span class="status-pill status-active" style="padding: 2px 8px; font-size: 10px;"><i class="fa-solid fa-id-card"></i> SOCIO</span>';
+        if (rol === 'mayorista') return '<span class="status-pill status-paid" style="padding: 2px 8px; font-size: 10px; background: rgba(156, 39, 176, 0.1); color: #9c27b0; border-color: rgba(156, 39, 176, 0.2);"><i class="fa-solid fa-truck-fast"></i> MAYORISTA</span>';
+        return `<span class="text-muted fs-11" style="text-transform: uppercase;">${rol}</span>`;
+    }
 
-        document.getElementById('contadorClientes').textContent =
-            visibles === 0 ? "<?php echo L('user_no_results'); ?>" : `${showingPrefix} ${visibles} ${visibles !== 1 ? clientsLabel : clientLabel}.`;
+    function capitalizeFirst(s) {
+        return s.charAt(0).toUpperCase() + s.slice(1);
+    }
+
+    function updatePaginationUI() {
+        const from = paginationData.totalRegistros > 0 ? (paginationData.actual - 1) * paginationData.limit + 1 : 0;
+        const to = Math.min(paginationData.actual * paginationData.limit, paginationData.totalRegistros);
+        
+        let infoText = "<?php echo L('page_showing'); ?>";
+        infoText = infoText.replace('{from}', from).replace('{to}', to).replace('{total}', paginationData.totalRegistros);
+        
+        document.querySelector('.pagination-info').textContent = infoText;
+        document.querySelector('.pagination-current').textContent = `<?php echo L('page_info'); ?>`.replace('{current}', paginationData.actual).replace('{total}', paginationData.total);
+        
+        const controls = document.querySelector('.pagination-controls');
+        const btns = controls.querySelectorAll('button');
+        
+        btns[0].onclick = () => loadClients(1);
+        btns[0].disabled = paginationData.actual === 1;
+        
+        btns[1].onclick = () => loadClients(paginationData.actual - 1);
+        btns[1].disabled = paginationData.actual === 1;
+        
+        btns[2].onclick = () => loadClients(paginationData.actual + 1);
+        btns[2].disabled = paginationData.actual >= paginationData.total;
+        
+        btns[3].onclick = () => loadClients(paginationData.total);
+        btns[3].disabled = paginationData.actual >= paginationData.total;
     }
 
     function limpiarFiltrosClientes() {
         document.getElementById('filtroNombre').value = '';
         document.getElementById('filtroTipo').value = '';
         document.getElementById('filtroRol').value = '';
-        filtrarClientes();
+        currentFilters = { term: '', tipo: '', rol: '' };
+        loadClients(1);
     }
 
     // Inicializar contador al cargar
-    document.addEventListener('DOMContentLoaded', () => filtrarClientes());
+    document.addEventListener('DOMContentLoaded', () => {
+        // El primer render ya viene del PHP, pero configuramos los eventos
+        const inputBusqueda = document.getElementById('filtroNombre');
+        inputBusqueda.addEventListener('input', filtrarClientes);
+    });
 </script>

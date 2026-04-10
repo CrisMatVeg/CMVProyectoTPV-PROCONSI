@@ -334,11 +334,13 @@ class VentaPDO
 
     public static function obtenerVentasHoy(): array
     {
+        // DATE(v.fecha) = CURDATE() impide el uso de indices
+        $hoy = date('Y-m-d');
         $sql = "SELECT v.*, u.nombre AS nombre_cajero 
             FROM ventas v 
             LEFT JOIN usuarios u ON v.id_usuario = u.id
-            WHERE DATE(v.fecha) = CURDATE() ORDER BY v.fecha ASC";
-        $q = DBPDO::ejecutarConsulta($sql);
+            WHERE v.fecha >= :hoy ORDER BY v.fecha ASC";
+        $q = DBPDO::ejecutarConsulta($sql, [':hoy' => $hoy . ' 00:00:00']);
         return $q->fetchAll(PDO::FETCH_ASSOC);
     }
 
@@ -461,24 +463,77 @@ class VentaPDO
         return self::obtenerVentaPorTicket((int)$row['numero_ticket']);
     }
 
-    public static function buscarVentas(string $desde, string $hasta, ?int $idUsuario = null, ?string $numTicket = null, string $tipoDocumento = 'todos'): array
+    public static function buscarVentas(string $desde, string $hasta, ?int $idUsuario = null, ?string $numTicket = null, string $tipoDocumento = 'todos', int $limit = 50, int $offset = 0, string $ordenPor = 'fecha', string $ordenDir = 'ASC'): array
     {
-        $sql = "SELECT v.*, u.nombre as nombre_cajero,
-                    vo.numero_ticket as numero_ticket_origen
-            FROM ventas v
-            LEFT JOIN usuarios u ON v.id_usuario = u.id
-            LEFT JOIN ventas vo ON v.id_venta_origen = vo.id
-            WHERE 1=1";
+        // Whitelist para evitar inyección SQL en ORDER BY
+        $columnasPermitidas = ['fecha', 'numero_ticket', 'total', 'nombre_cajero'];
+        
+        $ordenPor = in_array($ordenPor, $columnasPermitidas) ? $ordenPor : 'fecha';
+        $ordenDir = strtoupper($ordenDir) === 'DESC' ? 'DESC' : 'ASC';
 
+        // Mapear alias si es necesario
+        $campoIdOrder = ($ordenPor === 'nombre_cajero') ? 'u_sub.nombre' : 'v_sub.' . $ordenPor;
+        $campoFinalOrder = ($ordenPor === 'nombre_cajero') ? 'u.nombre' : 'v.' . $ordenPor;
+
+        $params = [];
+        $whereClause = "WHERE 1=1";
+
+        if ($numTicket) {
+            $whereClause .= " AND v_sub.numero_ticket LIKE :ticket";
+            $params[':ticket'] = '%' . $numTicket . '%';
+        } else {
+            $whereClause .= " AND v_sub.fecha >= :desde AND v_sub.fecha <= :hasta";
+            $params[':desde'] = $desde . ' 00:00:00';
+            $params[':hasta'] = $hasta . ' 23:59:59';
+        }
+
+        if ($idUsuario) {
+            $whereClause .= " AND v_sub.id_usuario = :usuario";
+            $params[':usuario'] = $idUsuario;
+        }
+
+        if ($tipoDocumento === 'venta' || $tipoDocumento === 'abono') {
+            $whereClause .= " AND v_sub.tipo_documento = :tipoDoc";
+            $params[':tipoDoc'] = $tipoDocumento;
+        }
+
+        // Técnica: Late Row Lookup. Primero obtenemos solo los IDs de forma eficiente.
+        $innerJoin = ($ordenPor === 'nombre_cajero') ? "JOIN usuarios u_sub ON v_sub.id_usuario = u_sub.id" : "";
+        
+        $sql = "SELECT v.*, u.nombre as nombre_cajero, vo.numero_ticket as numero_ticket_origen
+                FROM (
+                    SELECT v_sub.id 
+                    FROM ventas v_sub
+                    $innerJoin
+                    $whereClause
+                    ORDER BY $campoIdOrder $ordenDir
+                    LIMIT :limit OFFSET :offset
+                ) AS sub
+                JOIN ventas v ON v.id = sub.id
+                LEFT JOIN usuarios u ON v.id_usuario = u.id
+                LEFT JOIN ventas vo ON v.id_venta_origen = vo.id
+                ORDER BY $campoFinalOrder $ordenDir";
+        
+        // PDO no permite bindParam en LIMIT/OFFSET en algunas versiones si no se emula,
+        // así que los reemplazamos directamente tras castearlos a int para total seguridad.
+        $sql = str_replace([':limit', ':offset'], [(int)$limit, (int)$offset], $sql);
+        
+        $q = DBPDO::ejecutarConsulta($sql, $params);
+        return $q->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public static function contarVentas(string $desde, string $hasta, ?int $idUsuario = null, ?string $numTicket = null, string $tipoDocumento = 'todos'): int
+    {
+        $sql = "SELECT COUNT(*) FROM ventas v WHERE 1=1";
         $params = [];
 
         if ($numTicket) {
-            $sql .= " AND LOWER(v.numero_ticket) LIKE LOWER(:ticket)";
+            $sql .= " AND v.numero_ticket LIKE :ticket";
             $params[':ticket'] = '%' . $numTicket . '%';
         } else {
-            $sql .= " AND DATE(v.fecha) BETWEEN :desde AND :hasta";
-            $params[':desde'] = $desde;
-            $params[':hasta'] = $hasta;
+            $sql .= " AND v.fecha >= :desde AND v.fecha <= :hasta";
+            $params[':desde'] = $desde . ' 00:00:00';
+            $params[':hasta'] = $hasta . ' 23:59:59';
         }
 
         if ($idUsuario) {
@@ -486,16 +541,14 @@ class VentaPDO
             $params[':usuario'] = $idUsuario;
         }
 
-        // Filtrar por tipo de documento
         if ($tipoDocumento === 'venta') {
             $sql .= " AND v.tipo_documento = 'venta'";
         } elseif ($tipoDocumento === 'abono') {
             $sql .= " AND v.tipo_documento = 'abono'";
-        } // 'todos' => sin filtro
+        }
 
-        $sql .= " ORDER BY v.fecha DESC";
         $q = DBPDO::ejecutarConsulta($sql, $params);
-        return $q->fetchAll(PDO::FETCH_ASSOC);
+        return (int)$q->fetchColumn();
     }
 
     /**
@@ -527,13 +580,16 @@ class VentaPDO
         return true;
     }
 
-    public static function obtenerVentasPorCliente(int $idCliente): array
+    public static function obtenerVentasPorCliente(int $idCliente, int $limit = 50, int $offset = 0): array
     {
         $sql = "SELECT v.*, u.nombre as nombre_cajero 
                 FROM ventas v
                 LEFT JOIN usuarios u ON v.id_usuario = u.id
                 WHERE v.id_cliente = :cliente
-                ORDER BY v.fecha DESC";
+                ORDER BY v.fecha DESC
+                LIMIT :limit OFFSET :offset";
+        
+        $sql = str_replace([':limit', ':offset'], [(int)$limit, (int)$offset], $sql);
         $q = DBPDO::ejecutarConsulta($sql, [':cliente' => $idCliente]);
         return $q->fetchAll(PDO::FETCH_ASSOC);
     }
@@ -705,95 +761,175 @@ class VentaPDO
     /**
      * Obtiene métricas clave para el dashboard.
      */
-    public static function obtenerKPIs(string $desde, string $hasta): array
+    public static function obtenerKPIs(string $desde, string $hasta, ?int $idUsuario = null, string $tipoDocumento = 'todos'): array
     {
-        $sql = "SELECT 
-                    COUNT(v.id) as total_tickets,
-                    COALESCE(SUM(v.total), 0) as total_ventas,
-                    COALESCE(SUM(v.base_imponible), 0) as total_base,
-                    COALESCE((SELECT SUM((lv.precio_unitario - lv.precio_coste_unitario) * lv.cantidad)
-                     FROM lineas_venta lv
-                     JOIN ventas v2 ON lv.id_venta = v2.id
-                     WHERE v2.estado = 'completada' 
-                     AND DATE(v2.fecha) BETWEEN :desde AND :hasta
-                     AND lv.devuelta = 0), 0) as margen_estimado
-                FROM ventas v
-                WHERE v.estado = 'completada' AND v.metodo_pago IN ('efectivo', 'tarjeta', 'bizum', 'a_cuenta', 'mixto') AND DATE(v.fecha) BETWEEN :desde2 AND :hasta2";
+        $desdeFull = $desde . ' 00:00:00';
+        $hastaFull = $hasta . ' 23:59:59';
 
         $params = [
-            ':desde'  => $desde,
-            ':hasta'  => $hasta,
-            ':desde2' => $desde,
-            ':hasta2' => $hasta
+            ':desde'     => $desdeFull,
+            ':hasta'     => $hastaFull
         ];
 
+        $sql = "SELECT 
+                    COUNT(v.id) as total_operaciones,
+                    COALESCE(SUM(v.total), 0) as total_ventas,
+                    COALESCE(SUM(v.base_imponible), 0) as total_base,
+                    COALESCE(SUM(sub.margen_v), 0) as beneficio_estimado,
+                    COALESCE(SUM(v.total) / NULLIF(COUNT(v.id), 0), 0) as ticket_medio
+                FROM ventas v
+                LEFT JOIN (
+                    SELECT lv_sub.id_venta, SUM((lv_sub.precio_unitario - lv_sub.precio_coste_unitario) * lv_sub.cantidad) as margen_v
+                    FROM lineas_venta lv_sub
+                    INNER JOIN ventas v_sub ON lv_sub.id_venta = v_sub.id
+                    WHERE lv_sub.devuelta = 0 
+                      AND v_sub.fecha >= :desde AND v_sub.fecha <= :hasta
+                    GROUP BY lv_sub.id_venta
+                ) AS sub ON v.id = sub.id_venta
+                WHERE v.estado = 'completada' 
+                  AND v.metodo_pago IN ('efectivo', 'tarjeta', 'bizum', 'a_cuenta', 'mixto') ";
+
+        if ($idUsuario) {
+            $sql .= " AND v.id_usuario = :idUsuario";
+            $params[':idUsuario'] = $idUsuario;
+        }
+        if ($tipoDocumento === 'venta' || $tipoDocumento === 'abono') {
+            $sql .= " AND v.tipo_documento = :tipoDoc";
+            $params[':tipoDoc'] = $tipoDocumento;
+        }
+
+        $sql .= " AND v.fecha >= :desde AND v.fecha <= :hasta";
+
         $q = DBPDO::ejecutarConsulta($sql, $params);
-        return $q->fetch(PDO::FETCH_ASSOC);
+        $result = $q->fetch(PDO::FETCH_ASSOC);
+
+        if (!$result) {
+            return [
+                'total_operaciones' => 0,
+                'total_ventas' => 0,
+                'total_base' => 0,
+                'beneficio_estimado' => 0,
+                'ticket_medio' => 0
+            ];
+        }
+
+        return $result;
     }
 
     /**
      * Obtiene ventas agrupadas por método de pago.
      */
-    public static function obtenerVentasPorMetodo(string $desde, string $hasta): array
+    public static function obtenerVentasPorMetodo(string $desde, string $hasta, ?int $idUsuario = null, string $tipoDocumento = 'todos'): array
     {
         $sql = "SELECT metodo_pago, COALESCE(SUM(total), 0) as total, COUNT(*) as cantidad
                 FROM ventas
-                WHERE estado = 'completada' AND metodo_pago IN ('efectivo', 'tarjeta', 'bizum', 'a_cuenta', 'mixto') AND DATE(fecha) BETWEEN :desde AND :hasta
-                GROUP BY metodo_pago";
-        $q = DBPDO::ejecutarConsulta($sql, [':desde' => $desde, ':hasta' => $hasta]);
+                WHERE estado = 'completada' 
+                  AND metodo_pago IN ('efectivo', 'tarjeta', 'bizum', 'a_cuenta', 'mixto') ";
+        
+        $params = [':desde' => $desde . ' 00:00:00', ':hasta' => $hasta . ' 23:59:59'];
+        if ($idUsuario) {
+            $sql .= " AND id_usuario = :idUsuario";
+            $params[':idUsuario'] = $idUsuario;
+        }
+        if ($tipoDocumento === 'venta' || $tipoDocumento === 'abono') {
+            $sql .= " AND tipo_documento = :tipoDoc";
+            $params[':tipoDoc'] = $tipoDocumento;
+        }
+        $sql .= " AND fecha >= :desde AND fecha <= :hasta GROUP BY metodo_pago";
+
+        $q = DBPDO::ejecutarConsulta($sql, $params);
         return $q->fetchAll(PDO::FETCH_ASSOC);
     }
 
     /**
      * Obtiene evolución de ventas por día.
      */
-    public static function obtenerVentasPorFecha(string $desde, string $hasta): array
+    public static function obtenerVentasPorFecha(string $desde, string $hasta, ?int $idUsuario = null, string $tipoDocumento = 'todos'): array
     {
         $sql = "SELECT DATE(fecha) as fecha, SUM(total) as total
                 FROM ventas
-                WHERE estado = 'completada' AND metodo_pago != 'financiado' AND DATE(fecha) BETWEEN :desde AND :hasta
+                WHERE estado = 'completada' 
+                  AND metodo_pago IN ('efectivo', 'tarjeta', 'bizum', 'a_cuenta', 'mixto') ";
+
+        $params = [':desde' => $desde . ' 00:00:00', ':hasta' => $hasta . ' 23:59:59'];
+        if ($idUsuario) {
+            $sql .= " AND id_usuario = :idUsuario";
+            $params[':idUsuario'] = $idUsuario;
+        }
+        if ($tipoDocumento === 'venta' || $tipoDocumento === 'abono') {
+            $sql .= " AND tipo_documento = :tipoDoc";
+            $params[':tipoDoc'] = $tipoDocumento;
+        }
+
+        $sql .= " AND fecha >= :desde AND fecha <= :hasta
                 GROUP BY DATE(fecha)
                 ORDER BY DATE(fecha) ASC";
-        $q = DBPDO::ejecutarConsulta($sql, [':desde' => $desde, ':hasta' => $hasta]);
+        $q = DBPDO::ejecutarConsulta($sql, $params);
         return $q->fetchAll(PDO::FETCH_ASSOC);
     }
 
     /**
      * Obtiene ventas agrupadas por cajero/usuario.
      */
-    public static function obtenerVentasPorCajero(string $desde, string $hasta): array
+    public static function obtenerVentasPorCajero(string $desde, string $hasta, ?int $idUsuario = null, string $tipoDocumento = 'todos'): array
     {
         $sql = "SELECT u.nombre, COALESCE(SUM(v.total), 0) as total, COUNT(v.id) as cantidad
                 FROM ventas v
                 JOIN usuarios u ON v.id_usuario = u.id
-                WHERE v.estado = 'completada' AND v.metodo_pago != 'financiado' AND DATE(v.fecha) BETWEEN :desde AND :hasta
+                WHERE v.estado = 'completada' 
+                  AND v.metodo_pago != 'financiado' ";
+
+        $params = [':desde' => $desde . ' 00:00:00', ':hasta' => $hasta . ' 23:59:59'];
+        if ($idUsuario) {
+            $sql .= " AND v.id_usuario = :idUsuario";
+            $params[':idUsuario'] = $idUsuario;
+        }
+        if ($tipoDocumento === 'venta' || $tipoDocumento === 'abono') {
+            $sql .= " AND v.tipo_documento = :tipoDoc";
+            $params[':tipoDoc'] = $tipoDocumento;
+        }
+
+        $sql .= " AND v.fecha >= :desde AND v.fecha <= :hasta
                 GROUP BY u.id
                 ORDER BY total DESC";
-        $q = DBPDO::ejecutarConsulta($sql, [':desde' => $desde, ':hasta' => $hasta]);
+        $q = DBPDO::ejecutarConsulta($sql, $params);
         return $q->fetchAll(PDO::FETCH_ASSOC);
     }
 
     /**
      * Obtiene ventas agrupadas por categoría.
      */
-    public static function obtenerVentasPorCategoria(string $desde, string $hasta): array
+    public static function obtenerVentasPorCategoria(string $desde, string $hasta, ?int $idUsuario = null, string $tipoDocumento = 'todos'): array
     {
         $sql = "SELECT p.categoria, COALESCE(SUM(lv.total_linea), 0) as total, COUNT(lv.id) as cantidad
                 FROM lineas_venta lv
-                JOIN productos p ON lv.id_producto = p.id
                 JOIN ventas v ON lv.id_venta = v.id
-                WHERE v.estado = 'completada' AND v.metodo_pago != 'financiado' AND lv.devuelta = 0 
-                AND DATE(v.fecha) BETWEEN :desde AND :hasta
+                JOIN productos p ON lv.id_producto = p.id
+                WHERE v.estado = 'completada' 
+                  AND v.metodo_pago != 'financiado' 
+                  AND lv.devuelta = 0 ";
+
+        $params = [':desde' => $desde . ' 00:00:00', ':hasta' => $hasta . ' 23:59:59'];
+        if ($idUsuario) {
+            $sql .= " AND v.id_usuario = :idUsuario";
+            $params[':idUsuario'] = $idUsuario;
+        }
+        if ($tipoDocumento === 'venta' || $tipoDocumento === 'abono') {
+            $sql .= " AND v.tipo_documento = :tipoDoc";
+            $params[':tipoDoc'] = $tipoDocumento;
+        }
+
+        $sql .= " AND v.fecha >= :desde AND v.fecha <= :hasta
                 GROUP BY p.categoria
                 ORDER BY total DESC";
-        $q = DBPDO::ejecutarConsulta($sql, [':desde' => $desde, ':hasta' => $hasta]);
+        $q = DBPDO::ejecutarConsulta($sql, $params);
         return $q->fetchAll(PDO::FETCH_ASSOC);
     }
 
     /**
      * Obtiene los productos más vendidos.
      */
-    public static function obtenerTopProductos(string $desde, string $hasta, int $limite = 10): array
+    public static function obtenerTopProductos(string $desde, string $hasta, int $limite = 10, ?int $idUsuario = null, string $tipoDocumento = 'todos'): array
     {
         $sql = "SELECT 
                     MAX(lv.id_producto) AS id_producto,
@@ -814,76 +950,136 @@ class VentaPDO
                 LEFT JOIN productos p ON lv.id_producto = p.id
                 WHERE v.estado = 'completada' 
                   AND v.metodo_pago != 'financiado'
-                  AND lv.devuelta = 0
-                  AND DATE(v.fecha) BETWEEN :desde AND :hasta
+                  AND lv.devuelta = 0 ";
+
+        $params = [':desde' => $desde . ' 00:00:00', ':hasta' => $hasta . ' 23:59:59'];
+        if ($idUsuario) {
+            $sql .= " AND v.id_usuario = :idUsuario";
+            $params[':idUsuario'] = $idUsuario;
+        }
+        if ($tipoDocumento === 'venta' || $tipoDocumento === 'abono') {
+            $sql .= " AND v.tipo_documento = :tipoDoc";
+            $params[':tipoDoc'] = $tipoDocumento;
+        }
+
+        $sql .= " AND v.fecha >= :desde AND v.fecha <= :hasta
                 GROUP BY nombre_producto_limpio, codigo_producto
                 ORDER BY unidades DESC, total_recaudado DESC
                 LIMIT :limite";
 
         $sql = str_replace(':limite', (int)$limite, $sql);
-
-        $q = DBPDO::ejecutarConsulta($sql, [':desde' => $desde, ':hasta' => $hasta]);
+        $q = DBPDO::ejecutarConsulta($sql, $params);
         return $q->fetchAll(PDO::FETCH_ASSOC);
     }
 
     /**
      * Obtiene el desglose de márgenes (Ingreso vs Coste).
      */
-    public static function obtenerMargenesDetallados(string $desde, string $hasta): array
+    public static function obtenerMargenesDetallados(string $desde, string $hasta, ?int $idUsuario = null, string $tipoDocumento = 'todos', string $agrupacion = 'dia'): array
     {
-        $sql = "SELECT DATE(v.fecha) as fecha,
+        $selectFecha = "DATE(v.fecha) as fecha";
+        $groupBy = "DATE(v.fecha)";
+
+        if ($agrupacion === 'mes') {
+            $selectFecha = "DATE_FORMAT(v.fecha, '%Y-%m-01') as fecha";
+            $groupBy = "DATE_FORMAT(v.fecha, '%Y-%m')";
+        } elseif ($agrupacion === 'año') {
+            $selectFecha = "DATE_FORMAT(v.fecha, '%Y-01-01') as fecha";
+            $groupBy = "YEAR(v.fecha)";
+        }
+
+        $sql = "SELECT $selectFecha,
                        SUM(lv.total_linea) as ingresos,
                        SUM(lv.precio_coste_unitario * lv.cantidad) as costes,
                        SUM(lv.total_linea - (lv.precio_coste_unitario * lv.cantidad)) as beneficio
                 FROM lineas_venta lv
-                JOIN productos p ON lv.id_producto = p.id
                 JOIN ventas v ON lv.id_venta = v.id
-                WHERE v.estado = 'completada' AND v.metodo_pago != 'financiado' AND lv.devuelta = 0
-                AND DATE(v.fecha) BETWEEN :desde AND :hasta
-                GROUP BY DATE(v.fecha)
+                WHERE v.estado = 'completada' AND v.metodo_pago != 'financiado' AND lv.devuelta = 0 ";
+
+        $params = [':desde' => $desde . ' 00:00:00', ':hasta' => $hasta . ' 23:59:59'];
+        if ($idUsuario) {
+            $sql .= " AND v.id_usuario = :idUsuario";
+            $params[':idUsuario'] = $idUsuario;
+        }
+        if ($tipoDocumento === 'venta' || $tipoDocumento === 'abono') {
+            $sql .= " AND v.tipo_documento = :tipoDoc";
+            $params[':tipoDoc'] = $tipoDocumento;
+        }
+
+        $sql .= " AND v.fecha >= :desde AND v.fecha <= :hasta
+                GROUP BY $groupBy
                 ORDER BY fecha ASC";
-        $q = DBPDO::ejecutarConsulta($sql, [':desde' => $desde, ':hasta' => $hasta]);
+        $q = DBPDO::ejecutarConsulta($sql, $params);
         return $q->fetchAll(PDO::FETCH_ASSOC);
     }
 
     /**
      * Obtiene el ranking completo de productos, incluyendo los que no han tenido ventas.
      */
-    public static function obtenerRankingCompletoProductos(string $desde, string $hasta): array
+    public static function obtenerRankingCompletoProductos(string $desde, string $hasta, int $limit = 100, int $offset = 0, ?int $idUsuario = null, string $tipoDocumento = 'todos'): array
     {
+        $params = [':desde' => $desde . ' 00:00:00', ':hasta' => $hasta . ' 23:59:59'];
+        $whereSub = "WHERE v.estado = 'completada' AND v.metodo_pago != 'financiado' AND lv.devuelta = 0 ";
+        
+        if ($idUsuario) {
+            $whereSub .= " AND v.id_usuario = :idUsuario";
+            $params[':idUsuario'] = $idUsuario;
+        }
+        if ($tipoDocumento === 'venta' || $tipoDocumento === 'abono') {
+            $whereSub .= " AND v.tipo_documento = :tipoDoc";
+            $params[':tipoDoc'] = $tipoDocumento;
+        }
+        $whereSub .= " AND v.fecha >= :desde AND v.fecha <= :hasta";
+
         $sql = "SELECT 
-                    MIN(p.id) AS id_producto,
+                    p.id AS id_producto,
                     TRIM(SUBSTRING_INDEX(p.nombre, '(', 1)) AS nombre_producto_limpio,
                     p.referencia AS codigo_producto,
                     p.categoria,
-                    COALESCE(SUM(lv.cantidad), 0) AS unidades,
-                    COALESCE(SUM(lv.total_linea), 0) AS total_recaudado
+                    COALESCE(sales.unidades, 0) AS unidades,
+                    COALESCE(sales.total_recaudado, 0) AS total_recaudado
                 FROM productos p
-                LEFT JOIN lineas_venta lv ON p.id = lv.id_producto
-                LEFT JOIN ventas v ON lv.id_venta = v.id 
-                    AND v.estado = 'completada' 
-                    AND v.metodo_pago != 'financiado'
-                    AND lv.devuelta = 0 
-                    AND DATE(v.fecha) BETWEEN :desde AND :hasta
-                GROUP BY nombre_producto_limpio, codigo_producto, p.categoria
-                ORDER BY unidades DESC, total_recaudado DESC";
+                LEFT JOIN (
+                    SELECT lv.id_producto, SUM(lv.cantidad) AS unidades, SUM(lv.total_linea) AS total_recaudado
+                    FROM lineas_venta lv
+                    INNER JOIN ventas v ON lv.id_venta = v.id
+                    $whereSub
+                    GROUP BY lv.id_producto
+                ) AS sales ON p.id = sales.id_producto
+                ORDER BY unidades DESC, total_recaudado DESC, p.id ASC
+                LIMIT :limit OFFSET :offset";
 
-        $q = DBPDO::ejecutarConsulta($sql, [':desde' => $desde, ':hasta' => $hasta]);
+        $limitVal = (int)$limit;
+        $offsetVal = (int)$offset;
+        $sql = str_replace([':limit', ':offset'], [$limitVal, $offsetVal], $sql);
+
+        $q = DBPDO::ejecutarConsulta($sql, $params);
         return $q->fetchAll(PDO::FETCH_ASSOC);
     }
     /**
      * Obtiene el desglose de IVA recaudado por tipo.
      */
-    public static function obtenerDesgloseIVA(string $desde, string $hasta): array
+    public static function obtenerDesgloseIVA(string $desde, string $hasta, ?int $idUsuario = null, string $tipoDocumento = 'todos'): array
     {
         $sql = "SELECT lv.iva_aplicado as porcentaje, SUM(lv.total_linea * (lv.iva_aplicado / (100 + lv.iva_aplicado))) as cuota, SUM(lv.total_linea) as total
                 FROM lineas_venta lv
-                JOIN ventas v ON lv.id_venta = v.id
-                WHERE v.estado = 'completada' AND v.metodo_pago != 'financiado' AND lv.devuelta = 0
-                AND DATE(v.fecha) BETWEEN :desde AND :hasta
+                INNER JOIN ventas v ON lv.id_venta = v.id
+                WHERE v.estado = 'completada' AND v.metodo_pago != 'financiado' AND lv.devuelta = 0 ";
+
+        $params = [':desde' => $desde . ' 00:00:00', ':hasta' => $hasta . ' 23:59:59'];
+        if ($idUsuario) {
+            $sql .= " AND v.id_usuario = :idUsuario";
+            $params[':idUsuario'] = $idUsuario;
+        }
+        if ($tipoDocumento === 'venta' || $tipoDocumento === 'abono') {
+            $sql .= " AND v.tipo_documento = :tipoDoc";
+            $params[':tipoDoc'] = $tipoDocumento;
+        }
+
+        $sql .= " AND v.fecha >= :desde AND v.fecha <= :hasta
                 GROUP BY lv.iva_aplicado
                 ORDER BY lv.iva_aplicado DESC";
-        $q = DBPDO::ejecutarConsulta($sql, [':desde' => $desde, ':hasta' => $hasta]);
+        $q = DBPDO::ejecutarConsulta($sql, $params);
         return $q->fetchAll(PDO::FETCH_ASSOC);
     }
 
@@ -1148,5 +1344,43 @@ class VentaPDO
             error_log("Error original en crearAbono: " . $e->getMessage() . " \nTraza: " . $e->getTraceAsString());
             throw $e;
         }
+    }
+    /**
+     * Verifica si los índices de rendimiento están creados.
+     * @return bool True si todo está optimizado.
+     */
+    public static function estanIndicesListos(): bool
+    {
+        try {
+            $q1 = DBPDO::ejecutarConsulta("SHOW INDEX FROM ventas WHERE Key_name = 'idx_ventas_fecha'");
+            $q2 = DBPDO::ejecutarConsulta("SHOW INDEX FROM ventas WHERE Key_name = 'idx_ventas_perf'");
+            return ($q1->rowCount() > 0 && $q2->rowCount() > 0);
+        } catch (Exception $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Intenta optimizar la base de datos añadiendo índices si no existen.
+     */
+    public static function optimizarIndices(): bool
+    {
+        $v1 = false; $v2 = false; $p1 = false;
+        try {
+            DBPDO::ejecutarConsulta("ALTER TABLE ventas ADD INDEX idx_ventas_fecha (fecha)", []);
+            $v1 = true;
+        } catch (Exception $e) { $v1 = true; /* Probablemente ya existe */ }
+        
+        try {
+            DBPDO::ejecutarConsulta("ALTER TABLE ventas ADD INDEX idx_ventas_perf (estado, metodo_pago, fecha)", []);
+            $v2 = true;
+        } catch (Exception $e) { $v2 = true; }
+        
+        try {
+            DBPDO::ejecutarConsulta("ALTER TABLE productos ADD INDEX idx_prod_cat_ref (categoria, referencia)", []);
+            $p1 = true;
+        } catch (Exception $e) { $p1 = true; }
+
+        return ($v1 && $v2 && $p1);
     }
 }

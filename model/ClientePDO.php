@@ -9,11 +9,23 @@ require_once __DIR__ . '/DBPDO.php';
 
 class ClientePDO
 {
-    public static function listarTodos(): array
+    public static function listarTodos(int $limit = 50, int $offset = 0): array
     {
-        $sql = "SELECT * FROM clientes ORDER BY nombre, apellidos";
+        $sql = "SELECT id, tipo, rol, nombre, apellidos, nif, email, telefono, puntos, ultima_compra, fecha_alta, fecha_baja 
+                FROM clientes 
+                ORDER BY id ASC 
+                LIMIT :limit OFFSET :offset";
+        
+        $sql = str_replace([':limit', ':offset'], [(int)$limit, (int)$offset], $sql);
         $q = DBPDO::ejecutarConsulta($sql);
         return $q->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public static function contarTodos(): int
+    {
+        $sql = "SELECT COUNT(*) FROM clientes WHERE fecha_baja IS NULL";
+        $q = DBPDO::ejecutarConsulta($sql);
+        return (int)$q->fetchColumn();
     }
 
     public static function obtenerPorId(int $id): ?array
@@ -104,12 +116,16 @@ class ClientePDO
         );
     }
 
-    public static function listarPorRol(string $rol): array
+    public static function listarPorRol(string $rol, int $limit = 50, int $offset = 0): array
     {
-        $q = DBPDO::ejecutarConsulta(
-            "SELECT * FROM clientes WHERE rol = :rol AND fecha_baja IS NULL ORDER BY nombre, apellidos",
-            [':rol' => $rol]
-        );
+        $sql = "SELECT id, tipo, rol, nombre, apellidos, nif, email, telefono, puntos, ultima_compra 
+                FROM clientes 
+                WHERE rol = :rol AND fecha_baja IS NULL 
+                ORDER BY id ASC 
+                LIMIT :limit OFFSET :offset";
+        
+        $sql = str_replace([':limit', ':offset'], [(int)$limit, (int)$offset], $sql);
+        $q = DBPDO::ejecutarConsulta($sql, [':rol' => $rol]);
         return $q->fetchAll(PDO::FETCH_ASSOC);
     }
 

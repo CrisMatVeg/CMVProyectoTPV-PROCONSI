@@ -37,8 +37,7 @@
                     <th><?php echo L('rates_th_name'); ?></th>
                     <th><?php echo L('rates_th_type'); ?></th>
                     <th class="text-right"><?php echo L('rates_th_value'); ?></th>
-                    <th class="text-center"><?php echo L('rates_th_date'); ?></th>
-                    <th class="text-center"><?php echo L('rates_th_scope'); ?></th>
+                    <th><?php echo L('rates_th_scope'); ?></th>
                     <th class="text-center"><?php echo L('rates_th_status'); ?></th>
                     <th class="text-center pr-20"><?php echo L('rates_th_actions'); ?></th>
                 </tr>
@@ -92,33 +91,16 @@
                             ?>
                         </td>
                         <td class="text-center">
-                            <div class="d-flex flex-column gap-4 ai-center">
-                                <?php if ($t['aplicada']): ?>
-                                    <span class="status-pill status-active" style="padding: 2px 8px; font-size: 10px;">
-                                        <i class="fa-solid fa-circle-check"></i> <?php echo L('rates_status_applied'); ?>
-                                    </span>
-                                <?php else: ?>
-                                    <span class="status-pill status-inactive" style="padding: 2px 8px; font-size: 10px;">
-                                        <i class="fa-solid fa-clock"></i> <?php echo L('rates_status_pending'); ?>
-                                    </span>
-                                <?php endif; ?>
-
-                                <span onclick="toggleTarifa(<?php echo $t['id']; ?>)"
-                                    class="status-pill cursor-pointer <?php echo $t['activo'] ? 'status-paid' : 'text-muted border-2'; ?>"
-                                    style="padding: 2px 8px; font-size: 10px; width: fit-content;"
-                                    title="<?php echo L('modal_change_status', true); ?>">
-                                    <i class="fa-solid <?php echo $t['activo'] ? 'fa-play' : 'fa-pause'; ?>"></i>
-                                    <?php echo $t['activo'] ? L('rates_status_active', true) : L('rates_status_paused', true); ?>
-                                </span>
-                            </div>
+                            <span onclick="toggleTarifa(<?php echo $t['id']; ?>)"
+                                class="status-pill cursor-pointer <?php echo $t['activo'] ? 'status-paid' : 'text-muted border-2'; ?>"
+                                style="padding: 2px 8px; font-size: 10px; width: fit-content;"
+                                title="<?php echo L('modal_change_status', true); ?>">
+                                <i class="fa-solid <?php echo $t['activo'] ? 'fa-play' : 'fa-pause'; ?>"></i>
+                                <?php echo $t['activo'] ? L('rates_status_active', true) : L('rates_status_paused', true); ?>
+                            </span>
                         </td>
                         <td class="text-center">
                             <div class="d-flex jc-center gap-8 pr-20">
-                                <?php if (!$t['aplicada']): ?>
-                                    <button onclick="aplicarTarifa(<?php echo $t['id']; ?>)" title="<?php echo L('rates_btn_apply_now'); ?>" class="btn-icon">
-                                        <i class="fa-solid fa-bolt"></i>
-                                    </button>
-                                <?php endif; ?>
                                 <button onclick='abrirModalTarifa(<?php echo json_encode($t, JSON_HEX_APOS | JSON_HEX_QUOT); ?>)' title="<?php echo L('rates_edit_rule'); ?>" class="btn-icon">
                                     <i class="fa-solid fa-pen"></i>
                                 </button>
@@ -131,7 +113,7 @@
                 <?php endforeach; ?>
                 <?php if (empty($avTarifas['lista'])): ?>
                     <tr>
-                        <td colspan="7">
+                        <td colspan="8">
                             <div class="empty-state">
                                 <i class="fa-solid fa-scale-balanced"></i>
                                 <?php echo L('rates_no_rates'); ?>
@@ -158,16 +140,11 @@
                 </div>
             </div>
 
-            <div class="table-container">
-                <table class="data-table">
+            <div class="table-container shadow-sm no-border" style="border-radius: 20px;">
+                <table class="data-table table-matrix" id="tarifarioTable">
                     <thead>
-                        <tr>
-                            <th><?php echo L('rates_th_product'); ?></th>
-                            <th class="text-center"><?php echo L('tpv_category'); ?></th>
-                            <th class="text-right"><?php echo L('rates_th_pvp_base'); ?></th>
-                            <th class="text-right" style="background: rgba(var(--accent-rgb), 0.05);"><?php echo L('rates_th_pvp_rate'); ?></th>
-                            <th class="text-center"><?php echo L('rates_th_diff'); ?></th>
-                            <th><?php echo L('rates_th_applied_rules'); ?></th>
+                        <tr id="tarifarioHeader">
+                            <!-- JS Dinámico -->
                         </tr>
                     </thead>
                     <tbody id="tarifarioBody">
@@ -204,6 +181,17 @@
         </div>
         <form id="tarifaForm" class="modal-body p-24" style="overflow-y: auto; max-height: 70vh;">
             <input type="hidden" id="tarifaId">
+
+            <div class="alert-premium premium-warning mb-24" style="border-left: 4px solid var(--accent); background: rgba(var(--accent-rgb), 0.05);">
+                <div class="alert-icon-wrap"><i class="fa-solid fa-circle-question fs-20"></i></div>
+                <div class="alert-content">
+                    <span class="alert-title font-bold"><?php echo L('rates_info_title'); ?></span>
+                    <p class="alert-desc fs-12 m-0 mt-4">
+                        <?php echo L('rates_info_replace'); ?><br>
+                        <?php echo L('rates_info_coexist'); ?>
+                    </p>
+                </div>
+            </div>
 
             <!-- TAB: GENERAL -->
             <div id="tab-general" class="tab-pane active">
@@ -655,98 +643,76 @@
 
     async function guardarTarifa() {
         limpiarErroresTarifa();
+        const nombre = document.getElementById('tarifaNombre').value.trim();
+        const valor = parseFloat(document.getElementById('tarifaValor').value);
+        const tipo = document.getElementById('tarifaTipo').value;
+        const id = document.getElementById('tarifaId').value;
+        const prioridad = document.getElementById('tarifaPrioridad').value;
+        
+        // RESTRICCIÓN: Al menos un filtro
+        const fechaIni = document.getElementById('tarifaFecha').value;
+        const fechaFin = document.getElementById('tarifaFechaFin').value;
+        const horaIni = document.getElementById('tarifaHoraInicio').value;
+        const horaFin = document.getElementById('tarifaHoraFin').value;
+        const roles = Array.from(document.querySelectorAll('.tarifa-rol-checkbox:checked')).map(cb => cb.value);
+        const clientes = Array.from(document.querySelectorAll('.tarifa-cliente-checkbox:checked')).map(cb => cb.value);
+        const dias = Array.from(document.querySelectorAll('.tarifa-dia-checkbox:checked')).map(cb => cb.value);
+
+        const hasFilter = (fechaIni || fechaFin || horaIni || horaFin || roles.length > 0 || clientes.length > 0 || dias.length > 0);
+
+        if (!nombre) {
+            document.getElementById('err-nombre').innerText = 'El nombre es obligatorio';
+            return;
+        }
+        if (isNaN(valor) || valor === 0) {
+            document.getElementById('err-valor').innerText = 'El valor no puede ser 0';
+            return;
+        }
+
+        if (!hasFilter) {
+            showCustomAlert('<?php echo L('modal_alert_title') ?>', '<?php echo L('rates_js_insufficient_criteria_body') ?>', 'warning');
+            return;
+        }
+
         const scope = document.getElementById('tarifaScope').value;
-        const categoria = document.getElementById('tarifaCategoria').value.trim();
-        const prodIds = Array.from(document.querySelectorAll('.tarifa-prod-checkbox:checked'))
-            .map(cb => parseInt(cb.value, 10))
-            .filter(id => !isNaN(id));
-        const tId = document.getElementById('tarifaId').value;
-        const diasSema = Array.from(document.querySelectorAll('.tarifa-dia-checkbox:checked'))
-            .map(cb => parseInt(cb.value, 10));
+        const categoria = document.getElementById('tarifaCategoria').value;
+        const selectedProds = Array.from(document.querySelectorAll('.tarifa-prod-checkbox:checked')).map(cb => cb.value);
 
         const payload = {
-            accion: tId ? 'editar' : 'añadir',
-            id: tId || null,
-            nombre: document.getElementById('tarifaNombre').value.trim(),
-            tipo: document.getElementById('tarifaTipo').value,
-            valor: document.getElementById('tarifaValor').value,
-            prioridad: document.getElementById('tarifaPrioridad')?.value || 0,
-            fecha_aplicacion: document.getElementById('tarifaFecha').value,
-            fecha_fin: document.getElementById('tarifaFechaFin').value || null,
-            dias_semana: diasSema,
-            hora_inicio: document.getElementById('tarifaHoraInicio')?.value || null,
-            hora_fin: document.getElementById('tarifaHoraFin')?.value || null,
-            roles_segmento: Array.from(document.querySelectorAll('.tarifa-rol-checkbox:checked')).map(cb => cb.value),
-            cliente_ids: Array.from(document.querySelectorAll('.tarifa-cliente-checkbox:checked')).map(cb => parseInt(cb.value)),
-            id_cliente: null, // Mantenemos compatibilidad por si acaso, pero ya no se usa como principal
+            accion: id ? 'editar' : 'añadir',
+            id,
+            nombre, valor, tipo, prioridad,
             scope,
-            categoria: scope === 'categoria' ? categoria : null,
-            producto_ids: scope === 'productos' ? prodIds : [],
+            categoria,
+            producto_ids: selectedProds,
+            tipo_cliente: roles.join(','),
+            roles_segmento: clientes.join(','),
+            dias_semana: dias.join(','),
+            hora_inicio: horaIni,
+            hora_fin: horaFin,
+            fecha_aplicacion: fechaIni,
+            fecha_fin: fechaFin
         };
-
-        if (payload.fecha_aplicacion && payload.fecha_fin) {
-            if (!validarFechas(payload.fecha_aplicacion, payload.fecha_fin)) {
-                showCustomAlert("<?php echo L('rates_confirm_apply_title'); ?>", "<?php echo L('rates_confirm_apply_msg'); ?>", 'warning');
-                return;
-            }
-        }
 
         try {
             const resp = await fetch('api/gestionTarifa.php', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(payload),
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
             });
             const r = await resp.json();
             if (r.ok) {
                 location.reload();
-            } else if (r.aErrores) {
-                for (const [field, msg] of Object.entries(r.aErrores)) {
-                    const el = document.getElementById('err-' + field);
-                    if (el && msg) el.innerText = msg;
-                }
             } else {
-                alert('Error: ' + (r.error || 'No se pudo guardar la tarifa'));
+                showCustomAlert('Error', r.error || 'No se pudo guardar la tarifa', 'error');
             }
         } catch (e) {
-            console.error(e);
-            alert('Error de conexión con el servidor');
+            showCustomAlert('Error', 'Error de conexión con el servidor', 'error');
         }
     }
 
-    async function aplicarTarifa(id) {
-        if (!id) return;
-        showCustomConfirm(
-            "<?php echo L('rates_confirm_apply_title'); ?>",
-            "<?php echo L('rates_confirm_apply_msg'); ?>",
-            async () => {
-                    try {
-                        const resp = await fetch('api/gestionTarifa.php', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({
-                                accion: 'aplicar',
-                                id
-                            }),
-                        });
-                        const r = await resp.json();
-                        if (r.ok) {
-                            location.reload();
-                        } else {
-                            showCustomAlert("<?php echo L('error'); ?>", r.error || "<?php echo L('modal_error_apply'); ?>", 'error');
-                        }
-                    } catch (e) {
-                        console.error(e);
-                        showCustomAlert("<?php echo L('error'); ?>", "<?php echo L('error_server_connection'); ?>", 'error');
-                    }
-                },
-                "<?php echo L('rates_btn_apply_now'); ?>",
-                'danger'
-        );
+    function aplicarTarifa(id) {
+        showCustomAlert('<?php echo L('modal_alert_title') ?>', '<?php echo L('rates_js_mass_apply_disabled_body') ?>', 'info');
     }
     async function toggleTarifa(id) {
         if (!id) return;
@@ -820,95 +786,101 @@
 
     function renderTarifario() {
         const query = document.getElementById('tarifarioSearch').value.toLowerCase();
+        const header = document.getElementById('tarifarioHeader');
         const tbody = document.getElementById('tarifarioBody');
-        tbody.innerHTML = '';
+        
+        // 1. Identificamos tarifas activas para las columnas
+        const activeRates = TARIFAS_DATA.filter(t => t.activo);
+        
+        // 2. Construimos la cabecera dinámica
+        let headerHtml = `
+            <th class="pl-24" style="width: 300px;">${<?php echo json_encode(L('rates_th_product', true)); ?>}</th>
+            <th class="text-center matrix-col-base" style="width: 120px; background: rgba(var(--accent-rgb), 0.02);">General</th>
+        `;
+        
+        activeRates.forEach((t, i) => {
+            const colClass = `matrix-col-${(i % 5) + 1}`;
+            headerHtml += `<th class="text-center ${colClass}" style="width: 140px;">${t.nombre}</th>`;
+        });
+        header.innerHTML = headerHtml;
 
+        // 3. Renderizamos las filas
+        tbody.innerHTML = '';
         const now = new Date();
         const today = now.toISOString().split('T')[0];
+        const dayOfWeek = now.getDay();
         const currentTime = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
-        const dayOfWeek = now.getDay(); // 0-6
 
         PRODUCTOS_DATA.forEach(p => {
+            // Filtro de búsqueda
             if (query && !p.nombre.toLowerCase().includes(query) && !p.categoria.toLowerCase().includes(query)) {
                 return;
             }
 
-            let price = parseFloat(p.precio_venta);
-            let appliedNames = [];
+            const basePrice = parseFloat(p.precio_venta || 0);
             
-            // Filtrar tarifas que aplican
-            const applicable = TARIFAS_DATA.filter(t => {
-                if (!t.activo) return false;
-                
-                // Fechas
-                if (t.fecha_aplicacion && today < t.fecha_aplicacion) return false;
-                if (t.fecha_fin && today > t.fecha_fin) return false;
-                
-                // Horas
-                if (t.hora_inicio && currentTime < t.hora_inicio) return false;
-                if (t.hora_fin && currentTime > t.hora_fin) return false;
-                
-                // Días semana
-                if (t.dias_semana) {
-                    const allowedDays = t.dias_semana.split(',').map(Number);
-                    if (!allowedDays.includes(dayOfWeek)) return false;
-                }
+            let rowHtml = `
+                <td class="pl-24">
+                    <div class="matrix-product-info">
+                        <span class="fw-700 fs-14 text-main">${p.nombre}</span>
+                        <span class="fs-11 text-muted tt-uppercase ls-1">${p.categoria || 'S/C'}</span>
+                    </div>
+                </td>
+                <td class="text-center bg-light-col">
+                    <span class="matrix-price matrix-col-base">${basePrice.toFixed(2)}€</span>
+                </td>
+            `;
 
-                // Scope
-                if (t.scope === 'categoria' && p.categoria !== t.categoria) return false;
+            // Celdas para cada tarifa
+            activeRates.forEach((t, i) => {
+                const colClass = `matrix-col-${(i % 5) + 1}`;
+                let appliedPrice = basePrice;
+                let isApplicable = true;
+
+                // --- Lógica de Aplicabilidad (Scope) ---
+                if (t.scope === 'categoria' && p.categoria !== t.categoria) isApplicable = false;
                 if (t.scope === 'productos') {
                     try {
                         const ids = JSON.parse(t.producto_ids || '[]');
-                        if (!ids.includes(p.id)) return false;
-                    } catch(e) { return false; }
+                        if (!ids.includes(p.id)) isApplicable = false;
+                    } catch(e) { isApplicable = false; }
                 }
 
                 // Excluidos
-                if (t.excluidos) {
+                if (isApplicable && t.excluidos) {
                     try {
                         const excl = JSON.parse(t.excluidos);
-                        if (excl.includes(p.id)) return false;
+                        if (excl.includes(p.id)) isApplicable = false;
                     } catch(e) {}
                 }
 
-                return true;
-            }).sort((a, b) => b.prioridad - a.prioridad);
-
-            applicable.forEach(t => {
-                const val = parseFloat(t.valor);
-                if (t.tipo === 'percent') price *= (1 + val/100);
-                else price += val;
-                appliedNames.push(t.nombre);
+                // --- Renderizado de Celda ---
+                if (isApplicable) {
+                    const val = parseFloat(t.valor);
+                    if (t.tipo === 'percent') appliedPrice *= (1 + val/100);
+                    else appliedPrice += val;
+                    
+                    rowHtml += `
+                        <td class="text-center">
+                            <span class="matrix-price ${colClass}">${appliedPrice.toFixed(2)}€</span>
+                        </td>
+                    `;
+                } else {
+                    rowHtml += `
+                        <td class="text-center">
+                            <span class="matrix-dash">—</span>
+                        </td>
+                    `;
+                }
             });
 
-            const diff = price - p.precio_venta;
-            const diffClass = diff > 0 ? 'text-green' : (diff < 0 ? 'text-red' : 'text-muted');
-            const diffSign = diff > 0 ? '+' : '';
-
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>
-                    <div class="fw-600">${p.nombre}</div>
-                    <div class="fs-10 text-muted">${p.referencia}</div>
-                </td>
-                <td class="text-center"><span class="status-pill status-light fs-10">${p.categoria}</span></td>
-                <td class="text-right font-mono">${p.precio_venta.toFixed(2)} €</td>
-                <td class="text-right font-mono fw-700" style="background: rgba(var(--accent-rgb), 0.02);">${price.toFixed(2)} €</td>
-                <td class="text-center font-mono fs-11 ${diffClass}">${diffSign}${diff.toFixed(2)} €</td>
-                <td>
-                    <div class="d-flex flex-wrap gap-4">
-                        ${appliedNames.length > 0 
-                            ? appliedNames.map(n => `<span class="status-pill status-active" style="font-size: 9px; padding: 1px 6px;">${n}</span>`).join('')
-                            : '<span class="text-muted fs-11 italic"><?php echo L('rates_no_rules_applied'); ?></span>'
-                        }
-                    </div>
-                </td>
-            `;
-            tbody.appendChild(row);
+            const tr = document.createElement('tr');
+            tr.innerHTML = rowHtml;
+            tbody.appendChild(tr);
         });
 
         if (tbody.innerHTML === '') {
-            tbody.innerHTML = '<tr><td colspan="6" class="text-center p-40 text-muted"><?php echo L('rates_no_products_found'); ?></td></tr>';
+            tbody.innerHTML = `<tr><td colspan="${activeRates.length + 2}" class="text-center p-40 text-muted fs-14 italic">${<?php echo json_encode(L('rates_no_products_found', true)); ?>}</td></tr>`;
         }
     }
 </script>
@@ -1132,6 +1104,64 @@
         font-weight: 600;
         color: var(--accent);
     }
+
+    /* --- TARIFARIO MATRIX STYLES --- */
+    #view-tarifario .table-container {
+        overflow-x: auto;
+        width: 100%;
+    }
+
+    .table-matrix {
+        min-width: 800px; /* Asegura un ancho mínimo para forzar scroll si hay pocas tarifas pero pantalla pequeña */
+    }
+
+    .table-matrix thead th {
+        background: var(--surface);
+        padding: 20px 16px;
+        font-weight: 700;
+        font-size: 14px;
+        border-bottom: 2px solid var(--border);
+        white-space: nowrap;
+    }
+    
+    .table-matrix tbody td {
+        padding: 16px;
+        vertical-align: middle;
+        border-bottom: 1.5px solid var(--border);
+        height: 70px;
+    }
+
+    .matrix-price {
+        font-family: var(--font-main);
+        font-weight: 700;
+        font-size: 15px;
+        transition: transform 0.2s;
+    }
+    
+    .matrix-price:hover {
+        transform: scale(1.05);
+    }
+
+    .matrix-dash {
+        color: var(--text-muted);
+        opacity: 0.3;
+        font-weight: 400;
+    }
+
+    .matrix-product-info {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .matrix-col-base { color: var(--accent) !important; }
+    .matrix-col-1 { color: #10b981 !important; } /* Green */
+    .matrix-col-2 { color: #f59e0b !important; } /* Orange */
+    .matrix-col-3 { color: #8b5cf6 !important; } /* Purple */
+    .matrix-col-4 { color: #db2777 !important; } /* Pink */
+    .matrix-col-5 { color: #06b6d4 !important; } /* Cyan */
+    
+    .bg-light-col { background: rgba(0,0,0,0.015); }
 
     /* CSS v2 Styling updates */
     .hover-border-accent:hover {

@@ -88,24 +88,45 @@ try {
 
     if ($accion === 'buscarTexto') {
         $term = trim($input['term'] ?? '');
-        if ($term === '') {
+        $limit = isset($input['limit']) ? (int)$input['limit'] : 20;
+        $offset = isset($input['offset']) ? (int)$input['offset'] : 0;
+
+        if ($term === '' && !isset($input['force'])) {
             throw new Exception('Debes indicar un texto para buscar');
         }
-        $tipoFiltro = $input['tipo'] ?? null;
 
-        $sql = "SELECT id, tipo, rol, nombre, apellidos, nif, puntos FROM clientes WHERE (fecha_baja IS NULL)";
+        $tipoFiltro = $input['tipo'] ?? null;
+        $rolFiltro = $input['rol'] ?? null;
+
+        $baseSql = "FROM clientes WHERE (fecha_baja IS NULL)";
         $params = [];
         if (in_array($tipoFiltro, ['particular', 'empresa'], true)) {
-            $sql .= " AND tipo = :tipo";
+            $baseSql .= " AND tipo = :tipo";
             $params[':tipo'] = $tipoFiltro;
         }
-        $sql .= " AND (LOWER(nombre) LIKE LOWER(:t) OR LOWER(apellidos) LIKE LOWER(:t) OR LOWER(nif) LIKE LOWER(:t)) ORDER BY nombre, apellidos LIMIT 20";
-        $params[':t'] = '%' . $term . '%';
+        if ($rolFiltro) {
+            $baseSql .= " AND rol = :rol";
+            $params[':rol'] = $rolFiltro;
+        }
 
-        $q = DBPDO::ejecutarConsulta($sql, $params);
+        if ($term !== '') {
+            $baseSql .= " AND (nombre LIKE :t OR apellidos LIKE :t OR nif LIKE :t OR email LIKE :t)";
+            $params[':t'] = '%' . $term . '%';
+        }
+
+        // Obtener total para paginación
+        $countSql = "SELECT COUNT(*) " . $baseSql;
+        $qCount = DBPDO::ejecutarConsulta($countSql, $params);
+        $total = (int)$qCount->fetchColumn();
+
+        // Obtener datos paginados
+        $dataSql = "SELECT id, tipo, rol, nombre, apellidos, nif, email, telefono, puntos, fecha_alta " . $baseSql . " ORDER BY id ASC LIMIT :limit OFFSET :offset";
+        $dataSql = str_replace([':limit', ':offset'], [(int)$limit, (int)$offset], $dataSql);
+
+        $q = DBPDO::ejecutarConsulta($dataSql, $params);
         $lista = $q->fetchAll(PDO::FETCH_ASSOC);
 
-        echo json_encode(['ok' => true, 'lista' => $lista]);
+        echo json_encode(['ok' => true, 'lista' => $lista, 'total' => $total]);
         exit;
     }
 
@@ -118,14 +139,28 @@ try {
     if ($accion === 'historial') {
         $id = isset($input['id']) ? (int)$input['id'] : null;
         if (!$id) throw new Exception('ID obligatorio para el historial');
+        
+        $limit = isset($input['limit']) ? (int)$input['limit'] : 50;
+        $offset = isset($input['offset']) ? (int)$input['offset'] : 0;
 
         require_once __DIR__ . '/../model/VentaPDO.php';
         require_once __DIR__ . '/../model/ValePDO.php';
-        $ventas = VentaPDO::obtenerVentasPorCliente($id);
+        $ventas = VentaPDO::obtenerVentasPorCliente($id, $limit, $offset);
         $vales  = ValePDO::obtenerValesPorCliente($id);
 
         $cliente = ClientePDO::obtenerPorId($id);
         echo json_encode(['ok' => true, 'ventas' => $ventas, 'vales' => $vales, 'cliente' => $cliente]);
+        exit;
+    }
+
+    if ($accion === 'listar') {
+        $limit = isset($input['limit']) ? (int)$input['limit'] : 50;
+        $offset = isset($input['offset']) ? (int)$input['offset'] : 0;
+        
+        $lista = ClientePDO::listarTodos($limit, $offset);
+        $total = ClientePDO::contarTodos();
+        
+        echo json_encode(['ok' => true, 'lista' => $lista, 'total' => $total]);
         exit;
     }
 

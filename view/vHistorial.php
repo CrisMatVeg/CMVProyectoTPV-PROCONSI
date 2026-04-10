@@ -28,58 +28,94 @@
         </div>
     </div>
 
-    <?php if (!$avHistorial['verCierres']): ?>
+    <!-- PANEL DE FILTROS COMÚN -->
+    <div class="filters-panel container-wider">
+        <form id="formFiltros" method="get" action="index.php" class="filters-form" novalidate>
+            <input type="hidden" name="verCierres" value="<?php echo $avHistorial['verCierres'] ? '1' : '0'; ?>">
+            
+            <!-- Selector de Periodo -->
+            <div class="filter-group">
+                <label><?php echo L('history_filter_period'); ?></label>
+                <select name="periodo" id="filterPeriodo" class="filter-input">
+                    <option value="hoy" <?php echo $avHistorial['filtros']['periodo'] === 'hoy' ? 'selected' : ''; ?>><?php echo L('history_period_today'); ?></option>
+                    <option value="semana" <?php echo $avHistorial['filtros']['periodo'] === 'semana' ? 'selected' : ''; ?>><?php echo L('history_period_week'); ?></option>
+                    <option value="mes" <?php echo $avHistorial['filtros']['periodo'] === 'mes' ? 'selected' : ''; ?>><?php echo L('history_period_month'); ?></option>
+                    <option value="todo" <?php echo $avHistorial['filtros']['periodo'] === 'todo' ? 'selected' : ''; ?>><?php echo L('history_period_all'); ?></option>
+                    <option value="personalizado" <?php echo $avHistorial['filtros']['periodo'] === 'personalizado' ? 'selected' : ''; ?>><?php echo L('history_period_custom'); ?></option>
+                </select>
+            </div>
 
-        <!-- PANEL DE FILTROS -->
-        <div class="filters-panel container-wider">
-            <form method="get" action="index.php" class="filters-form" novalidate>
+            <!-- Rango Personalizado (Oculto si no es personalizado) -->
+            <div id="customDates" class="d-contents" style="<?php echo $avHistorial['filtros']['periodo'] !== 'personalizado' ? 'display:none' : ''; ?>">
                 <div class="filter-group">
                     <label><?php echo L('history_filter_since'); ?></label>
                     <input type="date" name="fechaDesde" value="<?php echo $avHistorial['filtros']['desde']; ?>" class="filter-input">
-                    <?php if (isset($avHistorial['aErrores']['fechaDesde']) && $avHistorial['aErrores']['fechaDesde'] != null) { ?>
-                        <span class="form-error"><?php echo $avHistorial['aErrores']['fechaDesde']; ?></span>
-                    <?php } ?>
                 </div>
                 <div class="filter-group">
                     <label><?php echo L('history_filter_until'); ?></label>
                     <input type="date" name="fechaHasta" value="<?php echo $avHistorial['filtros']['hasta']; ?>" class="filter-input">
-                    <?php if (isset($avHistorial['aErrores']['fechaHasta']) && $avHistorial['aErrores']['fechaHasta'] != null) { ?>
-                        <span class="form-error"><?php echo $avHistorial['aErrores']['fechaHasta']; ?></span>
-                    <?php } ?>
                 </div>
+            </div>
+
+            <?php if (!$avHistorial['verCierres']): ?>
                 <div class="filter-group w-120">
                     <label><?php echo L('history_filter_ticket'); ?></label>
-                    <input type="text" name="numeroTicket" value="<?php echo $avHistorial['filtros']['ticket']; ?>" class="filter-input" placeholder="Ej: 1002">
+                    <input type="text" name="numeroTicket" id="searchTicket" value="<?php echo $avHistorial['filtros']['ticket']; ?>" class="filter-input" placeholder="Ej: 1002">
                 </div>
 
-                <div class="filter-group w-200">
+                <div class="filter-group w-180">
                     <label><?php echo L('history_filter_cashier'); ?></label>
                     <select name="idCajero" class="filter-input">
                         <option value=""><?php echo L('history_filter_all_cashiers'); ?></option>
                         <?php foreach ($avHistorial['cajeros'] as $c): ?>
                             <option value="<?php echo $c->getId(); ?>" <?php echo $avHistorial['filtros']['cajero'] == $c->getId() ? 'selected' : ''; ?>>
-                                <?php echo $c->getNombreCompleto(); ?> (<?php echo $c->getUsername(); ?>)
+                                <?php echo $c->getNombreCompleto(); ?>
                             </option>
                         <?php endforeach; ?>
                     </select>
                 </div>
-                <div class="filter-group w-160">
+                <div class="filter-group w-140">
                     <label><?php echo L('history_filter_type'); ?></label>
                     <select name="tipoDocumento" class="filter-input">
-                        <option value="todos" <?php echo $avHistorial['filtros']['tipoDocumento'] === 'todos' ? 'selected' : ''; ?>>Todos</option>
-                        <option value="venta" <?php echo $avHistorial['filtros']['tipoDocumento'] === 'venta' ? 'selected' : ''; ?>>Solo ventas</option>
-                        <option value="abono" <?php echo $avHistorial['filtros']['tipoDocumento'] === 'abono' ? 'selected' : ''; ?>>Solo abonos</option>
+                        <option value="todos" <?php echo $avHistorial['filtros']['tipoDocumento'] === 'todos' ? 'selected' : ''; ?>><?php echo L('history_type_all'); ?></option>
+                        <option value="venta" <?php echo $avHistorial['filtros']['tipoDocumento'] === 'venta' ? 'selected' : ''; ?>><?php echo L('history_type_sales'); ?></option>
+                        <option value="abono" <?php echo $avHistorial['filtros']['tipoDocumento'] === 'abono' ? 'selected' : ''; ?>><?php echo L('history_type_abonos'); ?></option>
                     </select>
                 </div>
-                <button type="submit" class="btn-filter">
-                    <i class="fa-solid fa-magnifying-glass"></i> <?php echo L('history_filter_btn'); ?>
-                </button>
-            </form>
-        </div>
+            <?php endif; ?>
 
+            <!-- Ordenación -->
+            <div class="filter-group">
+                <label><?php echo L('history_filter_sort_by'); ?></label>
+                <div class="d-flex gap-4">
+                    <select name="ordenPor" class="filter-input">
+                        <option value="fecha" <?php echo $avHistorial['filtros']['ordenPor'] === 'fecha' ? 'selected' : ''; ?>><?php echo L('history_sort_date'); ?></option>
+                        <?php if (!$avHistorial['verCierres']): ?>
+                            <option value="numero_ticket" <?php echo $avHistorial['filtros']['ordenPor'] === 'numero_ticket' ? 'selected' : ''; ?>><?php echo L('history_sort_ticket'); ?></option>
+                            <option value="total" <?php echo $avHistorial['filtros']['ordenPor'] === 'total' ? 'selected' : ''; ?>><?php echo L('history_sort_amount'); ?></option>
+                            <option value="nombre_cajero" <?php echo $avHistorial['filtros']['ordenPor'] === 'nombre_cajero' ? 'selected' : ''; ?>><?php echo L('history_sort_cashier'); ?></option>
+                        <?php else: ?>
+                            <option value="total" <?php echo $avHistorial['filtros']['ordenPor'] === 'total' ? 'selected' : ''; ?>><?php echo L('history_sort_amount'); ?></option>
+                            <option value="id" <?php echo $avHistorial['filtros']['ordenPor'] === 'id' ? 'selected' : ''; ?>>ID #Z</option>
+                        <?php endif; ?>
+                    </select>
+                    <select name="ordenDir" class="filter-input w-80">
+                        <option value="DESC" <?php echo $avHistorial['filtros']['ordenDir'] === 'DESC' ? 'selected' : ''; ?>>DESC</option>
+                        <option value="ASC" <?php echo $avHistorial['filtros']['ordenDir'] === 'ASC' ? 'selected' : ''; ?>>ASC</option>
+                    </select>
+                </div>
+            </div>
+
+            <button type="submit" class="btn-filter no-print">
+                <i class="fa-solid fa-sync"></i>
+            </button>
+        </form>
+    </div>
+
+    <?php if (!$avHistorial['verCierres']): ?>
         <!-- RESULTADOS -->
         <div class="table-container container-wider">
-            <table class="data-table">
+            <table class="data-table exclude-pagination">
                 <thead>
                     <tr>
                         <th class="w-150"><?php echo L('history_th_ticket'); ?></th>
@@ -190,14 +226,14 @@
                             </td>
                             <td>
                                 <div class="d-flex gap-8 jc-center">
-                                    <button title="Ver detalle" class="btn-icon" onclick="verTicket(<?php echo $v['numero_ticket']; ?>)">
+                                    <button title="Ver detalle" class="btn-icon" onclick="verTicket('<?php echo $v['numero_ticket']; ?>')">
                                         <i class="fa-solid <?php echo $esAbono ? 'fa-file-circle-minus' : 'fa-receipt'; ?>"></i>
                                     </button>
-                                    <button title="<?php echo !empty($v['es_factura']) ? L('history_btn_view_invoice', true) : L('history_btn_gen_invoice', true); ?>" class="btn-icon <?php echo !empty($v['es_factura']) ? 'text-accent' : ''; ?>" onclick="abrirModalFactura(<?php echo $v['id']; ?>, <?php echo $v['numero_ticket']; ?>, '<?php echo addslashes(htmlspecialchars($v['nombre_cliente'] ?? '')); ?>', '<?php echo addslashes(htmlspecialchars($v['nif_cliente'] ?? '')); ?>', <?php echo !empty($v['es_factura']) ? 'true' : 'false'; ?>)">
+                                    <button title="<?php echo !empty($v['es_factura']) ? L('history_btn_view_invoice', true) : L('history_btn_gen_invoice', true); ?>" class="btn-icon <?php echo !empty($v['es_factura']) ? 'text-accent' : ''; ?>" onclick="abrirModalFactura('<?php echo $v['id']; ?>', '<?php echo $v['numero_ticket']; ?>', '<?php echo addslashes(htmlspecialchars($v['nombre_cliente'] ?? '')); ?>', '<?php echo addslashes(htmlspecialchars($v['nif_cliente'] ?? '')); ?>', <?php echo !empty($v['es_factura']) ? 'true' : 'false'; ?>)">
                                         <i class="fa-solid fa-file-invoice"></i>
                                     </button>
                                     <?php if ($esAbono && !empty($v['numero_ticket_origen'])): ?>
-                                        <button title="Ver venta origen: T-<?php echo $v['numero_ticket_origen']; ?>" class="btn-icon text-accent" onclick="verTicket(<?php echo (int)$v['numero_ticket_origen']; ?>)">
+                                        <button title="Ver venta origen: T-<?php echo $v['numero_ticket_origen']; ?>" class="btn-icon text-accent" onclick="verTicket('<?php echo $v['numero_ticket_origen']; ?>')">
                                             <i class="fa-solid fa-link"></i>
                                         </button>
                                     <?php endif; ?>
@@ -207,6 +243,63 @@
                     <?php endforeach; ?>
                 </tbody>
             </table>
+        </div>
+
+        <!-- Paginación para Ventas -->
+        <div class="pagination-footer mt-24 d-flex ai-center jc-between p-16 container-wider bg-surface border-top no-print" style="border-radius: 0 0 12px 12px;">
+            <div class="pagination-info fs-13 fw-500 text-muted">
+                <i class="fa-solid fa-list-ol mr-8 opacity-50"></i>
+                <?php 
+                    $from = $avHistorial['paginacion']['totalRegistros'] > 0 ? ($avHistorial['paginacion']['actual'] - 1) * $avHistorial['paginacion']['limit'] + 1 : 0;
+                    $to = min($avHistorial['paginacion']['actual'] * $avHistorial['paginacion']['limit'], $avHistorial['paginacion']['totalRegistros']);
+                    echo str_replace(['{from}', '{to}', '{total}'], (array)[$from, $to, $avHistorial['paginacion']['totalRegistros']], L('page_showing')); 
+                ?>
+            </div>
+            
+            <div class="pagination-controls d-flex ai-center gap-12">
+                <?php
+                // Construir URL base con TODOS los filtros actuales para persistencia
+                $params = [
+                    'fechaDesde'    => $avHistorial['filtros']['desde'],
+                    'fechaHasta'    => $avHistorial['filtros']['hasta'],
+                    'periodo'       => $_GET['periodo'] ?? 'hoy',
+                    'ordenPor'      => $avHistorial['filtros']['ordenPor'] ?? 'fecha',
+                    'ordenDir'      => $avHistorial['filtros']['ordenDir'] ?? 'DESC',
+                    'numeroTicket'  => $avHistorial['filtros']['ticket'] ?? '',
+                    'idCajero'      => $avHistorial['filtros']['cajero'] ?? '',
+                    'tipoDocumento' => $avHistorial['filtros']['tipoDocumento'] ?? 'todos'
+                ];
+                $baseUrl = "index.php?" . http_build_query($params);
+                $isFirst = $avHistorial['paginacion']['actual'] <= 1;
+                $isLast  = $avHistorial['paginacion']['actual'] >= $avHistorial['paginacion']['total'];
+                ?>
+                
+                <div class="d-flex gap-4">
+                    <a class="btn-icon btn-sm <?php echo $isFirst ? 'disabled pointer-events-none opacity-30' : ''; ?>" 
+                       href="<?php echo $baseUrl; ?>&p=1" title="<?php echo L('page_first'); ?>">
+                        <i class="fa-solid fa-angles-left"></i>
+                    </a>
+                    <a class="btn-secondary btn-sm <?php echo $isFirst ? 'disabled pointer-events-none opacity-30' : ''; ?>" 
+                       href="<?php echo $baseUrl; ?>&p=<?php echo $avHistorial['paginacion']['actual'] - 1; ?>" style="min-width: 100px; height: 36px; display: inline-flex; align-items: center; justify-content: center;">
+                        <i class="fa-solid fa-chevron-left mr-8"></i> <?php echo L('page_prev'); ?>
+                    </a>
+                </div>
+
+                <div class="pagination-current fw-700 fs-13 d-flex ai-center px-16 h-36 border shadow-sm" style="background: #fff; border-radius: 8px; color: var(--accent); min-width: 120px; justify-content: center; border-color: rgba(var(--accent-rgb), 0.2);">
+                    <?php echo str_replace(['{current}', '{total}'], [$avHistorial['paginacion']['actual'], max(1, $avHistorial['paginacion']['total'])], L('page_info')); ?>
+                </div>
+
+                <div class="d-flex gap-4">
+                    <a class="btn-secondary btn-sm <?php echo $isLast ? 'disabled pointer-events-none opacity-30' : ''; ?>" 
+                       href="<?php echo $baseUrl; ?>&p=<?php echo $avHistorial['paginacion']['actual'] + 1; ?>" style="min-width: 100px; height: 36px; display: inline-flex; align-items: center; justify-content: center;">
+                        <?php echo L('page_next'); ?> <i class="fa-solid fa-chevron-right ml-8"></i>
+                    </a>
+                    <a class="btn-icon btn-sm <?php echo $isLast ? 'disabled pointer-events-none opacity-30' : ''; ?>" 
+                       href="<?php echo $baseUrl; ?>&p=<?php echo $avHistorial['paginacion']['total']; ?>" title="<?php echo L('page_last'); ?>">
+                        <i class="fa-solid fa-angles-right"></i>
+                    </a>
+                </div>
+            </div>
         </div>
     <?php else: ?>
         <!-- LISTADO DE CIERRES FISCALES -->
@@ -279,6 +372,61 @@
                     <?php endforeach; ?>
                 </tbody>
             </table>
+        </div>
+
+        <!-- Paginación para Cierres -->
+        <div class="pagination-footer mt-24 d-flex ai-center jc-between p-16 container-wider bg-surface border-top no-print" style="border-radius: 0 0 12px 12px;">
+            <div class="pagination-info fs-13 fw-500 text-muted">
+                <i class="fa-solid fa-list-ol mr-8 opacity-50"></i>
+                <?php 
+                    $from = $avHistorial['paginacion']['totalRegistros'] > 0 ? ($avHistorial['paginacion']['actual'] - 1) * $avHistorial['paginacion']['limit'] + 1 : 0;
+                    $to = min($avHistorial['paginacion']['actual'] * $avHistorial['paginacion']['limit'], $avHistorial['paginacion']['totalRegistros']);
+                    echo str_replace(['{from}', '{to}', '{total}'], (array)[$from, $to, $avHistorial['paginacion']['totalRegistros']], L('page_showing')); 
+                ?>
+            </div>
+            
+            <div class="pagination-controls d-flex ai-center gap-12">
+                <?php
+                // Construir URL base con TODOS los filtros actuales para persistencia
+                $params = [
+                    'verCierres'    => 1,
+                    'fechaDesde'    => $avHistorial['filtros']['desde'],
+                    'fechaHasta'    => $avHistorial['filtros']['hasta'],
+                    'periodo'       => $_GET['periodo'] ?? 'hoy',
+                    'ordenPor'      => $avHistorial['filtros']['ordenPor'] ?? 'fecha',
+                    'ordenDir'      => $avHistorial['filtros']['ordenDir'] ?? 'DESC'
+                ];
+                $baseUrl = "index.php?" . http_build_query($params);
+                $isFirst = $avHistorial['paginacion']['actual'] <= 1;
+                $isLast  = $avHistorial['paginacion']['actual'] >= $avHistorial['paginacion']['total'];
+                ?>
+                
+                <div class="d-flex gap-4">
+                    <a class="btn-icon btn-sm <?php echo $isFirst ? 'disabled pointer-events-none opacity-30' : ''; ?>" 
+                       href="<?php echo $baseUrl; ?>&p=1" title="<?php echo L('page_first'); ?>">
+                        <i class="fa-solid fa-angles-left"></i>
+                    </a>
+                    <a class="btn-secondary btn-sm <?php echo $isFirst ? 'disabled pointer-events-none opacity-30' : ''; ?>" 
+                       href="<?php echo $baseUrl; ?>&p=<?php echo $avHistorial['paginacion']['actual'] - 1; ?>" style="min-width: 100px; height: 36px; display: inline-flex; align-items: center; justify-content: center;">
+                        <i class="fa-solid fa-chevron-left mr-8"></i> <?php echo L('page_prev'); ?>
+                    </a>
+                </div>
+
+                <div class="pagination-current fw-700 fs-13 d-flex ai-center px-16 h-36 border shadow-sm" style="background: #fff; border-radius: 8px; color: var(--accent); min-width: 120px; justify-content: center; border-color: rgba(var(--accent-rgb), 0.2);">
+                    <?php echo str_replace(['{current}', '{total}'], [$avHistorial['paginacion']['actual'], max(1, $avHistorial['paginacion']['total'])], L('page_info')); ?>
+                </div>
+
+                <div class="d-flex gap-4">
+                    <a class="btn-secondary btn-sm <?php echo $isLast ? 'disabled pointer-events-none opacity-30' : ''; ?>" 
+                       href="<?php echo $baseUrl; ?>&p=<?php echo $avHistorial['paginacion']['actual'] + 1; ?>" style="min-width: 100px; height: 36px; display: inline-flex; align-items: center; justify-content: center;">
+                        <?php echo L('page_next'); ?> <i class="fa-solid fa-chevron-right ml-8"></i>
+                    </a>
+                    <a class="btn-icon btn-sm <?php echo $isLast ? 'disabled pointer-events-none opacity-30' : ''; ?>" 
+                       href="<?php echo $baseUrl; ?>&p=<?php echo $avHistorial['paginacion']['total']; ?>" title="<?php echo L('page_last'); ?>">
+                        <i class="fa-solid fa-angles-right"></i>
+                    </a>
+                </div>
+            </div>
         </div>
     <?php endif; ?>
 
@@ -594,8 +742,9 @@
 
 <script>
     function verTicket(id) {
+        if (!id) return;
         // Direct call to global function in main.js
-        fetch('api/obtenerVenta.php?id=' + id)
+        fetch('api/obtenerVenta.php?id=' + encodeURIComponent(id))
             .then(r => r.json())
             .then(data => {
                 if (data.ok) mostrarTicket(data.venta, false);
@@ -611,7 +760,7 @@
 
         // Si ya tiene datos completos, podemos abrir directamente la factura
         if (yaEsFactura && nombreExistente && nifExistente) {
-            window.open('api/imprimirTicketPro.php?id=' + numTicket + '&modo=factura', '_blank');
+            window.open('api/imprimirTicketPro.php?id=' + encodeURIComponent(numTicket) + '&modo=factura', '_blank');
             return;
         }
 
@@ -630,12 +779,12 @@
         const nif = document.getElementById('facNifCliente').value.trim();
 
         if (!nombre || !nif) {
-            showCustomAlert("<?php echo L('history_modal_label_name'); ?>", "<?php echo L('history_js_inv_req'); ?>", 'warning');
+            showCustomAlert(<?php echo json_encode(L('history_modal_label_name')); ?>, <?php echo json_encode(L('history_js_inv_req')); ?>, 'warning');
             return;
         }
 
         if (!validarDocumento(nif)) {
-            showCustomAlert("<?php echo L('client_js_invalid_doc'); ?>", "<?php echo L('history_js_inv_format_error'); ?>", 'warning');
+            showCustomAlert(<?php echo json_encode(L('client_js_invalid_doc')); ?>, <?php echo json_encode(L('history_js_inv_format_error')); ?>, 'warning');
             return;
         }
 
@@ -649,22 +798,22 @@
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    id_venta: parseInt(idVenta),
+                    id_venta: idVenta,
                     nombre_cliente: nombre,
                     nif_cliente: nif
                 })
             });
             const res = await r.json();
             if (!res.ok) {
-                showCustomAlert("<?php echo L('config_save_error'); ?>", (res.error || "<?php echo L('history_js_gen_error'); ?>"), 'error');
+                showCustomAlert(<?php echo json_encode(L('config_save_error')); ?>, (res.error || <?php echo json_encode(L('history_js_gen_error')); ?>), 'error');
                 return;
             }
             cerrarModalFactura();
-            window.open('api/imprimirTicketPro.php?id=' + ticket + '&modo=factura', '_blank');
+            window.open('api/imprimirTicketPro.php?id=' + encodeURIComponent(ticket) + '&modo=factura', '_blank');
             // Recargar la página para que el badge FAC aparezca en la fila
             setTimeout(() => location.reload(), 800);
         } catch (e) {
-            showCustomAlert("<?php echo L('config_save_error'); ?>", "<?php echo L('history_js_conn_error'); ?>", 'error');
+            showCustomAlert(<?php echo json_encode(L('config_save_error')); ?>, <?php echo json_encode(L('history_js_conn_error')); ?>, 'error');
         } finally {
             btn.disabled = false;
         }
@@ -674,16 +823,16 @@
         window._currentZId = data.id;
         document.getElementById('z-id').innerText = '#Cierre-' + String(data.id).padStart(3, '0');
         document.getElementById('z-header-info').innerHTML = `
-        <span><i class="fa-solid fa-calendar-day opacity-50 mr-4"></i> ${data.fecha}</span>
-        <span><i class="fa-solid fa-user-tie opacity-50 mr-4"></i> <?php echo L('history_report_z_resp'); ?> <b>${data.nombre_usuario || "<?php echo L('system'); ?>"}</b></span>
-    `;
+            <span><i class="fa-solid fa-calendar-day opacity-50 mr-4"></i> ${data.fecha}</span>
+            <span><i class="fa-solid fa-user-tie opacity-50 mr-4"></i> <?php echo L('history_report_z_resp'); ?> <b>${data.nombre_usuario || <?php echo json_encode(L('system')); ?>}</b></span>
+        `;
 
         const fmt = (num) => new Intl.NumberFormat('de-DE', {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2
         }).format(num) + ' €';
         const rango = (data.primera_venta && data.ultima_venta) ?
-            `${data.primera_venta.substring(11, 16)}h → ${data.ultima_venta.substring(11, 16)}h` : "<?php echo L('history_report_z_no_activity'); ?>";
+            `${data.primera_venta.substring(11, 16)}h → ${data.ultima_venta.substring(11, 16)}h` : <?php echo json_encode(L('history_report_z_no_activity')); ?>;
 
         document.getElementById('z-rango').innerText = rango;
         document.getElementById('z-tickets').innerText = data.num_tickets || 0;
@@ -731,12 +880,12 @@
                         bodyRet.appendChild(tr);
                     });
                 } else {
-                    bodyRet.innerHTML = '<tr><td colspan="4" class="text-center py-24 text-muted fs-12 italic"><?php echo L('history_js_no_movs'); ?></td></tr>';
+                    bodyRet.innerHTML = '<tr><td colspan="4" class="text-center py-24 text-muted fs-12 italic">' + <?php echo json_encode(L('history_js_no_movs')); ?> + '</td></tr>';
                 }
 
                 if (info.ok && info.turnos && info.turnos.length) {
                     window._currentTurnosData = info.turnos;
-                    document.getElementById('z-num-turnos').innerText = info.turnos.length + ' ' + (info.turnos.length === 1 ? "<?php echo L('history_js_shift'); ?>" : "<?php echo L('history_js_shifts'); ?>");
+                    document.getElementById('z-num-turnos').innerText = info.turnos.length + ' ' + (info.turnos.length === 1 ? <?php echo json_encode(L('history_js_shift')); ?> : <?php echo json_encode(L('history_js_shifts')); ?>);
                     info.turnos.forEach((t, index) => {
                         const tr = document.createElement('tr');
                         const h_ape = t.fecha_apertura ? t.fecha_apertura.substring(11, 16) : '-';
@@ -757,8 +906,8 @@
                         bodyTur.appendChild(tr);
                     });
                 } else if (bodyTur) {
-                    document.getElementById('z-num-turnos').innerText = '0 <?php echo L('history_js_shifts'); ?>';
-                    bodyTur.innerHTML = '<tr><td colspan="3" class="text-center py-24 text-muted fs-12 italic"><?php echo L('history_js_no_shifts'); ?></td></tr>';
+                    document.getElementById('z-num-turnos').innerText = '0 ' + <?php echo json_encode(L('history_js_shifts')); ?>;
+                    bodyTur.innerHTML = '<tr><td colspan="3" class="text-center py-24 text-muted fs-12 italic">' + <?php echo json_encode(L('history_js_no_shifts')); ?> + '</td></tr>';
                 }
 
                 // Recopilar datos de turnos y retiros para la ventana de impresión
@@ -777,7 +926,7 @@
                 };
             })
             .catch(() => {
-                document.getElementById('z-retiros-body').innerHTML = '<tr><td colspan="4" class="text-center text-red fs-12"><?php echo L('history_js_load_movs_error'); ?></td></tr>';
+                document.getElementById('z-retiros-body').innerHTML = '<tr><td colspan="4" class="text-center text-red fs-12">' + <?php echo json_encode(L('history_js_load_movs_error')); ?> + '</td></tr>';
             })
             .finally(() => {
                 document.getElementById('modalReporteZ').style.display = 'flex';
@@ -788,169 +937,122 @@
         const d = window._currentZData;
         if (!d) return;
 
-        const {
-            data,
-            fmt,
-            fmtNum,
-            rango,
-            turnosRows,
-            retirosRows
-        } = d;
+        const { data, fmt, fmtNum, rango, turnosRows, retirosRows } = d;
         const deuda = parseFloat(data.deuda_generada) || 0;
         const deudaColor = deuda > 0 ? '#dc2626' : '#16a34a';
 
-        const html = `<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<title>Cierre Fiscal #${String(data.id).padStart(3,'0')}</title>
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Courier New', monospace; background: #fff; color: #000; font-size: 12px; padding: 20mm 15mm; }
-  
-  .header { text-align: center; border-bottom: 3px double #000; padding-bottom: 12px; margin-bottom: 16px; }
-  .header .empresa { font-size: 20px; font-weight: 900; letter-spacing: 3px; text-transform: uppercase; }
-  .header .subtitulo { font-size: 11px; letter-spacing: 1px; color: #555; margin-top: 2px; }
-  .header .num-cierre { font-size: 28px; font-weight: 900; letter-spacing: -1px; margin: 8px 0 4px; }
-  .header .meta { font-size: 11px; color: #444; display: flex; justify-content: center; gap: 24px; margin-top: 6px; }
+        // Escapar strings y pre-calcular traducciones
+        const empresa = <?php echo json_encode($avConfig['empresa_nombre'] ?? 'ElectroBazar'); ?>;
+        const langCode = <?php echo json_encode(($_SESSION['lang'] ?? 'es') === 'en' ? 'en-GB' : 'es-ES'); ?>;
+        
+        // Traducciones pre-escapadas
+        const t = {
+            sub: <?php echo json_encode(L('history_report_z_sub')); ?>,
+            resp: <?php echo json_encode(L('history_report_z_th_shift_resp')); ?>,
+            activity: <?php echo json_encode(L('history_report_z_activity')); ?>,
+            system: <?php echo json_encode(L('system')); ?>,
+            summary: <?php echo json_encode(L('history_report_z_ops_summary')); ?>,
+            ops: <?php echo json_encode(L('history_report_z_ops')); ?>,
+            tickets: <?php echo json_encode(L('history_th_tickets_z')); ?>,
+            imbalance: <?php echo json_encode(L('history_report_z_imbalance')); ?>,
+            breakdown: <?php echo json_encode(L('history_report_z_breakdown')); ?>,
+            cash: <?php echo json_encode(L('tpv_method_cash')); ?>,
+            card: <?php echo json_encode(L('tpv_method_card')); ?>,
+            bizum: <?php echo json_encode(L('tpv_method_bizum')); ?>,
+            totalArqueado: <?php echo json_encode(L('history_report_z_total_arqueado')); ?>,
+            shiftsTitle: <?php echo json_encode(L('history_report_z_shifts_title')); ?>,
+            shiftOpen: <?php echo json_encode(L('history_report_z_th_shift_open')); ?>,
+            shiftClose: <?php echo json_encode(L('history_report_z_th_shift_close')); ?>,
+            shiftReal: <?php echo json_encode(L('history_report_z_th_shift_real')); ?>,
+            noShifts: <?php echo json_encode(L('history_js_no_shifts')); ?>,
+            movsTitle: <?php echo json_encode(L('history_report_z_movements_title')); ?>,
+            movTime: <?php echo json_encode(L('history_report_z_th_mov_time')); ?>,
+            movConcept: <?php echo json_encode(L('history_report_z_th_mov_concept')); ?>,
+            movAmount: <?php echo json_encode(L('history_report_z_th_mov_amount')); ?>,
+            noMovs: <?php echo json_encode(L('history_js_no_movs')); ?>,
+            footer: <?php echo json_encode(L('history_report_z_footer')); ?>
+        };
 
-  .seccion { margin-bottom: 14px; }
-  .seccion-titulo { font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; border-bottom: 1px solid #000; padding-bottom: 4px; margin-bottom: 8px; }
+        let html = '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">';
+        html += '<title>Cierre Fiscal #' + String(data.id).padStart(3,"0") + '</title>';
+        html += '<style>' +
+                '* { box-sizing: border-box; margin: 0; padding: 0; }' +
+                'body { font-family: "Courier New", monospace; background: #fff; color: #000; font-size: 12px; padding: 20mm 15mm; }' +
+                '.header { text-align: center; border-bottom: 3px double #000; padding-bottom: 12px; margin-bottom: 16px; }' +
+                '.header .empresa { font-size: 20px; font-weight: 900; letter-spacing: 3px; text-transform: uppercase; }' +
+                '.header .subtitulo { font-size: 11px; letter-spacing: 1px; color: #555; margin-top: 2px; }' +
+                '.header .num-cierre { font-size: 28px; font-weight: 900; letter-spacing: -1px; margin: 8px 0 4px; }' +
+                '.header .meta { font-size: 11px; color: #444; display: flex; justify-content: center; gap: 24px; margin-top: 6px; }' +
+                '.seccion { margin-bottom: 14px; }' +
+                '.seccion-titulo { font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; border-bottom: 1px solid #000; padding-bottom: 4px; margin-bottom: 8px; }' +
+                '.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }' +
+                '.kpi { border: 1px solid #ccc; padding: 10px 12px; }' +
+                '.kpi .label { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #666; margin-bottom: 4px; }' +
+                '.kpi .valor { font-size: 16px; font-weight: 900; }' +
+                '.total-box { border: 2px solid #000; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; background: #f0f0f0; }' +
+                '.total-box .label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }' +
+                '.total-box .valor { font-size: 24px; font-weight: 900; letter-spacing: -1px; }' +
+                'table { width: 100%; border-collapse: collapse; font-size: 11px; }' +
+                'thead tr { background: #000; color: #fff; }' +
+                'thead th { padding: 6px 8px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }' +
+                'tbody td { padding: 6px 8px; border-bottom: 1px solid #ddd; }' +
+                '.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }' +
+                '.pie { margin-top: 20px; padding-top: 12px; border-top: 3px double #000; text-align: center; font-size: 10px; color: #666; letter-spacing: 1px; }' +
+                '.text-right { text-align: right; }' +
+                '@media print { body { padding: 10mm; } @page { margin: 10mm; size: A4; } }' +
+                '</style></head><body>';
 
-  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 14px; }
-  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
-  
-  .kpi { border: 1px solid #ccc; padding: 10px 12px; }
-  .kpi .label { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #666; margin-bottom: 4px; }
-  .kpi .valor { font-size: 16px; font-weight: 900; }
-  .kpi.destacado { border: 2px solid #000; background: #f9f9f9; }
-  .kpi.destacado .valor { font-size: 20px; }
+        html += '<div class="header">' +
+                '<div class="empresa">' + empresa + '</div>' +
+                '<div class="subtitulo">' + t.sub + '</div>' +
+                '<div class="num-cierre">#Cierre-' + String(data.id).padStart(3,"0") + '</div>' +
+                '<div class="meta">' +
+                '<span>' + data.fecha + '</span> ' +
+                '<span>' + t.resp + ': <strong>' + (data.nombre_usuario || t.system) + '</strong></span> ' +
+                '<span>' + t.activity + ': ' + rango + '</span>' +
+                '</div></div>';
 
-  .total-box { border: 2px solid #000; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; background: #f0f0f0; }
-  .total-box .label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
-  .total-box .valor { font-size: 24px; font-weight: 900; letter-spacing: -1px; }
+        html += '<div class="seccion">' +
+                '<div class="seccion-titulo">' + t.summary + '</div>' +
+                '<div class="grid-3">' +
+                '<div class="kpi"><div class="label">' + t.ops + '</div><div class="valor">' + (data.num_tickets || 0) + ' ' + t.tickets + '</div></div>' +
+                '<div class="kpi"><div class="label">' + t.activity + '</div><div class="valor">' + rango + '</div></div>' +
+                '<div class="kpi" style="border-color: ' + deudaColor + ';">' +
+                '<div class="label">' + t.imbalance + '</div>' +
+                '<div class="valor" style="color: ' + deudaColor + ';">' + (deuda >= 0 ? '+' : '') + fmt(deuda) + '</div></div>' +
+                '</div></div>';
 
-  table { width: 100%; border-collapse: collapse; font-size: 11px; }
-  thead tr { background: #000; color: #fff; }
-  thead th { padding: 6px 8px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
-  tbody td { padding: 6px 8px; border-bottom: 1px solid #ddd; }
-  tbody tr:last-child td { border-bottom: none; }
+        html += '<div class="seccion">' +
+                '<div class="seccion-titulo">' + t.breakdown + '</div>' +
+                '<div class="grid-3">' +
+                '<div class="kpi"><div class="label">' + t.cash + '</div><div class="valor">' + fmt(data.total_efectivo) + '</div></div>' +
+                '<div class="kpi"><div class="label">' + t.card + '</div><div class="valor">' + fmt(data.total_tarjeta) + '</div></div>' +
+                '<div class="kpi"><div class="label">' + t.bizum + '</div><div class="valor">' + fmt(data.total_bizum || 0) + '</div></div>' +
+                '</div></div>';
 
-  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        html += '<div class="total-box"><div class="label">' + t.totalArqueado + '</div><div class="valor">' + fmt(data.total_general) + '</div></div>';
 
-  .pie { margin-top: 20px; padding-top: 12px; border-top: 3px double #000; text-align: center; font-size: 10px; color: #666; letter-spacing: 1px; }
-  
-  .text-right { text-align: right; }
-  .font-bold { font-weight: 700; }
-  .text-red { color: #dc2626; }
-  .text-green { color: #16a34a; }
+        html += '<div class="grid-2"><div class="seccion">' +
+                '<div class="seccion-titulo">' + t.shiftsTitle + '</div>' +
+                '<table><thead><tr><th>' + t.shiftOpen + '</th><th>' + t.shiftClose + '</th><th>' + t.resp + '</th><th class="text-right">' + t.shiftReal + '</th></tr></thead>' +
+                '<tbody>' + (turnosRows || '<tr><td colspan="4" style="text-align:center; padding:12px; color:#999;">' + t.noShifts + '</td></tr>') + '</tbody>' +
+                '</table></div>';
 
-  @media print {
-    body { padding: 10mm; }
-    @page { margin: 10mm; size: A4; }
-  }
-</style>
-</head>
-<body>
+        html += '<div class="seccion">' +
+                '<div class="seccion-titulo">' + t.movsTitle + '</div>' +
+                '<table><thead><tr><th>' + t.movTime + '</th><th>' + t.movConcept + '</th><th class="text-right">' + t.movAmount + '</th></tr></thead>' +
+                '<tbody>' + (retirosRows || '<tr><td colspan="3" style="text-align:center; padding:12px; color:#999;">' + t.noMovs + '</td></tr>') + '</tbody>' +
+                '</table></div></div>';
 
-<div class="header">
-  <div class="empresa"><?php echo htmlspecialchars($avConfig['empresa_nombre'] ?? 'ElectroBazar'); ?></div>
-  <div class="subtitulo"><?php echo L('history_report_z_sub'); ?></div>
-  <div class="num-cierre">#Cierre-${String(data.id).padStart(3,'0')}</div>
-  <div class="meta">
-    <span>${data.fecha}</span>
-    <span><?php echo L('history_report_z_th_shift_resp'); ?>: <strong>${data.nombre_usuario || "<?php echo L('system'); ?>"}</strong></span>
-    <span><?php echo L('history_report_z_activity'); ?>: ${rango}</span>
-  </div>
-</div>
-
-<div class="seccion">
-  <div class="seccion-titulo"><?php echo L('history_report_z_ops_summary'); ?></div>
-  <div class="grid-3">
-    <div class="kpi">
-      <div class="label"><?php echo L('history_report_z_ops'); ?></div>
-      <div class="valor">${data.num_tickets || 0} <?php echo L('history_th_tickets_z'); ?></div>
-    </div>
-    <div class="kpi">
-      <div class="label"><?php echo L('history_report_z_activity'); ?></div>
-      <div class="valor">${rango}</div>
-    </div>
-    <div class="kpi" style="border-color: ${deudaColor};">
-      <div class="label"><?php echo L('history_report_z_imbalance'); ?></div>
-      <div class="valor" style="color: ${deudaColor};">${(deuda >= 0 ? '+' : '') + fmt(deuda)}</div>
-    </div>
-  </div>
-</div>
-
-<div class="seccion">
-  <div class="seccion-titulo"><?php echo L('history_report_z_breakdown'); ?></div>
-  <div class="grid-3">
-    <div class="kpi">
-      <div class="label"><?php echo L('tpv_method_cash'); ?></div>
-      <div class="valor">${fmt(data.total_efectivo)}</div>
-    </div>
-    <div class="kpi">
-      <div class="label"><?php echo L('tpv_method_card'); ?></div>
-      <div class="valor">${fmt(data.total_tarjeta)}</div>
-    </div>
-    <div class="kpi">
-      <div class="label"><?php echo L('tpv_method_bizum'); ?></div>
-      <div class="valor">${fmt(data.total_bizum || 0)}</div>
-    </div>
-  </div>
-</div>
-
-<div class="total-box">
-  <div class="label"><?php echo L('history_report_z_total_arqueado'); ?></div>
-  <div class="valor">${fmt(data.total_general)}</div>
-</div>
-
-<div class="grid-2">
-  <div class="seccion">
-    <div class="seccion-titulo"><?php echo L('history_report_z_shifts_title'); ?></div>
-    <table>
-      <thead>
-        <tr>
-          <th><?php echo L('history_report_z_th_shift_open'); ?></th>
-          <th><?php echo L('history_report_z_th_shift_close'); ?></th>
-          <th><?php echo L('history_report_z_th_shift_resp'); ?></th>
-          <th class="text-right"><?php echo L('history_report_z_th_shift_real'); ?></th>
-        </tr>
-      </thead>
-      <tbody>
-        ${turnosRows || '<tr><td colspan="4" style="text-align:center; padding:12px; color:#999;"><?php echo L('history_js_no_shifts'); ?></td></tr>'}
-      </tbody>
-    </table>
-  </div>
-
-  <div class="seccion">
-    <div class="seccion-titulo"><?php echo L('history_report_z_movements_title'); ?></div>
-    <table>
-      <thead>
-        <tr>
-          <th><?php echo L('history_report_z_th_mov_time'); ?></th>
-          <th><?php echo L('history_report_z_th_mov_concept'); ?></th>
-          <th class="text-right"><?php echo L('history_report_z_th_mov_amount'); ?></th>
-        </tr>
-      </thead>
-      <tbody>
-        ${retirosRows || '<tr><td colspan="3" style="text-align:center; padding:12px; color:#999;"><?php echo L('history_js_no_movs'); ?></td></tr>'}
-      </tbody>
-    </table>
-  </div>
-</div>
-
-<div class="pie">
-  <?php echo htmlspecialchars($avConfig['empresa_nombre'] ?? 'ElectroBazar'); ?> TPV &nbsp;·&nbsp; <?php echo L('history_report_z_footer'); ?> &nbsp;·&nbsp; ${new Date().toLocaleString('<?php echo $_SESSION['lang'] === 'en' ? 'en-GB' : 'es-ES'; ?>')}
-</div>
-
-<script>window.onload = () => { window.print(); setTimeout(() => window.close(), 500); }<\/script>
-</body>
-</html>`;
+        html += '<div class="pie">' + empresa + ' TPV &nbsp;·&nbsp; ' + t.footer + ' &nbsp;·&nbsp; ' + new Date().toLocaleString(langCode) + '</div>';
+        html += '<' + 'script>window.onload = () => { window.print(); setTimeout(() => window.close(), 500); };<' + '/script>';
+        html += '</body></html>';
 
         const ventana = window.open('', '_blank', 'width=900,height=700');
-        ventana.document.write(html);
-        ventana.document.close();
+        if (ventana) {
+            ventana.document.write(html);
+            ventana.document.close();
+        }
     }
 
     function cerrarModalZ() {
@@ -971,8 +1073,8 @@
         const h_cie = t.fecha_cierre ? t.fecha_cierre.substring(11, 16) : 'Abierto';
         const res = t.resumen || {};
 
-        document.getElementById('td-titulo').innerText = "<?php echo L('history_js_shift'); ?> T-" + String(t.id).padStart(3, '0');
-        document.getElementById('td-periodo').innerText = "<?php echo L('history_modal_shift_horario'); ?>: " + h_ape + "h - " + h_cie + "h | <?php echo L('history_modal_shift_resp'); ?>: " + (t.nombre_usuario_apertura || '?');
+        document.getElementById('td-titulo').innerText = <?php echo json_encode(L('history_js_shift')); ?> + " T-" + String(t.id).padStart(3, '0');
+        document.getElementById('td-periodo').innerText = <?php echo json_encode(L('history_modal_shift_horario')); ?> + ": " + h_ape + "h - " + h_cie + "h | " + <?php echo json_encode(L('history_modal_shift_resp')); ?> + ": " + (t.nombre_usuario_apertura || '?');
         document.getElementById('td-total').innerText = fmt(res.total || 0);
         document.getElementById('td-tickets').innerText = res.num_tickets || 0;
 
@@ -980,9 +1082,9 @@
         const containerMetodos = document.getElementById('td-metodos');
         containerMetodos.innerHTML = '';
         const metodos = [
-            { label: "<?php echo L('tpv_method_cash'); ?>", val: res.efectivo, class: 'text-green', icon: 'fa-money-bill-1-wave', bg: 'rgba(34, 197, 94, 0.15)', iconColor: '#16a34a' },
-            { label: "<?php echo L('tpv_method_card'); ?>", val: res.tarjeta, class: 'text-blue', icon: 'fa-credit-card', bg: 'rgba(59, 130, 246, 0.15)', iconColor: '#2563eb' },
-            { label: "<?php echo L('tpv_method_bizum'); ?>", val: res.bizum, class: 'text-accent', icon: 'fa-mobile-screen-button', bg: 'rgba(79, 70, 229, 0.15)', iconColor: '#4f46e5' },
+            { label: <?php echo json_encode(L('tpv_method_cash')); ?>, val: res.efectivo, class: 'text-green', icon: 'fa-money-bill-1-wave', bg: 'rgba(34, 197, 94, 0.15)', iconColor: '#16a34a' },
+            { label: <?php echo json_encode(L('tpv_method_card')); ?>, val: res.tarjeta, class: 'text-blue', icon: 'fa-credit-card', bg: 'rgba(59, 130, 246, 0.15)', iconColor: '#2563eb' },
+            { label: <?php echo json_encode(L('tpv_method_bizum')); ?>, val: res.bizum, class: 'text-accent', icon: 'fa-mobile-screen-button', bg: 'rgba(79, 70, 229, 0.15)', iconColor: '#4f46e5' },
         ];
         metodos.forEach(m => {
             const div = document.createElement('div');
@@ -1019,7 +1121,7 @@
                 bodyMov.appendChild(tr);
             });
         } else {
-            bodyMov.innerHTML = '<tr><td colspan="3" class="text-center py-12 text-muted italic fs-10"><?php echo L('history_modal_shift_no_movs'); ?></td></tr>';
+            bodyMov.innerHTML = '<tr><td colspan="3" class="text-center py-12 text-muted italic fs-10">' + <?php echo json_encode(L('history_modal_shift_no_movs')); ?> + '</td></tr>';
         }
 
         document.getElementById('modalTurnoDetalle').style.display = 'flex';
@@ -1028,4 +1130,49 @@
     function cerrarTurnoDetalle() {
         document.getElementById('modalTurnoDetalle').style.display = 'none';
     }
+
+    // ── Lógica de Filtros Avanzados ──────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', () => {
+        const form = document.getElementById('formFiltros');
+        if (!form) return;
+
+        const periodSelect = document.getElementById('filterPeriodo');
+        const customDates = document.getElementById('customDates');
+        const searchInput = document.getElementById('searchTicket');
+        
+        // Toggle de fechas personalizadas
+        if (periodSelect) {
+            periodSelect.addEventListener('change', () => {
+                if (periodSelect.value === 'personalizado') {
+                    customDates.style.display = 'contents';
+                } else {
+                    customDates.style.display = 'none';
+                    form.submit();
+                }
+            });
+        }
+
+        // Auto-submit en cambios de select
+        form.querySelectorAll('select').forEach(sel => {
+            if (sel.id !== 'filterPeriodo') {
+                sel.addEventListener('change', () => form.submit());
+            }
+        });
+
+        // Auto-submit en cambios de fecha
+        form.querySelectorAll('input[type="date"]').forEach(inp => {
+            inp.addEventListener('change', () => form.submit());
+        });
+
+        // Debounce para búsqueda de ticket
+        if (searchInput) {
+            let timeout = null;
+            searchInput.addEventListener('input', () => {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => {
+                    form.submit();
+                }, 500);
+            });
+        }
+    });
 </script>

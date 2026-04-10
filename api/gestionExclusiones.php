@@ -5,8 +5,8 @@ require_once __DIR__ . '/csrf_check.php';
  * Obtiene y gestiona exclusiones de productos en tarifas/promociones.
  */
 
-ini_set('display_errors', 0);
-error_reporting(0);
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
 header('Content-Type: application/json; charset=utf-8');
 
 try {
@@ -29,8 +29,12 @@ try {
         case 'listar_aplicables':
             $idProducto = (int)($input['id_producto'] ?? 0);
             if (!$idProducto) throw new Exception('ID de producto inválido');
-            $res = PriceEngine::getRulesForProduct($idProducto);
-            echo json_encode(['ok' => true, 'reglas' => $res]);
+            $engineResult = PriceEngine::getRulesForProduct($idProducto);
+            echo json_encode([
+                'ok' => true, 
+                'reglas' => $engineResult['reglas'],
+                'debug_stats' => $engineResult['debug_stats']
+            ]);
             break;
 
         case 'excluir':
@@ -38,10 +42,17 @@ try {
             $idRegla = (int)($input['id_regla'] ?? 0);
             $tipo = $input['tipo'] ?? ''; // 'tarifa' o 'promocion'
             if (!$idProducto || !$idRegla) throw new Exception('Parámetros inválidos');
-            if ($tipo === 'tarifa') {
-                TarifaPrecioPDO::excluirProducto($idRegla, $idProducto);
-            } elseif ($tipo === 'promocion') {
-                PromocionPDO::excluirProducto($idRegla, $idProducto);
+            if (($input['tipo'] ?? '') === 'tarifa') {
+                $idTarifa = (int)($input['id_regla'] ?? 0);
+                if ($idTarifa > 0) {
+                    $tarifa = TarifaPrecioPDO::obtenerPorId($idTarifa);
+                    if ($tarifa && isset($tarifa['aplicada']) && $tarifa['aplicada']) {
+                         throw new Exception('No se puede excluir un producto de una tarifa que ya ha sido aplicada permanentemente');
+                    }
+                    TarifaPrecioPDO::excluirProducto($idTarifa, $idProducto);
+                }
+            } elseif (($input['tipo'] ?? '') === 'promocion') {
+                PromocionPDO::excluirProducto((int)$input['id_regla'], $idProducto);
             } else {
                 throw new Exception('Tipo de regla desconocido');
             }
