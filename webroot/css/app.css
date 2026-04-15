@@ -32,6 +32,7 @@
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.05);
   --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.12);
   --shadow-xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  --header-bg: linear-gradient(135deg, #0f1c8c 0%, #1d4ed8 60%, #1890d0 100%);
   --sidebar-width: 360px;
 }
 
@@ -57,14 +58,24 @@ body[data-theme-mode="dark"] {
   --red-light: #7f1d1d;
 }
 
+body[data-theme-mode="black"] {
+  --bg: #000000;
+  --surface: #020617;
+  --surface2: #020617;
+  --border: #111827;
+  --text: #f9fafb;
+  --text-muted: #6b7280;
+  --header-bg: #020617; /* Solid black header for black mode */
+}
 
 
-/* Accent Colors */
-[data-theme-accent="blue"] { --accent: #1d4ed8; --accent2: #0ea5e9; --header-bg: linear-gradient(135deg, #0f1c8c 0%, #1d4ed8 60%, #1890d0 100%); }
-[data-theme-accent="green"] { --accent: #16a34a; --accent2: #22c55e; --header-bg: linear-gradient(135deg, #064e3b 0%, #16a34a 60%, #22c55e 100%); }
-[data-theme-accent="red"] { --accent: #dc2626; --accent2: #f97316; --header-bg: linear-gradient(135deg, #7f1d1d 0%, #dc2626 60%, #ef4444 100%); }
-[data-theme-accent="purple"] { --accent: #7c3aed; --accent2: #a855f7; --header-bg: linear-gradient(135deg, #4c1d95 0%, #7c3aed 60%, #a855f7 100%); }
-[data-theme-accent="amber"] { --accent: #d97706; --accent2: #f59e0b; --header-bg: linear-gradient(135deg, #78350f 0%, #d97706 60%, #fbbf24 100%); }
+
+/* Accent Colors (Applied to <body>) */
+body[data-theme-accent="blue"] { --accent: #1d4ed8; --accent2: #0ea5e9; --header-bg: linear-gradient(135deg, #0f1c8c 0%, #1d4ed8 60%, #1890d0 100%); }
+body[data-theme-accent="green"] { --accent: #16a34a; --accent2: #22c55e; --header-bg: linear-gradient(135deg, #064e3b 0%, #16a34a 60%, #22c55e 100%); }
+body[data-theme-accent="red"] { --accent: #dc2626; --accent2: #f97316; --header-bg: linear-gradient(135deg, #7f1d1d 0%, #dc2626 60%, #ef4444 100%); }
+body[data-theme-accent="purple"] { --accent: #7c3aed; --accent2: #a855f7; --header-bg: linear-gradient(135deg, #4c1d95 0%, #7c3aed 60%, #a855f7 100%); }
+body[data-theme-accent="amber"] { --accent: #d97706; --accent2: #f59e0b; --header-bg: linear-gradient(135deg, #78350f 0%, #d97706 60%, #fbbf24 100%); }
 
 /* ==========================================================================
    2. RESET & BASE
@@ -431,7 +442,7 @@ input, select, textarea { font-family: inherit; outline: none; }
 /* ==========================================================================
    7. TICKETS & PRINTING
    ========================================================================== */
-.ticket-wrapper { width: 100%; max-width: 450px; background: #fff; display: flex; flex-direction: column; border-radius: 12px; overflow: hidden; box-shadow: var(--shadow-lg); }
+.ticket-wrapper { width: 100%; max-width: 550px; background: #fff; display: flex; flex-direction: column; border-radius: 12px; overflow: hidden; box-shadow: var(--shadow-lg); }
 .ticket-brand-header { background: var(--accent); color: #fff; padding: 24px; text-align: center; }
 .ticket-items { padding: 16px 24px; border-bottom: 1px dashed var(--border); }
 @media print {

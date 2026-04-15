@@ -21,11 +21,12 @@ try {
     require_once __DIR__ . '/../model/DBPDO.php';
 
     // MIGRACIÓN AUTOMÁTICA (Provisional para estabilizar el sistema)
-    try {
-        DBPDO::ejecutarConsulta("ALTER TABLE ventas ADD COLUMN IF NOT EXISTS efectivo_recibido DECIMAL(10,2) DEFAULT 0.00");
-        DBPDO::ejecutarConsulta("ALTER TABLE pagos_venta ADD COLUMN IF NOT EXISTS id_turno INT DEFAULT NULL");
-    } catch (Throwable $e) { /* Ya existe o error menor */
-    }
+    // MySQL no soporta "IF NOT EXISTS" al añadir columnas, así que ejecutamos una a una y capturamos errores.
+    try { DBPDO::ejecutarConsulta("ALTER TABLE ventas ADD COLUMN efectivo_recibido DECIMAL(10,2) DEFAULT 0.00"); } catch (Throwable $e) {}
+    try { DBPDO::ejecutarConsulta("ALTER TABLE pagos_venta ADD COLUMN id_turno INT DEFAULT NULL"); } catch (Throwable $e) {}
+    try { DBPDO::ejecutarConsulta("ALTER TABLE ventas ADD COLUMN puntos_ganados INT DEFAULT 0"); } catch (Throwable $e) {}
+    try { DBPDO::ejecutarConsulta("ALTER TABLE ventas ADD COLUMN puntos_canjeados INT DEFAULT 0"); } catch (Throwable $e) {}
+    try { DBPDO::ejecutarConsulta("ALTER TABLE ventas ADD COLUMN puntos_descuento_amt DECIMAL(10,2) DEFAULT 0.00"); } catch (Throwable $e) {}
 
     // ⚠️ Usuario.php debe cargarse ANTES de session_start()
     require_once __DIR__ . '/../model/Usuario.php';

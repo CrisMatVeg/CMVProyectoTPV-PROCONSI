@@ -88,6 +88,14 @@ if (isset($_POST['idTurnoPendiente']) && (int)$_POST['idTurnoPendiente'] > 0) {
 $ventasIniciales = $turnoActual ? VentaPDO::obtenerVentasPorTurno((int)$turnoActual['id']) : [];
 $resumen = calcularResumenCaja($ventasIniciales);
 
+// [NUEVO] Sobrescribir totales de cobro con el registro REAL de pagos_venta (abonos incluidos)
+if ($turnoActual) {
+    $totalesReales = CajaTurnoPDO::obtenerTotalesMetodosTurno((int)$turnoActual['id']);
+    $resumen['totalEfectivo'] = $totalesReales['efectivo'];
+    $resumen['totalTarjeta']  = $totalesReales['tarjeta'];
+    $resumen['totalBizum']    = $totalesReales['bizum'];
+}
+
 
 if (isset($_POST['registrarRetiro']) && $turnoActual) {
     $importe = max(0, (float)($_POST['importeRetiro'] ?? 0));
@@ -263,6 +271,20 @@ if ($turnoAbiertoFinal) {
     $totalIngresado = 0;
 }
 $resumen = calcularResumenCaja($ventasHoy);
+
+// [NUEVO] Sobrescribir totales de cobro con el registro REAL de pagos_venta (abonos incluidos)
+if ($turnoAbiertoFinal) {
+    $totalesReales = CajaTurnoPDO::obtenerTotalesMetodosTurno((int)$turnoAbiertoFinal['id']);
+    $resumen['totalEfectivo'] = $totalesReales['efectivo'];
+    $resumen['totalTarjeta']  = $totalesReales['tarjeta'];
+    $resumen['totalBizum']    = $totalesReales['bizum'];
+} else if ($ultimoCerradoHoy) {
+    $totalesReales = CajaTurnoPDO::obtenerTotalesMetodosTurno((int)$ultimoCerradoHoy['id']);
+    $resumen['totalEfectivo'] = $totalesReales['efectivo'];
+    $resumen['totalTarjeta']  = $totalesReales['tarjeta'];
+    $resumen['totalBizum']    = $totalesReales['bizum'];
+}
+
 $esperadoEfectivoTurno = max(0, $fondoInicial + $resumen['totalEfectivo'] + $totalIngresado - $totalRetirado);
 $ultimoFondoSugerido = CajaTurnoPDO::obtenerUltimoFondoSugerido();
 

@@ -20,8 +20,8 @@ $turnoCaja = CajaTurnoPDO::obtenerTurnoAbierto();
 $ultimoFondoSugerido = CajaTurnoPDO::obtenerUltimoFondoSugerido();
 
 
-// Carga de productos desde la base de datos (incluyendo inactivos para el filtro "De baja")
-$oProductos = ProductoPDO::listarProductos(false);
+// Carga inicial limitada (se completará con scroll infinito/AJAX para optimizar rendimiento)
+$oProductos = ProductoPDO::listarProductos(false, 100);
 $aProductos = [];
 foreach ($oProductos as $oProducto) {
     // Procesamiento del icono (binario a base64 para la vista)

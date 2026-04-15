@@ -141,7 +141,7 @@
             </div>
 
             <div class="table-container shadow-sm no-border" style="border-radius: 20px;">
-                <table class="data-table table-matrix" id="tarifarioTable">
+                <table class="data-table table-matrix exclude-pagination" id="tarifarioTable">
                     <thead>
                         <tr id="tarifarioHeader">
                             <!-- JS Dinámico -->
@@ -151,6 +151,11 @@
                         <!-- JS Dinámico -->
                     </tbody>
                 </table>
+            </div>
+
+            <!-- Controles de Paginación -->
+            <div id="tarifarioPagination" class="pagination-fancy mt-24">
+                <!-- JS Dinámico -->
             </div>
         </div>
     </div>
@@ -770,6 +775,10 @@
     const PRODUCTOS_DATA = <?php echo json_encode($avTarifas['productos']); ?>;
     const TARIFAS_DATA = <?php echo json_encode($avTarifas['lista']); ?>;
 
+    let tarifarioCurrentPage = 1;
+    let tarifarioItemsPerPage = 50;
+    let filteredProductos = [];
+
     function switchMainTab(tab) {
         document.querySelectorAll('.main-tab-content').forEach(el => el.classList.add('d-none'));
         document.querySelectorAll('.modal-tabs .tab-btn').forEach(el => el.classList.remove('active'));
@@ -780,15 +789,19 @@
         } else {
             document.getElementById('view-tarifario').classList.remove('d-none');
             document.getElementById('btnTabTarifario').classList.add('active');
+            tarifarioCurrentPage = 1; // Reset al entrar
             renderTarifario();
         }
     }
 
-    function renderTarifario() {
+    function renderTarifario(resetPage = true) {
         const query = document.getElementById('tarifarioSearch').value.toLowerCase();
         const header = document.getElementById('tarifarioHeader');
         const tbody = document.getElementById('tarifarioBody');
+        const pagination = document.getElementById('tarifarioPagination');
         
+        if (resetPage) tarifarioCurrentPage = 1;
+
         // 1. Identificamos tarifas activas para las columnas
         const activeRates = TARIFAS_DATA.filter(t => t.activo);
         
@@ -804,40 +817,48 @@
         });
         header.innerHTML = headerHtml;
 
-        // 3. Renderizamos las filas
-        tbody.innerHTML = '';
+        // 3. Filtrado de datos
+        filteredProductos = PRODUCTOS_DATA.filter(p => {
+            if (!query) return true;
+            return p.nombre.toLowerCase().includes(query) || (p.categoria && p.categoria.toLowerCase().includes(query));
+        });
+
+        const totalItems = filteredProductos.length;
+        const totalPages = Math.ceil(totalItems / tarifarioItemsPerPage);
+        
+        // Ajuste de página actual si el filtro reduce mucho los resultados
+        if (tarifarioCurrentPage > totalPages) tarifarioCurrentPage = totalPages || 1;
+
+        const start = (tarifarioCurrentPage - 1) * tarifarioItemsPerPage;
+        const end = start + tarifarioItemsPerPage;
+        const pagedItems = filteredProductos.slice(start, end);
+
+        // 4. Renderizamos las filas (USANDO UN BUFFER DE STRING PARA MÁXIMA VELOCIDAD)
+        let tbodyHtml = '';
         const now = new Date();
         const today = now.toISOString().split('T')[0];
-        const dayOfWeek = now.getDay();
-        const currentTime = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
-
-        PRODUCTOS_DATA.forEach(p => {
-            // Filtro de búsqueda
-            if (query && !p.nombre.toLowerCase().includes(query) && !p.categoria.toLowerCase().includes(query)) {
-                return;
-            }
-
+        
+        pagedItems.forEach(p => {
             const basePrice = parseFloat(p.precio_venta || 0);
             
             let rowHtml = `
-                <td class="pl-24">
-                    <div class="matrix-product-info">
-                        <span class="fw-700 fs-14 text-main">${p.nombre}</span>
-                        <span class="fs-11 text-muted tt-uppercase ls-1">${p.categoria || 'S/C'}</span>
-                    </div>
-                </td>
-                <td class="text-center bg-light-col">
-                    <span class="matrix-price matrix-col-base">${basePrice.toFixed(2)}€</span>
-                </td>
+                <tr>
+                    <td class="pl-24">
+                        <div class="matrix-product-info">
+                            <span class="fw-700 fs-14 text-main">${p.nombre}</span>
+                            <span class="fs-11 text-muted tt-uppercase ls-1">${p.categoria || 'S/C'}</span>
+                        </div>
+                    </td>
+                    <td class="text-center bg-light-col">
+                        <span class="matrix-price matrix-col-base">${basePrice.toFixed(2)}€</span>
+                    </td>
             `;
 
-            // Celdas para cada tarifa
             activeRates.forEach((t, i) => {
                 const colClass = `matrix-col-${(i % 5) + 1}`;
                 let appliedPrice = basePrice;
                 let isApplicable = true;
 
-                // --- Lógica de Aplicabilidad (Scope) ---
                 if (t.scope === 'categoria' && p.categoria !== t.categoria) isApplicable = false;
                 if (t.scope === 'productos') {
                     try {
@@ -846,7 +867,6 @@
                     } catch(e) { isApplicable = false; }
                 }
 
-                // Excluidos
                 if (isApplicable && t.excluidos) {
                     try {
                         const excl = JSON.parse(t.excluidos);
@@ -854,7 +874,6 @@
                     } catch(e) {}
                 }
 
-                // --- Renderizado de Celda ---
                 if (isApplicable) {
                     const val = parseFloat(t.valor);
                     if (t.tipo === 'percent') appliedPrice *= (1 + val/100);
@@ -874,14 +893,56 @@
                 }
             });
 
-            const tr = document.createElement('tr');
-            tr.innerHTML = rowHtml;
-            tbody.appendChild(tr);
+            rowHtml += `</tr>`;
+            tbodyHtml += rowHtml;
         });
 
-        if (tbody.innerHTML === '') {
+        if (totalItems === 0) {
             tbody.innerHTML = `<tr><td colspan="${activeRates.length + 2}" class="text-center p-40 text-muted fs-14 italic">${<?php echo json_encode(L('rates_no_products_found', true)); ?>}</td></tr>`;
+            pagination.innerHTML = '';
+        } else {
+            tbody.innerHTML = tbodyHtml;
+            renderPaginationControls(totalItems, totalPages);
         }
+    }
+
+    function renderPaginationControls(totalItems, totalPages) {
+        const pagination = document.getElementById('tarifarioPagination');
+        const startItem = ((tarifarioCurrentPage - 1) * tarifarioItemsPerPage) + 1;
+        const endItem = Math.min(startItem + tarifarioItemsPerPage - 1, totalItems);
+
+        let html = `
+            <div class="pagination-info">
+                <span>Mostrando <strong>${startItem}-${endItem}</strong> de <strong>${totalItems}</strong> productos</span>
+            </div>
+            <div class="pagination-actions">
+                <button class="pag-btn" ${tarifarioCurrentPage === 1 ? 'disabled' : ''} onclick="changeTarifarioPage(1)" title="Primera página">
+                    <i class="fa-solid fa-angles-left"></i>
+                </button>
+                <button class="pag-btn" ${tarifarioCurrentPage === 1 ? 'disabled' : ''} onclick="changeTarifarioPage(${tarifarioCurrentPage - 1})" title="Anterior">
+                    <i class="fa-solid fa-angle-left"></i>
+                </button>
+                
+                <div class="pag-pages">
+                    <span class="fs-13">Página <strong>${tarifarioCurrentPage}</strong> de ${totalPages}</span>
+                </div>
+
+                <button class="pag-btn" ${tarifarioCurrentPage === totalPages ? 'disabled' : ''} onclick="changeTarifarioPage(${tarifarioCurrentPage + 1})" title="Siguiente">
+                    <i class="fa-solid fa-angle-right"></i>
+                </button>
+                <button class="pag-btn" ${tarifarioCurrentPage === totalPages ? 'disabled' : ''} onclick="changeTarifarioPage(${totalPages})" title="Última página">
+                    <i class="fa-solid fa-angles-right"></i>
+                </button>
+            </div>
+        `;
+        pagination.innerHTML = html;
+    }
+
+    function changeTarifarioPage(page) {
+        tarifarioCurrentPage = page;
+        renderTarifario(false);
+        // Scroll suave al top de la tabla
+        document.getElementById('view-tarifario').scrollIntoView({ behavior: 'smooth' });
     }
 </script>
 
@@ -1240,5 +1301,68 @@
             white-space: normal;
             font-size: 16px;
         }
+    }
+
+    /* Paginación Fancy */
+    .pagination-fancy {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: var(--surface);
+        padding: 16px 24px;
+        border-radius: 16px;
+        border: 1.5px solid var(--border);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+    }
+
+    .pagination-info {
+        font-size: 14px;
+        color: var(--text-muted);
+    }
+
+    .pagination-info strong {
+        color: var(--text-main);
+    }
+
+    .pagination-actions {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .pag-btn {
+        width: 38px;
+        height: 38px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        color: var(--text-main);
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .pag-btn:hover:not([disabled]) {
+        background: var(--accent);
+        color: white;
+        border-color: var(--accent);
+        transform: translateY(-2px);
+    }
+
+    .pag-btn[disabled] {
+        opacity: 0.4;
+        cursor: not-allowed;
+    }
+
+    .pag-pages {
+        background: var(--surface2);
+        padding: 8px 20px;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        font-weight: 600;
+        min-width: 140px;
+        text-align: center;
     }
 </style>

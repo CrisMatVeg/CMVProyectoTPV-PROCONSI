@@ -72,15 +72,16 @@ export const CartManager = {
    * Core Cart Actions
    */
   addToCart(id) {
-    const product = AppConfig.products.find(p => p.id === id);
+    const product = AppConfig.products.find(p => String(p.id) === String(id));
     if (!product || product.inactive || product.stock <= 0) return false;
 
-    if (AppState.cart[id]) {
-      if (AppState.cart[id].qty >= product.stock) return "stock_limit";
-      AppState.cart[id].qty++;
+    const cart = AppState.cart; // Read ONCE into a local variable
+    if (cart[id]) {
+      if (cart[id].qty >= product.stock) return "stock_limit";
+      cart[id].qty++;
     } else {
       const finalPrice = this.getEffectivePrice(product, AppState.socioActual);
-      AppState.cart[id] = {
+      cart[id] = {
         ...product,
         qty: 1,
         price: finalPrice,
@@ -89,42 +90,44 @@ export const CartManager = {
         serials: []
       };
     }
-    AppState.saveCart();
+    AppState.cart = cart; // Write back via setter to persist
     return true;
   },
 
   changeQty(id, delta) {
-    if (!AppState.cart[id]) return;
-    const item = AppState.cart[id];
-    const product = AppConfig.products.find(p => p.id === item.id);
+    const cart = AppState.cart; // Read ONCE
+    if (!cart[id]) return;
+    const item = cart[id];
+    const product = AppConfig.products.find(p => String(p.id) === String(item.id));
     
     if (delta > 0 && item.qty >= product.stock) return "stock_limit";
     
     item.qty += delta;
     if (item.qty <= 0) {
-      delete AppState.cart[id];
+      delete cart[id];
     }
-    AppState.saveCart();
+    AppState.cart = cart; // Write back
   },
 
   setQty(id, value) {
-    if (!AppState.cart[id]) return;
-    const item = AppState.cart[id];
-    const product = AppConfig.products.find(p => p.id === item.id);
+    const cart = AppState.cart; // Read ONCE
+    if (!cart[id]) return;
+    const item = cart[id];
+    const product = AppConfig.products.find(p => String(p.id) === String(item.id));
     
     let newQty = parseInt(value);
     if (isNaN(newQty) || newQty < 0) newQty = 1;
 
     if (newQty === 0) {
-      delete AppState.cart[id];
+      delete cart[id];
     } else if (newQty > product.stock) {
       item.qty = product.stock;
-      AppState.saveCart();
+      AppState.cart = cart; // Write back
       return "stock_limit";
     } else {
       item.qty = newQty;
     }
-    AppState.saveCart();
+    AppState.cart = cart; // Write back
     return true;
   },
 
@@ -244,11 +247,15 @@ export const CartManager = {
       ? (subtotalAfterBundles - generalDiscount) * (AppConfig.socioDiscount / 100) 
       : 0;
 
+    // IMPORTANT: Loyalty points are treated as a direct "discount" on the price per final requirements.
+    // This reduces the 'totals.total' and consequently the taxable base and VAT.
     const totalDiscount = bundleDiscountTotal + generalDiscount + socioAmt + (AppState.puntosDescuentoAmt || 0);
     const subtotalFinal = Math.max(0, subtotal - totalDiscount);
 
     // 5. Derive Base and Tax from PVP (which already contains VAT)
-    const discountFactor = subtotal > 0 ? subtotalFinal / subtotal : 1;
+    // Loyalty points are a payment method, so they shouldn't reduce the taxable base
+    const subtotalTaxable = Math.max(0, subtotal - bundleDiscountTotal - generalDiscount - socioAmt);
+    const discountFactor = subtotal > 0 ? subtotalTaxable / subtotal : 1;
     let totalBase = 0;
     let totalTax = 0;
     const breakdown = {};

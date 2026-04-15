@@ -103,9 +103,10 @@ try {
             $limit = isset($datos['limit']) ? (int)$datos['limit'] : 50;
             $offset = isset($datos['offset']) ? (int)$datos['offset'] : 0;
             $term = isset($datos['term']) ? trim($datos['term']) : '';
+            $cat = isset($datos['cat']) ? trim($datos['cat']) : '';
 
-            $lista = ProductoPDO::listarProductos(false, $limit, $offset, $term);
-            $total = ProductoPDO::contarProductos(false, $term);
+            $lista = ProductoPDO::listarProductos(false, $limit, $offset, $term, $cat);
+            $total = ProductoPDO::contarProductos(false, $term, $cat);
 
             $formatted = array_map(function($p) {
                 $icono = $p->getIcono();

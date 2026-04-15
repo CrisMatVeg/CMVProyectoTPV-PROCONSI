@@ -52,16 +52,31 @@ class ProductoPDO
      * @param bool $soloActivos Si es true, solo devuelve productos con activo=1. Default true.
      * @return Producto[]
      */
-    public static function listarProductos(bool $soloActivos = true, int $limit = 50, int $offset = 0, string $term = ''): array
+    public static function listarProductos(bool $soloActivos = true, int $limit = 50000, int $offset = 0, string $term = '', string $categoria = ''): array
     {
         self::init();
         $hoy = date('Y-m-d');
-        $where = $soloActivos ? " WHERE p.activo = 1 " : " WHERE 1=1 ";
-        $params = [];
         
+        $where = " WHERE 1=1 ";
+        $params = [];
+
+        // Filtro de actividad
+        if ($categoria === 'baja') {
+            $where .= " AND p.activo = 0 ";
+        } elseif ($soloActivos) {
+            $where .= " AND p.activo = 1 ";
+        }
+        
+        // Filtro de búsqueda
         if ($term !== '') {
             $where .= " AND (p.nombre LIKE :term OR p.referencia LIKE :term) ";
             $params[':term'] = '%' . $term . '%';
+        }
+
+        // Filtro de categoría
+        if ($categoria !== '' && $categoria !== 'all' && $categoria !== 'baja') {
+            $where .= " AND p.categoria = :categoria ";
+            $params[':categoria'] = $categoria;
         }
 
         $sql = "SELECT p.id, p.referencia, p.nombre, p.descripcion, p.precio_coste, p.precio_venta, 
@@ -124,14 +139,25 @@ class ProductoPDO
         return $productos;
     }
 
-    public static function contarProductos(bool $soloActivos = true, string $term = ''): int
+    public static function contarProductos(bool $soloActivos = true, string $term = '', string $categoria = ''): int
     {
-        $where = $soloActivos ? " WHERE activo = 1" : " WHERE 1=1";
+        $where = " WHERE 1=1 ";
         $params = [];
+
+        if ($categoria === 'baja') {
+            $where .= " AND activo = 0 ";
+        } elseif ($soloActivos) {
+            $where .= " AND activo = 1 ";
+        }
         
         if ($term !== '') {
-            $where .= " AND (nombre LIKE :term OR referencia LIKE :term)";
+            $where .= " AND (nombre LIKE :term OR referencia LIKE :term) ";
             $params[':term'] = '%' . $term . '%';
+        }
+
+        if ($categoria !== '' && $categoria !== 'all' && $categoria !== 'baja') {
+            $where .= " AND categoria = :categoria ";
+            $params[':categoria'] = $categoria;
         }
 
         $sql = "SELECT COUNT(*) FROM productos $where";

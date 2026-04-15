@@ -3,9 +3,16 @@ const PRODUCTS = typeof DB_PRODUCTS !== "undefined" ? DB_PRODUCTS : [];
 
 
 // ── Estado global ──────────────────────────────────────────────────────────────
-let cart = JSON.parse(localStorage.getItem("tpv_cart")) || {};
-if (Array.isArray(cart)) cart = {}; // Migration from previous bad state
-let selectedPayment = "efectivo";
+Object.defineProperty(window, 'cart', {
+    get: function() {
+        let c = JSON.parse(localStorage.getItem("tpv_cart") || "{}");
+        return (c && typeof c === 'object' && !Array.isArray(c)) ? c : {};
+    },
+    set: function(v) {
+        localStorage.setItem("tpv_cart", JSON.stringify(v));
+    }
+});
+var selectedPayment = "efectivo";
 let discountPct = 0;
 let ticketNum = 1001;
 let activeCat = "all";
@@ -17,8 +24,8 @@ let stockFilter = "all";
 let sortOrder = "name-asc";
 let isAdmin =
   typeof IS_ADMIN_BACKEND !== "undefined" ? IS_ADMIN_BACKEND : false;
-let currentTicketNum = null;
-let socioActual = null;
+var currentTicketNum = null;
+var socioActual = null;
 const SOCIO_DISCOUNT = 5;
 const PUNTOS_MIN_CANJE = 50;
 const PUNTOS_VALOR_EURO = 0.05; // 50 pts = 2.5€ => 1 pt = 0.05€
@@ -26,6 +33,10 @@ let currentPromo = null;
 const PROMOS = typeof DB_PROMOS !== "undefined" ? DB_PROMOS : [];
 const TARIFAS = typeof DB_TARIFAS !== "undefined" ? DB_TARIFAS : [];
 let valeAplicado = null;
+let tpvOffset = 100;
+let tpvLimit = 100;
+let tpvCanLoadMore = true;
+let tpvIsLoading = false;
 
 function formatTicketNumber(numero, fecha, esFactura, tipoDocumento) {
   let prefix;
@@ -40,8 +51,8 @@ function formatTicketNumber(numero, fecha, esFactura, tipoDocumento) {
 }
 
 window.formatTicketNumber = formatTicketNumber;
-let clienteSeleccionado = null;
-let tipoClienteActual = "particular";
+var clienteSeleccionado = null;
+var tipoClienteActual = "particular";
 let ULTIMOS_CLIENTES_BUSCADOS = [];
 
 // ── Interceptor CSRF para API ──────────────────────────────────────────────────
@@ -148,7 +159,7 @@ function getEffectivePrice(p, socio = null) {
 
 // ── Estado de venta pospuesta ──────────────────────────────────────────────────
 let postponedSale = JSON.parse(sessionStorage.getItem("postponedSale")) || null;
-let currentPayments = []; // [NUEVO] Para pagos mixtos
+var currentPayments = []; // [NUEVO] Para pagos mixtos
 let totalVentaActual = 0; // [NUEVO] Para sincronizar con el modal de cobro
 let checkoutContext = 'mixto'; // [NUEVO] Contexto original del sidebar
 
@@ -288,18 +299,22 @@ function renderProducts() {
   let filtered = PRODUCTS.filter((p) => {
     let matchesCat = false;
     if (activeCat === "all") {
-      matchesCat = true; // Show all products (active and inactive)
+      matchesCat = true;
     } else if (activeCat === "baja") {
-      matchesCat = p.inactive;
+      matchesCat = !!p.inactive;
     } else {
-      matchesCat = !p.inactive && p.cat === activeCat;
+      // Comparación robusta (insensible a mayúsculas y espacios)
+      const pCat = String(p.cat || "").trim().toLowerCase();
+      const aCat = String(activeCat || "").trim().toLowerCase();
+      matchesCat = !p.inactive && pCat === aCat;
     }
 
     if (!matchesCat) return false;
 
-    const matchesSearch =
-      p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.codigo.toLowerCase().includes(searchTerm.toLowerCase());
+    const pName = String(p.name || "").toLowerCase();
+    const pCode = String(p.codigo || "").toLowerCase();
+    const sTerm = String(searchTerm || "").toLowerCase();
+    const matchesSearch = pName.includes(sTerm) || pCode.includes(sTerm);
     if (!matchesSearch) return false;
 
     const matchesPrice =
@@ -483,19 +498,56 @@ function changeQty(cartKey, delta) {
 }
 
 function clearCart() {
+  // ── Estado del carrito ─────────────────────────────────────────────
   cart = {};
   discountPct = 0;
-  socioActual = null;
   currentPromo = null;
-  localStorage.removeItem("tpv_cart"); // Persist empty state
+  currentPayments = [];
+  localStorage.removeItem("tpv_cart");
+
+  // ── Estado del cliente y puntos ───────────────────────────────────
+  socioActual = null;
+  clienteSeleccionado = null;
+  puntosCanjeados = 0;
+  puntosDescuentoAmt = 0;
+
+  // ── UI: cupón de descuento ─────────────────────────────────────────
   const el_discountCode = document.getElementById("discountCode");
-  const el_discountRow = document.getElementById("discountRow");
-  const el_errDiscount = document.getElementById("err-discount");
+  const el_discountRow  = document.getElementById("discountRow");
+  const el_errDiscount  = document.getElementById("err-discount");
   if (el_discountCode) el_discountCode.value = "";
-  if (el_discountRow) el_discountRow.style.display = "none";
-  if (el_errDiscount) el_errDiscount.innerText = "";
+  if (el_discountRow)  el_discountRow.style.display = "none";
+  if (el_errDiscount)  el_errDiscount.innerText = "";
+
+  // ── UI: búsqueda de socio ──────────────────────────────────────────
+  const el_socioSearch = document.getElementById("socioSearch");
+  const el_socioInfo   = document.getElementById("socioInfo");
+  const el_btnAddSocio = document.getElementById("btnAddSocio");
+  if (el_socioSearch) el_socioSearch.value = "";
+  if (el_socioInfo)   el_socioInfo.innerHTML = "";
+  if (el_btnAddSocio) el_btnAddSocio.classList.add("d-none");
+
+  // ── UI: búsqueda de cliente genérico ──────────────────────────────
+  const el_clienteSearch = document.getElementById("clienteBusquedaInput");
+  const el_clienteResult = document.getElementById("clienteBusquedaResult");
+  if (el_clienteSearch) el_clienteSearch.value = "";
+  if (el_clienteResult) el_clienteResult.innerHTML = "";
+
+  // ── UI: vales del cliente ─────────────────────────────────────────
+  const el_valesContainer = document.getElementById("clienteValesContainer");
+  if (el_valesContainer) el_valesContainer.classList.add("d-none");
+  quitarValeAplicado();
+
+  // ── UI: puntos canjeados ──────────────────────────────────────────
+  quitarPuntosCanjeados();
+
+  // ── UI: sección puntos (ocultarla si el cliente se va) ────────────
+  const el_puntosSection = document.getElementById("puntosSection");
+  if (el_puntosSection) el_puntosSection.classList.add("d-none");
+
   renderCart();
 }
+
 
 function postponeSale() {
   if (Object.keys(cart).length === 0) {
@@ -662,6 +714,7 @@ function renderCart() {
 
   const subtotal = items.reduce((a, b) => a + b.price * b.qty, 0);
   updateTotals(subtotal);
+  updateMixSummary();
 }
 
 function updateTotals(initialSubtotal) {
@@ -987,6 +1040,7 @@ function cerrarModalCliente() {
 
 function seleccionarTipoCliente(tipo) {
   tipoClienteActual = tipo;
+  validarACuenta();
   const btnP = document.getElementById("btnParticular");
   const btnE = document.getElementById("btnEmpresa");
   const btnS = document.getElementById("btnSocio");
@@ -1427,6 +1481,7 @@ async function buscarClienteGuardado() {
 function seleccionarClienteGuardado(idx) {
   const c = ULTIMOS_CLIENTES_BUSCADOS[idx];
   if (!c) return;
+  
   clienteSeleccionado = c;
 
   if (tipoClienteActual === "empresa") {
@@ -1473,7 +1528,7 @@ async function processPayment() {
     document.getElementById("btnParticular").click();
   }
   
-  currentPayments = []; // Reset pagos mixtos
+  // currentPayments = []; // [ELIMINADO] No resetear aquí, se limpia en clearCart o al finalizar éxito
 
   // 2. Si hay un vale aplicado, lo añadimos como primer pago
   if (valeAplicado) {
@@ -1484,14 +1539,7 @@ async function processPayment() {
     });
   }
 
-  // Si hay puntos canjeados, los añadimos como un pago
-  if (puntosCanjeados > 0 && puntosDescuentoAmt > 0) {
-    currentPayments.push({
-      metodo: "puntos",
-      importe: Math.min(totalVentaActual - currentPayments.reduce((acc, p) => acc + p.importe, 0), puntosDescuentoAmt),
-      label: `Puntos: ${puntosCanjeados}`,
-    });
-  }
+  // (Points are now handled as a discount in CartManager, so they don't enter currentPayments)
 
   // 3. Pre-añadir el método seleccionado en el sidebar (Efectivo por defecto)
   const totalPagadoValesPuntos = currentPayments.reduce((acc, p) => acc + p.importe, 0);
@@ -1587,24 +1635,30 @@ async function processPayment() {
 
  // ── Pagos Mixtos (Split Payments) ─────────────────────────────────────────────
 function updateMixSummary() {
-  const puntosPago = currentPayments.find(p => p.metodo === "puntos");
-  const descuentoPuntos = puntosPago ? parseFloat(puntosPago.importe) : 0;
-  
-  const displayTotal = totalVentaActual - descuentoPuntos;
+  // El total de la venta es el bruto (sincronizado con AppState)
+  totalVentaActual = (typeof AppState !== 'undefined' && AppState.cart) ? CartManager.calculateTotals().total : totalVentaActual;
+  const displayTotal = totalVentaActual; 
 
-  // Calculamos lo pagado con todo EXCEPTO puntos (porque puntos ya redujo el total a pagar)
-  const totalPagadoSinPuntos = currentPayments
-    .filter(p => p.metodo !== "puntos")
-    .reduce((acc, p) => acc + p.importe, 0);
+  // El total pagado incluye TODO (puntos, vales, efectivo, etc.)
+  const totalPagado = currentPayments.reduce((acc, p) => acc + p.importe, 0);
 
-  const pendiente = Math.max(0, displayTotal - totalPagadoSinPuntos);
+  const pendiente = Math.max(0, displayTotal - totalPagado);
+
+  // Sincronizar input de monto si estamos en modo pago único (A cuenta, Efectivo...)
+  const inputMonto = document.getElementById("mixPagoMonto");
+  if (inputMonto && checkoutContext !== 'mixto') {
+      if (selectedPayment === 'a_cuenta' || selectedPayment === 'efectivo') {
+          // Ambos por defecto muestran el total operativo (en a_cuenta es lo fiado, en efectivo lo pagado)
+          inputMonto.value = displayTotal.toFixed(2);
+      }
+  }
 
   const el_Total = document.getElementById("mixTotalVenta");
   const el_Pagado = document.getElementById("mixTotalPagado");
   const el_Pendiente = document.getElementById("mixTotalPendiente");
 
   if (el_Total) el_Total.textContent = fmt(displayTotal);
-  if (el_Pagado) el_Pagado.textContent = fmt(totalPagadoSinPuntos);
+  if (el_Pagado) el_Pagado.textContent = fmt(totalPagado);
   
   const el_PendienteRow = el_Pendiente?.parentElement;
   const el_Lista = document.getElementById("mixListaPagos");
@@ -1616,6 +1670,9 @@ function updateMixSummary() {
     el_Pendiente.parentElement.classList.toggle("text-green", pendiente <= 0.01);
   }
 
+  // Ejecutar feedback inicial
+  calcularCambioMix();
+
   // Si no es mixto, ocultamos la lista de pagos, el selector y el botón de AÑADIR (petición usuario)
   if (checkoutContext !== 'mixto') {
       if (el_Lista) el_Lista.style.setProperty("display", "none", "important");
@@ -1625,11 +1682,13 @@ function updateMixSummary() {
       const el_selector = document.getElementById("selectorMetodoPago");
       if (el_selector) el_selector.style.setProperty("display", "none", "important");
 
-      // Ocultar también cualquier fila extra del resumen excepto el Total
+      // Ocultar también cualquier fila extra del resumen excepto el Total y el Pendiente
       const resContainer = document.getElementById("pagosMixResumen");
       if (resContainer) {
           Array.from(resContainer.children).forEach((child, idx) => {
-              if (idx > 0) child.style.setProperty("display", "none", "important");
+              // Dejamos el primer hijo (Total) y el tercero (Pendiente) visibles
+              if (idx !== 0 && idx !== 2) child.style.setProperty("display", "none", "important");
+              else child.style.display = "";
           });
       }
   } else {
@@ -1654,10 +1713,10 @@ function updateMixSummary() {
   // Si ya no queda nada, habilitar botón de cobrar
   const btnFinal = document.getElementById("confirmarClienteBtn");
   if (btnFinal) {
-    btnFinal.disabled = (pendiente > 0.01 && currentPayments.length > 0) || (currentPayments.length === 0 && pendiente > 0.01);
-    // Realmente, si hay pagos y el pendiente es 0, habilitamos.
-    // Si no hay pagos, se puede cobrar si el total es > 0? No, en mixto debe haber pagos.
-    btnFinal.disabled = pendiente > 0.01;
+    // Si es "A cuenta", permitimos cobrar siempre que haya un cliente (la validación final la hace el Manager)
+    // Caso contrario, cobro normal/mixto: habilitamos solo si el pendiente es 0.
+    const esAcuenta = (checkoutContext === 'a_cuenta' || (selectedPayment === 'a_cuenta' && checkoutContext !== 'mixto'));
+    btnFinal.disabled = esAcuenta ? false : (pendiente > 0.01);
   }
 
   renderPaymentsList();
@@ -1683,18 +1742,23 @@ function renderPaymentsList() {
 
   container.innerHTML = currentPayments
     .map(
-      (p, index) => `
+      (p, index) => {
+        const hasCambio = (p.metodo === 'efectivo' && p.recibido > p.importe + 0.005);
+        const cambio = hasCambio ? (p.recibido - p.importe) : 0;
+        return `
     <div class="d-flex ai-center jc-space-between p-8-12 bg-surface1 br-8 border-1 mb-4 animate-slide-right">
-        <div class="d-flex ai-center gap-8">
+        <div class="d-flex ai-center gap-8 flex-wrap">
             <i class="fa-solid ${icons[p.metodo] || "fa-wallet"} opacity-70"></i>
             <span class="badge ${p.metodo === "efectivo" ? "bg-accent text-white" : "bg-surface3 border-1 text-primary"} p-2-6 br-4 fs-9 font-bold uppercase">${I18N[p.metodo] || p.metodo.replace("_", " ")}</span>
             <span class="font-mono font-bold">${fmt(p.importe)}</span>
+            ${hasCambio ? `<span class="fs-10 text-muted">(Entregado: ${fmt(p.recibido)} · <span class="text-green font-bold">Cambio: ${fmt(cambio)}</span>)</span>` : ''}
         </div>
         <button onclick="removePagoMixto(${index})" class="text-red border-none bg-none cursor-pointer hover-scale p-4">
             <i class="fa-solid fa-trash-can"></i>
         </button>
     </div>
-  `,
+  `;
+      }
     )
     .join("");
 }
@@ -1746,6 +1810,14 @@ function addPagoMixto() {
   const inputMonto = document.getElementById("mixPagoMonto");
   const importeIngresado = parseFloat(inputMonto.value) || 0;
 
+  // VALIDACIÓN: El método de pago debe ser uno válido.
+  // No se permite registrar pagos sin haber seleccionado Efectivo, Tarjeta o Bizum.
+  const metodosValidos = ['efectivo', 'tarjeta', 'bizum'];
+  if (!selectedPayment || !metodosValidos.includes(selectedPayment)) {
+    showToast(`<i class='fa-solid fa-hand-pointer'></i> Selecciona un método de pago (Efectivo, Tarjeta o Bizum)`, 'warning');
+    return;
+  }
+
   if (importeIngresado <= 0) {
     showToast(`<i class='fa-solid fa-circle-exclamation'></i> ${I18N.enterAmount}`);
     return;
@@ -1779,23 +1851,35 @@ function addPagoMixto() {
     return;
   }
 
-  const importeAplicado = Math.min(importeIngresado, pendiente);
+  // Para efectivo en modo mixto: el importe aplicado está limitado al pendiente,
+  // pero guardamos el recibido real para calcular el cambio.
+  const esEfectivo = (selectedPayment === "efectivo");
+  const importeAplicado = esEfectivo ? Math.min(importeIngresado, pendiente) : Math.min(importeIngresado, pendiente);
+  const recibidoReal = esEfectivo ? importeIngresado : importeAplicado;
 
   // Añadir pago
   currentPayments.push({
     metodo: selectedPayment,
     importe: importeAplicado,
-    recibido: selectedPayment === "efectivo" ? importeIngresado : importeAplicado,
+    recibido: recibidoReal,
     fecha_limite: selectedPayment === "a_cuenta" ? document.getElementById("aCuentaFechaLimite").value : null,
   });
 
   // Limpiar y actualizar
   inputMonto.value = "";
   const cambioEl = document.getElementById("efectivoCambio");
-  if (cambioEl) cambioEl.textContent = "0,00 €";
+
+  // Si el cliente pagó de más en efectivo, mostrar el cambio en el modal
+  if (esEfectivo && recibidoReal > importeAplicado + 0.005) {
+    const cambio = recibidoReal - importeAplicado;
+    if (cambioEl) cambioEl.textContent = fmt(cambio);
+    showToast(`<i class='fa-solid fa-coins'></i> Cambio: ${fmt(cambio)}`, "success");
+  } else {
+    if (cambioEl) cambioEl.textContent = "0,00 €";
+    showToast(`<i class='fa-solid fa-circle-check'></i> ${I18N.paymentIdentified}`);
+  }
 
   updateMixSummary();
-  showToast(`<i class='fa-solid fa-circle-check'></i> ${I18N.paymentIdentified}`);
 
   // Resetear selección de botones
   document.querySelectorAll(".btn-tpv-method").forEach((b) => {
@@ -1831,38 +1915,69 @@ function calcularCambioMix() {
   const inputMonto = document.getElementById("mixPagoMonto");
   const montoIngresado = parseFloat(inputMonto?.value) || 0;
   
-  const totalPagado = currentPayments.reduce((acc, p) => acc + p.importe, 0);
-  const pendiente = Math.max(0, totalVentaActual - totalPagado);
+  // Pendiente real = total - TODOS los pagos ya confirmados.
+  // En mixto puede haber varios pagos de distintos métodos; todos cuentan.
+  const totalPagadoConfirmado = currentPayments.reduce((acc, p) => acc + p.importe, 0);
+  const pendienteReal = Math.max(0, totalVentaActual - totalPagadoConfirmado);
 
-  const el_labelMonto = document.getElementById("labelMontoPago");
   const cambioEl = document.getElementById("efectivoCambio");
+  const feedbackEl = document.getElementById("mixPagoStatusFeedback");
   if (!cambioEl) return;
 
-  if (selectedPayment === "efectivo" && montoIngresado > 0) {
-    // Si es un pago individual de efectivo (no mixto), actualizamos el recibido del pago de efectivo real
-    if (checkoutContext === 'efectivo') {
+  if (selectedPayment === "efectivo") {
+      const falta  = pendienteReal - montoIngresado;
+      const cambio = Math.max(0, montoIngresado - pendienteReal);
+      if (feedbackEl) {
+          if (falta > 0.005) {
+              feedbackEl.className = "mt-8 p-10 br-8 text-center font-bold fs-13 bg-red-soft text-red";
+              feedbackEl.innerHTML = `<i class="fa-solid fa-hourglass-half"></i> Faltan: ${fmt(falta)}`;
+          } else if (cambio > 0.005) {
+              feedbackEl.className = "mt-8 p-10 br-8 text-center font-bold fs-13 bg-green-soft text-green";
+              feedbackEl.innerHTML = `<i class="fa-solid fa-coins"></i> Cambio a devolver: <strong>${fmt(cambio)}</strong>`;
+          } else if (montoIngresado > 0) {
+              feedbackEl.className = "mt-8 p-10 br-8 text-center font-bold fs-13 bg-green-soft text-green";
+              feedbackEl.innerHTML = `<i class="fa-solid fa-check-double"></i> Pago exacto`;
+          } else {
+              feedbackEl.innerHTML = "";
+          }
+      }
+
+    if (montoIngresado > 0 && checkoutContext === 'efectivo') {
         const pagoEfeActual = currentPayments.find(p => p.metodo === 'efectivo');
         if (pagoEfeActual) {
             pagoEfeActual.recibido = montoIngresado;
         }
     }
+    cambioEl.textContent = fmt(Math.max(0, montoIngresado - pendienteReal));
 
-    // Calcular cambio relativo al total de la venta si es el único pago
-    const totalPagar = totalVentaActual - (valeAplicado ? valeAplicado.importe : 0) - puntosDescuentoAmt;
-    if (montoIngresado > totalPagar) {
-        cambioEl.textContent = fmt(montoIngresado - totalPagar);
-    } else {
-        cambioEl.textContent = "0,00 €";
-    }
-  } else if (selectedPayment === "efectivo" && montoIngresado > pendiente) {
-    const cambio = montoIngresado - pendiente;
-    cambioEl.textContent = fmt(cambio);
+  } else if (selectedPayment === "a_cuenta") {
+      // Inversión lógica: montoIngresado es la DEUDA
+      const entregaHoy = Math.max(0, totalVentaActual - montoIngresado);
+      if (feedbackEl) {
+          feedbackEl.className = "mt-8 p-10 br-8 text-center font-bold fs-13 bg-accent-soft text-accent";
+          if (entregaHoy > 0.005) {
+              feedbackEl.innerHTML = `<i class="fa-solid fa-hand-holding-dollar"></i> Deuda: ${fmt(montoIngresado)} | Pago hoy: ${fmt(entregaHoy)}`;
+          } else {
+              feedbackEl.innerHTML = `<i class="fa-solid fa-file-invoice-dollar"></i> Todo fiado (${fmt(montoIngresado)})`;
+          }
+      }
+      cambioEl.textContent = "0,00 €";
   } else {
-    cambioEl.textContent = "0,00 €";
+      if (feedbackEl) feedbackEl.innerHTML = "";
+      cambioEl.textContent = "0,00 €";
   }
 
-  // [NUEVO] Actualizar el resumen para que se vea el cambio si se ha modificado el recibido
-  updateMixSummary();
+  // [NUEVO] Sincronizar el pendiente de la barra lateral sin disparar el bucle recursivo.
+  // Solo actualizamos mientras el usuario teclea (montoIngresado > 0).
+  // Cuando el input está vacío, updateMixSummary ya puso el valor correcto.
+  if (montoIngresado > 0) {
+      const el_Pendiente = document.getElementById("mixTotalPendiente");
+      if (el_Pendiente) {
+          const pnd = (selectedPayment === 'a_cuenta') ? montoIngresado : Math.max(0, pendienteReal - montoIngresado);
+          el_Pendiente.textContent = fmt(pnd);
+          el_Pendiente.parentElement.classList.toggle("text-red", pnd > 0.01);
+      }
+  }
 }
 /**
  * Función auxiliar para calcular el total final del carrito (reutilizando la lógica de renderCart)
@@ -1954,295 +2069,15 @@ function abrirModalPago() {
   validarACuenta();
 }
 
+/**
+ * Bridge function to unified saving logic in app.js
+ */
 async function ejecutarCobroFinal() {
-  const btn = document.getElementById("confirmarClienteBtn");
-  btn.disabled = true;
-  btn.textContent = I18N.saving;
-
-  const items = Object.values(cart);
-
-  // ── Replicar exactamente el cálculo de updateTotals ──────────────────────────
-  let subtotal = 0;
-  let bundleDiscountTotal = 0;
-
-  // Acumular subtotal linea a linea
-  items.forEach((item) => {
-    subtotal += item.price * item.qty;
-  });
-
-  // Descuento de pack (bundle) — agrupa variantes del mismo producto
-  if (
-    currentPromo &&
-    (currentPromo.tipo === "bundle" || currentPromo.tipo === "fixed_bundle")
-  ) {
-    const groups = {};
-    items.forEach((item) => {
-      if (!groups[item.id])
-        groups[item.id] = { baseId: item.id, cat: item.cat, units: [] };
-      for (let i = 0; i < item.qty; i++) groups[item.id].units.push(item.price);
-    });
-    Object.values(groups).forEach((group) => {
-      let applies = false;
-      if (currentPromo.id_producto && currentPromo.id_producto == group.baseId)
-        applies = true;
-      else if (
-        currentPromo.categoria_code &&
-        currentPromo.categoria_code === group.cat
-      )
-        applies = true;
-      else if (!currentPromo.id_producto && !currentPromo.categoria_code)
-        applies = true;
-      if (!applies) return;
-
-      const buyQty = parseInt(currentPromo.bundle_buy_qty) || 0;
-      const payQty = parseInt(currentPromo.bundle_pay_qty) || 0;
-      const totalQty = group.units.length;
-
-      if (currentPromo.tipo === "bundle" && buyQty > 0 && payQty > 0) {
-        const sets = Math.floor(totalQty / buyQty);
-        const freeUnits = sets * (buyQty - payQty);
-        const sorted = [...group.units].sort((a, b) => a - b);
-        bundleDiscountTotal += sorted
-          .slice(0, freeUnits)
-          .reduce((s, p) => s + p, 0);
-      } else if (currentPromo.tipo === "fixed_bundle" && buyQty > 0) {
-        const sets = Math.floor(totalQty / buyQty);
-        const avgPrice = group.units.reduce((s, p) => s + p, 0) / totalQty;
-        const normalPrice = sets * buyQty * avgPrice;
-        const bundlePrice = sets * parseFloat(currentPromo.valor);
-        if (normalPrice > bundlePrice)
-          bundleDiscountTotal += normalPrice - bundlePrice;
-      }
-    });
-  }
-
-  const subtotalAfterBundles = subtotal - bundleDiscountTotal;
-
-  // Descuento de cupón (% o importe fijo)
-  let couponDiscount = 0;
-  if (
-    currentPromo &&
-    (currentPromo.tipo === "percent" || currentPromo.tipo === "amount")
-  ) {
-    if (currentPromo.tipo === "percent") {
-      couponDiscount = (subtotalAfterBundles * currentPromo.valor) / 100;
-    } else {
-      couponDiscount = Math.min(subtotalAfterBundles, currentPromo.valor);
-    }
-  }
-
-  // Descuento de socio (5%)
-  const socioAmt =
-    socioActual && socioActual.es_socio
-      ? (subtotalAfterBundles - couponDiscount) * (SOCIO_DISCOUNT / 100)
-      : 0;
-  
-  // Descuento por puntos
-  const puntosAmt = puntosDescuentoAmt;
-
-  const totalDiscountAmt = bundleDiscountTotal + couponDiscount + socioAmt + puntosAmt;
-  const subtotalFinal = subtotal - totalDiscountAmt;
-
-  // IVA prorateado
-  const discountFactor = subtotal > 0 ? subtotalFinal / subtotal : 1;
-  let vatTotal = 0;
-  items.forEach((item) => {
-    const line = item.price * item.qty * discountFactor;
-    vatTotal += line * (item.iva / 100);
-  });
-  const totalFinal = subtotalFinal + vatTotal;
-
-  // Etiqueta del descuento para el ticket
-  let descuentoLabel = "";
-  if (bundleDiscountTotal > 0 && currentPromo) {
-    descuentoLabel =
-      currentPromo.label ||
-      `${currentPromo.bundle_buy_qty}x${currentPromo.bundle_pay_qty}`;
-  }
-  if (socioAmt > 0) {
-    descuentoLabel +=
-      (descuentoLabel ? " + " : "") + I18N.socio + " " + SOCIO_DISCOUNT + "%";
-  }
-  if (couponDiscount > 0 && currentPromo && currentPromo.codigo) {
-    descuentoLabel +=
-      (descuentoLabel ? " + " : "") + "Cupón " + currentPromo.codigo;
-  }
-  if (puntosAmt > 0) {
-    descuentoLabel +=
-      (descuentoLabel ? " + " : "") + I18N.pointsRedeemedLabel.replace('{amount}', puntosCanjeados);
-  }
-  // ──────────────────────────────────────────────────────────────────────────────
-
-  const clienteId =
-    tipoClienteActual === "socio"
-      ? socioActual
-        ? socioActual.id
-        : null
-      : clienteSeleccionado
-        ? clienteSeleccionado.id
-        : null;
-
-  const facturaActiva =
-    document.getElementById("facturaToggle") &&
-    document.getElementById("facturaToggle").checked;
-  if (facturaActiva && tipoClienteActual === "particular") {
-    const nombreCli =
-      document.getElementById("newClienteNombre")?.value ||
-      (clienteSeleccionado ? clienteSeleccionado.nombre : null);
-    if (!clienteId && !nombreCli) {
-      showToast(I18N.facturaRequired);
-      btn.disabled = false;
-      btn.textContent = I18N.charge;
-      return;
-    }
-  }
-
-  console.log("ejecutarCobroFinal: Procediendo con el cobro...", checkoutContext);
-
-  // 1. VALIDACIÓN SEGURIDAD: Efectivo no puede ser inferior al total si es el único pago (petición usuario)
-  if (checkoutContext === "efectivo") {
-    // Buscamos el pago de efectivo que hemos pre-añadido al 100%
-    const pagoEfe = currentPayments.find((p) => p.metodo === "efectivo");
-    const totalVenta = totalVentaActual - (valeAplicado ? valeAplicado.importe : 0) - puntosDescuentoAmt;
-
-    if (!pagoEfe || (parseFloat(pagoEfe.recibido) || 0) < totalVenta - 0.01) {
-      showToast(
-        `<i class='fa-solid fa-circle-exclamation'></i> ${I18N.cashTotalRequired}`,
-      );
-      btn.disabled = false;
-      btn.textContent = I18N.charge;
-      return;
-    }
-  }
-
-  const totalEfectivoRecibido = currentPayments
-    .filter((p) => p.metodo === "efectivo")
-    .reduce((sum, p) => sum + (p.recibido || p.importe), 0);
-
-  const totalOtrosPagos = currentPayments
-    .filter((p) => p.metodo !== "efectivo")
-    .reduce((sum, p) => sum + p.importe, 0);
-
-  const totalVenta = totalVentaActual - (valeAplicado ? valeAplicado.importe : 0) - puntosDescuentoAmt;
-  const efectivoNecesario = Math.max(0, totalVenta - totalOtrosPagos);
-  const cambioARetornar = Math.max(0, totalEfectivoRecibido - efectivoNecesario);
-
-  // 2. VALIDACIÓN CAJA: No permitir devolución si no hay efectivo suficiente en el cajón
-  if (cambioARetornar > 0.01) {
-    try {
-      const respCaja = await fetch("./api/cajaEstadoActual.php").then(r => r.json());
-      if (respCaja.ok) {
-        const efectivoEnCaja = parseFloat(respCaja.efectivoActual) || 0;
-        if (cambioARetornar > efectivoEnCaja + 0.01) {
-          showToast(
-            `<i class='fa-solid fa-vault'></i> No hay suficiente efectivo en caja para devolver el cambio (${fmt(cambioARetornar)}). Disponible: ${fmt(efectivoEnCaja)}`,
-          );
-          btn.disabled = false;
-          btn.textContent = "Cobrar";
-          return;
-        }
-      }
-    } catch (errCaja) {
-      console.error("Error validando saldo de caja:", errCaja);
-      // Opcional: ¿Bloqueamos si falla la API de caja? Por seguridad, mejor solo loguear si no es crítico.
-    }
-  }
-
-  const payload = {
-    tipoCliente: tipoClienteActual,
-    nombreCliente:
-      tipoClienteActual === "empresa"
-        ? document.getElementById("empresaNombre").value
-        : socioActual
-          ? socioActual.nombre
-          : clienteSeleccionado
-            ? clienteSeleccionado.nombre
-            : null,
-    nifCliente:
-      tipoClienteActual === "empresa"
-        ? document.getElementById("empresaNif").value
-        : socioActual
-          ? socioActual.nif
-          : clienteSeleccionado
-            ? clienteSeleccionado.nif
-            : null,
-    idCliente: clienteId,
-    esFactura: facturaActiva ? 1 : 0,
-    comentarios:
-      document.getElementById("ticketComentarios")?.value.trim() || null,
-    metodoPago:
-      currentPayments.filter(p => parseFloat(p.importe) > 0).length === 1 
-        ? currentPayments.filter(p => parseFloat(p.importe) > 0)[0].metodo 
-        : "mixto",
-    pagos: currentPayments.filter(p => parseFloat(p.importe) > 0),
-    subtotal,
-    total: totalFinal,
-    descuentoAmt: totalDiscountAmt,
-    descuentoLabel,
-    puntosGanados: Math.floor(totalVentaActual),
-    puntosCanjeados: puntosCanjeados,
-    puntosDescuentoAmt: puntosDescuentoAmt,
-    lineas: items.map((it) => ({
-      id: it.id,
-      name: it.variant ? `${it.name} (${it.variant})` : it.name,
-      id_variante: it.variant_id || null,
-      codigo: it.codigo,
-      price: it.price,
-      qty: it.qty,
-      serials: it.serials || [],
-    })),
-    efectivo: {
-      recibido: totalEfectivoRecibido,
-    },
-    idVale: valeAplicado ? valeAplicado.id : null,
-    codigoVale: valeAplicado ? valeAplicado.codigo : null,
-    importeVale: valeAplicado
-      ? Math.min(totalFinal, parseFloat(valeAplicado.importe_restante))
-      : 0,
-    puntosCanjeados: puntosCanjeados,
-    importePuntosCanjeados: puntosDescuentoAmt,
-    codigoCupon:
-      currentPromo && currentPromo.codigo ? currentPromo.codigo : null,
-  };
-
-
-  try {
-    const resp = await fetch("./api/guardarVenta.php", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const data = await resp.json();
-
-    if (!data.ok) {
-      if (data.aErrores) {
-        for (const [key, msg] of Object.entries(data.aErrores)) {
-          const errEl = document.getElementById("err-" + key);
-          if (errEl && msg) errEl.innerText = msg;
-        }
-        return;
-      }
-      throw new Error(data.error || "Error al guardar la venta");
-    }
-
-    if (data.venta) {
-      data.venta.efectivo_recibido = payload.efectivo.recibido;
-      currentTicketNum = data.venta.numero_ticket;
-      mostrarTicket(data.venta);
-      cerrarModalCliente();
-      clearCart();
-      showToast(
-        `<i class='fa-solid fa-circle-check'></i> ${I18N.successSave}`,
-      );
-    } else {
-      throw new Error("La API no devolvió los datos de la venta.");
-    }
-  } catch (err) {
-    console.error("Error en confirmarCliente:", err);
-    showToast("<i class='fa-solid fa-circle-xmark'></i> " + err.message);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = I18N.charge;
+  if (window.app) {
+    window.app.confirmarCliente();
+  } else {
+    console.error("The modern TPV application (app.js) is not yet initialized.");
+    showToast("<i class='fa-solid fa-circle-exclamation'></i> La aplicación aún se está cargando, por favor espera un momento.");
   }
 }
 
@@ -2341,7 +2176,7 @@ function mostrarTicket(v, isFromTPV = true) {
   }
 
   const emailInput = document.getElementById("tkEmailInput");
-  if (emailInput) emailInput.value = "";
+  if (emailInput) emailInput.value = v.cliente_email || "";
   const errEmail = document.getElementById("err-email");
   if (errEmail) errEmail.innerText = "";
 
@@ -2530,46 +2365,36 @@ function mostrarTicket(v, isFromTPV = true) {
 
   // Si no hay ningún descuento aplicado, calcular directamente desde las líneas (factorDesc=1)
   // Si hay descuento, prorratear usando v.total / v.subtotal para distribuirlo proporcionalmente
+  const vPuntosAmt = parseFloat(v.puntos_descuento_amt) || 0;
+  // Si hay cualquier descuento (promo, cupón o puntos), prorratear usando v.total / v.subtotal
   const factorDesc =
-    (vDescAmt > 0 || vDescPct > 0) && vSubtotal > 0 ? vTotal / vSubtotal : 1;
+    (vDescAmt > 0 || vDescPct > 0 || vPuntosAmt > 0) && vSubtotal > 0 ? vTotal / vSubtotal : 1;
 
-  // Agrupar base e IVA por tipo, usando total_linea y excluyendo devueltas
+  // Desglose IVA BRUTO (antes de descuentos).
+  // Base + IVA = subtotal bruto de las líneas (ej: 130,94€).
+  // Usamos precio_unitario × cantidad porque total_linea ya lleva descuentos aplicados.
+  // Los descuentos (puntos, cupones, etc.) se muestran como ítems separados en el ticket.
   const ivaGrupos = {};
   const isAbonoDoc = (v.tipo_documento || 'venta') === 'abono';
   v.lineas.forEach((l) => {
     if (l.devuelta && !isAbonoDoc) return;
-    const rate = parseFloat(l.iva_aplicado ?? 21);
-    const pvpDesc = parseFloat(l.total_linea) * factorDesc;
-    const base = pvpDesc / (1 + rate / 100);
-    const tax = pvpDesc - base;
+    const rate     = parseFloat(l.iva_aplicado ?? 21);
+    const pvpBruto = parseFloat(l.precio_unitario) * parseFloat(l.cantidad); // Precio bruto sin descuentos globales
+    const base     = pvpBruto / (1 + rate / 100);
+    const tax      = pvpBruto - base;
     if (!ivaGrupos[rate]) ivaGrupos[rate] = { base: 0, tax: 0 };
     ivaGrupos[rate].base += base;
-    ivaGrupos[rate].tax += tax;
+    ivaGrupos[rate].tax  += tax;
   });
 
-  // TOTAL coherente: suma exacta del desglose (base+tax de cada grupo)
-  // Esto evita que un v.total incorrecto en BD cause inconsistencias visuales
-  let displayTotal = Object.values(ivaGrupos).reduce(
-    (acc, g) => acc + g.base + g.tax,
-    0,
-  );
+  // displayTotal = total neto real (con descuentos aplicados) — viene directo del backend.
+  // Se usa únicamente para la fila TOTAL; el desglose IVA muestra valores brutos.
+  const displayTotal = isAbonoDoc ? -Math.abs(vTotal) : vTotal;
 
-  // [NUEVO] Restar el descuento de puntos si existe
-  const puntosDescuentoAmt = parseFloat(v.puntos_descuento_amt || 0);
-  if (puntosDescuentoAmt > 0) {
-      if (isAbonoDoc) {
-          // En abonos, el descuento de puntos se resta del valor absoluto
-          displayTotal = -(Math.abs(displayTotal) - puntosDescuentoAmt);
-      } else {
-          displayTotal = Math.max(0, displayTotal - puntosDescuentoAmt);
-      }
-  }
 
-  // Actualizar TOTAL derivado del desglose
+  // TOTAL: usar el valor neto real del backend (ya incluye todos los descuentos)
   if (el_tkTotal) {
-      const isAbonoTotal = (v.tipo_documento || 'venta') === 'abono';
-      // Forzamos signo negativo en abonos por si las líneas ya vienen negativas (evitar doble negativo)
-      el_tkTotal.textContent = fmt(isAbonoTotal ? -Math.abs(displayTotal) : displayTotal);
+      el_tkTotal.textContent = fmt(isAbonoDoc ? -Math.abs(vTotal) : vTotal);
   }
 
   // Ocultar fila Subtotal genérica (queda reemplazada por el desglose)
@@ -2605,19 +2430,28 @@ function mostrarTicket(v, isFromTPV = true) {
       });
     }
 
-    if (tieneEfectivo && parseFloat(v.efectivo_recibido) > 0) {
+    const efectivoRecibido = parseFloat(v.efectivo_recibido) || 0;
+
+    let efectivoCambio = 0;
+    if (v.metodo_pago === "mixto") {
+       efectivoCambio = Math.max(0, efectivoRecibido - importeEfectivoMixto);
+    } else {
+       efectivoCambio = Math.max(0, efectivoRecibido - displayTotal);
+    }
+
+    // En mixto: solo mostrar fila si hay cambio real que devolver.
+    // En efectivo puro: mostrar siempre que haya recibido > 0.
+    const mostrarFila = tieneEfectivo && (
+      v.metodo_pago !== "mixto"
+        ? efectivoRecibido > 0
+        : efectivoCambio > 0.005
+    );
+
+    if (mostrarFila) {
       tkEfectivoRow.classList.remove("d-none");
       const el_tkEntregado = document.getElementById("tkEntregado");
       const el_tkCambio = document.getElementById("tkCambio");
-      
-      let efectivoCambio = 0;
-      if (v.metodo_pago === "mixto") {
-         efectivoCambio = Math.max(0, parseFloat(v.efectivo_recibido) - importeEfectivoMixto);
-      } else {
-         efectivoCambio = Math.max(0, parseFloat(v.efectivo_recibido) - displayTotal);
-      }
-
-      if (el_tkEntregado) el_tkEntregado.textContent = fmt(v.efectivo_recibido);
+      if (el_tkEntregado) el_tkEntregado.textContent = fmt(efectivoRecibido);
       if (el_tkCambio) el_tkCambio.textContent = fmt(efectivoCambio);
     } else {
       tkEfectivoRow.classList.add("d-none");
@@ -2671,6 +2505,9 @@ function mostrarTicket(v, isFromTPV = true) {
         const sumPagos = (v.pagos || []).reduce((acc, p) => acc + parseFloat(p.importe), 0);
         const pendienteReal = Math.max(0, displayTotal - sumPagos);
         
+        // [NUEVO] Asegurar que la variable global para el modal es la recalcalculada
+        window.currentVentaPendiente = pendienteReal;
+
         if (pendienteReal > 0.01 || v.estado === "pendiente_pago" && displayTotal > sumPagos) {
           tkAbonarParteContainer.classList.remove("d-none");
         } else {
@@ -2971,6 +2808,16 @@ function abrirModalAbonoParcial() {
   if (inputImporte) inputImporte.value = "";
   const selectMetodo = document.getElementById("abonoMetodo");
   if (selectMetodo) selectMetodo.value = "efectivo";
+
+  // [NUEVO] Mostrar el importe pendiente si lo tenemos
+  const displayPendiente = document.getElementById("abonoPendienteDisplay");
+  const valorPendiente = document.getElementById("abonoPendienteValor");
+  if (displayPendiente && valorPendiente && window.currentVentaPendiente !== undefined) {
+    valorPendiente.textContent = fmt(window.currentVentaPendiente);
+    displayPendiente.classList.remove("d-none");
+  } else if (displayPendiente) {
+    displayPendiente.classList.add("d-none");
+  }
 
   modal.classList.add("visible");
   if (inputImporte) setTimeout(() => inputImporte.focus(), 100);
@@ -3643,9 +3490,77 @@ function showToast(msg) {
 }
 
 // ── Búsqueda y filtros ─────────────────────────────────────────────────────────
+let searchTimeout = null;
 function handleSearch(val) {
   searchTerm = val;
-  renderProducts();
+  if (searchTimeout) clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(async () => {
+    await loadMoreProducts(true);
+  }, 300);
+}
+
+async function loadMoreProducts(reset = false) {
+  if (tpvIsLoading) return;
+  if (!reset && !tpvCanLoadMore) return;
+
+  tpvIsLoading = true;
+  if (reset) {
+    tpvOffset = 0;
+    tpvCanLoadMore = true;
+    const grid = document.getElementById("productsGrid");
+    if (grid) grid.innerHTML = '<div class="w-100 text-center p-40 opacity-50"><i class="fa-solid fa-circle-notch fa-spin fs-24 mb-12"></i><br>' + (I18N.loading || "Cargando catálogo...") + '</div>';
+  }
+
+  try {
+    const resp = await fetch("api/gestionProducto.php?accion=listar", {
+      method: "POST",
+      body: JSON.stringify({
+        limit: tpvLimit,
+        offset: tpvOffset,
+        term: searchTerm,
+        cat: activeCat
+      })
+    });
+    const r = await resp.json();
+    if (r.ok) {
+        const newProducts = (r.productos || []).map(p => ({
+            id: p.id,
+            name: p.nombre,
+            codigo: p.referencia,
+            price: p.precio_venta,
+            icono: p.icono || '📦',
+            cat: p.categoria,
+            stock: p.stock,
+            inactive: !p.activo,
+            es_pack: p.es_pack,
+            atributos: p.atributos,
+            componentes_pack: p.componentes_pack
+        }));
+
+        if (reset) {
+            tpvOffset = 0;
+            tpvCanLoadMore = true; // Reiniciar para permitir scroll en la nueva categoría
+            PRODUCTS.length = 0;
+            const feedbackContainer = document.getElementById("loadingMoreFeedback");
+            if (feedbackContainer) feedbackContainer.classList.add("hidden");
+            console.log(`[TPV] Reiniciando carga para: ${activeCat}`);
+        }
+        
+        PRODUCTS.push(...newProducts);
+        tpvOffset += newProducts.length;
+
+        if (newProducts.length < tpvLimit) {
+            tpvCanLoadMore = false;
+        }
+        
+        console.log(`[TPV] Cargados ${newProducts.length} productos. Nuevo offset: ${tpvOffset}. CanLoadMore: ${tpvCanLoadMore}`);
+        renderProducts();
+    }
+  } catch (e) {
+    console.error("Error loading products:", e);
+  } finally {
+    tpvIsLoading = false;
+  }
 }
 
 function toggleAdvancedFilters() {
@@ -3681,8 +3596,8 @@ function fmt(n) {
 }
 
 // Variables globales para fidelización (Portadas de PaymentManager)
-let puntosCanjeados = 0;
-let puntosDescuentoAmt = 0;
+var puntosCanjeados = 0;
+var puntosDescuentoAmt = 0;
 let clienteActualPuntos = 0;
 
 function tick() {
@@ -3738,11 +3653,29 @@ if (productsGrid) {
         .forEach((t) => t.classList.remove("active"));
       tab.classList.add("active");
       activeCat = tab.dataset.cat;
-      renderProducts();
+      loadMoreProducts(true);
     });
   }
 
   renderProducts();
+
+  // Atributos (Tags) Navigation
+  const attrTabs = document.getElementById("attrTabs");
+  if (attrTabs) {
+    attrTabs.addEventListener("click", (e) => {
+      const tag = e.target.closest(".attr-tab-btn");
+      if (!tag) return;
+      tag.classList.toggle("active");
+      applyAdvancedFilters(); // Llamamos a la lógica de filtros locales
+    });
+  }
+
+  productsGrid.addEventListener("scroll", () => {
+    if (productsGrid.scrollTop + productsGrid.clientHeight >= productsGrid.scrollHeight - 20) {
+      loadMoreProducts();
+    }
+  });
+
   updatePostponeUI();
 }
 

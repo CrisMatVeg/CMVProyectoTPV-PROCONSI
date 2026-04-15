@@ -57,7 +57,7 @@ class VentaPDO
             $descAmt = round($subtotal * $descPct / 100, 2);
         }
 
-        // Calcular total real, base e IVA directamente desde las líneas
+        // 1. Calcular total bruto real desde las líneas enviadas (PVP con IVA)
         $totalBase = 0;
         $totalIva  = 0;
         $totalReal = 0;
@@ -68,22 +68,37 @@ class VentaPDO
             $totalLinea = round($precioUnit * $qty, 2);
             $ivaRate    = (float)($linea['iva'] ?? 21.00);
 
-            $base = $totalLinea / (1 + $ivaRate / 100);
-            $iva  = $totalLinea - $base;
+            $lineBase = $totalLinea / (1 + $ivaRate / 100);
+            $lineIva  = $totalLinea - $lineBase;
 
-            $totalBase += $base;
-            $totalIva  += $iva;
+            $totalBase += $lineBase;
+            $totalIva  += $lineIva;
             $totalReal += $totalLinea;
         }
 
-        $base   = round($totalBase, 2);
-        $ivaAmt = round($totalIva, 2);
-        $total  = round($totalReal, 2);
+        // 2. Determinar el Total Neto Real que el cliente DEBE pagar.
+        // El frontend envía 'descuentoAmt' que ya es el total a descontar (incluye promos y descuentos fijos, pero NO puntos ya que son pago).
+        // El Total Neto es Bruto - Descuento.
+        $totalNetoCalculado = round($totalReal - $descAmt, 2);
+        if ($totalNetoCalculado < 0) $totalNetoCalculado = 0;
+
+        // 3. Ajustar Base e IVA proporcionalmente para que la suma cuadre con el Total Neto.
+        if ($totalReal > 0) {
+            $factorEscala = $totalNetoCalculado / $totalReal;
+            $base   = round($totalBase * $factorEscala, 2);
+            $ivaAmt = round($totalIva * $factorEscala, 2);
+            // El Total final es la suma de base + iva (para evitar descuadres de redondeo)
+            $total = round($base + $ivaAmt, 2);
+        } else {
+            $base   = 0;
+            $ivaAmt = 0;
+            $total  = 0;
+        }
 
         $tipoCliente      = in_array($datos['tipoCliente'] ?? '', ['particular', 'empresa']) ? $datos['tipoCliente'] : 'particular';
         $nombreCliente    = isset($datos['nombreCliente']) ? mb_substr(trim($datos['nombreCliente']), 0, 100) : null;
         $nifCliente       = isset($datos['nifCliente']) ? mb_substr(trim($datos['nifCliente']), 0, 20) : null;
-        $metodoPago       = in_array($datos['metodoPago'] ?? '', ['efectivo', 'tarjeta', 'bizum', 'a_cuenta', 'mixto']) ? $datos['metodoPago'] : 'efectivo';
+        $metodoPago       = in_array($datos['metodoPago'] ?? '', ['efectivo', 'tarjeta', 'bizum', 'a_cuenta', 'mixto', 'puntos']) ? $datos['metodoPago'] : 'efectivo';
         $idCliente        = isset($datos['idCliente']) ? (int)$datos['idCliente'] : null;
         $efectivoRecibido = round((float)($datos['efectivo']['recibido'] ?? $datos['efectivoRecibido'] ?? 0), 2);
 
@@ -103,6 +118,8 @@ class VentaPDO
             $estado = ($totalPagadoCalculado < $total - 0.01) ? 'pendiente_pago' : 'completada';
         } elseif ($metodoPago === 'a_cuenta') {
             $pagadoACuenta = round((float)($datos['pagadoACuenta'] ?? 0), 2);
+            // Safety Cap: Pagado inicial no puede superar el total neto de la venta
+            if ($pagadoACuenta > $total) $pagadoACuenta = $total;
             $totalPagadoCalculado = $pagadoACuenta;
             $fechaLimite = !empty($datos['fechaLimitePago']) ? $datos['fechaLimitePago'] : null;
             $estado = 'pendiente_pago';
@@ -284,7 +301,7 @@ class VentaPDO
                 require_once __DIR__ . '/PagoPDO.php';
                 foreach ($datos['pagos'] as $pago) {
                     $importePago = round((float)$pago['importe'], 2);
-                    $metodo = in_array($pago['metodo'] ?? '', ['efectivo', 'tarjeta', 'bizum', 'a_cuenta', 'vale']) ? $pago['metodo'] : 'efectivo';
+                    $metodo = in_array($pago['metodo'] ?? '', ['efectivo', 'tarjeta', 'bizum', 'a_cuenta', 'vale', 'puntos']) ? $pago['metodo'] : 'efectivo';
                     // We DO NOT register 'a_cuenta' in pagos_venta because it is pending debt, not a payment.
                     if ($importePago > 0 && $metodo !== 'a_cuenta') {
                         PagoPDO::registrarPago($idVenta, $importePago, $metodo, $idUsuario, 'Pago de la venta', $datos['idTurno'] ?? null);
@@ -356,7 +373,7 @@ class VentaPDO
 
     public static function obtenerVentaPorTicket(int $numTicket): ?array
     {
-        $sqlVenta = "SELECT v.*, u.nombre AS nombre_cajero, c.puntos AS puntos_cliente_actual
+        $sqlVenta = "SELECT v.*, u.nombre AS nombre_cajero, c.puntos AS puntos_cliente_actual, c.email AS cliente_email
                      FROM ventas v
                      LEFT JOIN usuarios u ON v.id_usuario = u.id
                      LEFT JOIN clientes c ON v.id_cliente = c.id

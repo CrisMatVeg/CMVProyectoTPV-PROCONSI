@@ -617,6 +617,7 @@ $translations = [
     'purchase_status_facturado' => 'Abgerechnet',
     'purchase_placeholder_alb_ref' => 'Z.B. LS-2024-001',
     'purchase_placeholder_fac_num' => 'Z.B. RE-2024/001',
+    'purchase_js_saved_loading_next' => 'Lieferschein gespeichert. Nächsten Lieferanten laden...',
     'purchase_js_del_line' => 'Position löschen',
     'purchase_js_conn_error' => 'Verbindungsfehler',
     'purchase_modal_details_vendor' => 'Lieferant',

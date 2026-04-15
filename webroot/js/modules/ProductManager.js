@@ -19,7 +19,8 @@ export const ProductManager = {
         document.getElementById("editName").value = p.name;
         document.getElementById("editSku").value = p.codigo;
         document.getElementById("editPrice").value = p.price;
-        document.getElementById("editIva").value = p.iva || 21;
+        const editIvaEl = document.getElementById("editIva");
+        if (editIvaEl) editIvaEl.value = p.iva || 21;
         document.getElementById("editMesesGarantia").value = p.meses_garantia || 24;
         document.getElementById("editEmoji").value = p.icono;
 

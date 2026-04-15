@@ -14,14 +14,18 @@ class CierreFiscalPDO
      */
     public static function obtenerResumenParaCierre(): array
     {
+        // [NUEVO] El resumen ahora se basa en los pagos REALES realizados (pagos_venta)
+        // para incluir abonos a cuenta y pagos parciales en el reporte del día.
+        // Un pago se incluye en el cierre si su turno asociado todavía no tiene num_z.
         $sql = "SELECT 
-                COALESCE(SUM(CASE WHEN metodo_pago = 'efectivo' THEN total ELSE 0 END), 0) as total_efectivo,
-                COALESCE(SUM(CASE WHEN metodo_pago = 'tarjeta' THEN total ELSE 0 END), 0) as total_tarjeta,
-                COALESCE(SUM(CASE WHEN metodo_pago = 'bizum' THEN total ELSE 0 END), 0) as total_bizum,
-                COALESCE(SUM(CASE WHEN metodo_pago = 'a_cuenta' THEN total ELSE 0 END), 0) as total_a_cuenta,
-                COALESCE(SUM(CASE WHEN metodo_pago != 'a_cuenta' THEN total ELSE 0 END), 0) as total_general
-            FROM ventas 
-            WHERE num_z IS NULL";
+                COALESCE(SUM(CASE WHEN p.metodo_pago = 'efectivo' THEN p.importe ELSE 0 END), 0) as total_efectivo,
+                COALESCE(SUM(CASE WHEN p.metodo_pago = 'tarjeta' THEN p.importe ELSE 0 END), 0) as total_tarjeta,
+                COALESCE(SUM(CASE WHEN p.metodo_pago = 'bizum' THEN p.importe ELSE 0 END), 0) as total_bizum,
+                0 as total_a_cuenta,
+                COALESCE(SUM(p.importe), 0) as total_general
+            FROM pagos_venta p
+            JOIN caja_turnos t ON p.id_turno = t.id
+            WHERE t.num_z IS NULL";
         $q = DBPDO::ejecutarConsulta($sql);
         return $q->fetch(PDO::FETCH_ASSOC);
     }

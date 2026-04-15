@@ -80,11 +80,6 @@
         </button>
     </div>
 
-    <div class="d-flex ai-center jc-between mb-24 container-wider pl-40">
-        <button onclick="document.getElementById('formNuevoCliente').style.display='flex'" class="btn-save h-44 px-20 shadow-sm" style="border-radius: 12px; font-weight: 600;">
-            <i class="fa-solid fa-plus mr-8"></i> <?php echo L('client_btn_new'); ?>
-        </button>
-    </div>
 
     <div class="table-container container-wider br-20">
         <table class="data-table exclude-pagination" id="tablaClientes">

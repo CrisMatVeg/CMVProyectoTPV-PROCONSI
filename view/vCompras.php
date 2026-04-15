@@ -175,9 +175,12 @@
     .alb-total-box {
         background: var(--surface);
         border: 2px solid var(--accent);
-        border-radius: 16px;
-        padding: 16px 20px;
+        border-radius: 12px;
+        padding: 16px 24px;
         text-align: right;
+        width: 100%;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
     }
 
     .alb-total-label {
@@ -213,7 +216,7 @@
 </style>
 
 <div id="modalNuevoAlbaran" class="modal-overlay-bg">
-    <div class="modal-content" style="max-width: 1000px; width: 95%; border-radius: 20px; overflow: hidden;">
+    <div class="modal-content" style="max-width: 1000px; width: 95%; height: auto; max-height: 90vh; border-radius: 20px; overflow: hidden; display: flex; flex-direction: column;">
         <div class="modal-header">
             <div>
                 <h2 style="margin:0 0 2px 0"><?php echo L('purchase_modal_albaran_title'); ?></h2>
@@ -222,7 +225,7 @@
             <button class="btn-close-modal" onclick="cerrarModalNuevoAlbaran()">&times;</button>
         </div>
 
-        <div class="p-24 overflow-y-auto" style="max-height: calc(100vh - 220px);">
+        <div class="p-24 overflow-y-auto" style="flex: 1; min-height: 0;">
             <!-- Cabecera del albarán -->
             <div class="d-grid grid-3 gap-16 mb-20 p-16 bg-surface2 br-12 border-2">
                 <div class="form-group mb-0">
@@ -282,7 +285,7 @@
                 </table>
             </div>
 
-            <!-- Info + Total -->
+            <!-- Info de stock -->
             <div class="alb-info-box">
                 <i class="fa-solid fa-circle-info text-accent fs-20"></i>
                 <p class="m-0">
@@ -290,18 +293,21 @@
                     <?php echo L('purchase_info_pending'); ?>
                 </p>
             </div>
+        </div>
+
+        <div class="modal-footer border-top p-32 bg-surface2" style="flex-shrink: 0; z-index: 5; flex-direction: column; display: flex;">
             <div class="alb-total-box">
                 <div class="alb-total-label"><?php echo L('purchase_total_albaran'); ?></div>
                 <div class="alb-total-amount"><span id="albTotal">0,00</span> <span style="font-size:18px">€</span></div>
             </div>
-        </div>
-
-        <div class="modal-footer pt-16 border-top p-24">
-            <button class="btn-cancel" onclick="cerrarModalNuevoAlbaran()"><?php echo L('modal_cancel'); ?></button>
-            <div class="flex-1"></div>
-            <button id="btnGuardarAlbaran" class="btn-save w-auto px-32" onclick="guardarAlbaran()">
-                <i class="fa-solid fa-check-circle mr-8"></i> <?php echo L('purchase_btn_process'); ?>
-            </button>
+            
+            <div class="d-flex w-100 ai-center" style="margin-top: 4px;">
+                <button class="btn-cancel" onclick="cerrarModalNuevoAlbaran()"><?php echo L('modal_cancel'); ?></button>
+                <div class="flex-1"></div>
+                <button id="btnGuardarAlbaran" class="btn-save w-auto px-32" onclick="guardarAlbaran()">
+                    <i class="fa-solid fa-check-circle mr-8"></i> <?php echo L('purchase_btn_process'); ?>
+                </button>
+            </div>
         </div>
     </div>
 </div>
@@ -710,7 +716,19 @@
             if (res.success) {
                 // Notificar al TPV que el stock ha cambiado
                 sessionStorage.setItem('tpv_refresh_stock', Date.now());
-                window.location.reload();
+                const queueData = sessionStorage.getItem('tpv_pedido_auto_data');
+                let hasMore = false;
+                try {
+                    const q = JSON.parse(queueData);
+                    if (q && q.length > 0) hasMore = true;
+                } catch(e){}
+
+                if (hasMore) {
+                   showNotification('<i class="fa-solid fa-spinner fa-spin"></i> ' + <?php echo json_encode(L('purchase_js_saved_loading_next')); ?>, 'info');
+                   setTimeout(() => window.location.reload(), 1500);
+                } else {
+                   window.location.reload();
+                }
             } else {
                 showCustomAlert(<?php echo json_encode(L('prod_js_error')); ?>, res.error || <?php echo json_encode(L('prod_js_error')); ?>, 'error');
             }
@@ -917,8 +935,13 @@
         // Insertar banner al inicio del modal
         const bannerEl = document.createElement('div');
         bannerEl.id = 'autoPedidoBanner';
-        bannerEl.style.cssText = 'background:#fef9c3;border:1px solid #f59e0b;color:#92400e;padding:12px 16px;font-size:13px;margin-bottom:16px;border-radius:8px;';
-        bannerEl.innerHTML = bannerMsg;
+        const isMulti = data.length > 1;
+        const bannerColor = isMulti ? '#fff7ed' : '#fef9c3';
+        const borderColor = isMulti ? '#ea580c' : '#f59e0b';
+        const textColor = isMulti ? '#9a3412' : '#92400e';
+        
+        bannerEl.style.cssText = `background:${bannerColor};border:2px solid ${borderColor};color:${textColor};padding:14px 18px;font-size:13px;margin-bottom:16px;border-radius:12px;display:flex;align-items:center;gap:12px;box-shadow:0 4px 6px -1px rgb(0 0 0 / 0.1);`;
+        bannerEl.innerHTML = `<i class="fa-solid ${isMulti ? 'fa-layer-group' : 'fa-box-open'} fs-20"></i> <div>${bannerMsg}</div>`;
         const lineasContainer = document.getElementById('albLineas');
         if (lineasContainer) {
             const tableContainer = lineasContainer.closest('.table-container');

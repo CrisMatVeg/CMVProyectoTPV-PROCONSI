@@ -194,7 +194,7 @@
                     <div class="fs-13 font-bold tt-uppercase mb-16 pb-8 border-bottom"><?php echo L('dashboard_stats_payments'); ?></div>
                     <div class="d-flex flex-column gap-12">
                         <?php foreach ($avDashboard['metodos'] as $m): ?>
-                            <?php if ($m['metodo_pago'] === 'financiado') continue; ?>
+                            <?php if (in_array($m['metodo_pago'], ['financiado', 'mixto', 'a_cuenta'])) continue; ?>
                             <div class="d-flex jc-space-between ai-center">
                                 <div class="d-flex ai-center gap-8">
                                     <?php

@@ -420,4 +420,34 @@ class CajaTurnoPDO
 
         return $fondoInicial + $ventasEfectivo + $abonosEfectivo + $totalIngresado - $totalRetirado;
     }
+
+    /**
+     * Obtiene el total recaudado en este turno por cada método de pago
+     * basándose en la tabla pagos_venta (que es el registro real de flujos).
+     */
+    public static function obtenerTotalesMetodosTurno(int $idTurno): array
+    {
+        $sql = "SELECT metodo_pago, SUM(importe) as total 
+                FROM pagos_venta 
+                WHERE id_turno = :id 
+                GROUP BY metodo_pago";
+        $q = DBPDO::ejecutarConsulta($sql, [':id' => $idTurno]);
+        $results = $q->fetchAll(PDO::FETCH_ASSOC);
+
+        $totales = [
+            'efectivo' => 0.0,
+            'tarjeta'  => 0.0,
+            'bizum'    => 0.0,
+            'vale'     => 0.0,
+            'puntos'   => 0.0
+        ];
+
+        foreach ($results as $r) {
+            $m = $r['metodo_pago'];
+            if (array_key_exists($m, $totales)) {
+                $totales[$m] = (float)$r['total'];
+            }
+        }
+        return $totales;
+    }
 }

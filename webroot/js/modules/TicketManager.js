@@ -10,7 +10,14 @@ export const TicketManager = {
 
     showTicket(v, isFromTPV = false) {
         this.currentTicketNum = v.numero_ticket;
+        
+        // Sincronizar los globales que usan los botones de main.js (imprimir, PDF, anular)
+        window.currentTicketNum = v.numero_ticket;
+        window.currentVentaId   = v.id;
+        window.currentVentaPendiente = parseFloat(v.total) - parseFloat(v.pagado_a_cuenta || 0);
+
         const fmt2 = Utils.fmt2;
+
 
         const el_tkNum = document.getElementById("tkNumero");
         if (el_tkNum) {
@@ -74,32 +81,26 @@ export const TicketManager = {
         const vTotal = parseFloat(v.total) || 0;
         const vSubtotal = parseFloat(v.subtotal) || 0;
         const vDescAmt = parseFloat(v.descuento_amt) || 0;
-        const vDescPct = parseFloat(v.descuento_pct) || 0;
-        const factorDesc = (vDescAmt > 0 || vDescPct > 0) && vSubtotal > 0
-            ? vTotal / vSubtotal
-            : 1;
-
+        const vPuntosAmt = parseFloat(v.puntos_descuento_amt) || 0;
+        
         const ivaGrupos = {};
         v.lineas.forEach((l) => {
             if (l.devuelta) return;
             const rate = parseFloat(l.iva_aplicado ?? 21);
-            const pvpDesc = parseFloat(l.total_linea) * factorDesc;
-            const base = pvpDesc / (1 + rate / 100);
-            const tax = pvpDesc - base;
+            // Usamos precio_unitario × cantidad (precio BRUTO antes de descuentos globales).
+            // Los descuentos (puntos, cupones) se muestran como ítems separados en el ticket.
+            const pvpBruto = parseFloat(l.precio_unitario) * parseFloat(l.cantidad);
+            const base = pvpBruto / (1 + rate / 100);
+            const tax = pvpBruto - base;
             if (!ivaGrupos[rate]) ivaGrupos[rate] = { base: 0, tax: 0 };
             ivaGrupos[rate].base += base;
             ivaGrupos[rate].tax += tax;
         });
 
+        // El displayTotal ahora es simplemente lo que suma el desglose (que cuadra con v.total)
         let displayTotal = Object.values(ivaGrupos).reduce((acc, g) => acc + g.base + g.tax, 0);
 
-        // [NUEVO] Aplicar descuento de puntos si existe
-        const puntosDescuentoAmt = parseFloat(v.puntos_descuento_amt || 0);
-        if (puntosDescuentoAmt > 0) {
-            displayTotal = Math.max(0, displayTotal - puntosDescuentoAmt);
-        }
-
-        if (el_tkTotal) el_tkTotal.textContent = fmt2(displayTotal);
+        if (el_tkTotal) el_tkTotal.textContent = fmt2(vTotal);
         if (el_tkSubtotalRow) el_tkSubtotalRow.style.display = "none";
 
         if (el_tkIvaDesglose) {
@@ -113,6 +114,16 @@ export const TicketManager = {
                         <span>IVA ${rate}%</span><span>${fmt2(data.tax)}</span>
                     </div>
                 `).join("");
+        }
+
+        const el_tkPuntosRow = document.getElementById("tkPuntosRow");
+        if (el_tkPuntosRow) {
+            if (vPuntosAmt > 0) {
+                el_tkPuntosRow.classList.remove("d-none");
+                el_tkPuntosRow.innerHTML = `<span><i class="fa-solid fa-star text-gold"></i> Puntos canjeados (${v.puntos_canjeados})</span><span>-${fmt2(vPuntosAmt)}</span>`;
+            } else {
+                el_tkPuntosRow.classList.add("d-none");
+            }
         }
 
         // Reset tabs
@@ -129,6 +140,92 @@ export const TicketManager = {
 
         const el_tkPointsTotal = document.getElementById("tkPointsTotalBalance");
         if (el_tkPointsTotal) el_tkPointsTotal.textContent = v.puntos_cliente_total || (v.cliente_puntos !== undefined ? v.cliente_puntos : "—");
+
+        const el_tkEmail = document.getElementById("tkEmailInput");
+        if (el_tkEmail) {
+            el_tkEmail.value = v.cliente_email || "";
+        }
+
+        // --- Multi-Payment Breakdown ---
+        const el_tkPagosSection = document.getElementById("tkPagosSection");
+        const el_tkPagosLista = document.getElementById("tkPagosLista");
+        
+        if (el_tkPagosSection && el_tkPagosLista) {
+            const pagos = v.pagos || [];
+            if (pagos.length > 0) {
+                el_tkPagosSection.classList.remove("d-none");
+                
+                const methodIcons = {
+                    efectivo: '<i class="fa-solid fa-money-bill-wave" style="color:var(--green)"></i>',
+                    tarjeta: '<i class="fa-solid fa-credit-card" style="color:var(--accent)"></i>',
+                    bizum: '<i class="fa-solid fa-mobile-screen-button" style="color:var(--accent2)"></i>',
+                    vale: '<i class="fa-solid fa-ticket" style="color:var(--orange)"></i>',
+                    puntos: '<i class="fa-solid fa-star" style="color:var(--gold)"></i>',
+                    a_cuenta: '<i class="fa-solid fa-clock-rotate-left" style="color:var(--text-muted)"></i>'
+                };
+
+                el_tkPagosLista.innerHTML = pagos
+                    .filter(p => (p.metodo || p.metodo_pago) !== 'puntos')
+                    .map(p => {
+                        const method = p.metodo || p.metodo_pago || 'efectivo';
+                        const icon = methodIcons[method] || '<i class="fa-solid fa-circle-dollar-to-slot"></i>';
+                        const label = method.charAt(0).toUpperCase() + method.slice(1).replace('_', ' ');
+                        
+                        return `
+                            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 13px;">
+                                <span style="display: flex; align-items: center; gap: 8px;">
+                                    ${icon}
+                                    <span style="font-weight: 500;">${label}</span>
+                                </span>
+                                <span style="font-family:'DM Mono',monospace; font-weight: 700;">${fmt2(p.importe)}</span>
+                            </div>
+                        `;
+                    }).join("");
+
+                // Show change if cash was received (using global efectivo_recibido from sales header)
+                const cashPago = pagos.find(p => (p.metodo || p.metodo_pago) === 'efectivo');
+                const efRecibido = parseFloat(v.efectivo_recibido || 0);
+                
+                if (cashPago && efRecibido > 0) {
+                    const importeEfectivo = parseFloat(cashPago.importe || 0);
+                    // Solo mostramos si el importe entregado es mayor que el pagado (hay cambio) o si explícitamente se quiere ver el desglose
+                    if (efRecibido > importeEfectivo) {
+                        const cambio = efRecibido - importeEfectivo;
+                        el_tkPagosLista.innerHTML += `
+                            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; margin-top: 8px; border-top: 1px dashed var(--border); padding-top: 4px; opacity: 0.8;">
+                                <span style="font-weight: 500;">Efectivo entregado:</span>
+                                <span style="font-family:'DM Mono',monospace;">${fmt2(efRecibido)}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 700; color: var(--green);">
+                                <span style="font-weight: 600;">Cambio devuelto:</span>
+                                <span style="font-family:'DM Mono',monospace;">${fmt2(cambio)}</span>
+                            </div>
+                        `;
+                    }
+                }
+            } else {
+                el_tkPagosSection.classList.add("d-none");
+            }
+        }
+
+        // --- Botones de acción (Heredado de mostrarTicket en main.js) ---
+        const btnAnular = document.getElementById("btnAnularTicket");
+        const btnNuevaVenta = document.getElementById("btnNuevaVenta");
+
+        if (btnAnular) {
+            const isAbono = (v.tipo_documento || 'venta') === 'abono';
+            // Mostrar botón anular si es historial, completada y no es un abono
+            btnAnular.style.display = (!isFromTPV && v.estado === "completada" && !isAbono) ? "flex" : "none";
+            btnAnular.onclick = () => {
+                if (typeof window.abrirModalAnulacionTicket === 'function') {
+                    window.abrirModalAnulacionTicket(v.numero_ticket, v.fecha, v.id_cliente);
+                }
+            };
+        }
+
+        if (btnNuevaVenta) {
+            btnNuevaVenta.style.display = isFromTPV ? "flex" : "none";
+        }
 
         document.getElementById("ticketModal").classList.add("visible");
     },

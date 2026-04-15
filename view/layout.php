@@ -7,9 +7,9 @@
     <meta name="csrf-token" content="<?= $_SESSION['csrf_token'] ?? '' ?>" />
     <title>TPV · ElectroBazar</title>
     <link rel="icon" type="image/x-icon" href="./favicon.ico">
-    <link rel="stylesheet" href="./webroot/css/estilos.css?v=1" />
-    <link rel="stylesheet" href="./webroot/css/components.css?v=1" />
-    <link rel="stylesheet" href="./webroot/css/app.css?v=1" />
+    <link rel="stylesheet" href="./webroot/css/estilos.css?v=2" />
+    <link rel="stylesheet" href="./webroot/css/components.css?v=2" />
+    <link rel="stylesheet" href="./webroot/css/app.css?v=2" />
     <!-- Generación de PDF en cliente -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <link rel="stylesheet" href="./webroot/css/fonts.css" />
@@ -378,7 +378,7 @@
     ?>
 
     <div class="modal-overlay" id="ticketModal">
-        <div class="modal ticket-wrapper" id="ticketContenido">
+        <div class="modal ticket-wrapper" id="ticketContenido" style="display: flex; flex-direction: column; max-height: 90vh; overflow: hidden; padding: 0;">
             <div class="ticket-brand-header">
                 <div class="title"><i class="fa-solid fa-bolt-lightning"></i> <?= $empresaNombre ?></div>
                 <div class="info"><?= $empresaDireccion ?> · NIF: <?= $empresaNif ?></div>
@@ -395,134 +395,170 @@
                 </button>
             </div>
 
-            <div id="tkSummaryTab" class="ticket-tab-content active p-20">
+            <div class="ticket-body" style="flex: 1; overflow-y: auto; padding: 0;">
+                <div id="tkSummaryTab" class="ticket-tab-content active p-20">
+                    <div class="ticket-meta">
+                        <span id="tkTipoDoc" class="doc-type"><?php echo L('ticket_type_sale'); ?></span>
+                        
+                        <span class="label"><?php echo L('ticket_label_number'); ?></span>
+                        <div class="d-flex ai-center">
+                            <span id="tkNumero" class="value">—</span>
+                            <span id="tkBadgeAbono" style="display:none;background:var(--red);color:#fff;font-size:9px;font-weight:800;padding:2px 7px;border-radius:4px;letter-spacing:.5px;margin-left:8px;vertical-align:middle;">ABONO</span>
+                        </div>
 
-            <!-- SECCIÓN CLIENTE (Removida por integración) -->
+                        <span id="tkLabelNumOrig" class="label d-none"><?php echo L('ticket_label_origin'); ?></span>
+                        <span id="tkNumOrig" class="value d-none">—</span>
 
-            <div class="ticket-meta">
-                <span id="tkTipoDoc" class="doc-type"><?php echo L('ticket_type_sale'); ?></span>
+                        <span class="label"><?php echo L('ticket_label_date'); ?></span> <span id="tkFecha">—</span>
+                        <span id="tkLabelClienteMeta" class="label d-none"><?php echo L('client_label_client'); ?></span>
+                        <span id="tkClienteMeta" class="value d-none">—</span>
+                        <span id="tkLabelNifMeta" class="label d-none"><?php echo L('client_label_cif'); ?></span>
+                        <span id="tkNifMeta" class="value d-none" style="font-family: inherit;">—</span>
+                        <span class="label"><?php echo L('ticket_label_cashier'); ?></span> <span id="tkCajero">—</span>
+                        <span class="label"><?php echo L('tpv_payment_method'); ?></span> <span id="tkMetodo">—</span>
+                    </div>
+
+                    <div id="tkLineas" class="ticket-items mt-16 mb-16"></div>
+
+                    <div class="ticket-totals pt-16 border-top">
+                        <div class="ticket-total-row label text-muted" id="tkSubtotalRow">
+                            <span><?php echo L('tpv_subtotal'); ?></span><span id="tkSubtotal">—</span>
+                        </div>
+                        <div id="tkDescRow" class="ticket-total-row d-none text-green">
+                            <span id="tkDescLabel"><?php echo L('tpv_discount'); ?></span><span id="tkDescAmt">—</span>
+                        </div>
+                        <div id="tkIvaDesglose"></div>
+                        <div id="tkPuntosRow" class="ticket-total-row d-none text-green"></div>
+                        <div id="tkValesRow" class="ticket-total-row d-none text-accent">
+                            <span><?php echo L('ticket_label_voucher_paid'); ?></span><span id="tkValesAmt">—</span>
+                        </div>
+                        <div class="ticket-total-row ticket-total-main">
+                            <span><?php echo L('tk_label_total'); ?></span><span id="tkTotal" class="font-mono">—</span>
+                        </div>
+                        <div id="tkEfectivoRow" class="d-none flex-column gap-4 mt-8 pt-8 border-top text-muted fs-12">
+                            <div class="ticket-total-row"><span><?php echo L('ticket_label_received'); ?></span><span id="tkEntregado">—</span></div>
+                            <div class="ticket-total-row"><span><?php echo L('ticket_label_change'); ?></span><span id="tkCambio">—</span></div>
+                        </div>
+                    </div>
+
+                    <div id="tkPagosSection" class="d-none" style="margin-top: 16px; padding: 12px; border: 1px solid var(--surface2); border-radius: 8px; background: rgba(0,0,0,0.02);">
+                        <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; margin-bottom: 8px;"><?php echo L('ticket_label_payment_breakdown'); ?></div>
+                        <div id="tkPagosLista" style="display: flex; flex-direction: column; gap: 4px;"></div>
+                        <div id="tkAbonarParteContainer" class="d-none" style="margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--surface2);">
+                            <button id="btnAbonarParte" onclick="abrirModalAbonoParcial()" class="btn-cancel w-100" style="background: var(--blue-light); color: var(--blue); border-color: var(--blue);">
+                                <i class="fa-solid fa-hand-holding-dollar"></i> <?php echo L('ticket_btn_register_abono'); ?>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="tkCommentsSection" class="d-none mt-16 p-12 br-8 border-2 bg-surface2 italic fs-12 text-muted" style="border-style: dashed;">
+                        <i class="fa-solid fa-quote-left mr-4 opacity-50"></i>
+                        <span id="tkCommentsText"></span>
+                    </div>
+
+                    <div id="tkAbonosSection" class="d-none"></div>
+                </div>
+
+                <div id="tkPointsTab" class="ticket-tab-content d-none p-24">
+                    <div class="points-hero d-flex flex-column ai-center jc-center py-32 bg-accent-light br-20 border-2 mb-24" style="border-color: rgba(var(--accent-rgb), 0.1);">
+                        <div class="points-icon-wrap mb-16 shadow-lg">
+                            <i class="fa-solid fa-star text-accent fs-32"></i>
+                        </div>
+                        <div class="fs-14 fw-700 text-accent tt-uppercase ls-1 mb-4"><?php echo L('ticket_tab_points'); ?></div>
+                        <div class="fs-48 font-mono fw-900 text-accent mb-4" id="tkPointsEarnedTotal">0</div>
+                        <div class="fs-12 text-muted fw-600"><?php echo L('tpv_points_earned'); ?></div>
+                    </div>
+
+                    <div class="grid-2 gap-16">
+                        <div class="points-card p-16 br-16 border-2 bg-surface shadow-sm">
+                            <div class="fs-11 text-muted tt-uppercase fw-700 mb-8 opacity-70"><?php echo L('tpv_points_redeemed'); ?></div>
+                            <div class="fs-20 font-mono fw-800 text-red" id="tkPointsRedeemed">0</div>
+                        </div>
+                        <div class="points-card p-16 br-16 border-2 bg-surface shadow-sm highlighted" style="border-color: var(--accent);">
+                            <div class="fs-11 text-muted tt-uppercase fw-700 mb-8 opacity-70"><?php echo L('tpv_points_total'); ?></div>
+                            <div class="fs-20 font-mono fw-800 text-accent" id="tkPointsTotalBalance">0</div>
+                        </div>
+                    </div>
+
+                    <div class="mt-24 p-16 br-16 bg-blue-light border-2 d-flex ai-center gap-12" style="border-color: rgba(var(--accent-rgb), 0.1);">
+                        <i class="fa-solid fa-circle-info text-accent fs-20"></i>
+                        <p class="fs-12 text-muted m-0 line-height-md">
+                            <strong>Recuerda:</strong> 100 puntos equivalen a 5€ de descuento. ¡Sigue acumulando para ahorrar en tus próximas compras!
+                        </p>
+                    </div>
+                </div>
+
+                <div class="ticket-email-section p-20 border-top" id="ticketEmailSection">
+                    <label class="form-label fs-11"><?php echo L('ticket_label_send_email'); ?></label>
+                    <div class="d-flex gap-8">
+                        <input type="text" id="tkEmailInput" placeholder="cliente@ejemplo.com" class="form-input font-mono fs-13">
+                        <button onclick="enviarTicketEmail()" id="btnSendEmail" class="btn-filter h-40 p-0-20 bg-blue">
+                            <i class="fa-solid fa-paper-plane"></i>
+                        </button>
+                    </div>
+                    <span id="err-email" class="form-error"></span>
+                </div>
+            </div>
+
+            <style>
+                .tk-footer-grid {
+                    display: flex !important;
+                    flex-wrap: nowrap !important;
+                    gap: 8px !important;
+                    padding: 16px !important;
+                    justify-content: center !important;
+                    align-items: stretch !important;
+                    background: var(--surface);
+                    border-top: 1px solid var(--border);
+                    border-radius: 0 0 20px 20px;
+                }
+                .btn-tk-action {
+                    flex: 1 1 0 !important;
+                    min-width: 0 !important;
+                    height: 48px !important;
+                    padding: 0 8px !important;
+                    border-radius: 12px !important;
+                    font-size: 13px !important;
+                    gap: 6px !important;
+                    white-space: nowrap !important;
+                    margin: 0 !important;
+                    display: flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                }
+                .btn-tk-action span {
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }
+                .btn-tk-action i { font-size: 14px; flex-shrink: 0; }
                 
-                <span class="label"><?php echo L('ticket_label_number'); ?></span>
-                <div class="d-flex ai-center">
-                    <span id="tkNumero" class="value">—</span>
-                    <span id="tkBadgeAbono" style="display:none;background:var(--red);color:#fff;font-size:9px;font-weight:800;padding:2px 7px;border-radius:4px;letter-spacing:.5px;margin-left:8px;vertical-align:middle;">ABONO</span>
-                </div>
-
-                <span id="tkLabelNumOrig" class="label d-none"><?php echo L('ticket_label_origin'); ?></span>
-                <span id="tkNumOrig" class="value d-none">—</span>
-
-                <span class="label"><?php echo L('ticket_label_date'); ?></span> <span id="tkFecha">—</span>
-                <span id="tkLabelClienteMeta" class="label d-none"><?php echo L('client_label_client'); ?></span>
-                <span id="tkClienteMeta" class="value d-none">—</span>
-                <span id="tkLabelNifMeta" class="label d-none"><?php echo L('client_label_cif'); ?></span>
-                <span id="tkNifMeta" class="value d-none" style="font-family: inherit;">—</span>
-                <span class="label"><?php echo L('ticket_label_cashier'); ?></span> <span id="tkCajero">—</span>
-                <span class="label"><?php echo L('tpv_payment_method'); ?></span> <span id="tkMetodo">—</span>
-            </div>
-
-            <div id="tkLineas" class="ticket-items mt-16 mb-16"></div>
-
-
-            <div class="ticket-totals pt-16 border-top">
-                <div class="ticket-total-row label text-muted" id="tkSubtotalRow">
-                    <span><?php echo L('tpv_subtotal'); ?></span><span id="tkSubtotal">—</span>
-                </div>
-                <div id="tkDescRow" class="ticket-total-row d-none text-green">
-                    <span id="tkDescLabel"><?php echo L('tpv_discount'); ?></span><span id="tkDescAmt">—</span>
-                </div>
-                <!-- Desglose IVA dinámico por tipo -->
-                <div id="tkIvaDesglose">
-                    <!-- Se rellena dinámicamente por JS: una fila por tipo de IVA -->
-                </div>
-                <div id="tkValesRow" class="ticket-total-row d-none text-accent">
-                    <span><?php echo L('ticket_label_voucher_paid'); ?></span><span id="tkValesAmt">—</span>
-                </div>
-                <div class="ticket-total-row ticket-total-main">
-                    <span><?php echo L('tk_label_total'); ?></span><span id="tkTotal" class="font-mono">—</span>
-                </div>
-                <!-- Efectivo -->
-                <div id="tkEfectivoRow" class="d-none flex-column gap-4 mt-8 pt-8 border-top text-muted fs-12">
-                    <div class="ticket-total-row"><span><?php echo L('ticket_label_received'); ?></span><span id="tkEntregado">—</span></div>
-                    <div class="ticket-total-row"><span><?php echo L('ticket_label_change'); ?></span><span id="tkCambio">—</span></div>
-                </div>
-            </div>
-
-            <!-- SECCIÓN PAGOS PARCIALES -->
-            <div id="tkPagosSection" class="d-none" style="margin-top: 16px; padding: 12px; border: 1px solid var(--surface2); border-radius: 8px; background: rgba(0,0,0,0.02);">
-                <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; margin-bottom: 8px;"><?php echo L('ticket_label_payment_breakdown'); ?></div>
-                <div id="tkPagosLista" style="display: flex; flex-direction: column; gap: 4px;"></div>
-
-                <div id="tkAbonarParteContainer" class="d-none" style="margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--surface2);">
-                    <button id="btnAbonarParte" onclick="abrirModalAbonoParcial()" class="btn-cancel w-100" style="background: var(--blue-light); color: var(--blue); border-color: var(--blue);">
-                        <i class="fa-solid fa-hand-holding-dollar"></i> <?php echo L('ticket_btn_register_abono'); ?>
-                    </button>
-                </div>
-            </div>
-
-            <!-- SECCIÓN COMENTARIOS -->
-            <div id="tkCommentsSection" class="d-none mt-16 p-12 br-8 border-2 bg-surface2 italic fs-12 text-muted" style="border-style: dashed;">
-                <i class="fa-solid fa-quote-left mr-4 opacity-50"></i>
-                <span id="tkCommentsText"></span>
-            </div> <!-- End tkCommentsSection -->
-
-            <!-- SECCIÓN ABONOS / DEVOLUCIONES (se rellena desde JS) -->
-            <div id="tkAbonosSection" class="d-none"></div>
-
-            </div> <!-- End tkSummaryTab -->
-
-            <!-- SECCIÓN PUNTOS FIDELIDAD -->
-            <div id="tkPointsTab" class="ticket-tab-content d-none p-24">
-                <div class="points-hero d-flex flex-column ai-center jc-center py-32 bg-accent-light br-20 border-2 mb-24" style="border-color: rgba(var(--accent-rgb), 0.1);">
-                    <div class="points-icon-wrap mb-16 shadow-lg">
-                        <i class="fa-solid fa-star text-accent fs-32"></i>
-                    </div>
-                    <div class="fs-14 fw-700 text-accent tt-uppercase ls-1 mb-4"><?php echo L('ticket_tab_points'); ?></div>
-                    <div class="fs-48 font-mono fw-900 text-accent mb-4" id="tkPointsEarnedTotal">0</div>
-                    <div class="fs-12 text-muted fw-600"><?php echo L('tpv_points_earned'); ?></div>
-                </div>
-
-                <div class="grid-2 gap-16">
-                    <div class="points-card p-16 br-16 border-2 bg-surface shadow-sm">
-                        <div class="fs-11 text-muted tt-uppercase fw-700 mb-8 opacity-70"><?php echo L('tpv_points_redeemed'); ?></div>
-                        <div class="fs-20 font-mono fw-800 text-red" id="tkPointsRedeemed">0</div>
-                    </div>
-                    <div class="points-card p-16 br-16 border-2 bg-surface shadow-sm highlighted" style="border-color: var(--accent);">
-                        <div class="fs-11 text-muted tt-uppercase fw-700 mb-8 opacity-70"><?php echo L('tpv_points_total'); ?></div>
-                        <div class="fs-20 font-mono fw-800 text-accent" id="tkPointsTotalBalance">0</div>
-                    </div>
-                </div>
-
-                <div class="mt-24 p-16 br-16 bg-blue-light border-2 d-flex ai-center gap-12" style="border-color: rgba(var(--accent-rgb), 0.1);">
-                    <i class="fa-solid fa-circle-info text-accent fs-20"></i>
-                    <p class="fs-12 text-muted m-0 line-height-md">
-                        <strong>Recuerda:</strong> 100 puntos equivalen a 5€ de descuento. ¡Sigue acumulando para ahorrar en tus próximas compras!
-                    </p>
-                </div>
-            </div>
-
-            <div class="ticket-email-section" id="ticketEmailSection">
-                <label class="form-label fs-11"><?php echo L('ticket_label_send_email'); ?></label>
-                <div class="d-flex gap-8">
-                    <input type="text" id="tkEmailInput" placeholder="cliente@ejemplo.com" class="form-input font-mono fs-13">
-                    <button onclick="enviarTicketEmail()" id="btnSendEmail" class="btn-filter h-40 p-0-20 bg-blue">
-                        <i class="fa-solid fa-paper-plane"></i>
-                    </button>
-                </div>
-                <span id="err-email" class="form-error"></span>
-            </div>
-
-            <div class="modal-footer p-24 bg-surface2 d-flex ai-center gap-12">
-                <button onclick="imprimirTicket()" class="btn-secondary flex-1 ai-center jc-center gap-8 px-16">
-                    <i class="fa-solid fa-print"></i> <?php echo L('ticket_btn_print'); ?>
-                </button>
-                <button onclick="descargarPDFTicket()" class="btn-secondary flex-1 ai-center jc-center gap-8 px-16" style="background: var(--blue-light); color: var(--blue); border-color: var(--blue);">
-                    <i class="fa-solid fa-file-pdf"></i> <?php echo L('tk_btn_pdf'); ?>
-                </button>
-                <button id="btnAnularTicket" class="btn-secondary flex-1 ai-center jc-center gap-8 px-16" style="background: var(--red-light); color: var(--red); border-color: var(--red); display: none;">
-                    <i class="fa-solid fa-ban"></i> <?php echo L('ticket_btn_void'); ?>
+                @media (max-width: 420px) {
+                    .btn-tk-action span { display: none !important; }
+                    .btn-tk-action { flex: 0 0 48px !important; }
+                    .btn-tk-action#btnNuevaVenta { flex: 1 !important; }
+                    .btn-tk-action#btnNuevaVenta span { display: inline !important; }
+                }
+            </style>
+            
+            <div class="tk-footer-grid" id="ticketFooter">
+                <button onclick="imprimirTicket()" class="btn-secondary btn-tk-action" title="<?php echo L('ticket_btn_print'); ?>">
+                    <i class="fa-solid fa-print"></i> 
+                    <span><?php echo L('ticket_btn_print'); ?></span>
                 </button>
                 
-                <button id="btnNuevaVenta" onclick="nuevaVenta()" class="btn-save flex-1 ai-center jc-center px-16"><?php echo L('ticket_btn_new_sale'); ?></button>
+                <button onclick="descargarPDFTicket()" class="btn-secondary btn-tk-action" style="background: var(--blue-light); color: var(--blue); border-color: var(--blue);" title="PDF">
+                    <i class="fa-solid fa-file-pdf"></i>
+                    <span>PDF</span>
+                </button>
+                
+                <button id="btnAnularTicket" class="btn-secondary btn-tk-action" style="background: var(--red-light); color: var(--red); border-color: var(--red); display: none;">
+                    <i class="fa-solid fa-ban"></i>
+                </button>
+                
+                <button id="btnNuevaVenta" onclick="nuevaVenta()" class="btn-save btn-tk-action fw-700">
+                    <span><?php echo L('ticket_btn_new_sale'); ?></span>
+                    <i class="fa-solid fa-chevron-right fs-10 opacity-70"></i>
+                </button>
             </div>
         </div>
     </div>
@@ -537,6 +573,9 @@
             <div class="modal-body p-20">
                 <div class="form-group mb-0">
                     <label class="form-label"><?php echo L('tpv_amount_to_add'); ?> (€)</label>
+                    <div id="abonoPendienteDisplay" class="mb-12 p-12 br-8 bg-blue-light text-blue fs-13 font-bold d-none">
+                        <i class="fa-solid fa-circle-info mr-8"></i> Pendiente: <span id="abonoPendienteValor">0,00</span> €
+                    </div>
                     <input type="number" id="abonoImporte" class="form-input font-mono fs-16" step="0.01" min="0.01" placeholder="0.00">
                 </div>
                 <div class="form-group mb-0 mt-16">
@@ -851,7 +890,7 @@
     </style>
     <script src="./webroot/js/validaciones.js?v=2"></script>
     <script src="./webroot/js/utils_global.js?v=16"></script>
-    <script src="./webroot/js/main.js?v=22"></script>
+    <script src="./webroot/js/main.js?v=31"></script>
     <script src="./webroot/js/pagination.js?v=1"></script>
     <!-- SISTEMA DE MODALES GLOBALES (ALERTAS Y CONFIRMACIONES) -->
     <div class="modal-overlay" id="globalAlertModal" style="z-index: 15000;">
@@ -1050,6 +1089,9 @@
             }
         }
     </script>
+    <?php if (isset($_SESSION['paginaEnCurso']) && $_SESSION['paginaEnCurso'] === 'inicioPrivado'): ?>
+        <script type="module" src="./webroot/js/app.js?v=16"></script>
+    <?php endif; ?>
 </body>
 
 </html>

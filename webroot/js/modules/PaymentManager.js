@@ -261,40 +261,125 @@ export const PaymentManager = {
 
     const totals = CartManager.calculateTotals();
     const items = Object.values(AppState.cart);
-
-    const clienteId = AppState.tipoClienteActual === "socio" 
-        ? (AppState.socioActual ? AppState.socioActual.id : null)
-        : (AppState.clienteSeleccionado ? AppState.clienteSeleccionado.id : null);
-
-    const facturaActiva = document.getElementById("facturaToggle")?.checked;
-    
-    // Validations
-    if (facturaActiva && AppState.tipoClienteActual === "particular" && !clienteId) {
-        Utils.showToast("⚠ Factura obligatoria. Selecciona o registra un cliente.", "warning");
+    if (items.length === 0) {
+        Utils.showToast("⚠ El carrito está vacío", "warning");
         btn.disabled = false;
         btn.textContent = "Cobrar";
         return;
     }
 
-    if (AppState.tipoClienteActual === "empresa") {
-        const empNif = this.getClienteNif();
-        if (!validarDocumento(empNif)) {
-            Utils.showToast("⚠ El CIF/NIF de la empresa no tiene un formato válido.", "warning");
+    const clienteId = AppState.tipoClienteActual === "socio" 
+        ? (AppState.socioActual ? AppState.socioActual.id : null)
+        : (AppState.clienteSeleccionado ? AppState.clienteSeleccionado.id : null);
+
+    // 1. Detect selected method from UI BEFORE validation
+    let modalMethod = null;
+    const selectedBtn = document.querySelector("#selectorMetodoPago .btn-tpv-method.border-accent");
+    if (selectedBtn) {
+        modalMethod = selectedBtn.id.replace("btn", "").toLowerCase();
+        if (modalMethod === "acuenta") modalMethod = "a_cuenta";
+    }
+
+    const facturaActiva = document.getElementById("facturaToggle")?.checked;
+    const currentSelected = (modalMethod || AppState.selectedPayment || "efectivo");
+    const isAcuenta = currentSelected === "a_cuenta";
+    const isMixto = (checkoutContext === "mixto" || currentSelected === "mixto");
+    
+    // 2. Validation Logic
+    if (isAcuenta || facturaActiva) {
+        if (!clienteId && AppState.tipoClienteActual !== "empresa") {
+            Utils.showToast("Debe identificar un cliente para esta operación", "warning");
             btn.disabled = false;
             btn.textContent = "Cobrar";
             return;
+        }
+        
+        const empNif = this.getClienteNif();
+        if (facturaActiva && (!empNif || !window.validarDocumento(empNif))) {
+            Utils.showToast("El NIF/CIF del cliente no es válido para factura", "error");
+            btn.disabled = false;
+            btn.textContent = "Cobrar";
+            return;
+        }
+
+        if (isAcuenta) {
+            const aCFecha = (document.getElementById("aCuentaFechaLimite") || {value: ""}).value;
+            if (!window.validarFechas(new Date().toISOString().split("T")[0], aCFecha)) {
+                Utils.showToast("La fecha límite no puede ser anterior a hoy", "error");
+                btn.disabled = false;
+                btn.textContent = "Cobrar";
+                return;
+            }
         }
     }
 
-    if (AppState.selectedPayment === "a_cuenta") {
-        const aCFecha = document.getElementById("aCuentaFechaLimite").value;
-        if (!validarFechas(new Date().toISOString().split("T")[0], aCFecha)) {
-            Utils.showToast("⚠ La fecha límite para pago a cuenta debe ser igual o posterior a hoy.", "warning");
-            btn.disabled = false;
-            btn.textContent = "Cobrar";
-            return;
+    const efectivoRecibidoEl = document.getElementById("mixPagoMonto") || document.getElementById("efectivoRecibido");
+    const uiEfectivoRecibido = parseFloat((efectivoRecibidoEl || {value:0}).value) || 0;
+
+    const basePayments = (isMixto ? (window.currentPayments || []) : [])
+        .filter(p => parseFloat(p.importe) > 0 && p.metodo !== "puntos");
+
+    // 2. Build the pagos list for the backend
+    const currentPaidTot = basePayments.reduce((acc, p) => acc + parseFloat(p.importe), 0);
+    const totalRemainingToAllocate = Math.max(0, totals.total - currentPaidTot);
+
+    let pagosList = [...basePayments];
+
+    if (isAcuenta) {
+        // SPECIAL LOGIC FOR CREDIT SALES:
+        // The user input (uiEfectivoRecibido) represents the DEBT they want to credit.
+        const debtPart = Math.min(totalRemainingToAllocate, uiEfectivoRecibido);
+        const initialPaymentPart = Math.max(0, totalRemainingToAllocate - debtPart);
+
+        // 1. The cash part (Initial Payment) - This goes to the cash box!
+        if (initialPaymentPart > 0.005) {
+            pagosList.push({
+                metodo: "efectivo",
+                importe: initialPaymentPart,
+                recibido: initialPaymentPart
+            });
         }
+        // 2. The credit part (The actual debt)
+        if (debtPart > 0.005) {
+            pagosList.push({
+                metodo: "a_cuenta",
+                importe: debtPart,
+                recibido: debtPart
+            });
+        }
+    } else if (totalRemainingToAllocate > 0.005) {
+        // Standard non-credit payment
+        let metodoRemanente = modalMethod || AppState.selectedPayment || "efectivo";
+        if (metodoRemanente === "mixto") metodoRemanente = "efectivo"; 
+        
+        pagosList.push({
+            metodo: metodoRemanente,
+            importe: totalRemainingToAllocate,
+            recibido: metodoRemanente === "efectivo" ? Math.max(totalRemainingToAllocate, uiEfectivoRecibido) : totalRemainingToAllocate
+        });
     }
+
+    // Identify primary payment method for legacy backend support
+    let finalMetodoPago = modalMethod || AppState.selectedPayment || "efectivo";
+    if (pagosList.length === 1) {
+        finalMetodoPago = pagosList[0].metodo;
+    } else if (pagosList.length > 1) {
+        finalMetodoPago = "mixto";
+    }
+
+    // 3. Identification & Payload
+    const aCuentaFechaEl = document.getElementById("aCuentaFechaLimite");
+    // In the current UI, 'A cuenta' amount in the input represents the DEBT (Importe Fiado).
+    // The backend expects 'pagadoACuenta' to be the INITIAL PAYMENT (Entrega).
+    // So: PaidNow = Total - Debt
+    let aCuentaPagadoVal = 0;
+    if (isAcuenta) {
+        const debtInputVal = parseFloat(uiEfectivoRecibido) || 0;
+        aCuentaPagadoVal = Math.max(0, totals.total - debtInputVal);
+    }
+
+    const cashPayment = pagosList.find(p => p.metodo === "efectivo");
+    const finalEfectivoRecibido = cashPayment ? (cashPayment.recibido || cashPayment.importe) : 0;
 
     const payload = {
         tipoCliente: AppState.tipoClienteActual,
@@ -302,7 +387,9 @@ export const PaymentManager = {
         nifCliente: this.getClienteNif(),
         idCliente: clienteId,
         esFactura: facturaActiva ? 1 : 0,
-        metodoPago: AppState.selectedPayment,
+        comentarios: (document.getElementById("ticketComentarios") || {value: ""}).value.trim(),
+        metodoPago: finalMetodoPago,
+        pagos: pagosList,
         subtotal: totals.subtotal,
         total: totals.total,
         descuentoAmt: totals.totalDiscount,
@@ -316,18 +403,20 @@ export const PaymentManager = {
             serials: it.serials || []
         })),
         efectivo: {
-            recibido: parseFloat(document.getElementById("efectivoRecibido").value) || 0
+            recibido: finalEfectivoRecibido
         },
-        pagadoACuenta: AppState.selectedPayment === "a_cuenta" ? parseFloat(document.getElementById("aCuentaPagado").value) || 0 : 0,
-        fechaLimitePago: AppState.selectedPayment === "a_cuenta" ? document.getElementById("aCuentaFechaLimite").value : null,
+        pagadoACuenta: aCuentaPagadoVal,
+        fechaLimitePago: (aCuentaFechaEl || {value:null}).value,
         idVale: AppState.valeAplicado ? AppState.valeAplicado.id : null,
         codigoVale: AppState.valeAplicado ? AppState.valeAplicado.codigo : null,
-        importeVale: AppState.valeAplicado ? AppState.valeAplicado.importe_restante : 0,
+        importeVale: AppState.valeAplicado ? Math.min(totals.total, parseFloat(AppState.valeAplicado.importe_restante || 0)) : 0,
         puntosGanados: Math.floor(totals.total),
         puntosCanjeados: AppState.puntosCanjeados || 0,
-        puntosDescuentoAmt: AppState.puntosDescuentoAmt || 0
+        puntosDescuentoAmt: AppState.puntosDescuentoAmt || 0,
+        codigoCupon: (AppState.currentPromo && AppState.currentPromo.codigo) ? AppState.currentPromo.codigo : null
     };
 
+    console.log("Saving Venta Payload:", payload);
 
     try {
         const data = await ApiService.request("./api/guardarVenta.php", {
@@ -336,16 +425,24 @@ export const PaymentManager = {
         });
         if (data.ok) {
             Utils.showToast("Venta guardada con éxito", "success");
-            AppState.cart = {};
-            AppState.saveCart();
-            TicketManager.showTicket(data.venta);
+            
+            // Delegate clearCart to master main.js if available
+            if (typeof window.clearCart === "function") {
+                window.clearCart();
+            } else {
+                AppState.clearCart();
+            }
+            
+            window.currentPayments = [];
+            TicketManager.showTicket(data.venta, true);
             document.getElementById("clienteModal").classList.remove("visible");
         } else {
-            Utils.showToast("Error: " + data.error, "error");
+            console.error("Backend Error:", data);
+            Utils.showToast("Error: " + (data.error || "Fallo al guardar"), "error");
         }
     } catch (e) {
-        console.error(e);
-        Utils.showToast("Error de conexión", "error");
+        console.error("Connection/Runtime Error:", e);
+        Utils.showToast("Error de conexión o de sistema", "error");
     } finally {
         btn.disabled = false;
         btn.textContent = "Cobrar";

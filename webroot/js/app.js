@@ -3,14 +3,14 @@
  * Main entry point and orchestration layer.
  */
 
-import { AppConfig, AppState } from './modules/AppConfig.js';
-import { ApiService } from './modules/ApiService.js';
-import { Utils } from './modules/Utils.js';
-import { TicketManager } from './modules/TicketManager.js';
-import { ProductManager } from './modules/ProductManager.js';
-import { CartManager } from './modules/CartManager.js';
-import { UiController } from './modules/UiController.js';
-import { PaymentManager } from './modules/PaymentManager.js';
+import { AppConfig, AppState } from './modules/AppConfig.js?v=3';
+import { ApiService } from './modules/ApiService.js?v=3';
+import { Utils } from './modules/Utils.js?v=3';
+import { TicketManager } from './modules/TicketManager.js?v=10';
+import { ProductManager } from './modules/ProductManager.js?v=3';
+import { CartManager } from './modules/CartManager.js?v=5';
+import { UiController } from './modules/UiController.js?v=3';
+import { PaymentManager } from './modules/PaymentManager.js?v=5';
 
 const TpvApp = {
   /**
@@ -101,12 +101,11 @@ const TpvApp = {
 
     // 2. Setup UI Features
     UiController.initSidebarResizer();
-    UiController.updateClock();
-    setInterval(() => UiController.updateClock(), 1000 * 60);
+
 
     // 3. Load Theme
     const mode = localStorage.getItem("theme-mode") || "light";
-    const accent = localStorage.getItem("theme-accent") || "indigo";
+    const accent = localStorage.getItem("theme-accent") || "blue";
     UiController.setMode(mode);
     UiController.setAccent(accent);
 

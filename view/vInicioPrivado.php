@@ -73,7 +73,7 @@
                         <label class="form-label fs-11 tt-uppercase opacity-70 mb-8"><i class="fa-solid fa-tags"></i> <?php echo L('tpv_additional_tags'); ?></label>
                         <div class="attr-tabs" id="attrTabs" style="display:flex; flex-wrap:wrap; gap:8px;">
                             <?php foreach ($atributosDisponibles as $attr): ?>
-                                <button class="attr-tab cat-tab d-inline-flex ai-center gap-6"
+                                <button class="attr-tab attr-tab-btn d-inline-flex ai-center gap-6"
                                     data-attr="<?php echo htmlspecialchars($attr); ?>"
                                     style="font-size: 11px; padding: 6px 14px;">
                                     <i class="fa-solid fa-tag" style="opacity: 0.5;"></i> <?php echo htmlspecialchars($attr); ?>
@@ -604,6 +604,9 @@
                             <div class="d-flex gap-8 ai-center">
                                 <input id="mixPagoMonto" type="number" step="0.01" class="form-input font-mono fs-20 text-right flex-1 bg-surface1 border-0 br-8" placeholder="0,00" oninput="calcularCambioMix()" />
                                 <button id="mixBtnAddPago" onclick="addPagoMixto()" class="btn-save p-12-24 br-8 font-bold" style="height:unset; font-size:14px;"><?php echo L('tpv_add'); ?></button>
+                            </div>
+                            <div id="mixPagoStatusFeedback" class="mt-8 p-10 br-8 text-center font-bold fs-13 animate-fade-in" style="background: rgba(0,0,0,0.05);">
+                                <!-- Dinámico vía JS -->
                             </div>
                         </div>
                         <!-- Cambio efectivo -->

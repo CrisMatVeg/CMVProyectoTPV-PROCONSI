@@ -618,6 +618,7 @@ $translations = [
     'purchase_status_facturado' => 'Facturado',
     'purchase_placeholder_alb_ref' => 'Ej: ALB-2024-001',
     'purchase_placeholder_fac_num' => 'Ej: 2024/FACT-001',
+    'purchase_js_saved_loading_next' => 'Albarán guardado. Cargando siguiente proveedor...',
     'purchase_js_del_line' => 'Eliminar línea',
     'purchase_js_conn_error' => 'Error de conexión',
     'purchase_modal_details_vendor' => 'Proveedor',
