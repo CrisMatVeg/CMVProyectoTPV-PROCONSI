@@ -10,16 +10,32 @@ require_once __DIR__ . '/DBPDO.php';
 require_once __DIR__ . '/Venta.php';
 require_once __DIR__ . '/MovimientoStockPDO.php';
 require_once __DIR__ . '/PriceEngine.php';
+require_once dirname(__DIR__) . '/config/config.php';
 
 class VentaPDO
 {
 
-    public static function obtenerSiguienteTicket(): int
+    public static function obtenerSiguienteTicket(?PDO $db = null): int
     {
-        $sql = "SELECT COALESCE(MAX(numero_ticket), 0) + 1 AS siguiente FROM ventas";
-        $q = DBPDO::ejecutarConsulta($sql);
-        $row = $q->fetch(PDO::FETCH_ASSOC);
-        return (int)$row['siguiente'];
+        $db = $db ?? DBPDO::getPDO();
+        
+        // Bloqueamos la fila del correlativo para este ticket
+        $stmt = $db->prepare("SELECT valor FROM correlativos WHERE nombre = 'ticket' FOR UPDATE");
+        $stmt->execute();
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$row) {
+            // Si por alguna razón no existe, lo inicializamos (seguridad adicional)
+            $db->query("INSERT INTO correlativos (nombre, valor) VALUES ('ticket', 1000) ON DUPLICATE KEY UPDATE valor = valor");
+            $next = 1001;
+        } else {
+            $next = (int)$row['valor'] + 1;
+        }
+        
+        $upd = $db->prepare("UPDATE correlativos SET valor = ? WHERE nombre = 'ticket'");
+        $upd->execute([$next]);
+        
+        return $next;
     }
 
     /**
@@ -46,7 +62,10 @@ class VentaPDO
      */
     public static function guardarVenta(array $datos, int $idUsuario): int
     {
-        $numTicket = self::obtenerSiguienteTicket();
+        $numTicket = 0; // Inicializar para evitar error de variable no definida
+        // El número de ticket se obtendrá dentro de la transacción para asegurar atomicidad
+        // $numTicket = self::obtenerSiguienteTicket(); 
+
 
         $subtotal = round((float)$datos['subtotal'], 2);
         $descPct  = round((float)($datos['descuentoPct'] ?? 0), 2);
@@ -95,12 +114,28 @@ class VentaPDO
             $total  = 0;
         }
 
+        // Aseguramos que los datos normalizados para persistir no sean negativos individualmente
+        $datos['subtotal'] = $totalReal;
+        $datos['total']    = $total;
+        $datos['base']     = $base;
+        $datos['iva']      = $ivaAmt;
+
         $tipoCliente      = in_array($datos['tipoCliente'] ?? '', ['particular', 'empresa']) ? $datos['tipoCliente'] : 'particular';
         $nombreCliente    = isset($datos['nombreCliente']) ? mb_substr(trim($datos['nombreCliente']), 0, 100) : null;
         $nifCliente       = isset($datos['nifCliente']) ? mb_substr(trim($datos['nifCliente']), 0, 20) : null;
         $metodoPago       = in_array($datos['metodoPago'] ?? '', ['efectivo', 'tarjeta', 'bizum', 'a_cuenta', 'mixto', 'puntos']) ? $datos['metodoPago'] : 'efectivo';
         $idCliente        = isset($datos['idCliente']) ? (int)$datos['idCliente'] : null;
         $efectivoRecibido = round((float)($datos['efectivo']['recibido'] ?? $datos['efectivoRecibido'] ?? 0), 2);
+
+        // [FallBack] Si no viene arriba, buscar en el desglose de pagos (útil para TPV modular)
+        if ($efectivoRecibido <= 0.005 && !empty($datos['pagos'])) {
+            foreach ($datos['pagos'] as $p) {
+                if (($p['metodo'] ?? $p['metodo_pago'] ?? '') === 'efectivo') {
+                    $efectivoRecibido = round((float)($p['recibido'] ?? $p['importe'] ?? 0), 2);
+                    break;
+                }
+            }
+        }
 
         $totalPagadoCalculado = 0;
         $pagadoACuenta = 0;
@@ -127,6 +162,31 @@ class VentaPDO
             $totalPagadoCalculado = $total;
             $estado = 'completada';
         }
+
+        // --- VALIDACIÓN DE EFECTIVO DISPONIBLE PARA EL CAMBIO ---
+        $cambio = 0;
+        if ($efectivoRecibido > 0) {
+            $importeEfectivoReal = 0;
+            if ($metodoPago === 'efectivo') {
+                $importeEfectivoReal = $total;
+            } elseif ($metodoPago === 'mixto' && !empty($datos['pagos'])) {
+                foreach ($datos['pagos'] as $pago) {
+                    if ($pago['metodo'] === 'efectivo') {
+                        $importeEfectivoReal += (float)$pago['importe'];
+                    }
+                }
+            }
+            $cambio = round($efectivoRecibido - $importeEfectivoReal, 2);
+        }
+
+        if ($cambio > 0.005) {
+            require_once __DIR__ . '/CajaTurnoPDO.php';
+            $efectivoEnCaja = CajaTurnoPDO::obtenerEfectivoActual();
+            if ($efectivoEnCaja < $cambio - 0.009) {
+                throw new \Exception("No hay suficiente efectivo en el cajón para el cambio (" . number_format($cambio, 2, ',', '.') . "€). Disponible: " . number_format($efectivoEnCaja, 2, ',', '.') . "€");
+            }
+        }
+        // -------------------------------------------------------
 
         $descuentoLabel = isset($datos['descuentoLabel']) ? mb_substr(trim($datos['descuentoLabel']), 0, 100) : null;
 
@@ -168,12 +228,14 @@ class VentaPDO
         ];
 
         require_once __DIR__ . '/ProductoPDO.php';
-        ProductoPDO::init();
 
         $db = DBPDO::getPDO();
         $db->beginTransaction();
 
         try {
+            $numTicket = self::obtenerSiguienteTicket($db);
+            $paramsVenta[':ticket'] = $numTicket;
+
             DBPDO::ejecutarConsulta($sqlVenta, $paramsVenta);
 
             $qId   = DBPDO::ejecutarConsulta("SELECT id FROM ventas WHERE numero_ticket = :t", [':t' => $numTicket]);
@@ -181,6 +243,37 @@ class VentaPDO
             $idVenta = (int)$rowId['id'];
 
             $fechaVenta = date('Y-m-d');
+
+            // [NUEVO] Validación de stock atómica (FOR UPDATE)
+            foreach ($datos['lineas'] as $linea) {
+                $idProd = (int)($linea['id'] ?? 0);
+                if ($idProd <= 0) continue;
+                $qtySolicitada = (int)$linea['qty'];
+
+                $sqlLock = "SELECT id, nombre, stock_actual, es_pack FROM productos WHERE id = :id FOR UPDATE";
+                $prodLock = DBPDO::ejecutarConsulta($sqlLock, [':id' => $idProd])->fetch(PDO::FETCH_ASSOC);
+
+                if (!$prodLock) throw new Exception("Producto '{$linea['name']}' no encontrado.");
+
+                if (!empty($prodLock['es_pack'])) {
+                    $componentes = ProductoPDO::obtenerComponentesPack($idProd);
+                    foreach ($componentes as $comp) {
+                        $qtyTotalCompo = $qtySolicitada * (int)$comp['cantidad'];
+                        $idCompo = (int)$comp['id_producto'];
+                        
+                        $sqlLockCompo = "SELECT nombre, stock_actual FROM productos WHERE id = :id FOR UPDATE";
+                        $compoLock = DBPDO::ejecutarConsulta($sqlLockCompo, [':id' => $idCompo])->fetch(PDO::FETCH_ASSOC);
+                        
+                        if ($compoLock['stock_actual'] < $qtyTotalCompo) {
+                            throw new Exception("Stock insuficiente para '{$compoLock['nombre']}' (Componente de '{$prodLock['nombre']}'). Disponible: {$compoLock['stock_actual']}, Requerido: $qtyTotalCompo");
+                        }
+                    }
+                } else {
+                    if ($prodLock['stock_actual'] < $qtySolicitada) {
+                        throw new Exception("Stock insuficiente para '{$prodLock['nombre']}'. Disponible: {$prodLock['stock_actual']}, Requerido: $qtySolicitada");
+                    }
+                }
+            }
 
             foreach ($datos['lineas'] as $linea) {
                 $precioUnit  = round((float)$linea['price'], 2);
@@ -214,14 +307,21 @@ class VentaPDO
                     }
                 }
 
-                $precioBaseSnapshot = $precioUnit;
-                $descuentosLog      = [];
-                if ($idProducto > 0) {
+                $precioBaseSnapshot = isset($linea['basePriceSnapshot']) ? (float)$linea['basePriceSnapshot'] : $precioUnit;
+                $descuentosLog      = isset($linea['descuentos']) ? $linea['descuentos'] : [];
+                
+                // Si NO vienen descuentos del frontend, intentamos recalcular (fallback compatibilidad legacy)
+                // Usamos la snapshot ya proporcionada si existe para evitar variaciones por tarifas expiradas
+                if (empty($descuentosLog) && $idProducto > 0) {
                     try {
+                        require_once __DIR__ . '/PriceEngine.php';
                         $breakdown          = PriceEngine::calculate($idProducto, $idCliente, $qty, $datos['codigoCupon'] ?? null);
-                        $precioBaseSnapshot = $breakdown['precio_base'];
+                        if (!isset($linea['basePriceSnapshot'])) {
+                            $precioBaseSnapshot = $breakdown['precio_base'];
+                        }
                         $descuentosLog      = $breakdown['descuentos'];
                     } catch (\Throwable $e) {
+                        // Si falla el motor de precios, mantenemos los valores básicos de la línea
                     }
                 }
 
@@ -339,7 +439,23 @@ class VentaPDO
                 }
             }
 
+            // [VERIFACTU] Encadenamiento y Huella
+            $fechaFormat = date('d-m-Y'); // DD-MM-YYYY de acuerdo al XSD de la AEAT
+            $tipoFC      = ($paramsVenta[':esFactura'] ? 'F1' : 'F2');
+            $numFormated = self::formatTicketNumber($numTicket, time(), $paramsVenta[':esFactura'], 'venta');
+            
+            self::procesarVeriFactu($db, $idVenta, $numFormated, $tipoFC, (float)$total, (float)$ivaAmt, $fechaFormat, $nifCliente, $nombreCliente);
+
             $db->commit();
+
+            // [NUEVO] Envío VeriFactu FUERA de la transacción para evitar conflictos
+            try {
+                require_once __DIR__ . '/AeatQueueService.php';
+                (new AeatQueueService())->enviarEspecifico((int)$idVenta);
+            } catch (\Exception $eVf) {
+                error_log("Error en envío inmediato VeriFactu: " . $eVf->getMessage());
+            }
+
             return $numTicket;
         } catch (\Throwable $e) {
             if ($db->inTransaction()) {
@@ -434,8 +550,12 @@ class VentaPDO
             }
         }
 
-        // --- FETCH DISCOUNTS FOR EACH LINE WITH NAMES ---
-        foreach ($lineas as &$l) {
+        // --- FETCH DISCOUNTS FOR ALL LINES AT ONCE (Fix N+1) ---
+        $lineIds = array_unique(array_column($lineasRaw, 'id'));
+        $descuentosPorLinea = [];
+        
+        if (!empty($lineIds)) {
+            $placeholders = implode(',', array_fill(0, count($lineIds), '?'));
             $sqlD = "SELECT lvd.*, 
                             CASE 
                                 WHEN lvd.tipo_descuento = 'tarifa' THEN tp.nombre
@@ -446,9 +566,16 @@ class VentaPDO
                      FROM lineas_venta_descuentos lvd
                      LEFT JOIN tarifas_precios tp ON lvd.tipo_descuento = 'tarifa' AND lvd.id_origen = tp.id
                      LEFT JOIN promociones p ON (lvd.tipo_descuento = 'promocion' OR lvd.tipo_descuento = 'cupon') AND lvd.id_origen = p.id
-                     WHERE lvd.id_linea_venta = :id";
-            $qD = DBPDO::ejecutarConsulta($sqlD, [':id' => $l['id']]);
-            $l['descuentos'] = $qD->fetchAll(PDO::FETCH_ASSOC);
+                     WHERE lvd.id_linea_venta IN ($placeholders)";
+            
+            $qD = DBPDO::ejecutarConsulta($sqlD, array_values($lineIds));
+            while ($d = $qD->fetch(PDO::FETCH_ASSOC)) {
+                $descuentosPorLinea[$d['id_linea_venta']][] = $d;
+            }
+        }
+
+        foreach ($lineas as &$l) {
+            $l['descuentos'] = $descuentosPorLinea[$l['id']] ?? [];
         }
         $venta['lineas'] = $lineas;
 
@@ -697,6 +824,11 @@ class VentaPDO
                 LogPDO::addLog('GENERACION_VALE', "Vale generado (#$codigoVale) por importe de " . number_format($importeAReembolsar, 2, ',', '.') . "€ tras devolución parcial/total de línea #$idLinea");
             } elseif ($metodoReembolso === 'efectivo') {
                 require_once __DIR__ . '/CajaTurnoPDO.php';
+                $efectivoEnCaja = CajaTurnoPDO::obtenerEfectivoActual();
+                if ($efectivoEnCaja < $importeAReembolsar - 0.009) {
+                    throw new \Exception("No hay suficiente efectivo en el cajón para el reembolso (" . number_format($importeAReembolsar, 2, ',', '.') . "€). Disponible: " . number_format($efectivoEnCaja, 2, ',', '.') . "€");
+                }
+
                 $turno = CajaTurnoPDO::obtenerTurnoAbierto();
                 if ($turno) {
                     CajaTurnoPDO::registrarRetiro(
@@ -1142,17 +1274,18 @@ class VentaPDO
     }
 
     /**
-     * Crea un ticket de abono (devolución) independiente vinculado a la venta original.
+     * Crea un ticket de abono (factura rectificativa) independiente vinculado a la venta original.
      * No modifica el ticket de origen. El abono tiene importes negativos.
      *
      * @param int    $idVentaOrigen  ID de la venta a la que se asocia el abono
      * @param array  $lineasDevolver Array de ['id_linea' => X, 'cantidad' => Y] a devolver
-     * @param string $motivo         Motivo de la devolución
-     * @param string $metodoReembolso  'efectivo', 'vale', 'reemplazo'
-     * @param int    $idUsuario      ID del usuario que procesa la devolución
+     * @param string $motivo         Motivo de la devolución / rectificación
+     * @param string $metodoReembolso 'efectivo', 'vale', 'reemplazo'
+     * @param int    $idUsuario      ID del usuario que procesa
+     * @param bool   $reponerStock   Si se deben reponer productos al inventario
      * @return int  Número de ticket del abono generado
      */
-    public static function crearAbono(int $idVentaOrigen, array $lineasDevolver, string $motivo, string $metodoReembolso, int $idUsuario): int
+    public static function crearAbono(int $idVentaOrigen, array $lineasDevolver, string $motivo, string $metodoReembolso, int $idUsuario, bool $reponerStock = true): int
     {
         // 1. Obtener datos de la venta original
         $sqlV = "SELECT * FROM ventas WHERE id = :id";
@@ -1161,10 +1294,15 @@ class VentaPDO
         if (!$ventaOrigen) throw new \Exception('Venta de origen no encontrada.');
 
         // 2. Calcular totales del abono a partir de las líneas a devolver
-        $totalBaseAbono = 0;
-        $totalIvaAbono  = 0;
         $totalAbono     = 0;
         $lineasAbono    = []; // Enriquecidas con datos completos de la línea original
+
+        // Calcular factor de escala original para prorratear descuentos globales en la devolución
+        $origTotal    = abs((float)$ventaOrigen['total']);
+        $origSubtotal = abs((float)$ventaOrigen['subtotal']);
+        $factorEscala = ($origSubtotal > 0.01) ? ($origTotal / $origSubtotal) : 1;
+        // El factor no debería ser superior a 1 si solo hubo descuentos, pero lo limitamos para seguridad
+        if ($factorEscala > 1) $factorEscala = 1;
 
         foreach ($lineasDevolver as $item) {
             $idLinea  = (int)$item['id_linea'];
@@ -1179,9 +1317,14 @@ class VentaPDO
             if ($cantidad <= 0) $cantidad = $cantidadMaxima;
             if ($cantidad > $cantidadMaxima) $cantidad = $cantidadMaxima;
 
-            $precioUnit  = (float)$linea['precio_unitario'];
-            $ivaRate     = (float)$linea['iva_aplicado'];
-            $totalLinea  = round($precioUnit * $cantidad, 2);
+            // Precio nominal de la línea
+            $precioUnitNominal = (float)$linea['precio_unitario'];
+            $ivaRate           = (float)$linea['iva_aplicado'];
+            
+            // Aplicar el factor de escala de la venta original para obtener el precio efectivo
+            $precioUnitEfectivo = round($precioUnitNominal * $factorEscala, 2);
+            
+            $totalLinea  = round($precioUnitEfectivo * $cantidad, 2);
             $base        = $totalLinea / (1 + $ivaRate / 100);
             $iva         = $totalLinea - $base;
 
@@ -1193,6 +1336,7 @@ class VentaPDO
                 'linea_origen' => $linea,
                 'cantidad'     => $cantidad,
                 'total_linea'  => $totalLinea,
+                'precio_unit_efectivo' => $precioUnitEfectivo
             ];
         }
 
@@ -1204,8 +1348,8 @@ class VentaPDO
         $totalIvaAbono  = round($totalIvaAbono, 2);
         $totalAbono     = round($totalAbono, 2);
 
-        // 3. Obtener siguiente número de ticket
-        $numTicket = self::obtenerSiguienteTicket();
+        // El número de ticket se obtendrá dentro de la transacción para asegurar atomicidad
+        // $numTicket = self::obtenerSiguienteTicket();
 
         // 4. INSERT en ventas (importe NEGATIVO para el abono)
         $sqlAbono = "INSERT INTO ventas
@@ -1245,16 +1389,13 @@ class VentaPDO
             ':ventaOrigen' => $idVentaOrigen,
         ];
 
-        // Precaución: ProductoPDO::init() contiene sentencias ALTER TABLE que rompen la transacción
-        // provocando un commit implícito, por lo que debemos inicializarlo ANTES.
-        require_once __DIR__ . '/ProductoPDO.php';
-        ProductoPDO::init();
-        require_once __DIR__ . '/MovimientoStockPDO.php';
-
         $db = DBPDO::getPDO();
         $db->beginTransaction();
 
         try {
+            $numTicket = self::obtenerSiguienteTicket($db);
+            $paramsAbono[':ticket'] = $numTicket;
+
             DBPDO::ejecutarConsulta($sqlAbono, $paramsAbono);
             $idAbono = (int)$db->lastInsertId();
 
@@ -1280,8 +1421,8 @@ class VentaPDO
                     ':prod'      => $lo['id_producto'],
                     ':nombre'    => $lo['nombre_producto'],
                     ':codigo'    => $lo['codigo_producto'],
-                    ':precio'    => -$lo['precio_unitario'],
-                    ':base_snap' => -$lo['precio_base_snapshot'],
+                    ':precio'    => -$la['precio_unit_efectivo'],
+                    ':base_snap' => -$la['precio_unit_efectivo'],
                     ':coste'     => -$lo['precio_coste_unitario'],
                     ':iva'       => $lo['iva_aplicado'],
                     ':qty'       => -$qty,
@@ -1291,8 +1432,8 @@ class VentaPDO
                     ':metodo'    => $metodoReembolso,
                 ]);
 
-                // 6. Reponer stock del producto devuelto
-                if ($lo['id_producto']) {
+                // 6. Reponer stock del producto devuelto (Solo si se solicita)
+                if ($reponerStock && $lo['id_producto']) {
                     $prod = ProductoPDO::obtenerProductoPorId((int)$lo['id_producto']);
                     if (!empty($prod['es_pack'])) {
                         $componentes = ProductoPDO::obtenerComponentesPack((int)$lo['id_producto']);
@@ -1316,6 +1457,12 @@ class VentaPDO
                 require_once __DIR__ . '/LogPDO.php';
                 LogPDO::addLog('GENERACION_VALE', "Vale generado (#$codigoVale) por $totalAbono€ - Abono #$numTicket");
             } elseif ($metodoReembolso === 'efectivo') {
+                require_once __DIR__ . '/CajaTurnoPDO.php';
+                $efectivoEnCaja = CajaTurnoPDO::obtenerEfectivoActual();
+                if ($efectivoEnCaja < $totalAbono - 0.009) {
+                    throw new \Exception("No hay suficiente efectivo en el cajón para el reembolso (" . number_format($totalAbono, 2, ',', '.') . "€). Disponible: " . number_format($efectivoEnCaja, 2, ',', '.') . "€");
+                }
+
                 if ($turno) {
                     CajaTurnoPDO::registrarRetiro(
                         (int)$turno['id'],
@@ -1347,7 +1494,42 @@ class VentaPDO
                 [':estado' => $nuevoEstado, ':id' => $idVentaOrigen]
             );
 
+            // [VERIFACTU] Encadenamiento y Huella (Abono)
+            $fechaFormatAb = date('d-m-Y');
+            $tipoAb        = ($ventaOrigen['es_factura'] ? 'R1' : 'R5');
+            $numFormatedAb = self::formatTicketNumber($numTicket, time(), $ventaOrigen['es_factura'], 'abono');
+
+            // Referencia a la factura/ticket original rectificado
+            $serieOrigenAb = self::formatTicketNumber(
+                $ventaOrigen['numero_ticket'],
+                $ventaOrigen['fecha'],
+                $ventaOrigen['es_factura'],
+                'venta'
+            );
+            $fechaOrigenAb   = date('d-m-Y', strtotime($ventaOrigen['fecha']));
+            // Importes de la venta original (para ImporteRectificacion en el XML)
+            $baseOrigenAb    = self::normalizarValorHash(abs((float)$ventaOrigen['base_imponible']));
+            $cuotaOrigenAb   = self::normalizarValorHash(abs((float)$ventaOrigen['iva_amt']));
+
+            self::procesarVeriFactu(
+                $db, $idAbono, $numFormatedAb, $tipoAb,
+                (float)$totalAbono, (float)$totalIvaAbono, $fechaFormatAb,
+                $ventaOrigen['nif_cliente'] ?? '',
+                $ventaOrigen['nombre_cliente'] ?? '',
+                $serieOrigenAb, $fechaOrigenAb,
+                $baseOrigenAb, $cuotaOrigenAb
+            );
+
             $db->commit();
+
+            // [NUEVO] Envío VeriFactu FUERA de la transacción para evitar conflictos (Abono)
+            try {
+                require_once __DIR__ . '/AeatQueueService.php';
+                (new AeatQueueService())->enviarEspecifico((int)$idAbono);
+            } catch (\Exception $eVf) {
+                error_log("Error en envío inmediato VeriFactu (Abono): " . $eVf->getMessage());
+            }
+
             return $numTicket;
 
         } catch (\Throwable $e) {
@@ -1378,26 +1560,295 @@ class VentaPDO
     }
 
     /**
-     * Intenta optimizar la base de datos añadiendo índices si no existen.
+     * [REPRODUCTO] Método mantenido para compatibilidad de firma, pero los índices
+     * ahora se gestionan mediante scripts de migración fuera del runtime.
      */
     public static function optimizarIndices(): bool
     {
-        $v1 = false; $v2 = false; $p1 = false;
-        try {
-            DBPDO::ejecutarConsulta("ALTER TABLE ventas ADD INDEX idx_ventas_fecha (fecha)", []);
-            $v1 = true;
-        } catch (Exception $e) { $v1 = true; /* Probablemente ya existe */ }
-        
-        try {
-            DBPDO::ejecutarConsulta("ALTER TABLE ventas ADD INDEX idx_ventas_perf (estado, metodo_pago, fecha)", []);
-            $v2 = true;
-        } catch (Exception $e) { $v2 = true; }
-        
-        try {
-            DBPDO::ejecutarConsulta("ALTER TABLE productos ADD INDEX idx_prod_cat_ref (categoria, referencia)", []);
-            $p1 = true;
-        } catch (Exception $e) { $p1 = true; }
+        return true;
+    }
 
-        return ($v1 && $v2 && $p1);
+    /**
+     * ============================================================
+     * MÉTODOS VERIFACTU (RD 1007/2023)
+     * ============================================================
+     */
+
+    /**
+     * Obtiene el hash_actual del último registro de venta para el encadenamiento VeriFactu.
+     * @param PDO|null $db Conexión opcional (para usar dentro de transacciones)
+     */
+    public static function obtenerUltimoHash(?PDO $db = null): ?string
+    {
+        $db = $db ?? DBPDO::getPDO();
+        $sql = "SELECT hash_actual FROM ventas WHERE hash_actual IS NOT NULL ORDER BY id DESC LIMIT 1";
+        $stmt = $db->query($sql);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ? $row['hash_actual'] : null;
+    }
+
+    /**
+     * Genera la cadena normalizada y el hash SHA256 según el Reglamento VeriFactu.
+     * @param array $datos Cabecera de la factura/evento
+     * @param string|null $hashAnterior Huella del registro previo
+     * @return string Hash SHA256 en mayúsculas
+     */
+    public static function generarHashVeriFactu(array $datos, ?string $hashAnterior = null): string
+    {
+        // 1. Recopilación de campos (Tipo: Alta de factura)
+        // Estructura oficial: IDEmisorFactura, NumSerieFactura, FechaExpedicionFactura, TipoFactura, CuotaTotal, ImporteTotal, Huella, FechaHoraHusoGenRegistro
+        
+        $campos = [
+            'IDEmisorFactura'         => self::normalizarValorHash($datos['nif_emisor'] ?? ''),
+            'NumSerieFactura'         => self::normalizarValorHash($datos['numero_serie'] ?? ''),
+            'FechaExpedicionFactura'  => self::normalizarValorHash($datos['fecha_expedicion'] ?? ''),
+            'TipoFactura'             => self::normalizarValorHash($datos['tipo_factura'] ?? 'F1'),
+            'CuotaTotal'              => self::normalizarValorHash($datos['cuota_total'] ?? '0.00'),
+            'ImporteTotal'            => self::normalizarValorHash($datos['importe_total'] ?? '0.00'),
+            'Huella'                  => self::normalizarValorHash($hashAnterior ?? str_repeat('0', 64)),
+            'FechaHoraHusoGenRegistro'=> self::normalizarValorHash($datos['fecha_hora_gen'] ?? date('Y-m-d\TH:i:sP'))
+        ];
+
+        // 2. Concatenación con formato nombreCampo1=valorCampo1&nombreCampo2=valorCampo2...
+        $cadena = "";
+        foreach ($campos as $nombre => $valor) {
+            if ($cadena !== "") $cadena .= "&";
+            $cadena .= $nombre . "=" . $valor;
+        }
+
+        // 3. Cálculo del Hash (SHA256)
+        $hashResult = strtoupper(hash('sha256', $cadena));
+        error_log("VeriFactu Hash Debug: Cadena=[$cadena] Hash=[$hashResult]");
+        return $hashResult;
+    }
+
+    /**
+     * Procesa el encadenamiento VeriFactu para un registro de venta/abono recién insertado.
+     * @param PDO $db Conexión activa
+     * @param int $idVenta ID del registro en la tabla ventas
+     * @param string $numeroSerie Número de ticket/factura formateado
+     * @param string $tipoFactura Clave AEAT (F1, R1, F2, R5...)
+     * @param float $total Importe total
+     * @param float $iva Cuota total IVA
+     * @param string $nifCliente NIF del destinatario (para facturas completas)
+     * @param string $nombreCliente Nombre/Razón del destinatario
+     * @param string $facturaOrigenSerie Serie de la factura rectificada (para abonos)
+     * @param string $facturaOrigenFecha Fecha de la factura rectificada DD-MM-YYYY
+     * @param string $baseOrigenRectificada Base imponible de la factura original
+     * @param string $cuotaOrigenRectificada Cuota IVA de la factura original
+     */
+    private static function procesarVeriFactu(
+        PDO $db, int $idVenta, string $numeroSerie, string $tipoFactura,
+        float $total, float $iva, string $fechaExpedicion,
+        string $nifCliente = '', string $nombreCliente = '',
+        string $facturaOrigenSerie = '', string $facturaOrigenFecha = '',
+        string $baseOrigenRectificada = '', string $cuotaOrigenRectificada = ''
+    ): void
+    {
+        require_once __DIR__ . '/ConfiguracionPDO.php';
+        $nifEmisor = defined('EMPRESA_CIF') ? EMPRESA_CIF : (ConfiguracionPDO::obtenerValor('empresa_nif') ?? '00000000T');
+
+        // 1. Obtener el hash del registro anterior
+        $hashAnterior = self::obtenerUltimoHash($db);
+
+        // 2. Normalizar valores para el Hash y el XML (Sincronización total)
+        $normCuota   = self::normalizarValorHash(abs($iva));
+        $normImporte = self::normalizarValorHash(abs($total));
+        $normBase    = self::normalizarValorHash(abs($total - $iva));
+        $normHashAnt = $hashAnterior ?? str_repeat('0', 64); // No normalizar la huella!
+
+        $fechaHoraGen = date('Y-m-d\TH:i:sP');
+        $datosHash = [
+            'nif_emisor'       => $nifEmisor,
+            'numero_serie'     => $numeroSerie,
+            'fecha_expedicion' => $fechaExpedicion,
+            'tipo_factura'     => $tipoFactura,
+            'cuota_total'      => $normCuota,
+            'importe_total'    => $normImporte,
+            'fecha_hora_gen'   => $fechaHoraGen
+        ];
+        
+        $hashActual = self::generarHashVeriFactu($datosHash, $normHashAnt);
+
+        // 3. Generar XML VeriFactu
+        require_once __DIR__ . '/VeriFactuService.php';
+        $vfService = new VeriFactuService();
+        
+        // Necesitamos datos del registro anterior para el XML
+        $datosUltimo = self::obtenerDatosUltimoRegistro($db);
+
+        $resultadoXML = $vfService->procesarAlta([
+            'numero_serie'     => $numeroSerie,
+            'fecha_expedicion' => $fechaExpedicion,
+            'tipo_factura'     => $tipoFactura,
+            'base_imponible'   => $normBase,
+            'cuota_total'      => $normCuota,
+            'importe_total'    => $normImporte,
+            'hash_actual'      => $hashActual,
+            'hash_anterior'    => $normHashAnt,
+            'fecha_hora_gen'   => $fechaHoraGen,
+            'destinatario_nif' => $nifCliente,
+            'destinatario_nombre' => $nombreCliente,
+            'factura_rectificada_serie' => $facturaOrigenSerie,
+            'factura_rectificada_fecha' => $facturaOrigenFecha,
+            'base_rectificada'          => $baseOrigenRectificada,
+            'cuota_rectificada'         => $cuotaOrigenRectificada,
+            'serie_anterior'   => $datosUltimo['serie'] ?? '',
+            'fecha_anterior'   => $datosUltimo['fecha'] ?? ''
+        ]);
+
+        // 4. Encolar para envío a la AEAT (Asíncrono)
+        require_once __DIR__ . '/AeatQueueService.php';
+        $queueService = new AeatQueueService();
+        if (isset($resultadoXML['ok']) && $resultadoXML['ok']) {
+            $queueService->encolar($idVenta, $resultadoXML['path']);
+        } else {
+            // Guardar el error en la cola o en log si falló la creación del XML
+            $errorMsg = $resultadoXML['error'] ?? 'Error desconocido al generar XML';
+            error_log("VeriFactu Error: $errorMsg");
+            // Opcionalmente encolar con estado 'error'
+            $queueService->encolarError($idVenta, "Error generación XML: $errorMsg");
+        }
+
+        // 5. Construir URL del código QR para cotejo AEAT
+        $qrBaseUrl = defined('VERIFACTU_URL_QR_PRUEBAS') ? VERIFACTU_URL_QR_PRUEBAS : 'https://prewww2.aeat.es/wlpl/TIKE-CONT/ValidarQR';
+        $qrParams = [
+            'nif'      => $nifEmisor,
+            'numserie' => $numeroSerie,
+            'fecha'    => date('d-m-Y', strtotime($fechaExpedicion)),
+            'importe'  => number_format(abs($total), 2, '.', ''),
+            'hash'     => substr($hashActual, 0, 8)
+        ];
+        $qrUrl = $qrBaseUrl . "?" . http_build_query($qrParams);
+
+        // 6. Persistir en la base de datos
+        $xmlPath = $resultadoXML['ok'] ? $resultadoXML['path'] : null;
+        $estadoEnvio = ($resultadoXML['ok']) ? 'pendiente' : 'error';
+
+        $sql = "UPDATE ventas 
+                SET hash_actual = :hashActual, 
+                    hash_anterior = :hashAnterior,
+                    fecha_hora_gen_fiscal = :fechaHora,
+                    estado_envio_aeat = :estado,
+                    codigo_qr = :xmlPath,
+                    qr_verifactu = :qrUrl
+                WHERE id = :id";
+        
+        $stmt = $db->prepare($sql);
+        $stmt->execute([
+            ':hashActual'   => $hashActual,
+            ':hashAnterior' => $hashAnterior,
+            ':fechaHora'    => $fechaHoraGen,
+            ':estado'       => $estadoEnvio,
+            ':xmlPath'      => $xmlPath,
+            ':qrUrl'        => $qrUrl,
+            ':id'           => $idVenta
+        ]);
+    }
+
+    /**
+     * Realiza una ANULACIÓN técnica del registro en VeriFactu.
+     * Se usa cuando un registro se envió por error y debe ser invalidado (no es un abono comercial).
+     */
+    public static function anularRegistroVerifactu(int $idVenta, string $motivo): array
+    {
+        $db = DBPDO::getPDO();
+        $venta = self::obtenerVentaPorId($idVenta);
+        if (!$venta) return ['ok' => false, 'error' => 'Venta no encontrada'];
+
+        // 1. Obtener hash anterior para encadenar la anulación
+        $hashAnterior = self::obtenerUltimoHash($db);
+        $fechaHoraGen = date('Y-m-d\TH:i:sP');
+
+        require_once __DIR__ . '/ConfiguracionPDO.php';
+        $nifEmisor = defined('EMPRESA_CIF') ? EMPRESA_CIF : (ConfiguracionPDO::obtenerValor('empresa_nif') ?? '00000000T');
+
+        // 2. Generar huella de anulación (Campos mínimos según normativa)
+        $datosHash = [
+            'nif_emisor'       => $nifEmisor,
+            'numero_serie'     => self::formatTicketNumber($venta['numero_ticket'], $venta['fecha'], $venta['es_factura']),
+            'fecha_expedicion' => date('d-m-Y', strtotime($venta['fecha'])),
+            'tipo_factura'     => 'ANUL', // Identificador interno para el log
+            'cuota_total'      => '0.00',
+            'importe_total'    => '0.00',
+            'fecha_hora_gen'   => $fechaHoraGen
+        ];
+        $hashActual = self::generarHashVeriFactu($datosHash, $hashAnterior);
+
+        // 3. Generar XML RegistroAnulacion
+        require_once __DIR__ . '/VeriFactuService.php';
+        $vfService = new VeriFactuService();
+        $datosUltimo = self::obtenerDatosUltimoRegistro($db);
+
+        $resultadoXML = $vfService->procesarAnulacion([
+            'numero_serie'     => $datosHash['numero_serie'],
+            'fecha_expedicion' => $datosHash['fecha_expedicion'],
+            'hash_actual'      => $hashActual,
+            'hash_anterior'    => $hashAnterior,
+            'fecha_hora_gen'   => $fechaHoraGen,
+            'serie_anterior'   => $datosUltimo['serie'] ?? '',
+            'fecha_anterior'   => $datosUltimo['fecha'] ?? ''
+        ]);
+
+        if ($resultadoXML['ok']) {
+            // Actualizar estado en la venta
+            DBPDO::ejecutarConsulta(
+                "UPDATE ventas SET estado_envio_aeat = 'anulado_pendiente', hash_actual = :h WHERE id = :id",
+                [':h' => $hashActual, ':id' => $idVenta]
+            );
+
+            // Encolar XML de anulación
+            require_once __DIR__ . '/AeatQueueService.php';
+            (new AeatQueueService())->encolar($idVenta, $resultadoXML['path']);
+        }
+
+        return $resultadoXML;
+    }
+
+    /**
+     * Normaliza los valores para la huella según AEAT:
+     * - Trim de espacios.
+     * - Numéricos con 1 o 2 decimales, ignorando ceros a la derecha irrelevantes.
+     */
+    private static function normalizarValorHash($valor): string
+    {
+        $valor = trim((string)$valor);
+        
+        // Si es numérico y no parece una huella (64 chars) ni un NIF/Serie (alfanumérico largo), forzamos formato estándar. 
+        if (is_numeric($valor) && strlen($valor) < 20 && !preg_match('/^[A-Z]{1}/i', $valor)) {
+            $f = (float)$valor;
+            // Formateamos a 2 decimales y limpiamos ceros sobrantes
+            $valor = number_format($f, 2, '.', '');
+            if (strpos($valor, '.') !== false) {
+                $valor = rtrim(rtrim($valor, '0'), '.');
+            }
+        }
+        
+        return $valor;
+    }
+
+    /**
+     * Obtiene los datos de serie y fecha del último registro fiscal para el encadenamiento XML.
+     */
+    public static function obtenerDatosUltimoRegistro(?PDO $db = null): array
+    {
+        $db = $db ?? DBPDO::getPDO();
+        $sql = "SELECT numero_ticket, fecha, es_factura, hash_actual 
+                FROM ventas 
+                WHERE hash_actual IS NOT NULL 
+                ORDER BY id DESC LIMIT 1";
+        $stmt = $db->query($sql);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$row) return [];
+
+        $numFormated = self::formatTicketNumber($row['numero_ticket'], $row['fecha'], $row['es_factura']);
+        $fechaFormat = date('d-m-Y', strtotime($row['fecha']));
+
+        return [
+            'serie' => $numFormated,
+            'fecha' => $fechaFormat,
+            'hash'  => $row['hash_actual']
+        ];
     }
 }

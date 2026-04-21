@@ -12,39 +12,8 @@ require_once __DIR__ . '/MovimientoStockPDO.php';
 
 class ProductoPDO
 {
-    // Bloque de inicialización para asegurar el esquema de la base de datos
-    private static $inicializado = false;
+    // Bloque de inicialización eliminado (Gestionado por scripts SQL externos)
 
-    public static function init()
-    {
-        if (self::$inicializado) return;
-        try {
-            // Asegurar que id_proveedor existe (FK)
-            DBPDO::ejecutarConsulta("ALTER TABLE productos ADD COLUMN IF NOT EXISTS id_proveedor INT DEFAULT NULL");
-            // Asegurar que codigo_iva e id_tipo_iva existen
-            DBPDO::ejecutarConsulta("ALTER TABLE productos ADD COLUMN IF NOT EXISTS codigo_iva VARCHAR(50) DEFAULT 'GENERAL'");
-            DBPDO::ejecutarConsulta("ALTER TABLE productos ADD COLUMN IF NOT EXISTS id_tipo_iva INT DEFAULT NULL");
-            DBPDO::ejecutarConsulta("ALTER TABLE productos ADD COLUMN IF NOT EXISTS margen DECIMAL(10,2) DEFAULT 0.00");
-            DBPDO::ejecutarConsulta("ALTER TABLE productos ADD COLUMN IF NOT EXISTS precio_proveedor DECIMAL(10,4) DEFAULT 0.0000");
-            
-            // AUTO-REPARACIÓN: Sincronizar precio_coste desde historial si es 0 y hay entradas_stock.
-            // Se usa el PMP real histórico: Σ(cantidad * precio) / Σ(cantidad)
-            DBPDO::ejecutarConsulta("
-                UPDATE productos p 
-                SET p.precio_coste = (
-                    SELECT COALESCE(SUM(es.cantidad * es.precio_coste) / NULLIF(SUM(es.cantidad), 0), 0)
-                    FROM entradas_stock es 
-                    WHERE es.id_producto = p.id
-                )
-                WHERE p.precio_coste = 0 
-                  AND EXISTS (SELECT 1 FROM entradas_stock es2 WHERE es2.id_producto = p.id)
-            ");
-        } catch (Throwable $e) {
-            // Silencio si ya existen o hay error de permisos (loguear si es necesario)
-            error_log("Error en auto-migración ProductoPDO: " . $e->getMessage());
-        }
-        self::$inicializado = true;
-    }
 
 
     /**
@@ -54,7 +23,6 @@ class ProductoPDO
      */
     public static function listarProductos(bool $soloActivos = true, int $limit = 50000, int $offset = 0, string $term = '', string $categoria = ''): array
     {
-        self::init();
         $hoy = date('Y-m-d');
         
         $where = " WHERE 1=1 ";
@@ -207,7 +175,6 @@ class ProductoPDO
      */
     public static function añadirProducto(array $datos): array
     {
-        self::init();
         $iconoDato = $datos['icono'] ?? '';
         if (strpos($iconoDato, 'data:image') === 0) {
             $parts = explode(',', $iconoDato);
@@ -276,15 +243,7 @@ class ProductoPDO
             MovimientoStockPDO::registrarMovimiento((int)$p['id'], 'inicial', (int)$datos['stock_actual'], $idUsuario, "Stock inicial");
             
             if ($precioCoste > 0) {
-                // Auto-migración explícita en caso de que no haya saltado por otro lado
-                try {
-                    DBPDO::ejecutarConsulta("CREATE TABLE IF NOT EXISTS entradas_stock (
-                        id INT AUTO_INCREMENT PRIMARY KEY, id_producto INT NOT NULL, cantidad INT NOT NULL, precio_coste DECIMAL(10,4) NOT NULL DEFAULT 0,
-                        cmp_anterior DECIMAL(10,4) NOT NULL DEFAULT 0, cmp_resultante DECIMAL(10,4) NOT NULL DEFAULT 0, stock_anterior INT NOT NULL DEFAULT 0,
-                        stock_nuevo INT NOT NULL DEFAULT 0, id_usuario INT DEFAULT NULL, notas TEXT DEFAULT NULL, fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
-                        INDEX idx_producto (id_producto)
-                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-                } catch (\Throwable $e) {}
+                // El registro de stock inicial requiere que la tabla entradas_stock exista (creada vía SQL)
 
                 $sqlInsert = "INSERT INTO entradas_stock
                         (id_producto, cantidad, precio_coste, cmp_anterior, cmp_resultante,
@@ -413,6 +372,25 @@ class ProductoPDO
             $dif = $stockActual - (int)$prodAntiguo['stock_actual'];
             $idUsuario = isset($_SESSION['usuarioActualTPV']) ? $_SESSION['usuarioActualTPV']->getId() : null;
             MovimientoStockPDO::registrarMovimiento($id, 'ajuste', $dif, $idUsuario, "Ajuste manual en edición");
+        }
+
+        // Auditoría global de cambio de margen (solo para productos existentes)
+        if ($prodAntiguo && isset($datos['margen'])) {
+            $margenNuevo = (float)$datos['margen'];
+            $margenAntiguo = (float)$prodAntiguo['margen'];
+            
+            if (abs($margenNuevo - $margenAntiguo) > 0.0001) {
+                $idUsuario = isset($_SESSION['usuarioActualTPV']) ? $_SESSION['usuarioActualTPV']->getId() : null;
+                self::registrarLogAjusteGlobal([
+                    'id_usuario' => $idUsuario,
+                    'tipo_operacion' => 'ajuste_manual_margen',
+                    'valor' => $margenNuevo,
+                    'tipo_valor' => 'percent',
+                    'categoria_nom' => $prodAntiguo['categoria'],
+                    'motivo' => $datos['motivo_cambio_precio'] ?? 'Ajuste manual',
+                    'productos_afectados' => 1
+                ]);
+            }
         }
 
         // Guardar componentes si es pack
@@ -638,7 +616,6 @@ class ProductoPDO
 
     public static function obtenerProductoPorId(int $id): ?array
     {
-        self::init();
         $hoy = date('Y-m-d');
         $sql = "SELECT p.*, ti.codigo as codigo_iva_calculado, ti.porcentaje, pr.aplica_re
                 FROM productos p
@@ -666,7 +643,6 @@ class ProductoPDO
 
     public static function obtenerProductoPorReferencia(string $referencia): ?array
     {
-        self::init();
         $hoy = date('Y-m-d');
         $sql = "SELECT p.*, ti.codigo as codigo_iva_calculado, ti.porcentaje, pr.aplica_re
                 FROM productos p
@@ -704,7 +680,6 @@ class ProductoPDO
      */
     public static function aplicarMargenMasivo(float $margen, ?string $categoria = null, array $excepciones = []): array
     {
-        self::init();
         $where = "es_pack = 0 AND activo = 1 AND precio_coste > 0";
         $params = [];
         
@@ -782,7 +757,6 @@ class ProductoPDO
 
     public static function ajustePrecioMasivo(float $valor, string $tipo, ?string $categoria = null, array $excepciones = []): array
     {
-        self::init();
         $where = "es_pack = 0 AND activo = 1";
         $params = [];
         
@@ -830,20 +804,27 @@ class ProductoPDO
 
             if ($pvpNuevo === $pvpActual) continue;
 
+            // Recalcular el nuevo margen si el coste es mayor a 0
+            $sqlProd = DBPDO::ejecutarConsulta("SELECT precio_coste FROM productos WHERE id = ?", [$p['id']]);
+            $rowProd = $sqlProd->fetch();
+            $coste = (float)($rowProd['precio_coste'] ?? 0);
+            $nuevoMargen = ($coste > 0) ? (($pvpNuevo / $coste) - 1) * 100 : 0;
+
             DBPDO::ejecutarConsulta(
-                "UPDATE productos SET precio_venta = :pvp WHERE id = :id",
-                [':pvp' => $pvpNuevo, ':id' => $p['id']]
+                "UPDATE productos SET precio_venta = :pvp, margen = :margen WHERE id = :id",
+                [':pvp' => $pvpNuevo, ':margen' => $nuevoMargen, ':id' => $p['id']]
             );
 
             // Auditoría
             DBPDO::ejecutarConsulta(
-                "INSERT INTO historicos_precios (id_producto, id_usuario, precio_anterior, precio_nuevo, origen, fecha) 
-                 VALUES (:id, :user, :ant, :new, 'ajuste_masivo', :fecha)",
+                "INSERT INTO auditoria_precios_base (id_producto, precio_old, precio_new, motivo, id_usuario, fecha) 
+                 VALUES (:id, :old, :new, :m, :user, :fecha)",
                 [
                     ':id'    => $p['id'],
-                    ':user'  => $idUsuario,
-                    ':ant'   => $pvpActual,
+                    ':old'   => $pvpActual,
                     ':new'   => $pvpNuevo,
+                    ':m'     => "Ajuste masivo ({$valor}" . ($tipo === 'percent' ? '%' : '€') . ")",
+                    ':user'  => $idUsuario,
                     ':fecha' => date('Y-m-d H:i:s')
                 ]
             );
@@ -936,6 +917,52 @@ class ProductoPDO
             return $consulta->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
             error_log("Error en buscarParaVincular: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Registra un log de cambio masivo global.
+     */
+    public static function registrarLogAjusteGlobal(array $datos): bool
+    {
+        try {
+            $sql = "INSERT INTO log_ajustes_globales 
+                    (fecha, id_usuario, tipo_operacion, valor, tipo_valor, categoria_nom, motivo, productos_afectados)
+                    VALUES (:fecha, :id_usuario, :tipo_op, :valor, :tipo_v, :cat_nom, :motivo, :afectados)";
+            
+            $params = [
+                ':fecha'      => date('Y-m-d H:i:s'),
+                ':id_usuario' => $datos['id_usuario'],
+                ':tipo_op'    => $datos['tipo_operacion'],
+                ':valor'       => $datos['valor'],
+                ':tipo_v'     => $datos['tipo_valor'],
+                ':cat_nom'    => $datos['categoria_nom'] ?? 'Todas',
+                ':motivo'     => $datos['motivo'],
+                ':afectados'  => $datos['productos_afectados']
+            ];
+
+            return DBPDO::ejecutarConsulta($sql, $params) !== false;
+        } catch (PDOException $e) {
+            error_log("Error en registrarLogAjusteGlobal: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Lista el historial de cambios globales.
+     */
+    public static function listarLogAjustesGlobales(): array
+    {
+        try {
+            $sql = "SELECT l.*, u.nombre as nombre_usuario 
+                    FROM log_ajustes_globales l
+                    JOIN usuarios u ON l.id_usuario = u.id
+                    ORDER BY l.fecha DESC LIMIT 100";
+            $consulta = DBPDO::ejecutarConsulta($sql);
+            return $consulta->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Error en listarLogAjustesGlobales: " . $e->getMessage());
             return [];
         }
     }

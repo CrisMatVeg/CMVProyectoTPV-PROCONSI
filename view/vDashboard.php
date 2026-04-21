@@ -162,6 +162,13 @@
                         </button>
                     </form>
 
+                    <!-- Auditoría VeriFactu -->
+                    <a href="verifactu_log.php" target="_blank" class="dashboard-btn" style="text-decoration: none;">
+                        <i class="fa-solid fa-microchip text-accent"></i>
+                        <span class="btn-title">Auditoría Fiscal</span>
+                        <span class="btn-desc">Logs y respuestas de la AEAT</span>
+                    </a>
+
                     <!-- Ajustes del Sistema -->
                     <form method="post">
                         <button type="submit" name="irConfiguracion" class="dashboard-btn">

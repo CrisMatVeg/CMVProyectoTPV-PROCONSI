@@ -264,6 +264,11 @@ CREATE TABLE IF NOT EXISTS ventas (
     id_turno INT DEFAULT NULL,
     tipo_documento ENUM('venta', 'abono') NOT NULL DEFAULT 'venta',
     id_venta_origen INT NULL DEFAULT NULL,
+    hash_actual VARCHAR(64) DEFAULT NULL,
+    hash_anterior VARCHAR(64) DEFAULT NULL,
+    firma_digital LONGTEXT DEFAULT NULL,
+    estado_envio_aeat ENUM('pendiente', 'enviado', 'error') NOT NULL DEFAULT 'pendiente',
+    codigo_qr TEXT DEFAULT NULL,
     CONSTRAINT fk_ventas_usr FOREIGN KEY (id_usuario) REFERENCES usuarios(id) ON DELETE SET NULL,
     CONSTRAINT fk_ventas_clie FOREIGN KEY (id_cliente) REFERENCES clientes(id) ON DELETE SET NULL,
     CONSTRAINT fk_ventas_z FOREIGN KEY (num_z) REFERENCES cierres_fiscales(id),
@@ -466,3 +471,34 @@ CREATE TABLE IF NOT EXISTS pagos_venta (
     CONSTRAINT fk_pago_usr FOREIGN KEY (id_usuario) REFERENCES usuarios(id) ON DELETE SET NULL,
     CONSTRAINT fk_pago_turno FOREIGN KEY (id_turno) REFERENCES caja_turnos(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+-- 10. TRIGGERS DE INTEGRIDAD VERIFACTU (RD 1007/2023)
+DELIMITER //
+
+CREATE TRIGGER tg_ventas_prevent_update BEFORE UPDATE ON ventas
+FOR EACH ROW
+BEGIN
+    IF OLD.hash_actual IS NOT NULL THEN
+        IF NEW.total <> OLD.total OR 
+           NEW.base_imponible <> OLD.base_imponible OR 
+           NEW.iva_amt <> OLD.iva_amt OR 
+           NEW.subtotal <> OLD.subtotal OR
+           NEW.fecha <> OLD.fecha OR
+           NEW.numero_ticket <> OLD.numero_ticket OR
+           NEW.nif_cliente <> OLD.nif_cliente THEN
+           
+            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'VeriFactu: Inalterabilidad violada. No se permite modificar campos fiscales de una factura ya emitida.';
+        END IF;
+    END IF;
+END //
+
+CREATE TRIGGER tg_ventas_prevent_delete BEFORE DELETE ON ventas
+FOR EACH ROW
+BEGIN
+    IF OLD.hash_actual IS NOT NULL THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'VeriFactu: Inalterabilidad violada. No se permite eliminar registros del historial fiscal.';
+    END IF;
+END //
+
+DELIMITER ;

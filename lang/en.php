@@ -5,6 +5,7 @@ $translations = [
     'menu_perfil' => 'Profile',
     'menu_caja' => 'Cash',
     'menu_salir' => 'Logout',
+    'menu_usuarios' => 'Users',
     'label_cajero' => 'Cashier',
     'label_abierta' => 'OPEN',
     'label_cerrada' => 'CLOSED',
@@ -58,7 +59,7 @@ $translations = [
     'tpv_clear' => 'Clear',
     'tpv_empty_cart' => 'Add products',
     'tpv_empty_cart_sub' => 'to the order',
-    'tpv_subtotal' => 'Subtotal (Net Base)',
+    'tpv_subtotal' => 'Subtotal',
     'tpv_discount' => 'Discount',
     'tpv_total' => 'Total',
     'tpv_payment_method' => 'Payment method',
@@ -94,6 +95,7 @@ $translations = [
     'tpv_custom_price' => 'Price (VAT incl.)',
     'tpv_custom_desc_error' => 'Please enter a description',
     'tpv_custom_price_error' => 'Please enter a valid price',
+    'tpv_error_insufficient_cash' => 'Insufficient cash in the drawer for this operation.',
     'modal_add_item' => 'Add to order',
 
     // Modals
@@ -125,6 +127,7 @@ $translations = [
     'cash_open_btn_resolve' => 'Resolve Settlements',
     'cash_open_label_initial' => 'Initial balance (€)',
     'cash_open_btn_open' => 'Open register',
+    'cash_open_error_zero' => 'It is mandatory to enter an initial balance greater than 0.00€ to open the cash register.',
 
     // Client Modal (TPV)
     'client_type_title' => 'Client type?',
@@ -293,6 +296,10 @@ $translations = [
     'prod_modal_pill_tariff' => 'TARIFF',
     'prod_modal_pill_promo' => 'PROMO',
     'prod_modal_tab_tarifas_none' => 'No active tariffs or promotions for this product.',
+    'prod_modal_cost_history_none' => 'No recorded purchase or entry movements.',
+    'prod_modal_label_tags' => 'Labels / Tags',
+    'prod_modal_tags_placeholder' => 'Press Enter to add...',
+    'prod_modal_tags_help' => 'Add tags for classification (e.g., New, Season).',
 
     // Packs
     'prod_modal_pack_title_new' => 'New Sales Pack',
@@ -470,13 +477,27 @@ $translations = [
     'roles_label_perms' => 'Enabled Permissions',
     'roles_perm_key' => 'Key',
     'roles_btn_save' => 'Save Configuration',
+    'roles_btn_new' => 'New Role',
+    'roles_btn_clear' => 'Clear / New',
     'roles_js_edit_title' => 'Edit Role',
 
     // Role Names
     'role_admin' => 'Administrator',
-    'role_admin_desc' => 'Full system access',
+    'role_administrador' => 'Administrator',
+    'role_superadmin' => 'Super Administrator',
+    'role_encargado' => 'Manager',
     'role_cajero' => 'Cashier',
+    'role_dependiente' => 'Sales Clerk',
+    'role_supervisor' => 'Supervisor',
+    'role_user' => 'User',
+    'role_admin_desc' => 'Full system access',
+    'role_administrador_desc' => 'Full system access',
+    'role_superadmin_desc' => 'Total system control and advanced configuration.',
     'role_cajero_desc' => 'Sales and basic cash management',
+    'role_encargado_desc' => 'Staff management, cash counts, and inventory control',
+    'role_supervisor_desc' => 'Sales oversight and special TPV authorizations',
+    'role_dependiente_desc' => 'Limited access to sales and product queries.',
+    'role_user_desc' => 'Read-only access for general reports.',
 
     // Permissions
     'perm_acceso_tpv' => 'TPV Access',
@@ -487,6 +508,13 @@ $translations = [
     'perm_cerrar_caja' => 'Perform Closing',
     'perm_gestionar_clientes' => 'Manage Clients',
     'perm_gestionar_configuracion' => 'System Settings',
+    'perm_aplicar_descuentos' => 'Apply Discounts',
+    'perm_gestionar_devoluciones' => 'Manage Returns',
+    'perm_anular_ventas' => 'Void Sales / Tickets',
+    'perm_ver_costes' => 'View Costs & Margins',
+    'perm_gestionar_proveedores' => 'Manage Suppliers',
+    'perm_gestionar_inventario' => 'Inventory Management',
+    'perm_gestionar_gastos' => 'Manage Expenses',
 
     // Clients
     'client_rol_mayorista' => 'Wholesaler',
@@ -690,6 +718,7 @@ $translations = [
     'tpv_amount_to_add' => 'Amount to add',
     'tpv_add' => 'ADD',
     'tpv_change_to_return' => 'Change to Return',
+    'tpv_amount_received' => 'Amount Received (€)',
     'tpv_payment_deadline' => 'Payment Deadline',
     'tpv_select_client_to_owe' => 'SELECT A CLIENT TO OWE',
     'client_search_socio_placeholder' => 'DNI or Name of the member...',

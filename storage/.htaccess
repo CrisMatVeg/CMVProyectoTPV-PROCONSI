@@ -1,0 +1,9 @@
+# Bloqueo de acceso público a datos sensibles de VeriFactu
+Order deny,allow
+Deny from all
+
+# Opcional: Permitir el acceso a archivos de imagen si fuera necesario, 
+# pero por ahora bloqueamos todo por seguridad.
+# <FilesMatch "\.(jpg|jpeg|png|gif)$">
+#    Allow from all
+# </FilesMatch>

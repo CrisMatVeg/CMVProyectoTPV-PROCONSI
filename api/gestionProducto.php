@@ -31,11 +31,17 @@ try {
         exit;
     }
 
-    // Solo administradores
-    if ($_SESSION['usuarioActualTPV']->getRol() !== 'admin') {
-        http_response_code(403);
-        echo json_encode(['ok' => false, 'error' => 'Acceso restringido a administradores']);
-        exit;
+    // Comprobar permisos según la acción
+    $usuario = $_SESSION['usuarioActualTPV'];
+    
+    // Todas las acciones requieren estar autenticado (ya verificado arriba)
+    // Pero solo 'listar' es público para cualquier rol con acceso al TPV
+    if ($accion !== 'listar') {
+        if (!$usuario->tienePermiso('gestionar_productos')) {
+            http_response_code(403);
+            echo json_encode(['ok' => false, 'error' => 'No tienes permiso para realizar operaciones administrativas de productos']);
+            exit;
+        }
     }
 
 
@@ -118,12 +124,19 @@ try {
                     'id' => $p->getId(),
                     'nombre' => $p->getNombre(),
                     'referencia' => $p->getReferencia(),
+                    'descripcion' => $p->getDescripcion(),
                     'icono' => $icono,
                     'es_pack' => (int)$p->isPack(),
                     'precio_venta' => (float)$p->getPrecioVenta(),
+                    'precio_coste' => (float)$p->getPrecioCoste(),
+                    'precio_proveedor' => (float)$p->getPrecioProveedor(),
+                    'margen' => (float)$p->getMargen(),
+                    'id_proveedor' => $p->getIdProveedor(),
                     'categoria' => $p->getCategoria(),
+                    'codigo_iva' => $p->getCodigoIva(),
                     'stock' => (int)$p->getStockActual(),
                     'stock_minimo' => (int)$p->getStockMinimo(),
+                    'meses_garantia' => (int)$p->getMesesGarantia(),
                     'activo' => (int)$p->getActivo(),
                     'atributos' => $p->getAtributos(),
                     'componentes_pack' => $p->isPack() ? ProductoPDO::obtenerComponentesPack($p->getId()) : []
@@ -138,11 +151,11 @@ try {
                 'ok'       => true,
                 'producto' => [
                     'id'       => (int)$nuevo['id'],
-                    'name'     => $nuevo['nombre'],
-                    'codigo'   => $nuevo['referencia'],
-                    'price'    => (float)$nuevo['precio_venta'],
+                    'nombre'   => $nuevo['nombre'],
+                    'referencia' => $nuevo['referencia'],
+                    'precio_venta' => (float)$nuevo['precio_venta'],
                     'icono'    => $nuevo['icono'],
-                    'cat'      => $nuevo['categoria'],
+                    'categoria' => $nuevo['categoria'],
                     'stock'    => !empty($nuevo['es_pack']) ? ProductoPDO::calcularStockPack((int)$nuevo['id']) : (int)$nuevo['stock_actual'],
                     'inactive' => false,
                     'es_pack'  => (int)($nuevo['es_pack'] ?? 0),

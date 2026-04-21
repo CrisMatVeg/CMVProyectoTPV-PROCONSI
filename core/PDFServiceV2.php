@@ -359,4 +359,61 @@ class PDFServiceV2
 
         return $pdf->Output('S');
     }
+
+    public static function generarDeclaracionResponsablePDF($appConfig)
+    {
+        $productor = $appConfig['verifactu_productor_nombre'] ?? 'ElectroBazar Software S.L.';
+        $nifProductor = $appConfig['verifactu_productor_nif'] ?? 'B00000000';
+        $software = $appConfig['verifactu_nombre_sistema'] ?? 'ElectroBazar TPV';
+        $version = $appConfig['verifactu_version_sistema'] ?? '1.0.0';
+
+        $pdf = new FPDF('P', 'mm', 'A4');
+        $pdf->AddPage();
+        $pdf->SetMargins(25, 25, 25);
+
+        // Encabezado
+        $pdf->SetFont('Arial', 'B', 16);
+        $pdf->Cell(0, 10, self::decode('DECLARACIÓN RESPONSABLE'), 0, 1, 'C');
+        $pdf->SetFont('Arial', 'B', 10);
+        $pdf->Cell(0, 5, self::decode('SISTEMA INFORMÁTICO DE FACTURACIÓN (RD 1007/2023)'), 0, 1, 'C');
+        $pdf->Ln(20);
+
+        // Cuerpo
+        $pdf->SetFont('Arial', '', 11);
+        $textoIntro = "La entidad " . $productor . ", con NIF " . $nifProductor . ", en su condición de entidad productora del sistema informático de facturación:";
+        $pdf->MultiCell(0, 6, self::decode($textoIntro), 0, 'J');
+        $pdf->Ln(8);
+
+        $pdf->SetFont('Arial', 'B', 11);
+        $pdf->Cell(0, 10, self::decode('IDENTIFICACIÓN DEL SISTEMA:'), 0, 1, 'L');
+        $pdf->SetFont('Arial', '', 11);
+        $pdf->Cell(0, 6, self::decode("• Nombre: " . $software), 0, 1);
+        $pdf->Cell(0, 6, self::decode("• Versión: " . $version), 0, 1);
+        $pdf->Ln(10);
+
+        $pdf->SetFont('Arial', 'B', 11);
+        $pdf->Cell(0, 10, self::decode('DECLARA BAJO SU RESPONSABILIDAD:'), 0, 1, 'L');
+        $pdf->SetFont('Arial', '', 11);
+
+        $textoCuerpo = "Que el sistema informático arriba identificado cumple con los requisitos establecidos en el artículo 29.2.j) de la Ley 58/2003, de 17 de diciembre, General Tributaria y en el Reglamento que establece los requisitos que deben adoptar los sistemas y programas informáticos que soporten los procesos de facturación de empresarios y profesionales, aprobado por el Real Decreto 1007/2023, de 5 de diciembre.\n\n" .
+                       "Este sistema ha sido diseñado para garantizar la integridad, conservación, accesibilidad, legibilidad, trazabilidad e inalterabilidad de los registros de facturación, sin interpolaciones, omisiones o alteraciones de las que no quede la debida anotación en el propio sistema, cumpliendo con los estándares de encadenamiento de registros y firma digital exigidos por la normativa vigente.\n\n" .
+                       "La presente declaración responsable se expide a efectos de lo previsto en el artículo 12 del citado Reglamento.";
+
+        $pdf->MultiCell(0, 6, self::decode($textoCuerpo), 0, 'J');
+
+        $pdf->Ln(25);
+
+        // Fecha y Firma
+        $meses = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+        $fechaStr = "En Madrid, a " . date('d') . " de " . $meses[date('n')-1] . " de " . date('Y');
+        $pdf->Cell(0, 6, self::decode($fechaStr), 0, 1, 'L');
+        
+        $pdf->Ln(40);
+        $pdf->SetFont('Arial', 'B', 10);
+        $pdf->Cell(0, 5, self::decode('Firma del Representante Legal'), 0, 1, 'L');
+        $pdf->SetFont('Arial', '', 9);
+        $pdf->Cell(0, 5, self::decode('Sello de la Entidad Productora: ' . $productor), 0, 1, 'L');
+
+        return $pdf->Output('S');
+    }
 }

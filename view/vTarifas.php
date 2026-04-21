@@ -3,17 +3,21 @@
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <div class="main-full p-24">
     <div class="section-header container-wider">
-        <div class="section-title">
-            <h1><?php echo L('rates_title'); ?></h1>
-            <p><?php echo L('rates_subtitle'); ?></p>
+        <div class="d-flex ai-center gap-16">
+            <a href="index.php?irDashboard=1" class="btn-prominent-back compact" title="<?php echo L('login_back'); ?>">
+                <i class="fa-solid fa-chevron-left"></i>
+                <span><?php echo L('login_back'); ?></span>
+            </a>
+            <div class="vr" style="height: 32px; width: 1px; background: var(--border); opacity: 0.5;"></div>
+            <div class="section-title">
+                <h1 id="ratesPageTitle"><?php echo L('rates_title'); ?></h1>
+                <p><?php echo L('rates_subtitle'); ?></p>
+            </div>
         </div>
         <div class="d-flex gap-12">
             <button onclick="abrirModalTarifa()" class="btn-add">
                 <i class="fa-solid fa-plus"></i> <?php echo L('rates_btn_add'); ?>
             </button>
-            <a href="index.php?irDashboard=1" class="btn-back">
-                <?php echo L('rates_btn_back'); ?>
-            </a>
         </div>
     </div>
 
@@ -101,11 +105,11 @@
                         </td>
                         <td class="text-center">
                             <div class="d-flex jc-center gap-8 pr-20">
-                                <button onclick='abrirModalTarifa(<?php echo json_encode($t, JSON_HEX_APOS | JSON_HEX_QUOT); ?>)' title="<?php echo L('rates_edit_rule'); ?>" class="btn-icon">
-                                    <i class="fa-solid fa-pen"></i>
+                                <button onclick='abrirModalTarifa(<?php echo json_encode($t, JSON_HEX_APOS | JSON_HEX_QUOT); ?>)' title="<?php echo L('rates_edit_rule'); ?>" aria-label="<?php echo L('rates_edit_rule'); ?>" class="btn-icon">
+                                    <i class="fa-solid fa-pen" aria-hidden="true"></i>
                                 </button>
-                                <button onclick="eliminarTarifa(<?php echo $t['id']; ?>)" title="<?php echo L('modal_delete'); ?>" class="btn-icon text-red">
-                                    <i class="fa-solid fa-trash"></i>
+                                <button onclick="eliminarTarifa(<?php echo $t['id']; ?>)" title="<?php echo L('modal_delete'); ?>" aria-label="<?php echo L('modal_delete'); ?>" class="btn-icon text-red">
+                                    <i class="fa-solid fa-trash" aria-hidden="true"></i>
                                 </button>
                             </div>
                         </td>
@@ -135,8 +139,8 @@
                     <p class="fs-13 text-muted"><?php echo L('rates_global_subtitle'); ?></p>
                 </div>
                 <div class="search-input-fancy" style="max-width: 400px;">
-                    <i class="fa-solid fa-magnifying-glass"></i>
-                    <input type="text" id="tarifarioSearch" onkeyup="renderTarifario()" placeholder="<?php echo L('rates_search_placeholder'); ?>">
+                    <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                    <input type="text" id="tarifarioSearch" onkeyup="renderTarifario()" placeholder="<?php echo L('rates_search_placeholder'); ?>" aria-label="<?php echo L('rates_search_placeholder'); ?>">
                 </div>
             </div>
 
@@ -161,12 +165,12 @@
     </div>
 
 <!-- MODAL NUEVA TARIFA -->
-<div class="modal-overlay" id="tarifaModal">
+<div class="modal-overlay" id="tarifaModal" role="dialog" aria-modal="true" aria-labelledby="tarifaModalTitle">
     <div class="modal modal-content gap-16 ai-stretch w-modal-lg" style="max-width: 1100px; border-radius: 20px; overflow: hidden; height: auto; max-height: 95vh;">
         <div class="modal-header d-flex flex-column mb-0 p-0">
             <div class="d-flex ai-center jc-center w-100 p-24-32" style="position: relative;">
-                <h2 class="m-0 fs-20 fw-700 text-main text-center"><?php echo L('rates_modal_title'); ?></h2>
-                <button onclick="cerrarModalTarifa()" class="btn-close-modal" style="position: absolute; right: 24px; top: 50%; transform: translateY(-50%); font-size: 24px; background: transparent; border: none; cursor: pointer;">&times;</button>
+                <h2 class="m-0 fs-20 fw-700 text-main text-center" id="tarifaModalTitle"><?php echo L('rates_modal_title'); ?></h2>
+                <button onclick="cerrarModalTarifa()" class="btn-close-modal" style="position: absolute; right: 24px; top: 50%; transform: translateY(-50%); font-size: 24px; background: transparent; border: none; cursor: pointer;" aria-label="<?php echo L('modal_cancel'); ?>">&times;</button>
             </div>
 
             <div class="modal-tabs">
@@ -1306,8 +1310,10 @@
     /* Paginación Fancy */
     .pagination-fancy {
         display: flex;
+        flex-direction: column-reverse;
         align-items: center;
-        justify-content: space-between;
+        justify-content: center;
+        gap: 12px;
         background: var(--surface);
         padding: 16px 24px;
         border-radius: 16px;

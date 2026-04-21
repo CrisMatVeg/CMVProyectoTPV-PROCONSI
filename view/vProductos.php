@@ -3,80 +3,105 @@
 <div class="main-full p-24">
 
     <div class="section-header container-wider">
-        <div class="section-title">
-            <h1><?php echo L('prod_title'); ?></h1>
-            <p><?php echo L('prod_subtitle'); ?></p>
-        </div>
-        <div class="d-flex gap-12 ai-center flex-wrap">
-            <a href="index.php?irDashboard=1" class="btn-back">
-                <?php echo L('login_back'); ?>
+        <div class="d-flex ai-center gap-16">
+            <a href="index.php?irDashboard=1" class="btn-prominent-back compact" title="<?php echo L('login_back'); ?>">
+                <i class="fa-solid fa-chevron-left"></i>
+                <span><?php echo L('login_back'); ?></span>
             </a>
+            
+            <div class="vr" style="height: 32px; width: 1px; background: var(--border); opacity: 0.5;"></div>
 
-            <div class="tabs-nav mr-12">
+            <div class="section-title">
+                <div class="d-flex ai-center gap-10">
+                    <i class="fa-solid fa-boxes-stacked text-accent fs-24"></i>
+                    <div>
+                        <h1 class="m-0 fs-20"><?php echo L('prod_title'); ?></h1>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex gap-12 ai-center flex-wrap">
+            <div class="tabs-nav compact">
                 <button class="tab-btn active" onclick="switchTab('productos')" id="btnTabProductos">
-                    <?php echo L('prod_tab_standard'); ?>
+                    <i class="fa-solid fa-box"></i>
                 </button>
                 <button class="tab-btn" onclick="switchTab('packs')" id="btnTabPacks">
-                    <?php echo L('prod_tab_packs'); ?>
+                    <i class="fa-solid fa-cubes"></i>
                 </button>
             </div>
 
-            <div class="d-flex gap-8 ai-center bg-surface2 p-4 br-12 border">
+            <!-- Grupo de Utilidades -->
+            <div class="action-toolbar">
                 <!-- Botón Exportar -->
                 <div class="ie-dropdown-wrap" id="exportDropdownWrap">
-                    <button class="btn-filter" onclick="toggleExportDropdown()" style="border:none; background:transparent; color: var(--text-main) !important;">
-                        <?php echo L('prod_btn_export'); ?>
+                    <button class="toolbar-btn" onclick="toggleExportDropdown()" title="<?php echo L('prod_btn_export'); ?>">
+                        <i class="fa-solid fa-file-export"></i>
                     </button>
                     <div class="ie-dropdown" id="exportDropdown">
                         <a href="api/exportarProductos.php?format=csv" class="ie-dropdown-item">
-                            <?php echo L('prod_export_csv'); ?>
+                            <i class="fa-solid fa-file-csv mr-8"></i><?php echo L('prod_export_csv'); ?>
                         </a>
                         <a href="api/exportarProductos.php?format=json" class="ie-dropdown-item">
-                            <?php echo L('prod_export_json'); ?>
+                            <i class="fa-solid fa-file-code mr-8"></i><?php echo L('prod_export_json'); ?>
                         </a>
                     </div>
                 </div>
 
-                <div class="vr mx-4" style="height: 20px; width: 1px; background: var(--border); opacity: 0.5;"></div>
+                <div class="toolbar-divider"></div>
 
-                <button class="btn-filter" onclick="document.getElementById('importFileInput').click()" style="border:none; background:transparent; color: var(--text-main) !important;">
-                    <?php echo L('prod_btn_import'); ?>
+                <button class="toolbar-btn" onclick="document.getElementById('importFileInput').click()" title="<?php echo L('prod_btn_import'); ?>">
+                    <i class="fa-solid fa-file-import"></i>
                 </button>
                 <input type="file" id="importFileInput" accept=".csv,.json" class="d-none" onchange="importarProductos(this)">
 
-                <div class="vr mx-4" style="height: 20px; width: 1px; background: var(--border); opacity: 0.5;"></div>
+                <div class="toolbar-divider"></div>
 
-                <button onclick="abrirModalGestionCategorias()" class="btn-filter" style="border:none; background:transparent; color: var(--text-main) !important;">
-                    <?php echo L('prod_btn_categories'); ?>
+                <button onclick="abrirModalGestionCategorias()" class="toolbar-btn" title="<?php echo L('prod_btn_categories'); ?>">
+                    <i class="fa-solid fa-tags"></i>
                 </button>
 
-                <div class="vr mx-4" style="height: 20px; width: 1px; background: var(--border); opacity: 0.5;"></div>
+                <div class="toolbar-divider"></div>
 
-                <button onclick="generarPedidoAutomatico()" class="btn-filter" id="btnPedidoAuto" style="border:none; background:transparent; color: var(--accent-primary) !important; font-weight: 600;">
-                    <?php echo L('prod_btn_auto_order'); ?>
+                <button onclick="generarPedidoAutomatico()" class="toolbar-btn text-accent" id="btnPedidoAuto" title="<?php echo L('prod_btn_auto_order'); ?>">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
                 </button>
 
-                <div class="vr mx-4" style="height: 20px; width: 1px; background: var(--border); opacity: 0.5;"></div>
+                <div class="toolbar-divider"></div>
 
-                <button onclick="abrirModalMargenMasivo()" class="btn-filter" id="btnMargenMasivo" style="border:none; background:transparent; color: #7c3aed !important; font-weight: 600;" title="<?php echo L('prod_tip_mass_margin'); ?>">
-                    <?php echo L('prod_btn_mass_margin'); ?>
+                <button onclick="abrirModalMargenMasivo()" class="toolbar-btn text-purple" id="btnMargenMasivo" title="<?php echo L('prod_tip_mass_margin'); ?>">
+                    <i class="fa-solid fa-percent"></i>
                 </button>
 
-                <div class="vr mx-4" style="height: 20px; width: 1px; background: var(--border); opacity: 0.5;"></div>
+                <div class="toolbar-divider"></div>
 
-                <button onclick="abrirModalAjusteMasivo()" class="btn-filter" id="btnAjusteMasivo" style="border:none; background:transparent; color: #7c3aed !important; font-weight: 600;" title="<?php echo L('prod_tip_mass_adjustment'); ?>">
-                    <?php echo L('prod_btn_mass_adjustment'); ?>
+                <button onclick="abrirModalAjusteMasivo()" class="toolbar-btn text-purple" id="btnAjusteMasivo" title="<?php echo L('prod_tip_mass_adjustment'); ?>">
+                    <i class="fa-solid fa-sliders"></i>
+                </button>
+
+                <div class="toolbar-divider"></div>
+
+                <button onclick="abrirModalHistorialGlobal()" class="toolbar-btn text-orange" id="btnHistorialGlobal" title="<?php echo L('prod_btn_history_global'); ?>">
+                    <i class="fa-solid fa-history"></i>
                 </button>
             </div>
 
             <div class="flex-1"></div>
 
-            <button onclick="abrirModalProducto()" class="btn-save h-44 px-20 shadow-sm" id="btnNuevoProducto">
-                <i class="fa-solid fa-plus"></i> <?php echo L('prod_btn_new_product'); ?>
-            </button>
-            <button onclick="abrirModalPack()" class="btn-save h-44 px-20 shadow-sm d-none" id="btnNuevoPack">
-                <i class="fa-solid fa-plus"></i> <?php echo L('prod_btn_new_pack'); ?>
-            </button>
+            <div class="d-flex gap-8">
+                <button onclick="abrirModalProducto()" class="btn-save-compact" id="btnNuevoProducto" title="<?php echo L('prod_btn_new_product'); ?>">
+                    <div class="icon-stack">
+                        <i class="fa-solid fa-box"></i>
+                        <i class="fa-solid fa-plus tiny-plus"></i>
+                    </div>
+                </button>
+                <button onclick="abrirModalPack()" class="btn-save-compact d-none" id="btnNuevoPack" title="<?php echo L('prod_btn_new_pack'); ?>">
+                    <div class="icon-stack">
+                        <i class="fa-solid fa-cubes"></i>
+                        <i class="fa-solid fa-plus tiny-plus"></i>
+                    </div>
+                </button>
+            </div>
         </div>
     </div>
 
@@ -233,7 +258,7 @@
         </table>
 
         <!-- Paginación -->
-        <div class="pagination-footer mt-24 d-flex ai-center jc-between p-16 bg-surface border-top">
+        <div class="pagination-footer mt-24 d-flex ai-center p-16 bg-surface border-top" style="flex-direction: column-reverse; justify-content: center; gap: 12px;">
             <div class="pagination-info fs-12 text-muted">
                 <?php 
                     $from = $avProductos['paginacion']['totalRegistros'] > 0 ? ($avProductos['paginacion']['actual'] - 1) * $avProductos['paginacion']['limit'] + 1 : 0;
@@ -458,6 +483,67 @@
         padding: 2px 8px;
     }
 
+    /* --- Tags / Atributos --- */
+    .tags-input-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        min-height: 44px;
+        height: auto !important;
+        align-items: center;
+        background: var(--surface2);
+        border: 2px solid transparent;
+        transition: all 0.2s;
+        border-radius: 12px;
+        padding: 8px 12px;
+    }
+
+    .tags-input-container:focus-within {
+        border-color: var(--accent);
+        background: var(--surface);
+        box-shadow: 0 0 0 4px rgba(52, 152, 219, 0.1);
+    }
+
+    #tagsContainer {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        width: 100%;
+    }
+
+    .tag-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        background: var(--accent);
+        color: white;
+        border-radius: 8px;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        animation: tagPop 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    @keyframes tagPop {
+        from { transform: scale(0.5); opacity: 0; }
+        to { transform: scale(1); opacity: 1; }
+    }
+
+    .tag-chip .remove-tag {
+        cursor: pointer;
+        opacity: 0.8;
+        transition: opacity 0.2s;
+        font-size: 16px;
+        line-height: 1;
+        margin-left: 2px;
+    }
+
+    .tag-chip .remove-tag:hover {
+        opacity: 1;
+    }
+
     /* --- Secciones dentro de pestaña --- */
     .tab-section {
         background: var(--bg-body, var(--surface));
@@ -610,6 +696,23 @@
                     <div class="form-group mb-32" style="margin-top: 15px;">
                         <label class="form-label mb-4"><?php echo L('prod_modal_label_desc'); ?></label>
                         <textarea id="prodDesc" placeholder="<?php echo L('prod_placeholder_desc'); ?>" class="form-input" rows="2"></textarea>
+                    </div>
+
+                    <!-- ETIQUETAS / CATEGORIZACIÓN -->
+                    <div class="form-group mb-32">
+                        <label class="form-label mb-8 d-flex jc-between ai-center">
+                            <span><?php echo L('prod_modal_label_tags'); ?></span>
+                            <span class="fs-10 opacity-50 font-normal"><?php echo L('prod_modal_tags_help'); ?></span>
+                        </label>
+                        <div class="tags-input-container" id="tagsWrapper">
+                            <div id="tagsContainer" class="d-flex flex-wrap gap-8"></div>
+                            <input type="text" id="prodTagsInput" 
+                                   class="flex-1 min-w-150 border-0 bg-transparent p-4 fs-14" 
+                                   style="outline: none !important;"
+                                   placeholder="<?php echo L('prod_modal_tags_placeholder'); ?>"
+                                   onkeydown="handleTagKeydown(event)">
+                        </div>
+                        <input type="hidden" id="prodAtributos">
                     </div>
 
                     <div class="d-grid gap-32 mb-16 p-16 bg-surface2 br-12 border-2" style="grid-template-columns: 1fr 1fr;">
@@ -1370,6 +1473,21 @@
     // --- FUNCIONES GLOBALES DE MODALES ---
 
     function abrirModalProducto(producto = null) {
+        // Atributos / Etiquetas
+        const tagsContainer = document.getElementById('tagsContainer');
+        tagsContainer.innerHTML = '';
+        if (producto && producto.atributos) {
+            try {
+                const attrs = typeof producto.atributos === 'string' ? JSON.parse(producto.atributos) : producto.atributos;
+                if (Array.isArray(attrs)) {
+                    attrs.forEach(tag => addTagUI(tag));
+                }
+            } catch (e) {
+                console.error("Error parsing atributos:", e);
+            }
+        }
+        syncAtributosHidden();
+
         const modal = document.getElementById('modalProducto');
         const title = document.getElementById('modalTitle');
         const productForm = document.getElementById('formProducto');
@@ -1392,7 +1510,7 @@
             title.innerText = <?php echo json_encode(L('prod_modal_title_edit', true)); ?>;
             document.getElementById('prodId').value = producto.id;
             document.getElementById('prodIcono').value = producto.icono || '';
-            document.getElementById('prodCodigo').value = producto.codigo || '';
+            document.getElementById('prodCodigo').value = producto.referencia || '';
             document.getElementById('prodNombre').value = producto.nombre || '';
             document.getElementById('prodDesc').value = producto.descripcion || '';
             document.getElementById('prodCat').value = producto.categoria || '';
@@ -1403,7 +1521,7 @@
             if (selIva) selIva.value = producto.codigo_iva || 'GENERAL';
 
             inputCoste.value = parseFloat(producto.precio_coste || 0).toFixed(2);
-            document.getElementById('prodPrecioVenta').value = producto.price || producto.precio || '0.00';
+            document.getElementById('prodPrecioVenta').value = producto.precio_venta || '0.00';
             inputStock.value = producto.stock !== undefined ? producto.stock : (producto.stock_actual || '0');
             document.getElementById('prodStockMin').value = producto.stock_minimo || '0';
             document.getElementById('prodMargen').value = producto.margen || '0.00';
@@ -1572,7 +1690,7 @@
         // Debounce para no saturar la API
         if (timerPreviewMargen) clearTimeout(timerPreviewMargen);
         timerPreviewMargen = setTimeout(async () => {
-            const categoria = document.getElementById('massCategoriaSelect').value;
+            const motivo = document.getElementById('massMargenMotivo').value.trim(); if (!motivo) { showCustomAlert(<?php echo json_encode(L('prod_js_error', true)); ?>, <?php echo json_encode(L('prod_js_reason_req', true)); ?>, 'error'); btn.disabled = false; btn.innerHTML = oldHtml; return; } const categoria = document.getElementById('massCategoriaSelect').value;
             try {
                 const resp = await fetch('api/aplicarMargenMasivo.php', {
                     method: 'POST',
@@ -1609,7 +1727,7 @@
                     btn.disabled = true;
                     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + <?php echo json_encode(L('prod_js_applying', true)); ?>;
 
-                    const categoria = document.getElementById('massCategoriaSelect').value;
+                    const motivo = document.getElementById('massMargenMotivo').value.trim(); if (!motivo) { showCustomAlert(<?php echo json_encode(L('prod_js_error', true)); ?>, <?php echo json_encode(L('prod_js_reason_req', true)); ?>, 'error'); btn.disabled = false; btn.innerHTML = oldHtml; return; } const categoria = document.getElementById('massCategoriaSelect').value;
                     try {
                         const resp = await fetch('api/aplicarMargenMasivo.php', {
                             method: 'POST',
@@ -1619,6 +1737,7 @@
                             body: JSON.stringify({
                                 margen,
                                 categoria,
+                                motivo,
                                 excepciones: excepcionesMasivas.map(e => e.id)
                             })
                         });
@@ -1780,13 +1899,21 @@
                 btn.disabled = true;
                 btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ...';
 
+                const motivo = document.getElementById('massAjusteMotivo').value.trim();
+                if (!motivo) {
+                    showCustomAlert('<?php echo L('error') ?>', '<?php echo L('prod_js_reason_req') ?>', 'error');
+                    btn.disabled = false;
+                    btn.innerHTML = oldHtml;
+                    return;
+                }
+
                 const categoria = document.getElementById('ajusteCategoriaSelect').value;
                 try {
                     const resp = await fetch('api/ajustePrecioMasivo.php', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            valor, tipo, categoria,
+                            valor, tipo, categoria, motivo,
                             excepciones: excepcionesAjuste.map(e => e.id)
                         })
                     });
@@ -1830,7 +1957,7 @@
 
             if (data.ok) {
                 if (data.historial.length === 0) {
-                    body.innerHTML = `<tr><td colspan="5" class="text-center p-48 text-muted">${<?php echo json_encode(L('prod_modal_tab_tarifas_none', true)); ?>}</td></tr>`;
+                    body.innerHTML = `<tr><td colspan="5" class="text-center p-48 text-muted">${<?php echo json_encode(L('prod_modal_cost_history_none', true)); ?>}</td></tr>`;
                 } else {
                     body.innerHTML = data.historial.map(h => {
                         const fecha = new Date(h.fecha);
@@ -2137,15 +2264,44 @@
 
 
 
-    /* Lógica de atributos deshabilitada
-    function añadirAtributoUI(value = null) {
-        ...
+    // --- Lógica de Etiquetas / Atributos ---
+    function handleTagKeydown(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const val = e.target.value.trim();
+            if (val) {
+                addTagUI(val);
+                e.target.value = '';
+                syncAtributosHidden();
+            }
+        }
     }
 
-    function syncAtributos() {
-        ...
+    function addTagUI(tag) {
+        const container = document.getElementById('tagsContainer');
+        // Evitar duplicados
+        const existing = Array.from(container.querySelectorAll('.tag-text')).map(s => s.innerText);
+        if (existing.includes(tag)) return;
+
+        const chip = document.createElement('div');
+        chip.className = 'tag-chip';
+        chip.innerHTML = `
+            <span class="tag-text">${tag}</span>
+            <span class="remove-tag" onclick="removeTagUI(this)">&times;</span>
+        `;
+        container.appendChild(chip);
     }
-    */
+
+    function removeTagUI(el) {
+        el.parentElement.remove();
+        syncAtributosHidden();
+    }
+
+    function syncAtributosHidden() {
+        const container = document.getElementById('tagsContainer');
+        const tags = Array.from(container.querySelectorAll('.tag-text')).map(s => s.innerText);
+        document.getElementById('prodAtributos').value = tags.length > 0 ? JSON.stringify(tags) : '';
+    }
 
 
 
@@ -2191,9 +2347,7 @@
             precio_venta: document.getElementById('prodPrecioVenta').value,
             stock_minimo: document.getElementById('prodStockMin').value,
             requiere_serial: 0,
-            atributos: (document.getElementById('prodAtributos') || {
-                value: null
-            }).value || null,
+            atributos: document.getElementById('prodAtributos').value || null,
             codigo_iva: codigoIva,
             id_proveedor: document.getElementById('prodProveedor').value || null,
             aplica_re: 0,
@@ -2593,7 +2747,7 @@
             if (p.es_pack) return false; // Pack of packs not supported yet
             if (yaAñadidos.includes(p.id)) return false; // Already added
 
-            return p.nombre.toLowerCase().includes(query) || (p.codigo && p.codigo.toLowerCase().includes(query));
+            return p.nombre.toLowerCase().includes(query) || (p.referencia && p.referencia.toLowerCase().includes(query));
         }).slice(0, 8); // top 8
 
         resCont.innerHTML = '';
@@ -2608,9 +2762,9 @@
                         <div class="result-icon"><i class="fa-solid fa-box fs-14"></i></div>
                         <div class="flex-1 overflow-hidden">
                             <div class="result-title text-ellipsis">${p.nombre}</div>
-                            <div class="result-meta font-mono">${p.codigo || 'S/R'}</div>
+                            <div class="result-meta font-mono">${p.referencia || 'S/R'}</div>
                         </div>
-                        <div class="result-price">${(parseFloat(p.precio)).toFixed(2)}€</div>
+                        <div class="result-price">${(parseFloat(p.precio_venta)).toFixed(2)}€</div>
                     </div>
                 `;
                 div.onclick = () => {
@@ -3259,6 +3413,11 @@
                 </div>
             </div>
 
+            <div class="form-group mb-20">
+                <label class="form-label font-bold mb-8"><?php echo L('prod_modal_mass_margin_step_reason'); ?></label>
+                <textarea id="massMargenMotivo" class="form-input p-12 fs-13" rows="2" placeholder="<?php echo L('prod_modal_mass_adj_placeholder_reason'); ?>" style="border-radius: 12px;"></textarea>
+            </div>
+
             <div id="margenPreviewBox" class="p-16 br-12 border-2" style="display:none; background: rgba(var(--accent-rgb), 0.05); border-style: dashed; border-color: var(--accent);">
                 <div class="fs-11 tt-uppercase font-bold text-accent mb-8" style="letter-spacing: 0.05em;"><?php echo L('prod_modal_mass_margin_preview_title'); ?></div>
                 <div class="d-flex jc-between ai-center mb-4">
@@ -3333,6 +3492,11 @@
                     <div id="listaExcepcionesAjuste" style="display: flex; flex-direction: column !important; gap: 8px; max-height: 200px; overflow-y: auto;">
                     </div>
                 </div>
+            </div>
+
+            <div class="form-group mb-20">
+                <label class="form-label font-bold mb-8"><?php echo L('prod_modal_mass_adj_step_reason'); ?></label>
+                <textarea id="massAjusteMotivo" class="form-input p-12 fs-13" rows="2" placeholder="<?php echo L('prod_modal_mass_adj_placeholder_reason'); ?>" style="border-radius: 12px;"></textarea>
             </div>
 
             <div id="ajustePreviewBox" class="p-16 br-12 border bg-surface mb-20 text-center" style="display:none; border-style: dashed; border-color: var(--accent);">
@@ -3543,3 +3707,102 @@
     #modalAjusteIcon.text-green { color: var(--green); }
     #modalAjusteIcon.text-red { color: var(--red); }
 </style>
+<!-- MODAL HISTORIAL GLOBAL DE PRECIOS -->
+<div id="modalHistorialGlobalPrecios" class="modal-overlay-bg" style="display:none;">
+    <div class="modal-content" style="max-width: 900px; border-radius: 20px;">
+        <div class="modal-header">
+            <div>
+                <h2 class="m-0"><?php echo L('prod_modal_global_history_title'); ?></h2>
+                <p class="m-0 fs-12 text-muted"><?php echo L('prod_modal_global_history_subtitle'); ?></p>
+            </div>
+            <button onclick="cerrarModalHistorialGlobal()" class="btn-close-modal">&times;</button>
+        </div>
+        <div class="modal-body p-24">
+            <div class="table-container" style="max-height: 500px; overflow-y: auto;">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th class="pl-20"><?php echo L('prod_modal_th_date'); ?></th>
+                            <th><?php echo L('prod_modal_global_history_th_op'); ?></th>
+                            <th class="text-center"><?php echo L('prod_modal_global_history_th_value'); ?></th>
+                            <th><?php echo L('prod_modal_global_history_th_scope'); ?></th>
+                            <th class="text-right"><?php echo L('prod_modal_global_history_th_affected'); ?></th>
+                            <th class="pr-20"><?php echo L('prod_modal_stock_adj_label_reason'); ?></th>
+                        </tr>
+                    </thead>
+                    <tbody id="globalHistoryTableBody">
+                        <!-- JS Loaded -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- HISTORIAL GLOBAL DE PRECIOS ---
+    async function abrirModalHistorialGlobal() {
+        const modal = document.getElementById('modalHistorialGlobalPrecios');
+        const body = document.getElementById('globalHistoryTableBody');
+        
+        body.innerHTML = '<tr><td colspan="6" class="text-center p-24 opacity-50"><i class="fa-solid fa-spinner fa-spin"></i> <?php echo L('loading', true); ?></td></tr>';
+        
+        modal.style.display = 'flex';
+        
+        try {
+            const resp = await fetch('api/obtenerHistorialGlobalPrecios.php');
+            const data = await resp.json();
+            
+            if (data.ok) {
+                if (data.logs.length === 0) {
+                    body.innerHTML = `<tr><td colspan="6" class="text-center p-48 text-muted opacity-60"><i class="fa-solid fa-ghost fs-24 mb-8 d-block"></i> ${<?php echo json_encode(L('prod_modal_global_history_empty', true)); ?>}</td></tr>`;
+                } else {
+                    body.innerHTML = data.logs.map(log => {
+                        const date = new Date(log.fecha);
+                        const op = log.tipo_operacion;
+                        let badgeClass = 'bg-blue-soft text-blue';
+                        let badgeText = '<?php echo L('prod_tip_mass_adjustment'); ?>';
+
+                        if (op === 'margen_masivo') {
+                            badgeClass = 'bg-purple-soft text-purple';
+                            badgeText = '<?php echo L('prod_btn_mass_margin'); ?>';
+                        } else if (op === 'ajuste_manual_margen') {
+                            badgeClass = 'bg-orange-soft text-orange';
+                            badgeText = '<?php echo L('prod_pill_manual_adj', true) ?: "AJUSTE MANUAL"; ?>';
+                        }
+                        
+                        const scopeLabel = log.categoria_nom === 'all' || !log.categoria_nom ? '<?php echo L('prod_modal_mass_margin_cat_all'); ?>' : log.categoria_nom;
+                        
+                        return `
+                            <tr class="hover-bg-surface2 transition">
+                                <td class="pl-20 font-mono fs-12">
+                                    ${date.toLocaleDateString()}<br>
+                                    <span class="opacity-50">${date.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}</span>
+                                </td>
+                                <td>
+                                    <span class="badge ${badgeClass} tt-uppercase font-bold fs-10" style="padding: 2px 8px; border-radius: 4px;">
+                                        ${badgeText}
+                                    </span>
+                                </td>
+                                <td class="text-center font-bold font-mono">
+                                    ${parseFloat(log.valor) > 0 ? '+' : ''}${parseFloat(log.valor).toFixed(2)}${log.tipo_valor === 'percent' ? '%' : '€'}
+                                </td>
+                                <td class="fs-12">${scopeLabel}</td>
+                                <td class="text-right font-bold">${log.productos_afectados}</td>
+                                <td class="pr-20 fs-12 italic opacity-80" style="max-width: 250px;">${log.motivo || '---'}</td>
+                            </tr>
+                        `;
+                    }).join('');
+                }
+            } else {
+                body.innerHTML = `<tr><td colspan="6" class="text-center p-24 text-red">Error: ${data.error}</td></tr>`;
+            }
+        } catch (e) {
+            body.innerHTML = `<tr><td colspan="6" class="text-center p-24 text-red">Error de conexión</td></tr>`;
+        }
+    }
+
+    function cerrarModalHistorialGlobal() {
+        document.getElementById('modalHistorialGlobalPrecios').style.display = 'none';
+    }
+</script>

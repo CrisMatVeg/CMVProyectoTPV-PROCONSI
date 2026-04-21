@@ -10,6 +10,7 @@ try {
     require_once __DIR__ . '/../model/DBPDO.php';
     require_once __DIR__ . '/../model/VentaPDO.php';
     require_once __DIR__ . '/../model/ConfiguracionPDO.php';
+    require_once __DIR__ . '/../model/VeriFactuQrService.php';
 
     // session_start(); // Handled by csrf_check.php
     if (!isset($_SESSION['usuarioActualTPV'])) {
@@ -26,7 +27,16 @@ try {
 
     $appConfig = ConfiguracionPDO::obtenerConfiguracion();
 
+    // [VERIFACTU] Preparación de datos fiscales para QR
+    $nifEmisor = $appConfig['empresa_nif'] ?? '';
     $esFactura = ($venta['tipo_cliente'] === 'empresa' || (isset($venta['es_factura']) && $venta['es_factura'] == 1));
+    $numFormated = VentaPDO::formatTicketNumber($venta['numero_ticket'], $venta['fecha'], $esFactura, ($venta['tipo_documento'] ?? 'venta'));
+    $venta['numero_ticket_formato'] = $numFormated;
+    
+    $qrUrl = VeriFactuQrService::generarUrlAEAT($venta, $nifEmisor);
+    $qrBase64 = VeriFactuQrService::generarQrBase64($qrUrl);
+    $verifactuLabel = ($appConfig['verifactu_remision_voluntaria'] ?? '0') === '1' ? 'VERI*FACTU' : 'No Veri*Factu';
+
     $templatePath = $esFactura
         ? __DIR__ . '/../factura-electrobazar.html'
         : __DIR__ . '/../ticket-electrobazar.html';
@@ -59,6 +69,10 @@ try {
     $html = str_replace('{{EMPRESA_REGISTRO}}',      htmlspecialchars($appConfig['empresa_registro_mercantil'] ?? ''), $html);
     $html = str_replace('{{TICKET_POLITICA}}',       htmlspecialchars($appConfig['ticket_politica'] ?? ''), $html);
     $html = str_replace('{{TICKET_PIE_PAGINA}}',     htmlspecialchars($appConfig['ticket_pie_pagina'] ?? 'Gracias por su compra'), $html);
+
+    // [VERIFACTU] Reemplazos visuales
+    $html = str_replace('{{QR_CODE_IMAGE}}', $qrBase64, $html);
+    $html = str_replace('{{VERIFACTU_TEXT}}', $verifactuLabel, $html);
 
     // Datos comunes
     $formattedNum = VentaPDO::formatTicketNumber($venta['numero_ticket'], $venta['fecha'], $esFactura);

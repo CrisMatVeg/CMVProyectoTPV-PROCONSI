@@ -51,7 +51,7 @@ if (isset($_REQUEST['volver']) || isset($_REQUEST['irDashboard'])) {
 $avTarifas = [
     'lista'      => TarifaPrecioPDO::listarTodas(),
     'productos'  => ProductoPDO::listarProductos(false),
-    'clientes'   => ClientePDO::listarTodos(),
+    'clientes'   => ClientePDO::listarTodos(500),
     'categorias' => CategoriaPDO::listarTodas(),
     'roles'      => RolClientePDO::listarRoles(),
 ];

@@ -2,29 +2,26 @@
 <div class="main-full p-24">
 
     <!-- CABECERA DE SECCIÓN -->
-    <div class="section-header container-wider flex-wrap gap-16">
-        <div class="section-title">
-            <h1><?php echo L('history_title'); ?></h1>
-            <p><?php echo L('history_subtitle'); ?></p>
+    <div class="section-header container-wider">
+        <div class="d-flex ai-center gap-16" style="flex: 1;">
+            <a href="index.php?irDashboard=1" class="btn-prominent-back compact" title="<?php echo L('login_back'); ?>">
+                <i class="fa-solid fa-chevron-left"></i>
+                <span><?php echo L('login_back'); ?></span>
+            </a>
+            <div class="vr" style="height: 32px; width: 1px; background: var(--border); opacity: 0.5;"></div>
+            <div class="section-title">
+                <h1><?php echo L('history_title'); ?></h1>
+                <p><?php echo L('history_subtitle'); ?></p>
+            </div>
         </div>
 
-        <div class="d-flex ai-center gap-16 flex-wrap">
-            <div class="cat-tabs m-0">
-                <a href="index.php?verCierres=0" class="cat-tab <?php echo !$avHistorial['verCierres'] ? 'active' : ''; ?>" style="text-decoration: none;">
-                    <i class="fa-solid fa-receipt"></i> <?php echo L('history_tab_sales'); ?>
-                </a>
-                <a href="index.php?verCierres=1" class="cat-tab <?php echo $avHistorial['verCierres'] ? 'active' : ''; ?>" style="text-decoration: none;">
-                    <i class="fa-solid fa-file-invoice-dollar"></i> <?php echo L('history_tab_closings'); ?>
-                </a>
-            </div>
-
-            <div class="vr" style="height: 30px; width: 1px; background: var(--border); opacity: 0.5;"></div>
-
-            <form method="post" class="m-0">
-                <button type="submit" name="volver" class="btn-back">
-                    <?php echo L('history_btn_back'); ?>
-                </button>
-            </form>
+        <div class="cat-tabs m-0" style="margin-left: auto; flex: none; padding: 0; align-items: center;">
+            <a href="index.php?verCierres=0" class="cat-tab <?php echo !$avHistorial['verCierres'] ? 'active' : ''; ?>" style="text-decoration: none;">
+                <i class="fa-solid fa-receipt"></i> <?php echo L('history_tab_sales'); ?>
+            </a>
+            <a href="index.php?verCierres=1" class="cat-tab <?php echo $avHistorial['verCierres'] ? 'active' : ''; ?>" style="text-decoration: none;">
+                <i class="fa-solid fa-file-invoice-dollar"></i> <?php echo L('history_tab_closings'); ?>
+            </a>
         </div>
     </div>
 
@@ -126,13 +123,14 @@
                         <th class="text-right"><?php echo L('history_th_iva'); ?></th>
                         <th class="text-right"><?php echo L('history_th_total'); ?></th>
                         <th class="text-center"><?php echo L('history_th_status'); ?></th>
+                        <th class="text-center" style="width: 60px;">AEAT</th>
                         <th class="text-center w-80"><?php echo L('history_th_actions'); ?></th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (empty($avHistorial['ventas'])): ?>
                         <tr>
-                            <td colspan="9" class="empty-state">
+                            <td colspan="10" class="empty-state">
                                 <i class="fa-solid fa-folder-open"></i>
                                 <?php echo L('history_no_sales'); ?>
                             </td>
@@ -224,6 +222,23 @@
                                     </span>
                                 <?php endif; ?>
                             </td>
+                            <td class="text-center">
+                                <?php
+                                $stVeri = $v['estado_envio_aeat'] ?? 'pendiente';
+                                if ($stVeri === 'enviado'): ?>
+                                    <span class="text-green" title="Enviado a la AEAT">
+                                        <i class="fa-solid fa-cloud-check fs-18"></i>
+                                    </span>
+                                <?php elseif ($stVeri === 'error'): ?>
+                                    <span class="text-red" title="Error en el envío">
+                                        <i class="fa-solid fa-cloud-exclamation fs-18"></i>
+                                    </span>
+                                <?php else: ?>
+                                    <span class="text-amber" title="Pendiente de envío">
+                                        <i class="fa-solid fa-cloud-arrow-up fs-18"></i>
+                                    </span>
+                                <?php endif; ?>
+                            </td>
                             <td>
                                 <div class="d-flex gap-8 jc-center">
                                     <button title="Ver detalle" class="btn-icon" onclick="verTicket('<?php echo $v['numero_ticket']; ?>')">
@@ -246,7 +261,7 @@
         </div>
 
         <!-- Paginación para Ventas -->
-        <div class="pagination-footer mt-24 d-flex ai-center jc-between p-16 container-wider bg-surface border-top no-print" style="border-radius: 0 0 12px 12px;">
+        <div class="pagination-footer mt-24 d-flex ai-center p-16 container-wider bg-surface border-top no-print" style="flex-direction: column-reverse; justify-content: center; gap: 12px; border-radius: 0 0 12px 12px;">
             <div class="pagination-info fs-13 fw-500 text-muted">
                 <i class="fa-solid fa-list-ol mr-8 opacity-50"></i>
                 <?php 
@@ -375,7 +390,7 @@
         </div>
 
         <!-- Paginación para Cierres -->
-        <div class="pagination-footer mt-24 d-flex ai-center jc-between p-16 container-wider bg-surface border-top no-print" style="border-radius: 0 0 12px 12px;">
+        <div class="pagination-footer mt-24 d-flex ai-center p-16 container-wider bg-surface border-top no-print" style="flex-direction: column-reverse; justify-content: center; gap: 12px; border-radius: 0 0 12px 12px;">
             <div class="pagination-info fs-13 fw-500 text-muted">
                 <i class="fa-solid fa-list-ol mr-8 opacity-50"></i>
                 <?php 

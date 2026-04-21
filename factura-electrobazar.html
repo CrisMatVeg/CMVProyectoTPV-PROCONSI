@@ -180,6 +180,19 @@
       </div>
     </div>
 
+    <!-- SECCIÓN VERIFACTU (REGLAMENTARIA) -->
+    <div style="margin: 20px 0; padding: 12px; display: flex; align-items: center; gap: 30px; background: #fff;">
+      <div style="flex: 0 0 132px;">
+        <img src="{{QR_CODE_IMAGE}}" alt="QR AEAT" style="width: 132px; height: 132px; display: block;" />
+      </div>
+      <div style="flex: 1;">
+        <div style="font-weight: bold; font-size: 16px; margin-bottom: 8px;">{{VERIFACTU_TEXT}}</div>
+        <div style="font-size: 11px; line-height: 1.5; color: #333; font-family: sans-serif;">
+            Factura verificable en la sede electrónica de la AEAT.
+        </div>
+      </div>
+    </div>
+
     <!-- FECHAS -->
     <div class="dates-row">
       <div><span>Fecha de emisión:</span><br />{{FECHA_EMISION}}</div>
@@ -254,27 +267,20 @@
           <strong>BIC/SWIFT:</strong> BSABESBB<br />
           <strong>Referencia:</strong> {{FACTURA_NUM}}
         </div>
-        
-        <!-- DATOS FINANCIACIÓN -->
-        <div style="{{DISPLAY_FINANCIACION}}; margin-top: 15px;">
-           <div class="block-title">Información de Financiación</div>
-           <div class="block-body" style="line-height: 1.9">
-             <strong>Entidad:</strong> {{FINANCIACION_ENTIDAD}}<br />
-             <strong>Plazo:</strong> {{FINANCIACION_MESES}} meses<br />
-             <strong>Cuota Mensual:</strong> {{FINANCIACION_CUOTA}}<br />
-           </div>
         </div>
       </div>
       <div>
-        <div class="block-title">Notas y condiciones</div>
+        <div class="block-title">Notas y observaciones</div>
         <div class="block-body" style="line-height: 1.8">
-          Pago en un plazo máximo de 30 días desde la fecha de emisión. En caso
-          de retraso se aplicará un interés de demora del 1,5% mensual. Factura
-          emitida conforme al RD 1619/2012. Conserve este documento como
-          justificante de compra.
+          {{COMENTARIOS}}
+          <div style="margin-top: 10px; font-size: 11px; color: #666; font-style: normal;">
+            Factura emitida conforme al RD 1619/2012. Conserve este documento como justificante de compra.
+          </div>
         </div>
       </div>
     </div>
+
+
 
     <!-- PIE -->
     <div class="footer">

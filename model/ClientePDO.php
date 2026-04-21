@@ -11,12 +11,16 @@ class ClientePDO
 {
     public static function listarTodos(int $limit = 50, int $offset = 0): array
     {
+        // Safety cap: if 0 is passed, we fetch a large but memory-safe batch (2000).
+        // If a specific limit is provided, we respect it.
+        $realLimit = ($limit <= 0) ? 2000 : (int)$limit;
+        
         $sql = "SELECT id, tipo, rol, nombre, apellidos, nif, email, telefono, puntos, ultima_compra, fecha_alta, fecha_baja 
                 FROM clientes 
                 ORDER BY id ASC 
                 LIMIT :limit OFFSET :offset";
         
-        $sql = str_replace([':limit', ':offset'], [(int)$limit, (int)$offset], $sql);
+        $sql = str_replace([':limit', ':offset'], [$realLimit, (int)$offset], $sql);
         $q = DBPDO::ejecutarConsulta($sql);
         return $q->fetchAll(PDO::FETCH_ASSOC);
     }
@@ -118,25 +122,27 @@ class ClientePDO
 
     public static function listarPorRol(string $rol, int $limit = 50, int $offset = 0): array
     {
+        $realLimit = ($limit <= 0) ? 100000 : (int)$limit;
+
         $sql = "SELECT id, tipo, rol, nombre, apellidos, nif, email, telefono, puntos, ultima_compra 
                 FROM clientes 
                 WHERE rol = :rol AND fecha_baja IS NULL 
                 ORDER BY id ASC 
                 LIMIT :limit OFFSET :offset";
         
-        $sql = str_replace([':limit', ':offset'], [(int)$limit, (int)$offset], $sql);
+        $sql = str_replace([':limit', ':offset'], [$realLimit, (int)$offset], $sql);
         $q = DBPDO::ejecutarConsulta($sql, [':rol' => $rol]);
         return $q->fetchAll(PDO::FETCH_ASSOC);
     }
-
-    public static function listarSocios(): array
+    
+    public static function listarSocios(int $limit = 50, int $offset = 0): array
     {
-        return self::listarPorRol('socio');
+        return self::listarPorRol('socio', $limit, $offset);
     }
 
-    public static function listarMayoristas(): array
+    public static function listarMayoristas(int $limit = 50, int $offset = 0): array
     {
-        return self::listarPorRol('mayorista');
+        return self::listarPorRol('mayorista', $limit, $offset);
     }
     public static function sumarPuntos(int $id, int $puntos): void
     {

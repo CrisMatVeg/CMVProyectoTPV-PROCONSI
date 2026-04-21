@@ -311,6 +311,7 @@ $avCierreCaja = array_merge($avCierreCaja, [
     'pendientesArqueo' => CajaTurnoPDO::obtenerTurnosPendientesArqueo(),
     'fondoInicial'    => $fondoInicial,
     'totalRetirado'   => $totalRetirado,
+    'totalIngresado'  => $totalIngresado,
     'esperadoTurno'   => $esperadoEfectivoTurno,
     'mensajeError'    => $mensajeError ?? null,
     'canCerrarTurno'  => $canCerrarTurno,

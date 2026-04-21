@@ -2,14 +2,18 @@
 
     <!-- CABECERA DE SECCIÓN -->
     <div class="section-header container-wider">
-        <div class="section-title">
-            <h1><?php echo L('dashboard_btn_purchases'); ?></h1>
-            <p><?php echo L('dashboard_btn_purchases_sub'); ?></p>
+        <div class="d-flex ai-center gap-16">
+            <a href="index.php?irDashboard=1" class="btn-prominent-back compact" title="<?php echo L('login_back'); ?>">
+                <i class="fa-solid fa-chevron-left"></i>
+                <span><?php echo L('login_back'); ?></span>
+            </a>
+            <div class="vr" style="height: 32px; width: 1px; background: var(--border); opacity: 0.5;"></div>
+            <div class="section-title">
+                <h1><?php echo L('dashboard_btn_purchases'); ?></h1>
+                <p><?php echo L('dashboard_btn_purchases_sub'); ?></p>
+            </div>
         </div>
         <div class="d-flex gap-12 ai-center">
-            <a href="index.php?irDashboard=1" class="btn-back">
-                <?php echo L('login_back'); ?>
-            </a>
             <button onclick="abrirModalNuevoAlbaran()" class="btn-add">
                 <i class="fa-solid fa-truck-ramp-box"></i> <?php echo L('purchase_btn_new_albaran'); ?>
             </button>
@@ -58,14 +62,28 @@
                                 <td><?php echo htmlspecialchars($a['proveedor_nombre']); ?></td>
                                 <td class="text-right font-mono"><?php echo number_format($a['total'], 2, ',', '.'); ?> €</td>
                                 <td class="text-center">
-                                    <span class="badge <?php echo $a['estado'] === 'pendiente' ? 'badge-warning' : 'badge-success'; ?>">
-                                        <?php echo L('purchase_status_' . strtolower($a['estado']), true); ?>
+                                    <?php 
+                                        $badgeClass = 'badge-info';
+                                        if ($a['estado'] === 'recibido') $badgeClass = 'badge-warning';
+                                        elseif ($a['estado'] === 'validado') $badgeClass = 'badge-info';
+                                        elseif ($a['estado'] === 'facturado') $badgeClass = 'badge-success';
+                                        elseif ($a['estado'] === 'anulado') $badgeClass = 'badge-danger';
+                                    ?>
+                                    <span class="badge <?php echo $badgeClass; ?>">
+                                        <?php echo L('purchase_status_' . strtolower($a['estado'])); ?>
                                     </span>
                                 </td>
                                 <td class="text-center">
-                                    <button class="btn-icon" onclick="verDetalleAlbaran(<?php echo $a['id']; ?>)">
-                                        <i class="fa-solid fa-eye"></i>
-                                    </button>
+                                    <div class="d-flex jc-center gap-8">
+                                        <?php if ($a['estado'] === 'recibido'): ?>
+                                            <button class="btn-icon text-success" onclick="validarAlbaran(<?php echo $a['id']; ?>)" title="<?php echo L('purchase_btn_validate'); ?>">
+                                                <i class="fa-solid fa-circle-check"></i>
+                                            </button>
+                                        <?php endif; ?>
+                                        <button class="btn-icon" onclick="verDetalleAlbaran(<?php echo $a['id']; ?>)" title="<?php echo L('purchase_modal_details_title'); ?>">
+                                            <i class="fa-solid fa-eye"></i>
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -82,10 +100,10 @@
                 <thead>
                     <tr>
                         <th class="w-180 pl-20"><?php echo L('purchase_th_invoice_date'); ?></th>
-                        <th><?php echo L('purchase_th_invoice_num'); ?></th>
+                        <th><?php echo L('purchase_th_invoice_num'); ?> / <?php echo L('purchase_th_due_date'); ?></th>
                         <th><?php echo L('prod_modal_label_provider'); ?></th>
                         <th class="text-right"><?php echo L('tpv_total'); ?></th>
-                        <th class="text-center"><?php echo L('hist_th_payment'); ?></th>
+                        <th class="text-center"><?php echo L('prod_th_status'); ?></th>
                         <th class="text-center pr-20"><?php echo L('prod_th_actions'); ?></th>
                     </tr>
                 </thead>
@@ -98,21 +116,38 @@
                         <?php foreach ($avInicioPrivado['historico_facturas'] as $f): ?>
                             <tr>
                                 <td class="pl-20 font-mono text-muted"><?php echo date('d/m/Y', strtotime($f['fecha_factura'])); ?></td>
-                                <td class="font-bold"><?php echo htmlspecialchars($f['numero_factura']); ?></td>
+                                <td>
+                                    <div class="font-bold"><?php echo htmlspecialchars($f['numero_factura']); ?></div>
+                                    <div class="fs-12 text-muted"><?php echo L('purchase_th_due_date'); ?>: <?php echo date('d/m/Y', strtotime($f['fecha_vencimiento'])); ?></div>
+                                </td>
                                 <td><?php echo htmlspecialchars($f['proveedor_nombre']); ?></td>
                                 <td class="text-right font-bold font-mono text-accent">
                                     <?php echo number_format($f['total'], 2, ',', '.'); ?> €
                                 </td>
                                 <td class="text-center">
-                                    <span class="badge badge-info">
-                                        <i class="fa-solid <?php echo $f['metodo_pago'] === 'caja' ? 'fa-cash-register' : 'fa-building-columns'; ?> mr-4"></i>
-                                        <?php echo L('purchase_method_' . ($f['metodo_pago'] === 'caja' ? 'cash' : ($f['metodo_pago'] === 'banco' ? 'bank' : 'other')), true); ?>
-                                    </span>
+                                    <?php if ($f['pagado']): ?>
+                                        <span class="badge badge-success">
+                                            <i class="fa-solid <?php echo $f['metodo_pago'] === 'caja' ? 'fa-cash-register' : 'fa-building-columns'; ?> mr-4"></i>
+                                            <?php echo L('purchase_status_facturado'); ?>
+                                        </span>
+                                    <?php else: ?>
+                                        <span class="badge badge-danger">
+                                            <i class="fa-solid fa-clock mr-4"></i>
+                                            <?php echo L('purchase_status_recibido'); ?> (Pendiente)
+                                        </span>
+                                    <?php endif; ?>
                                 </td>
                                 <td class="text-center">
-                                    <button class="btn-icon" onclick="verDetalleFactura(<?php echo $f['id']; ?>)">
-                                        <i class="fa-solid fa-file-lines"></i>
-                                    </button>
+                                    <div class="d-flex jc-center gap-8">
+                                        <?php if (!$f['pagado']): ?>
+                                            <button class="btn-icon text-success" onclick="pagarFactura(<?php echo $f['id']; ?>)" title="<?php echo L('purchase_btn_pay'); ?>">
+                                                <i class="fa-solid fa-money-bill-transfer"></i>
+                                            </button>
+                                        <?php endif; ?>
+                                        <button class="btn-icon" onclick="verDetalleFactura(<?php echo $f['id']; ?>)">
+                                            <i class="fa-solid fa-file-lines"></i>
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -347,6 +382,10 @@
                         <option value="otro"><?php echo L('purchase_method_other'); ?></option>
                     </select>
                 </div>
+                <div class="form-group d-flex ai-center gap-8 mt-24">
+                    <input type="checkbox" id="facPagada" checked style="width: 20px; height: 20px;">
+                    <label for="facPagada" class="form-label mb-0 fs-13 fw-700"><?php echo L('purchase_label_mark_paid'); ?></label>
+                </div>
             </div>
 
             <div class="mb-8 fs-12 fw-700 tt-uppercase opacity-50"><?php echo L('purchase_label_pending_alb'); ?></div>
@@ -425,6 +464,11 @@
     .badge-info {
         background: rgba(33, 150, 243, 0.15);
         color: #1976d2;
+    }
+
+    .badge-danger {
+        background: rgba(244, 43, 85, 0.15);
+        color: #d32f2f;
     }
 
     .alb-item {
@@ -698,6 +742,35 @@
         ejecutarGuardarAlbaran(prov, num);
     }
 
+    async function validarAlbaran(id) {
+        showCustomConfirm(
+            <?php echo json_encode(L('purchase_btn_validate')); ?>,
+            <?php echo json_encode(L('purchase_js_validate_confirm')); ?>,
+            async () => {
+                try {
+                    const r = await fetch('api/compras.php', {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            action: 'validar_albaran',
+                            id: id
+                        })
+                    });
+                    const res = await r.json();
+                    if (res.success) {
+                        sessionStorage.setItem('tpv_refresh_stock', Date.now());
+                        window.location.reload();
+                    } else {
+                        showCustomAlert(<?php echo json_encode(L('prod_js_error')); ?>, res.error || <?php echo json_encode(L('prod_js_error')); ?>, 'error');
+                    }
+                } catch (e) {
+                    showCustomAlert(<?php echo json_encode(L('prod_js_error')); ?>, <?php echo json_encode(L('prod_js_error')); ?>, 'error');
+                }
+            },
+            <?php echo json_encode(L('purchase_btn_validate')); ?>,
+            'success'
+        );
+    }
+
     async function ejecutarGuardarAlbaran(prov_id, numero) {
         const btn = document.getElementById('btnGuardarAlbaran');
         btn.disabled = true;
@@ -744,6 +817,7 @@
         albaranesSeleccionados = [];
         document.getElementById('facProveedor').value = '';
         document.getElementById('facNum').value = '';
+        document.getElementById('facPagada').checked = true;
         document.getElementById('facTotal').innerText = '0,00';
         document.getElementById('listaAlbaranesPendientes').innerHTML = '<div class="p-20 text-center opacity-50 fs-13"><?php echo L('purchase_select_prov_hint'); ?></div>';
         document.getElementById('modalNuevaFactura').style.display = 'flex';
@@ -759,6 +833,7 @@
         try {
             const r = await fetch('api/compras.php?type=albaranes_pendientes');
             const data = await r.json();
+            // La API ya devuelve solo los 'validado' porque hemos actualizado listarAlbaranes(true)
             albaranesPendientes = data.filter(a => a.proveedor_id == provId);
             const container = document.getElementById('listaAlbaranesPendientes');
             if (albaranesPendientes.length === 0) container.innerHTML = '<div class="p-20 text-center opacity-50 fs-13"><?php echo L('purchase_no_pending_alb'); ?></div>';
@@ -819,6 +894,7 @@
                     numero_factura: num,
                     fecha: document.getElementById('facFecha').value,
                     metodo_pago: document.getElementById('facPago').value,
+                    pagado: document.getElementById('facPagada').checked,
                     ids_albaranes: albaranesSeleccionados
                 })
             });
@@ -829,6 +905,40 @@
             showCustomAlert(<?php echo json_encode(L('warning')); ?>, <?php echo json_encode(L('tpv_js_conn_error')); ?>, 'error');
         } finally {
             btn.disabled = false;
+        }
+    }
+
+    async function pagarFactura(id) {
+        showCustomConfirm(
+            <?php echo json_encode(L('purchase_btn_pay')); ?>,
+            <?php echo json_encode(L('purchase_js_pay_confirm')); ?>,
+            async () => {
+                // Si el usuario elige "Efectivo", pasamos 'caja'. Si no, por defecto 'banco'.
+                // Nota: showCustomConfirm es simple, así que por ahora forzamos 'caja' si acepta y luego 
+                // podríamos preguntar modo, pero para simplificar, usaremos un flujo de 'Caja' por defecto
+                // o añadiremos un selector.
+                ejecutarPagoFactura(id, 'caja');
+            },
+            <?php echo json_encode(L('purchase_method_cash')); ?>,
+            'success'
+        );
+    }
+
+    async function ejecutarPagoFactura(id, metodo) {
+        try {
+            const r = await fetch('api/compras.php', {
+                method: 'POST',
+                body: JSON.stringify({
+                    action: 'pagar_factura',
+                    id: id,
+                    metodo_pago: metodo
+                })
+            });
+            const res = await r.json();
+            if (res.success) window.location.reload();
+            else showCustomAlert('Error', res.error, 'error');
+        } catch (e) {
+            showCustomAlert('Error', 'Error de conexión', 'error');
         }
     }
 

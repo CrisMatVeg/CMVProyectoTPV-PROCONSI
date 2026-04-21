@@ -11,7 +11,9 @@ export const CartManager = {
    * Price Engine: Calculate dynamic price based on tariffs and dates
    */
   getEffectivePrice(product, socio = null) {
-    let finalPrice = parseFloat(product.price);
+    const basePrice = parseFloat(product.price || 0);
+    let finalPrice = basePrice;
+    const appliedTariffs = [];
     const now = new Date();
     const currentTime = now.getHours().toString().padStart(2, "0") + ":" +
                         now.getMinutes().toString().padStart(2, "0") + ":" +
@@ -62,10 +64,23 @@ export const CartManager = {
       } else {
         variation = val;
       }
-      finalPrice += variation;
+      
+      if (variation !== 0) {
+        finalPrice += variation;
+        appliedTariffs.push({
+          id_origen: t.id,
+          tipo_descuento: 'tarifa',
+          nombre: t.nombre,
+          valor_descontado: variation
+        });
+      }
     });
 
-    return Math.max(0, finalPrice);
+    return { 
+        price: Math.max(0, finalPrice), 
+        appliedTariffs, 
+        basePrice 
+    };
   },
 
   /**
@@ -80,17 +95,41 @@ export const CartManager = {
       if (cart[id].qty >= product.stock) return "stock_limit";
       cart[id].qty++;
     } else {
-      const finalPrice = this.getEffectivePrice(product, AppState.socioActual);
+      const effective = this.getEffectivePrice(product, AppState.socioActual);
       cart[id] = {
         ...product,
         qty: 1,
-        price: finalPrice,
+        price: effective.price,
+        appliedTariffs: effective.appliedTariffs,
+        basePriceSnapshot: effective.basePrice,
         iva: parseFloat(product.iva || 21),
         cartKey: String(id),
         serials: []
       };
     }
     AppState.cart = cart; // Write back via setter to persist
+    return true;
+  },
+
+  addCustomProduct(name, price, iva) {
+    const cart = AppState.cart;
+    const timestamp = new Date().getTime();
+    const cartKey = `comodin_${timestamp}`;
+
+    cart[cartKey] = {
+      id: -1,
+      name: name,
+      codigo: "COMODIN",
+      price: parseFloat(price),
+      iva: parseFloat(iva || 21),
+      qty: 1,
+      icono: '<i class="fa-solid fa-box-open"></i>',
+      maxStock: 999999,
+      cartKey: cartKey,
+      serials: []
+    };
+
+    AppState.cart = cart;
     return true;
   },
 
@@ -264,7 +303,7 @@ export const CartManager = {
       const p = parseFloat(item.price || 0);
       const q = parseInt(item.qty || 0);
       const itemPvpOrig = p * q;
-      const itemPvpFinal = itemPvpOrig * discountFactor;
+      const itemPvpFinal = Math.max(0, itemPvpOrig * discountFactor);
       
       const rate = (item.iva !== undefined && item.iva !== null) ? parseFloat(item.iva) : 25;
       const base = itemPvpFinal / (1 + rate / 100);
@@ -280,6 +319,10 @@ export const CartManager = {
 
     return {
       subtotal,          
+      bundleDiscount: bundleDiscountTotal,
+      generalDiscount: generalDiscount,
+      socioDiscount: socioAmt,
+      puntosDiscount: (AppState.puntosDescuentoAmt || 0),
       totalDiscount,      
       subtotalFinal,     
       totalBase,         
@@ -290,12 +333,18 @@ export const CartManager = {
   },
 
   postponeSale() {
+    const saved = JSON.parse(localStorage.getItem("postponed-sales") || "[]");
+    if (saved.length > 0) {
+        Utils.showToast("Ya existe una venta aparcada", "warning");
+        return;
+    }
+
     const items = Object.values(AppState.cart);
     if (!items.length) {
         Utils.showToast("El carrito está vacío", "warning");
         return;
     }
-    const saved = JSON.parse(localStorage.getItem("postponed-sales") || "[]");
+
     saved.push({
         id: Date.now(),
         date: new Date().toISOString(),
@@ -311,7 +360,20 @@ export const CartManager = {
 
   resumeSale(id) {
     const saved = JSON.parse(localStorage.getItem("postponed-sales") || "[]");
-    const index = saved.findIndex(s => s.id === id);
+    if (!saved.length) return;
+
+    if (Object.keys(AppState.cart).length > 0) {
+        Utils.showToast("Vacía el carrito primero para recuperar la venta", "warning");
+        return;
+    }
+
+    let index = -1;
+    if (id === undefined) {
+        index = saved.length - 1; // Resume last one
+    } else {
+        index = saved.findIndex(s => s.id === id);
+    }
+    
     if (index === -1) return;
 
     const sale = saved.splice(index, 1)[0];
@@ -327,3 +389,9 @@ export const CartManager = {
     Utils.showToast("Venta recuperada", "success");
   }
 };
+
+// Expose to global scope for legacy main.js
+if (typeof window !== "undefined") {
+    window.CartManager = CartManager;
+}
+

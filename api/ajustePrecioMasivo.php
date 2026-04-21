@@ -27,6 +27,7 @@ try {
     $categoria = isset($input['categoria']) ? trim($input['categoria'])   : null;
     $preview   = isset($input['preview'])   && $input['preview'];
     $excepciones = isset($input['excepciones']) ? (array)$input['excepciones'] : [];
+    $motivo    = isset($input['motivo'])    ? trim($input['motivo'])      : null;
 
     if ($categoria === '' || $categoria === 'TODOS' || $categoria === 'all') $categoria = null;
 
@@ -58,8 +59,30 @@ try {
         exit;
     }
 
+    if (empty($motivo)) {
+        throw new Exception('El motivo del ajuste es obligatorio');
+    }
+
     $resultado = ProductoPDO::ajustePrecioMasivo($valor, $tipo, $categoria, $excepciones);
     
+    // Registrar en el log global
+    $catNombre = 'Todas';
+    if ($categoria) {
+        $qCat = DBPDO::ejecutarConsulta("SELECT nombre FROM categorias WHERE codigo = :c OR id = :c", [':c' => $categoria]);
+        $rowCat = $qCat->fetch();
+        if ($rowCat) $catNombre = $rowCat['nombre'];
+    }
+
+    ProductoPDO::registrarLogAjusteGlobal([
+        'id_usuario' => $_SESSION['usuarioActualTPV']->getId(),
+        'tipo_operacion' => 'ajuste_masivo',
+        'valor' => $valor,
+        'tipo_valor' => $tipo,
+        'categoria_nom' => $catNombre,
+        'motivo' => $motivo,
+        'productos_afectados' => $resultado['actualizados']
+    ]);
+
     echo json_encode([
         'ok' => true,
         'actualizados' => $resultado['actualizados'],

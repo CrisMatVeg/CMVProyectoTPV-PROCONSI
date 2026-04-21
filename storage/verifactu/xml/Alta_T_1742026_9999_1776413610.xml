@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sfLR:RegFactuSistemaFacturacion xmlns:sfLR="https://www2.agenciatributaria.gob.es/static_files/common/internet/dep/aplicaciones/es/aeat/tike/cont/ws/SuministroLR.xsd" xmlns:sf="https://www2.agenciatributaria.gob.es/static_files/common/internet/dep/aplicaciones/es/aeat/tike/cont/ws/SuministroInformacion.xsd">
+  <sfLR:Cabecera>
+    <sf:ObligadoEmision xmlns:sf="https://www2.agenciatributaria.gob.es/static_files/common/internet/dep/aplicaciones/es/aeat/tike/cont/ws/SuministroInformacion.xsd">
+      <sf:NombreRazon>ElectroBazar</sf:NombreRazon>
+      <sf:NIF>12345678Z</sf:NIF>
+    </sf:ObligadoEmision>
+    <sf:RemisionVoluntaria xmlns:sf="https://www2.agenciatributaria.gob.es/static_files/common/internet/dep/aplicaciones/es/aeat/tike/cont/ws/SuministroInformacion.xsd">
+      <sf:Incidencia>N</sf:Incidencia>
+    </sf:RemisionVoluntaria>
+  </sfLR:Cabecera>
+  <sfLR:RegistroFactura>
+    <sf:RegistroAlta xmlns:sf="https://www2.agenciatributaria.gob.es/static_files/common/internet/dep/aplicaciones/es/aeat/tike/cont/ws/SuministroInformacion.xsd">
+      <sf:IDVersion>1.0</sf:IDVersion>
+      <sf:IDFactura>
+        <sf:IDEmisorFactura>12345678Z</sf:IDEmisorFactura>
+        <sf:NumSerieFactura>T-1742026-9999</sf:NumSerieFactura>
+        <sf:FechaExpedicionFactura>17-04-2026</sf:FechaExpedicionFactura>
+      </sf:IDFactura>
+      <sf:NombreRazonEmisor>ElectroBazar</sf:NombreRazonEmisor>
+      <sf:TipoFactura>F2</sf:TipoFactura>
+      <sf:DescripcionOperacion>Venta TPV</sf:DescripcionOperacion>
+      <sf:Desglose>
+        <sf:DetalleDesglose>
+          <sf:Impuesto>01</sf:Impuesto>
+          <sf:ClaveRegimen>01</sf:ClaveRegimen>
+          <sf:CalificacionOperacion>S1</sf:CalificacionOperacion>
+          <sf:TipoImpositivo>21.00</sf:TipoImpositivo>
+          <sf:BaseImponibleOimporteNoSujeto>82.64</sf:BaseImponibleOimporteNoSujeto>
+          <sf:CuotaRepercutida>17.36</sf:CuotaRepercutida>
+        </sf:DetalleDesglose>
+      </sf:Desglose>
+      <sf:CuotaTotal>17.36</sf:CuotaTotal>
+      <sf:ImporteTotal>100.00</sf:ImporteTotal>
+      <sf:Encadenamiento>
+        <sf:RegistroAnterior>
+          <sf:IDEmisorFactura>12345678Z</sf:IDEmisorFactura>
+          <sf:NumSerieFactura>T-16042026-9998</sf:NumSerieFactura>
+          <sf:FechaExpedicionFactura>16-04-2026</sf:FechaExpedicionFactura>
+          <sf:Huella>AA9594F803F9848AC62678A7C13582FF029334F216B248FB22DBF0A8280D5FC7</sf:Huella>
+        </sf:RegistroAnterior>
+      </sf:Encadenamiento>
+      <sf:SistemaInformatico>
+        <sf:NombreRazon>ElectroBazar Software S.L.</sf:NombreRazon>
+        <sf:NIF>B00000000</sf:NIF>
+        <sf:NombreSistemaInformatico>ElectroBazar TPV</sf:NombreSistemaInformatico>
+        <sf:IdSistemaInformatico>01</sf:IdSistemaInformatico>
+        <sf:Version>1.0.0</sf:Version>
+        <sf:NumeroInstalacion>INST001</sf:NumeroInstalacion>
+        <sf:TipoUsoPosibleSoloVerifactu>S</sf:TipoUsoPosibleSoloVerifactu>
+        <sf:TipoUsoPosibleMultiOT>N</sf:TipoUsoPosibleMultiOT>
+        <sf:IndicadorMultiplesOT>N</sf:IndicadorMultiplesOT>
+      </sf:SistemaInformatico>
+      <sf:FechaHoraHusoGenRegistro>2026-04-17T10:13:30+02:00</sf:FechaHoraHusoGenRegistro>
+      <sf:TipoHuella>01</sf:TipoHuella>
+      <sf:Huella>307B4CFB679864B86CE17D625FC90C87265D4C689128A294ABC000F4C79213D2</sf:Huella>
+    </sf:RegistroAlta>
+  </sfLR:RegistroFactura>
+</sfLR:RegFactuSistemaFacturacion>

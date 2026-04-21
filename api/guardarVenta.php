@@ -9,8 +9,8 @@ require_once __DIR__ . '/csrf_check.php';
  */
 
 // Suprimir errores PHP para que nunca contaminen el JSON
-ini_set('display_errors', 0);
-error_reporting(0);
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
 
 // Cabecera JSON siempre, incluso en caso de error
 header('Content-Type: application/json; charset=utf-8');
@@ -20,14 +20,6 @@ try {
     require_once __DIR__ . '/../config/confDBPDO.php';
     require_once __DIR__ . '/../model/DBPDO.php';
 
-    // MIGRACIÓN AUTOMÁTICA (Provisional para estabilizar el sistema)
-    // MySQL no soporta "IF NOT EXISTS" al añadir columnas, así que ejecutamos una a una y capturamos errores.
-    try { DBPDO::ejecutarConsulta("ALTER TABLE ventas ADD COLUMN efectivo_recibido DECIMAL(10,2) DEFAULT 0.00"); } catch (Throwable $e) {}
-    try { DBPDO::ejecutarConsulta("ALTER TABLE pagos_venta ADD COLUMN id_turno INT DEFAULT NULL"); } catch (Throwable $e) {}
-    try { DBPDO::ejecutarConsulta("ALTER TABLE ventas ADD COLUMN puntos_ganados INT DEFAULT 0"); } catch (Throwable $e) {}
-    try { DBPDO::ejecutarConsulta("ALTER TABLE ventas ADD COLUMN puntos_canjeados INT DEFAULT 0"); } catch (Throwable $e) {}
-    try { DBPDO::ejecutarConsulta("ALTER TABLE ventas ADD COLUMN puntos_descuento_amt DECIMAL(10,2) DEFAULT 0.00"); } catch (Throwable $e) {}
-
     // ⚠️ Usuario.php debe cargarse ANTES de session_start()
     require_once __DIR__ . '/../model/Usuario.php';
     require_once __DIR__ . '/../model/Venta.php';
@@ -35,7 +27,8 @@ try {
     require_once __DIR__ . '/../model/CajaTurnoPDO.php';
     require_once __DIR__ . '/../model/ClientePDO.php';
     require_once __DIR__ . '/../model/Validador.php';
-    ProductoPDO::init(); // Asegurar esquema fuera de cualquier transacción posterior
+    require_once __DIR__ . '/../model/ProductoPDO.php';
+
 
     // Iniciar sesión para verificar autenticación
     // session_start(); // Handled by csrf_check.php
@@ -75,36 +68,45 @@ try {
     }
 
     // Validaciones
-    $metodo_pago        = $datos['metodoPago'] ?? 'efectivo';
-    $id_cliente         = $datos['idCliente'] ?? null;
-    $nombre_cliente     = $datos['nombreCliente'] ?? null;
-    $nif_cliente        = null; // Inicializar nif_cliente
-    $total              = $datos['total'] ?? 0;
-    $subtotal           = $datos['subtotal'] ?? 0;
-    $descuento_pct      = $datos['descuentoPct'] ?? 0;
-    $lineas             = $datos['lineas'] ?? [];
+    $aErrores = [];
+    $metodo_pago    = $datos['metodoPago'] ?? 'efectivo';
+    $total          = $datos['total'] ?? 0;
+    $subtotal       = $datos['subtotal'] ?? 0;
+    
+    // Extraer datos con fallback para estructura modular (anidada) o plana (legacy)
+    $tipoCliente    = $datos['tipoCliente'] ?? ($datos['cliente']['tipo'] ?? 'particular');
+    $nombre_cliente = $datos['nombreCliente'] ?? ($datos['cliente']['nombre'] ?? ($datos['socio']['nombre'] ?? null));
+    $nif_cliente    = strtoupper(trim($datos['nifCliente'] ?? ($datos['cliente']['nif'] ?? ($datos['socio']['nif'] ?? ''))));
+    $id_cliente     = $datos['idCliente'] ?? ($datos['cliente']['id'] ?? ($datos['socio']['id'] ?? null));
+    $esFactura      = (!empty($datos['esFactura']) || $total >= 3000) ? 1 : 0;
 
-    if (isset($datos['tipoCliente']) && $datos['tipoCliente'] === 'empresa') {
-        $aErrores['empresaNombre'] = validacionFormularios::comprobarAlfaNumerico($datos['nombreCliente'] ?? '', 100, 3, 1);
-        $nifRaw = strtoupper(trim($datos['nifCliente'] ?? ''));
-        $nif_cliente = $nifRaw; // Asignar nif_cliente aquí
-        $aErrores['empresaNif'] = validacionFormularios::comprobarNoVacio($nifRaw);
-        if (!$aErrores['empresaNif']) {
-            if (!Validador::validarDocumento($nifRaw)) {
-                $aErrores['empresaNif'] = 'El CIF/NIF no tiene un formato válido (ej: B12345678, 12345678A, X1234567A).';
-            }
+    // Validación obligatoria para Empresas o Facturas nominativas
+    if ($tipoCliente === 'empresa' || $esFactura == 1) {
+        $errNombre = validacionFormularios::comprobarAlfaNumerico($nombre_cliente ?? '', 100, 3, 1);
+        if ($errNombre) $aErrores['empresaNombre'] = $errNombre;
+
+        if (empty($nif_cliente)) {
+            $aErrores['empresaNif'] = 'El NIF/CIF es obligatorio para empresas o facturas.';
+        } elseif (!Validador::validarDocumento($nif_cliente)) {
+            $aErrores['empresaNif'] = 'El CIF/NIF no tiene un formato válido (ej: B12345678, 12345678A, X1234567A).';
         }
     }
 
-    $entradaOK = true;
-    foreach ($aErrores as $e) {
-        if ($e != null) $entradaOK = false;
-    }
+    $entradaOK = empty($aErrores);
 
     if (!$entradaOK) {
-        echo json_encode(['ok' => false, 'aErrores' => $aErrores]);
+        // Consolidar errores en un solo string para el toast del frontend
+        $errorMsg = implode(" | ", array_filter($aErrores));
+        echo json_encode(['ok' => false, 'error' => $errorMsg, 'aErrores' => $aErrores]);
         exit;
     }
+
+    // Normalizar datos para los siguientes pasos
+    $datos['tipoCliente']   = $tipoCliente;
+    $datos['nombreCliente'] = $nombre_cliente;
+    $datos['nifCliente']    = $nif_cliente;
+    $datos['idCliente']     = $id_cliente;
+    $datos['esFactura']     = $esFactura;
 
     // Resolver / crear cliente en tabla clientes
     // - Si viene idCliente desde el TPV (socio ya seleccionado), se usa directamente

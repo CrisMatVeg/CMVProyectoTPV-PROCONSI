@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sfLR:RegFactuSistemaFacturacion xmlns:sfLR="https://www2.agenciatributaria.gob.es/static_files/common/internet/dep/aplicaciones/es/aeat/tike/cont/ws/SuministroLR.xsd" xmlns:sf="https://www2.agenciatributaria.gob.es/static_files/common/internet/dep/aplicaciones/es/aeat/tike/cont/ws/SuministroInformacion.xsd">
+  <sfLR:Cabecera>
+    <sf:ObligadoEmision xmlns:sf="https://www2.agenciatributaria.gob.es/static_files/common/internet/dep/aplicaciones/es/aeat/tike/cont/ws/SuministroInformacion.xsd">
+      <sf:NombreRazon>CERTIFICADO FISICA PRUEBAS</sf:NombreRazon>
+      <sf:NIF>99999910G</sf:NIF>
+    </sf:ObligadoEmision>
+    <sf:RemisionVoluntaria xmlns:sf="https://www2.agenciatributaria.gob.es/static_files/common/internet/dep/aplicaciones/es/aeat/tike/cont/ws/SuministroInformacion.xsd">
+      <sf:Incidencia>N</sf:Incidencia>
+    </sf:RemisionVoluntaria>
+  </sfLR:Cabecera>
+  <sfLR:RegistroFactura>
+    <sf:RegistroAnulacion xmlns:sf="https://www2.agenciatributaria.gob.es/static_files/common/internet/dep/aplicaciones/es/aeat/tike/cont/ws/SuministroInformacion.xsd">
+      <sf:IDVersion>1.0</sf:IDVersion>
+      <sf:IDFactura>
+        <sf:IDEmisorFacturaAnulada>99999910G</sf:IDEmisorFacturaAnulada>
+        <sf:NumSerieFacturaAnulada>T-2026-9999</sf:NumSerieFacturaAnulada>
+        <sf:FechaExpedicionFacturaAnulada>21-04-2026</sf:FechaExpedicionFacturaAnulada>
+      </sf:IDFactura>
+      <sf:Encadenamiento>
+        <sf:RegistroAnterior>
+          <sf:IDEmisorFactura>99999910G</sf:IDEmisorFactura>
+          <sf:NumSerieFactura>T-2026-9999</sf:NumSerieFactura>
+          <sf:FechaExpedicionFactura>21-04-2026</sf:FechaExpedicionFactura>
+          <sf:Huella>420A874D597E4F80D3439C42C01C22FE060FA6278DF36FA9DC035789AF862EE0</sf:Huella>
+        </sf:RegistroAnterior>
+      </sf:Encadenamiento>
+      <sf:SistemaInformatico>
+        <sf:NombreRazon>ElectroBazar Software S.L.</sf:NombreRazon>
+        <sf:NIF>B00000000</sf:NIF>
+        <sf:NombreSistemaInformatico>ElectroBazar TPV</sf:NombreSistemaInformatico>
+        <sf:IdSistemaInformatico>01</sf:IdSistemaInformatico>
+        <sf:Version>1.0.0</sf:Version>
+        <sf:NumeroInstalacion>INST001</sf:NumeroInstalacion>
+        <sf:TipoUsoPosibleSoloVerifactu>S</sf:TipoUsoPosibleSoloVerifactu>
+        <sf:TipoUsoPosibleMultiOT>N</sf:TipoUsoPosibleMultiOT>
+        <sf:IndicadorMultiplesOT>N</sf:IndicadorMultiplesOT>
+      </sf:SistemaInformatico>
+      <sf:FechaHoraHusoGenRegistro>2026-04-21T10:02:48+02:00</sf:FechaHoraHusoGenRegistro>
+      <sf:TipoHuella>01</sf:TipoHuella>
+      <sf:Huella>6C68C313405272B04C8DD5275053E324E0B50C9CD219C421CF6162BD6DA48A4E</sf:Huella>
+    </sf:RegistroAnulacion>
+  </sfLR:RegistroFactura>
+</sfLR:RegFactuSistemaFacturacion>

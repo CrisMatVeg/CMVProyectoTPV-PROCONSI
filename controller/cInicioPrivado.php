@@ -5,11 +5,8 @@ if (!isset($_SESSION['usuarioActualTPV'])) {
     exit;
 }
 
-if ($_SESSION['usuarioActualTPV']->getRol() == "admin") {
-    $esAdmin = true;
-} else {
-    $esAdmin = false;
-}
+$userRol = $_SESSION['usuarioActualTPV']->getRol();
+$esAdmin = ($userRol === "admin" || $userRol === "administrador");
 
 // Navegación Global handled by index.php
 
@@ -49,7 +46,7 @@ foreach ($oProductos as $oProducto) {
         "atributos" => $oProducto->getAtributos()
     ];
 }
-file_put_contents(__DIR__ . '/../tmp_debug_tpv_data.json', json_encode($aProductos, JSON_PRETTY_PRINT));
+
 
 // Cargar categorías dinámicas
 require_once 'model/CategoriaPDO.php';

@@ -5,6 +5,7 @@ $translations = [
     'menu_perfil' => 'Profil',
     'menu_caja' => 'Kasse',
     'menu_salir' => 'Abmelden',
+    'menu_usuarios' => 'Benutzer',
     'label_cajero' => 'Kassierer',
     'label_abierta' => 'OFFEN',
     'label_cerrada' => 'GESCHLOSSEN',
@@ -61,7 +62,7 @@ $translations = [
     'tpv_clear' => 'Leeren',
     'tpv_empty_cart' => 'Produkte hinzufügen',
     'tpv_empty_cart_sub' => 'zur Bestellung',
-    'tpv_subtotal' => 'Zwischensumme (Netto)',
+    'tpv_subtotal' => 'Zwischensumme',
     'tpv_discount' => 'Rabatt',
     'tpv_total' => 'Gesamt',
     'tpv_payment_method' => 'Zahlungsart',
@@ -96,8 +97,9 @@ $translations = [
     'tpv_custom_desc_placeholder' => 'Z.B. Installation, Dienstleistung...',
     'tpv_custom_price' => 'VK-Preis (inkl. MwSt.)',
     'tpv_custom_desc_error' => 'Beschreibung eingeben',
-    'tpv_custom_price_error' => 'Gültigen Preis eingeben',
-    'modal_add_item' => 'Zur Bestellung hinzufügen',
+    'tpv_custom_price_error' => 'Geben Sie einen gültigen Preis ein',
+    'tpv_error_insufficient_cash' => 'Unzureichendes Bargeld in der Schublade für diesen Vorgang.',
+    'modal_add_item' => 'Zum Auftrag hinzufügen',
 
     // Modals
     'modal_edit_title' => 'Produkt bearbeiten',
@@ -128,6 +130,7 @@ $translations = [
     'cash_open_btn_resolve' => 'Differenzen klären',
     'cash_open_label_initial' => 'Anfangsbestand (€)',
     'cash_open_btn_open' => 'Kasse öffnen',
+    'cash_open_error_zero' => 'Es ist zwingend erforderlich, einen Anfangsbestand von mehr als 0.00€ einzugeben, um die Kasse zu öffnen.',
 
     // Client Modal
     'client_type_title' => 'Kundentyp?',
@@ -318,6 +321,10 @@ $translations = [
     'prod_modal_pill_tariff' => 'TARIF',
     'prod_modal_pill_promo' => 'AKTION',
     'prod_modal_tab_tarifas_none' => 'Keine aktiven Tarife oder Aktionen für dieses Produkt.',
+    'prod_modal_cost_history_none' => 'Keine Einkaufs- oder Eingangsbewegungen registriert.',
+    'prod_modal_label_tags' => 'Labels / Tags',
+    'prod_modal_tags_placeholder' => 'Enter drücken zum Hinzufügen...',
+    'prod_modal_tags_help' => 'Tags zur Klassifizierung hinzufügen (z. B. Neu, Saison).',
 
     // Packs (Bundles)
     'prod_modal_pack_title_new' => 'Neues Verkaufs-Bundle',
@@ -500,10 +507,14 @@ $translations = [
     'roles_label_perms' => 'Aktivierte Rechte',
     'roles_perm_key' => 'Schlüssel',
     'roles_btn_save' => 'Konfiguration speichern',
+    'roles_btn_new' => 'Neue Rolle',
+    'roles_btn_clear' => 'Leeren / Neu',
     'roles_js_edit_title' => 'Rolle bearbeiten',
 
     // Rollennamen
     'role_admin' => 'Administrator',
+    'role_administrador' => 'Administrator',
+    'role_encargado' => 'Verantwortlicher',
     'role_superadmin' => 'Super-Administrator',
     'role_cajero' => 'Kassierer/in',
     'role_dependiente' => 'Verkäufer',
@@ -512,6 +523,10 @@ $translations = [
 
     // Rollenbeschreibungen
     'role_admin_desc' => 'Vollzugriff auf alle Systemfunktionen.',
+    'role_administrador_desc' => 'Vollzugriff auf alle Systemfunktionen.',
+    'role_superadmin_desc' => 'Vollständige Systemkontrolle und erweiterte Konfiguration.',
+    'role_encargado_desc' => 'Personalverwaltung, Kassenabschlüsse und Bestandskontrolle.',
+    'role_supervisor_desc' => 'Verkaufsüberwachung und spezielle TPV-Berechtigungen.',
     'role_cajero_desc' => 'Berechtigungen für Verkauf und Kassenabschluss.',
     'role_dependiente_desc' => 'Eingeschränkter Zugriff auf Verkauf und Abfragen.',
     'role_user_desc' => 'Nur Lesezugriff auf allgemeine Daten.',
@@ -522,15 +537,17 @@ $translations = [
     'perm_gestionar_productos' => 'Produktmanagement',
     'perm_gestionar_clientes' => 'Kundenmanagement',
     'perm_gestionar_configuracion' => 'Systemkonfiguration',
+    'perm_aplicar_descuentos' => 'Rabatte anwenden',
+    'perm_gestionar_devoluciones' => 'Retouren verwalten',
+    'perm_anular_ventas' => 'Verkäufe / Belege stornieren',
+    'perm_ver_costes' => 'Kosten und Margen sehen',
+    'perm_gestionar_proveedores' => 'Lieferanten verwalten',
+    'perm_gestionar_inventario' => 'Lagerverwaltung',
+    'perm_gestionar_gastos' => 'Ausgaben verwalten',
     'perm_ver_analitica' => 'Berichte & Analysen',
     'perm_apertura_caja' => 'Kassenöffnung',
     'perm_cerrar_caja' => 'Kassenabschluss',
-    'perm_devoluciones' => 'Retourenmanagement',
-    'perm_tickets' => 'Beleg- & Rechnungsverwaltung',
-    'perm_tarifas' => 'Preis- & Tarifverwaltung',
-    'perm_proveedores' => 'Lieferantenmanagement',
-    'perm_usuarios' => 'Benutzer & Rollen',
-    'perm_compras' => 'Einkaufsmanagement',
+    'perm_gestionar_usuarios' => 'Benutzer & Rollen',
     'perm_ver_historial' => 'Verkaufshistorie prüfen',
 
     // Kunden
@@ -744,6 +761,7 @@ $translations = [
     'tpv_amount_to_add' => 'Betrag',
     'tpv_add' => 'BUCHEN',
     'tpv_change_to_return' => 'Rückgeld',
+    'tpv_amount_received' => 'Erhaltener Betrag (€)',
     'tpv_payment_deadline' => 'Zahlungsziel',
     'tpv_select_client_to_owe' => 'KUNDE FÜR ANSCHREIBEN WÄHLEN',
     'client_search_socio_placeholder' => 'Name oder Mitgliedsnummer...',

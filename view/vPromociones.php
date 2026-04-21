@@ -478,17 +478,21 @@
 
 <div class="main-full p-24">
     <div class="section-header container-wider">
-        <div class="section-title">
-            <h1><?php echo L('promos_title'); ?></h1>
-            <p><?php echo L('promos_subtitle'); ?></p>
+        <div class="d-flex ai-center gap-16">
+            <a href="index.php?irDashboard=1" class="btn-prominent-back compact" title="<?php echo L('login_back'); ?>">
+                <i class="fa-solid fa-chevron-left"></i>
+                <span><?php echo L('login_back'); ?></span>
+            </a>
+            <div class="vr" style="height: 32px; width: 1px; background: var(--border); opacity: 0.5;"></div>
+            <div class="section-title">
+                <h1><?php echo L('promos_title'); ?></h1>
+                <p><?php echo L('promos_subtitle'); ?></p>
+            </div>
         </div>
         <div class="d-flex gap-12">
             <button onclick="window.abrirModalPromo()" class="btn-add">
                 <i class="fa-solid fa-plus"></i> <?php echo L('promos_btn_add'); ?>
             </button>
-            <a href="index.php?irDashboard=1" class="btn-back">
-                <?php echo L('promos_btn_back'); ?>
-            </a>
         </div>
     </div>
 

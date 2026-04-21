@@ -2,14 +2,16 @@
 <div class="main-full p-24">
     <!-- Encabezado de la sección -->
     <div class="section-header container-wider">
-        <div class="section-title">
-            <h1><?php echo L('dashboard_btn_users'); ?></h1>
-            <p><?php echo L('dashboard_btn_users_sub'); ?></p>
-        </div>
-        <div class="d-flex gap-12 ai-center">
-            <a href="index.php?irDashboard=1" class="btn-back">
-                <?php echo L('login_back'); ?>
+        <div class="d-flex ai-center gap-16">
+            <a href="index.php?irDashboard=1" class="btn-prominent-back compact" title="<?php echo L('login_back'); ?>">
+                <i class="fa-solid fa-chevron-left"></i>
+                <span><?php echo L('login_back'); ?></span>
             </a>
+            <div class="vr" style="height: 32px; width: 1px; background: var(--border); opacity: 0.5;"></div>
+            <div class="section-title">
+                <h1><?php echo L('dashboard_btn_users'); ?></h1>
+                <p><?php echo L('dashboard_btn_users_sub'); ?></p>
+            </div>
         </div>
     </div>
 
@@ -17,8 +19,8 @@
     <div class="filters-bar-new container-wider mb-24 br-20 shadow-sm" style="background: var(--surface2); padding: 16px; border: 1px solid var(--border);">
         <div class="filter-item flex-1">
             <div class="search-input-fancy" style="border-radius: 12px; background: var(--surface); padding-left: 15px;">
-                <i class="fa-solid fa-magnifying-glass opacity-50"></i>
-                <input type="text" id="userSearch" placeholder="<?php echo L('user_search_placeholder'); ?>" style="height: 48px; border: none; background: transparent; width: 100%; padding-left: 10px;">
+                <i class="fa-solid fa-magnifying-glass opacity-50" aria-hidden="true"></i>
+                <input type="text" id="userSearch" placeholder="<?php echo L('user_search_placeholder'); ?>" aria-label="<?php echo L('user_search_placeholder'); ?>" style="height: 48px; border: none; background: transparent; width: 100%; padding-left: 10px;">
             </div>
         </div>
         
@@ -57,10 +59,26 @@
                         <td class="username-cell font-mono text-muted"><?php echo $u->getUsername(); ?></td>
                         <td class="email-cell fs-12 text-muted italic"><?php echo $u->getEmail() ?? '<span class="text-red-light">'.L('user_no_email', true).'</span>'; ?></td>
                         <td>
-                            <span class="status-pill <?php echo strtolower($u->getRol()) === 'admin' ? 'status-active' : 'bg-surface2 text-muted'; ?> p-4-12 tt-uppercase fs-10 font-bold border-none">
-                                <i class="fa-solid <?php echo strtolower($u->getRol()) === 'admin' ? 'fa-shield-halved' : 'fa-user'; ?> mr-4"></i>
-                                <?php echo L('role_' . strtolower($u->getRol())); ?>
-                            </span>
+                            <?php if ($u->getId() !== $_SESSION['usuarioActualTPV']->getId()): ?>
+                                <form method="post" class="m-0 d-inline">
+                                    <input type="hidden" name="idUsuario" value="<?php echo $u->getId(); ?>">
+                                    <input type="hidden" name="cambiarRol" value="1">
+                                    <select name="idRol" class="filter-control w-auto h-36 px-12 fs-12 br-10 font-bold" 
+                                            onchange="this.form.submit()" 
+                                            style="background: var(--surface2); color: var(--text-muted); border: 1px solid var(--border); transition: all 0.2s;">
+                                        <?php foreach ($listaRoles as $r): ?>
+                                            <option value="<?php echo $r['id']; ?>" <?php echo $u->getIdRol() == $r['id'] ? 'selected' : ''; ?>>
+                                                <?php echo L('role_' . strtolower($r['nombre'])); ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </form>
+                            <?php else: ?>
+                                <span class="status-pill <?php echo strtolower($u->getRol()) === 'admin' ? 'status-active' : 'bg-surface2 text-muted'; ?> p-4-12 tt-uppercase fs-10 font-bold border-none shadow-sm">
+                                    <i class="fa-solid <?php echo strtolower($u->getRol()) === 'admin' ? 'fa-shield-halved' : 'fa-user'; ?> mr-4"></i>
+                                    <?php echo L('role_' . strtolower($u->getRol())); ?>
+                                </span>
+                            <?php endif; ?>
                         </td>
                         <td>
                             <span class="status-pill <?php echo $u->getActivo() ? 'status-active' : 'status-inactive'; ?>">
@@ -71,25 +89,10 @@
                             <div class="d-flex gap-8 jc-end ai-center">
                                 <!-- Botón Editar (Nombre/Email) -->
                                 <button onclick="abrirModalEditar(<?php echo $u->getId(); ?>, <?php echo htmlspecialchars(json_encode($u->getNombre())); ?>, <?php echo htmlspecialchars(json_encode($u->getEmail())); ?>)" 
-                                        class="btn-icon" title="<?php echo L('user_tip_edit'); ?>">
-                                    <i class="fa-solid fa-pen"></i>
+                                        class="btn-icon" title="<?php echo L('user_tip_edit'); ?>" aria-label="<?php echo L('user_tip_edit'); ?>">
+                                    <i class="fa-solid fa-pen" aria-hidden="true"></i>
                                 </button>
                                 
-                                <!-- Botón Cambiar Rol (Solo si no es el usuario actual) -->
-                                <?php if ($u->getId() !== $_SESSION['usuarioActualTPV']->getId()): ?>
-                                    <form method="post" class="d-inline">
-                                        <input type="hidden" name="idUsuario" value="<?php echo $u->getId(); ?>">
-                                        <input type="hidden" name="cambiarRol" value="1">
-                                        <select name="idRol" class="filter-control w-auto h-38 px-8 fs-12 br-10" onchange="this.form.submit()">
-                                            <option value="" disabled selected><?php echo L('user_select_rol'); ?></option>
-                                            <?php foreach ($listaRoles as $r): ?>
-                                                <option value="<?php echo $r['id']; ?>" <?php echo $u->getIdRol() == $r['id'] ? 'selected' : ''; ?>>
-                                                    <?php echo L('role_' . strtolower($r['nombre'])); ?>
-                                                </option>
-                                            <?php endforeach; ?>
-                                        </select>
-                                    </form>
-                                <?php endif; ?>
 
                                 <!-- Botón Dar Baja/Alta (Solo si no es el usuario actual) -->
                                 <?php if ($u->getId() !== $_SESSION['usuarioActualTPV']->getId()): ?>
@@ -124,11 +127,11 @@
     </div>
 
     <!-- MODAL AÑADIR USUARIO -->
-    <div class="modal-overlay <?php echo $showModal ? 'visible' : ''; ?>" id="modalAddUser">
+    <div class="modal-overlay <?php echo $showModal ? 'visible' : ''; ?>" id="modalAddUser" role="dialog" aria-modal="true" aria-labelledby="modalAddUserTitle">
         <div class="modal modal-content w-modal-md gap-20" style="max-width: 600px; border-radius: 20px; overflow: hidden; border: 1px solid var(--border); box-shadow: var(--shadow-lg);">
             <div class="modal-header">
-                <h2 class="modal-title fs-18"><?php echo L('user_modal_new_title'); ?></h2>
-                <button onclick="cerrarModalUsuario()" class="btn-close-modal">×</button>
+                <h2 class="modal-title fs-18" id="modalAddUserTitle"><?php echo L('user_modal_new_title'); ?></h2>
+                <button onclick="cerrarModalUsuario()" class="btn-close-modal" aria-label="<?php echo L('modal_cancel'); ?>">×</button>
             </div>
             <form method="post" class="form-grid gap-15" novalidate>
                 <div class="form-group">
@@ -182,11 +185,11 @@
     </div>
 
     <!-- MODAL EDITAR USUARIO -->
-    <div class="modal-overlay" id="modalEditUser">
+    <div class="modal-overlay" id="modalEditUser" role="dialog" aria-modal="true" aria-labelledby="modalEditUserTitle">
         <div class="modal modal-content w-modal-md gap-20" style="max-width: 500px; border-radius: 20px;">
             <div class="modal-header">
-                <h2 class="modal-title fs-18"><?php echo L('user_modal_edit_title'); ?></h2>
-                <button onclick="cerrarModalEditar()" class="btn-close-modal">×</button>
+                <h2 class="modal-title fs-18" id="modalEditUserTitle"><?php echo L('user_modal_edit_title'); ?></h2>
+                <button onclick="cerrarModalEditar()" class="btn-close-modal" aria-label="<?php echo L('modal_cancel'); ?>">×</button>
             </div>
             <form method="post" action="index.php?irUsuarios=1" class="form-grid gap-20">
                 <input type="hidden" name="idUsuario" id="edit_idUsuario">

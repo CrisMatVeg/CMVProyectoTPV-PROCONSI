@@ -11,9 +11,12 @@ class Proveedor
     private $aplica_re;
     private $notas;
     private $activo;
+    private $condiciones_pago;
+    private $plazo_entrega;
+    private $vencimiento_dias;
     private $fecha_alta;
 
-    public function __construct($id, $cif_nif, $nombre, $direccion, $telefono, $email, $aplica_re, $notas, $activo, $fecha_alta)
+    public function __construct($id, $cif_nif, $nombre, $direccion, $telefono, $email, $aplica_re, $notas, $activo, $condiciones_pago, $plazo_entrega, $vencimiento_dias, $fecha_alta)
     {
         $this->id = $id;
         $this->cif_nif = $cif_nif;
@@ -24,6 +27,9 @@ class Proveedor
         $this->aplica_re = $aplica_re;
         $this->notas = $notas;
         $this->activo = $activo;
+        $this->condiciones_pago = $condiciones_pago;
+        $this->plazo_entrega = $plazo_entrega;
+        $this->vencimiento_dias = $vencimiento_dias;
         $this->fecha_alta = $fecha_alta;
     }
 
@@ -62,6 +68,18 @@ class Proveedor
     public function getActivo()
     {
         return $this->activo;
+    }
+    public function getCondicionesPago()
+    {
+        return $this->condiciones_pago;
+    }
+    public function getPlazoEntrega()
+    {
+        return $this->plazo_entrega;
+    }
+    public function getVencimientoDias()
+    {
+        return $this->vencimiento_dias;
     }
     public function getFechaAlta()
     {

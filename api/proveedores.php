@@ -40,7 +40,10 @@ try {
                     'email' => $proveedor->getEmail(),
                     'aplica_re' => $proveedor->getAplicaRe(),
                     'notas' => $proveedor->getNotas(),
-                    'activo' => $proveedor->getActivo()
+                    'activo' => $proveedor->getActivo(),
+                    'condiciones_pago' => $proveedor->getCondicionesPago(),
+                    'plazo_entrega' => $proveedor->getPlazoEntrega(),
+                    'vencimiento_dias' => $proveedor->getVencimientoDias()
                 ] : null]);
             } else {
                 $proveedores = ProveedorPDO::listarTodos(isset($_GET['soloActivos']) ? ($_GET['soloActivos'] === 'true') : true);
@@ -54,7 +57,10 @@ try {
                         'telefono' => $p->getTelefono(),
                         'email' => $p->getEmail(),
                         'aplica_re' => $p->getAplicaRe(),
-                        'activo' => $p->getActivo()
+                        'activo' => $p->getActivo(),
+                        'condiciones_pago' => $p->getCondicionesPago(),
+                        'plazo_entrega' => $p->getPlazoEntrega(),
+                        'vencimiento_dias' => $p->getVencimientoDias()
                     ];
                 }
                 echo json_encode(['ok' => true, 'proveedores' => $res]);
@@ -83,14 +89,20 @@ try {
                     $data['id'], $data['cif_nif'], $data['nombre'],
                     $data['direccion'] ?? '', $data['telefono'] ?? '',
                     $data['email'] ?? '', $data['aplica_re'] ?? false,
-                    $data['notas'] ?? '', $data['activo'] ?? true
+                    $data['notas'] ?? '', $data['activo'] ?? true,
+                    $data['condiciones_pago'] ?? null,
+                    $data['plazo_entrega'] ?? null,
+                    $data['vencimiento_dias'] ?? 0
                 );
                 echo json_encode(['ok' => true, 'success' => $success]);
             } else {
                 $id = ProveedorPDO::añadirProveedor(
                     $data['cif_nif'], $data['nombre'], $data['direccion'] ?? '',
                     $data['telefono'] ?? '', $data['email'] ?? '',
-                    $data['aplica_re'] ?? false, $data['notas'] ?? ''
+                    $data['aplica_re'] ?? false, $data['notas'] ?? '',
+                    $data['condiciones_pago'] ?? null,
+                    $data['plazo_entrega'] ?? null,
+                    $data['vencimiento_dias'] ?? 0
                 );
                 echo json_encode(['ok' => true, 'success' => (bool)$id, 'id' => $id]);
             }

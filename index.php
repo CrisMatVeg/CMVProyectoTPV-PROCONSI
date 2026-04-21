@@ -52,14 +52,22 @@ if (isset($_SESSION['usuarioActualTPV'])) {
         if (!empty($pendientes)) {
             $_SESSION['mensajeErrorCaja'] = "No puedes abrir un nuevo turno porque existen arqueos pendientes de d&iacute;as anteriores. Por favor, resu&eacute;lvelos primero.";
         } else {
-            $fondoInicial = max(0, (float)($_POST['fondoInicial'] ?? 0));
-            CajaTurnoPDO::abrirTurno($_SESSION['usuarioActualTPV']->getId(), $fondoInicial);
-            LogPDO::addLog('APERTURA_CAJA', "Apertura de caja con fondo inicial de " . number_format($fondoInicial, 2, ',', '.') . "€");
+            $fondoInicial = (float)($_POST['fondoInicial'] ?? 0);
+            
+            if ($fondoInicial <= 0) {
+                $_SESSION['mensajeErrorCaja'] = L('cash_open_error_zero');
+                $_SESSION['paginaEnCurso'] = 'inicioPrivado';
+                header('Location: index.php');
+                exit;
+            } else {
+                CajaTurnoPDO::abrirTurno($_SESSION['usuarioActualTPV']->getId(), $fondoInicial);
+                LogPDO::addLog('APERTURA_CAJA', "Apertura de caja con fondo inicial de " . number_format($fondoInicial, 2, ',', '.') . "€");
 
-            // [NUEVO] Redirigir explícitamente al TPV tras abrir la caja para evitar quedarse en el Dashboard
-            $_SESSION['paginaEnCurso'] = 'inicioPrivado';
-            header('Location: index.php');
-            exit;
+                // [NUEVO] Redirigir explícitamente al TPV tras abrir la caja para evitar quedarse en el Dashboard
+                $_SESSION['paginaEnCurso'] = 'inicioPrivado';
+                header('Location: index.php');
+                exit;
+            }
         }
     }
 

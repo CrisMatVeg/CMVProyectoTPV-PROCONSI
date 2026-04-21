@@ -7,9 +7,9 @@
     <meta name="csrf-token" content="<?= $_SESSION['csrf_token'] ?? '' ?>" />
     <title>TPV · ElectroBazar</title>
     <link rel="icon" type="image/x-icon" href="./favicon.ico">
-    <link rel="stylesheet" href="./webroot/css/estilos.css?v=2" />
-    <link rel="stylesheet" href="./webroot/css/components.css?v=2" />
-    <link rel="stylesheet" href="./webroot/css/app.css?v=2" />
+    <link rel="stylesheet" href="./webroot/css/estilos.css?v=40" />
+    <link rel="stylesheet" href="./webroot/css/components.css?v=46" />
+    <link rel="stylesheet" href="./webroot/css/app.css?v=46" />
     <!-- Generación de PDF en cliente -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <link rel="stylesheet" href="./webroot/css/fonts.css" />
@@ -55,12 +55,13 @@
     }
     ?>
     <script>
-        const IS_ADMIN_BACKEND = <?php echo json_encode(isset($avInicioPrivado['esAdmin']) && $avInicioPrivado['esAdmin']); ?>;
-        const DB_PRODUCTS = <?php echo json_encode($avInicioPrivado['productos'] ?? []); ?>;
-        const DB_PROMOS = <?php echo json_encode($avInicioPrivado['promos'] ?? []); ?>;
-        const CAJERO_NOMBRE = <?php echo json_encode($avInicioPrivado['nombre_completo'] ?? (isset($_SESSION['usuarioActualTPV']) ? $_SESSION['usuarioActualTPV']->getNombreCompleto() : '')); ?>;
-        const IS_TPV = <?php echo json_encode(isset($_SESSION['paginaEnCurso']) && $_SESSION['paginaEnCurso'] === 'inicioPrivado'); ?>;
-        const CAJA_ABIERTA = <?php echo json_encode($_SESSION['cajaAbierta'] ?? false); ?>;
+        window.IS_ADMIN_BACKEND = <?php echo json_encode(isset($avInicioPrivado['esAdmin']) && $avInicioPrivado['esAdmin']); ?>;
+        window.DB_PRODUCTS = <?php echo json_encode($avInicioPrivado['productos'] ?? []); ?>;
+        window.DB_PROMOS = <?php echo json_encode($avInicioPrivado['promos'] ?? []); ?>;
+        window.USER_ROLE = <?php echo json_encode($avInicioPrivado['rol'] ?? ''); ?>;
+        window.CAJERO_NOMBRE = <?php echo json_encode($avInicioPrivado['nombre_completo'] ?? (isset($_SESSION['usuarioActualTPV']) ? $_SESSION['usuarioActualTPV']->getNombreCompleto() : '')); ?>;
+        window.IS_TPV = <?php echo json_encode(isset($_SESSION['paginaEnCurso']) && $_SESSION['paginaEnCurso'] === 'inicioPrivado'); ?>;
+        window.CAJA_ABIERTA = <?php echo json_encode($_SESSION['cajaAbierta'] ?? false); ?>;
         const ESC_POS_ENABLED = true;
         const USER_THEME_MODE = <?php echo json_encode($themeMode); ?>;
         const USER_THEME_ACCENT = <?php echo json_encode($themeAccent); ?>;
@@ -128,7 +129,8 @@
             pointsInvalidAmount: "<?php echo L('points_invalid_amount', true); ?>",
             pointsRedeemedLabel: "<?php echo L('points_redeemed_label', true); ?>",
             customDescError: "<?php echo L('tpv_custom_desc_error', true); ?>",
-            customPriceError: "<?php echo L('tpv_custom_price_error', true); ?>"
+            customPriceError: "<?php echo L('tpv_custom_price_error', true); ?>",
+            stock: "<?php echo L('tpv_stock', true); ?>"
         };
 
         // Global Fetch Wrapper for CSRF Protection
@@ -505,7 +507,8 @@
                     display: flex !important;
                     flex-wrap: nowrap !important;
                     gap: 8px !important;
-                    padding: 16px !important;
+                    padding: 16px 16px 45px 16px !important;
+                    box-sizing: border-box !important;
                     justify-content: center !important;
                     align-items: stretch !important;
                     background: var(--surface);
@@ -551,8 +554,9 @@
                     <span>PDF</span>
                 </button>
                 
-                <button id="btnAnularTicket" class="btn-secondary btn-tk-action" style="background: var(--red-light); color: var(--red); border-color: var(--red); display: none;">
-                    <i class="fa-solid fa-ban"></i>
+                <button id="btnAnularTicket" class="btn-secondary btn-tk-action" style="background: var(--red-light); color: var(--red); border-color: var(--red); display: none;" title="<?php echo L('ticket_btn_void'); ?>">
+                    <i class="fa-solid fa-arrow-rotate-left"></i>
+                    <span><?php echo L('ticket_btn_void'); ?></span>
                 </button>
                 
                 <button id="btnNuevaVenta" onclick="nuevaVenta()" class="btn-save btn-tk-action fw-700">
@@ -711,9 +715,15 @@
                 <select id="returnReason" class="form-input mb-8">
                     <option value="Defectuoso"><?php echo L('return_reason_defective'); ?></option>
                     <option value="Garantía"><?php echo L('return_reason_warranty'); ?></option>
-                    <option value="Error Cliente"><?php echo L('return_reason_error'); ?></option>
+                    <option value="Error de Facturación"><?php echo L('return_reason_error'); ?></option>
                     <option value="Otro"><?php echo L('return_reason_other'); ?></option>
                 </select>
+                
+                <div class="d-flex ai-center gap-8 mb-12 p-8 br-8 bg-surface2 border-1" style="border-style: dashed;">
+                    <input type="checkbox" id="returnReponerStock" checked style="width: 18px; height: 18px; cursor: pointer;">
+                    <label for="returnReponerStock" class="fs-12 fw-600 cp"><?php echo L('return_label_reponer_stock'); ?></label>
+                </div>
+
                 <textarea id="returnNote" class="form-input fs-12" placeholder="<?php echo L('client_comments_placeholder', true); ?>" rows="2"></textarea>
             </div>
 
@@ -890,8 +900,10 @@
     </style>
     <script src="./webroot/js/validaciones.js?v=2"></script>
     <script src="./webroot/js/utils_global.js?v=16"></script>
-    <script src="./webroot/js/main.js?v=31"></script>
-    <script src="./webroot/js/pagination.js?v=1"></script>
+    <?php if (isset($_SESSION['usuarioActualTPV']) && ($_SESSION['paginaEnCurso'] ?? '') !== 'Login'): ?>
+        <script src="./webroot/js/main.js?v=45"></script>
+        <script src="./webroot/js/app.js?v=44" type="module"></script>
+    <?php endif; ?>
     <!-- SISTEMA DE MODALES GLOBALES (ALERTAS Y CONFIRMACIONES) -->
     <div class="modal-overlay" id="globalAlertModal" style="z-index: 15000;">
         <div class="modal modal-content gap-16 ai-center w-400 text-center p-32">
@@ -1089,8 +1101,8 @@
             }
         }
     </script>
-    <?php if (isset($_SESSION['paginaEnCurso']) && $_SESSION['paginaEnCurso'] === 'inicioPrivado'): ?>
-        <script type="module" src="./webroot/js/app.js?v=16"></script>
+    <?php if (isset($_SESSION['paginaEnCurso']) && strtolower($_SESSION['paginaEnCurso']) === 'inicioprivado'): ?>
+        <script type="module" src="./webroot/js/app.js?v=33"></script>
     <?php endif; ?>
 </body>
 

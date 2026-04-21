@@ -46,18 +46,20 @@
 <div class="main-full p-24">
     <!-- CABECERA -->
     <div class="section-header container-wider">
-        <div class="section-title">
-            <div class="d-flex ai-center gap-12 mb-4">
-                <i class="fa-solid fa-chart-line text-accent fs-32"></i>
-                <h1 class="m-0 fs-28"><?php echo L('analytics_title'); ?></h1>
+        <div class="d-flex ai-center gap-16">
+            <a href="index.php?irDashboard=1" class="btn-prominent-back compact" title="<?php echo L('login_back'); ?>">
+                <i class="fa-solid fa-chevron-left"></i>
+                <span><?php echo L('login_back'); ?></span>
+            </a>
+            <div class="vr" style="height: 32px; width: 1px; background: var(--border); opacity: 0.5;"></div>
+            <div class="section-title">
+                <div class="d-flex ai-center gap-12 mb-4">
+                    <i class="fa-solid fa-chart-line text-accent fs-32"></i>
+                    <h1 class="m-0 fs-28"><?php echo L('analytics_title'); ?></h1>
+                </div>
+                <p class="text-muted fs-14"><?php echo L('analytics_subtitle'); ?></p>
             </div>
-            <p class="text-muted fs-14"><?php echo L('analytics_subtitle'); ?></p>
         </div>
-        <form method="post">
-            <button type="submit" name="volver" class="btn-back">
-                <i class="fa-solid fa-arrow-left mr-8"></i> <?php echo L('analytics_btn_back'); ?>
-            </button>
-        </form>
     </div>
     
     <!-- BANNER DE OPTIMIZACIÓN -->

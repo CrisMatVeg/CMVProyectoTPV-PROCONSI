@@ -2,16 +2,21 @@
 
     <!-- CABECERA DE SECCIÓN -->
     <div class="section-header container-wider">
-        <div class="section-title">
-            <h1><?php echo L('dashboard_btn_providers'); ?></h1>
-            <p><?php echo L('dashboard_btn_providers_sub'); ?></p>
+        <div class="d-flex ai-center gap-16">
+            <a href="index.php?irDashboard=1" class="btn-prominent-back compact" title="<?php echo L('login_back'); ?>">
+                <i class="fa-solid fa-chevron-left"></i>
+                <span><?php echo L('login_back'); ?></span>
+            </a>
+            <div class="vr" style="height: 32px; width: 1px; background: var(--border); opacity: 0.5;"></div>
+            <div class="section-title">
+                <h1><?php echo L('dashboard_btn_providers'); ?></h1>
+                <p><?php echo L('dashboard_btn_providers_sub'); ?></p>
+            </div>
         </div>
         <div class="d-flex gap-12 ai-center">
-            <a href="index.php?irDashboard=1" class="btn-back">
-                <?php echo L('login_back'); ?>
-            </a>
             <button onclick="abrirModalProveedor()" class="btn-add">
                 <i class="fa-solid fa-truck-field"></i> <?php echo L('prov_btn_new'); ?>
+            </button>
         </div>
     </div>
 
@@ -78,6 +83,9 @@
                             </td>
                             <td class="text-center">
                                 <div class="d-flex jc-center gap-8 pr-20">
+                                    <button class="btn-icon" onclick='verHistorialProveedor(<?php echo json_encode($p); ?>)' title="<?php echo L('prov_btn_history'); ?>" style="color: var(--accent);">
+                                        <i class="fa-solid fa-clock-rotate-left"></i>
+                                    </button>
                                     <button class="btn-icon" onclick='editarProveedor(<?php echo json_encode($p); ?>)' title="<?php echo L('user_tip_edit'); ?>">
                                         <i class="fa-solid fa-pen"></i>
                                     </button>
@@ -132,6 +140,21 @@
                     <div class="form-group">
                         <label class="form-label"><?php echo L('prov_label_email'); ?></label>
                         <input type="email" id="provEmail" class="form-input" placeholder="<?php echo L('prov_placeholder_email'); ?>">
+                    </div>
+
+                    <div class="d-grid grid-3 gap-16">
+                        <div class="form-group">
+                            <label class="form-label"><?php echo L('prov_label_pay_cond'); ?></label>
+                            <input type="text" id="provCondicionesPago" class="form-input" placeholder="<?php echo L('prov_placeholder_pay_cond'); ?>">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label"><?php echo L('prov_label_delivery_term'); ?></label>
+                            <input type="text" id="provPlazoEntrega" class="form-input" placeholder="<?php echo L('prov_placeholder_delivery_term'); ?>">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label"><?php echo L('prov_label_due_days'); ?></label>
+                            <input type="number" id="provVencimientoDias" class="form-input" min="0" placeholder="<?php echo L('prov_placeholder_due_days'); ?>">
+                        </div>
                     </div>
  
                     <div class="form-group">
@@ -204,6 +227,39 @@
     </div>
 </div>
 
+<!-- MODAL HISTORIAL DE PEDIDOS -->
+<div id="modalHistorial" class="modal-overlay-bg">
+    <div class="modal-content w-modal-lg" style="max-width: 1000px; border-radius: 20px; overflow: hidden; display: flex; flex-direction: column; max-height: 90vh; border: 1px solid var(--border); box-shadow: var(--shadow-lg);">
+        <div class="modal-header">
+            <h2 id="modalHistorialTitle"><?php echo L('prov_modal_history_title'); ?></h2>
+            <button class="btn-close-modal" onclick="cerrarModalHistorial()">&times;</button>
+        </div>
+        
+        <div class="flex-1 overflow-auto p-24 bg-surface2">
+            <div class="table-container m-0 border br-12 overflow-hidden bg-white">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th class="pl-20"><?php echo L('purchase_th_albaran'); ?></th>
+                            <th><?php echo L('purchase_th_invoice_date'); ?></th>
+                            <th class="text-right"><?php echo L('purchase_total_albaran'); ?></th>
+                            <th class="text-center"><?php echo L('prod_th_status'); ?></th>
+                            <th class="text-center pr-20"><?php echo L('prod_th_actions'); ?></th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbodyHistorial">
+                        <!-- Historial cargado aquí -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div class="modal-footer p-16 bg-surface1 border-top">
+            <button type="button" class="btn-cancel" onclick="cerrarModalHistorial()"><?php echo L('modal_cancel'); ?></button>
+        </div>
+    </div>
+</div>
+
 <script>
     function filtrarProveedores() {
         const term = document.getElementById('provSearch').value.toLowerCase().trim();
@@ -219,6 +275,9 @@
     function abrirModalProveedor() {
         document.getElementById('formProveedor').reset();
         document.getElementById('provId').value = '';
+        document.getElementById('provCondicionesPago').value = '';
+        document.getElementById('provPlazoEntrega').value = '';
+        document.getElementById('provVencimientoDias').value = '0';
         document.getElementById('modalProveedorTitle').innerText = "<?php echo L('prov_modal_new_title'); ?>";
         document.getElementById('divProvActivo').style.display = 'none';
         document.getElementById('tabBtnProductos').style.display = 'none';
@@ -240,7 +299,9 @@
         document.getElementById('provTel').value = p.telefono;
         document.getElementById('provEmail').value = p.email;
         document.getElementById('provDireccion').value = p.direccion;
-        // document.getElementById('provRE').checked = p.aplica_re == 1; // Ya no se usa toggle
+        document.getElementById('provCondicionesPago').value = p.condiciones_pago || '';
+        document.getElementById('provPlazoEntrega').value = p.plazo_entrega || '';
+        document.getElementById('provVencimientoDias').value = p.vencimiento_dias || 0;
         document.getElementById('provActivo').checked = p.activo == 1;
         document.getElementById('divProvActivo').style.display = 'flex';
         document.getElementById('modalProveedorTitle').innerText = "<?php echo L('prov_modal_edit_title'); ?>: " + p.nombre;
@@ -430,6 +491,9 @@
             telefono: document.getElementById('provTel').value,
             email: document.getElementById('provEmail').value,
             direccion: document.getElementById('provDireccion').value,
+            condiciones_pago: document.getElementById('provCondicionesPago').value,
+            plazo_entrega: document.getElementById('provPlazoEntrega').value,
+            vencimiento_dias: parseInt(document.getElementById('provVencimientoDias').value) || 0,
             aplica_re: 1, // Siempre aplicado
             activo: document.getElementById('provActivo').checked ? 1 : 0
         };
@@ -458,5 +522,49 @@
         } catch (err) {
             showCustomAlert("<?php echo L('prod_js_error'); ?>", "<?php echo L('prod_js_error'); ?>", 'error');
         }
+    }
+
+    async function verHistorialProveedor(p) {
+        document.getElementById('modalHistorialTitle').innerText = "<?php echo L('prov_modal_history_title'); ?> " + p.nombre;
+        const tbody = document.getElementById('tbodyHistorial');
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center p-20"><?php echo L('loading'); ?></td></tr>';
+        document.getElementById('modalHistorial').style.display = 'flex';
+
+        try {
+            const res = await fetch(`api/compras.php?type=albaranes&proveedor_id=${p.id}`);
+            const data = await res.json();
+            
+            if (data && data.length > 0) {
+                tbody.innerHTML = '';
+                data.forEach(a => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td class="pl-20 font-bold">${a.numero_albaran}</td>
+                        <td>${a.fecha}</td>
+                        <td class="text-right font-mono">${parseFloat(a.total || 0).toFixed(2)}€</td>
+                        <td class="text-center">
+                            <span class="status-pill status-${a.estado === 'facturado' ? 'active' : 'pending'}">
+                                ${a.estado.charAt(0).toUpperCase() + a.estado.slice(1)}
+                            </span>
+                        </td>
+                        <td class="text-center pr-20">
+                            <button class="btn-icon" onclick="window.location.href='index.php?irCompras=1&id_albaran=${a.id}'" title="<?php echo L('purchase_modal_details_title'); ?>">
+                                <i class="fa-solid fa-eye"></i>
+                            </button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } else {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center p-40 text-muted"><?php echo L('purchase_no_albaranes'); ?></td></tr>';
+            }
+        } catch (err) {
+            console.error(err);
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-red p-20"><?php echo L('prod_js_error'); ?></td></tr>';
+        }
+    }
+
+    function cerrarModalHistorial() {
+        document.getElementById('modalHistorial').style.display = 'none';
     }
 </script>

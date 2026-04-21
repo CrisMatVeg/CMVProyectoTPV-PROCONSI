@@ -31,19 +31,29 @@ try {
     $accion = $input['accion'] ?? '';
     $motivo = trim($input['motivo'] ?? 'Devolución estándar');
     $metodo = $input['metodoReembolso'] ?? 'efectivo';
+    $reponerStock = (bool)($input['reponerStock'] ?? true);
 
     if (!in_array($metodo, ['efectivo', 'vale', 'reemplazo'])) {
         $metodo = 'efectivo';
     }
 
     // ── Validación de plazos ──────────────────────────────────────────────────
-    $validarPlazos = function (string $fechaVenta, int $mesesGarantia, string $metodo) {
+    $validarPlazos = function (string $fechaVenta, int $mesesGarantia, string $metodo, string $motivo) {
         $fechaVentaTs   = strtotime($fechaVenta);
         $diasDiferencia = (time() - $fechaVentaTs) / (60 * 60 * 24);
 
         if ($metodo === 'efectivo' || $metodo === 'vale') {
-            if ($diasDiferencia > 30) {
-                throw new Exception("El plazo para reembolsos (30 días) ha expirado. Solo se permite el cambio por garantía si el producto tiene fallos.");
+            // Si el motivo es Error de Facturación/Rectificativa, el plazo es de 4 años (1460 días approx)
+            // Para cualquier otro motivo de devolución comercial se mantiene en 30 días
+            $esRectificativa = (strpos(strtolower($motivo), 'facturaci') !== false || strpos(strtolower($motivo), 'rectificativa') !== false);
+            $plazoMaximo = $esRectificativa ? 1460 : 30;
+
+            if ($diasDiferencia > $plazoMaximo) {
+                if ($esRectificativa) {
+                    throw new Exception("El plazo legal para rectificaciones fiscales (4 años) ha expirado.");
+                } else {
+                    throw new Exception("El plazo para devoluciones comerciales (30 días) ha expirado. Si se trata de un error de facturación, seleccione dicho motivo para realizar la rectificativa fiscal.");
+                }
             }
         }
         if ($metodo === 'reemplazo') {
@@ -117,7 +127,7 @@ try {
         }
 
 
-        $validarPlazos($l['fecha_venta'], (int)$l['meses_garantia'], $metodo);
+        $validarPlazos($l['fecha_venta'], (int)$l['meses_garantia'], $metodo, $motivo);
 
         $importeDevolucion = round($cantidad * (float)$l['precio_unitario'], 2);
         if ($metodo === 'efectivo' && $importeDevolucion > $efectivoDisponible + 0.009) {
@@ -130,7 +140,8 @@ try {
             [['id_linea' => $idLinea, 'cantidad' => $cantidad]],
             $motivo,
             $metodo,
-            $idUsuario
+            $idUsuario,
+            $reponerStock
         );
 
         LogPDO::addLog('ABONO_GENERADO', "Abono #$numAbono generado: $cantidad uds de línea #$idLinea ($importeDevolucion€) - Motivo: $motivo");
@@ -163,7 +174,7 @@ try {
             $venta['id_cliente'] = $nuevo_id_cliente;
         }
 
-        if ($metodo !== 'reemplazo') $validarPlazos($venta['fecha'], 36, $metodo);
+        if ($metodo !== 'reemplazo') $validarPlazos($venta['fecha'], 36, $metodo, $motivo);
         if ($metodo === 'saldo_cliente' && empty($venta['id_cliente'])) {
             throw new Exception('Venta anónima. No se puede reembolsar al saldo.');
         }
@@ -198,7 +209,8 @@ try {
             $lineasADevolver,
             $motivo,
             $metodo,
-            $idUsuario
+            $idUsuario,
+            $reponerStock
         );
 
         LogPDO::addLog('ABONO_GENERADO', "Abono #$numAbono (anulación completa ticket #$numTicket, $importeTotalDevolver€) - Motivo: $motivo");

@@ -34,7 +34,8 @@ if (isset($_POST['guardarConfiguracion'])) {
             'empresa_telefono', 'empresa_email', 'empresa_web', 'empresa_registro',
             'social_instagram', 'social_facebook', 'ticket_pie_pagina', 'ticket_politica',
             'smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_secure',
-            'empresa_aplica_re'
+            'empresa_aplica_re',
+            'verifactu_productor_nombre', 'verifactu_productor_nif', 'verifactu_id_sistema', 'verifactu_version_sistema'
         ];
 
         $configuracionesAGuardar = [];
@@ -97,7 +98,11 @@ $campos = [
     'smtp_user',
     'smtp_pass',
     'smtp_secure',
-    'empresa_aplica_re'
+    'empresa_aplica_re',
+    'verifactu_productor_nombre',
+    'verifactu_productor_nif',
+    'verifactu_id_sistema',
+    'verifactu_version_sistema'
 ];
 
 $avConfig = [];

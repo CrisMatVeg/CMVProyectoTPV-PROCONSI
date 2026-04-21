@@ -4,6 +4,7 @@ $translations = [
     'menu_tpv' => 'TPV',
     'menu_perfil' => 'Profil',
     'menu_caja' => 'Caisse',
+    'menu_usuarios' => 'Utilisateurs',
     'menu_salir' => 'Déconnexion',
     'label_cajero' => 'Caissier',
     'label_abierta' => 'OUVERTE',
@@ -61,7 +62,7 @@ $translations = [
     'tpv_clear' => 'Vider',
     'tpv_empty_cart' => 'Ajouter des produits',
     'tpv_empty_cart_sub' => 'à la commande',
-    'tpv_subtotal' => 'Sous-total (Hors Taxes)',
+    'tpv_subtotal' => 'Sous-total',
     'tpv_discount' => 'Remise',
     'tpv_total' => 'Total',
     'tpv_payment_method' => 'Mode de paiement',
@@ -97,6 +98,7 @@ $translations = [
     'tpv_custom_price' => 'PVP (Taxes incl.)',
     'tpv_custom_desc_error' => 'Entrez une description',
     'tpv_custom_price_error' => 'Entrez un prix valide',
+    'tpv_error_insufficient_cash' => 'Fonds insuffisants dans le tiroir pour cette opération.',
     'modal_add_item' => 'Ajouter à la commande',
 
     // Modals
@@ -128,6 +130,7 @@ $translations = [
     'cash_open_btn_resolve' => 'Résoudre clôtures',
     'cash_open_label_initial' => 'Fond de caisse (€)',
     'cash_open_btn_open' => 'Ouvrir la caisse',
+    'cash_open_error_zero' => 'Il est obligatoire de saisir un fonds initial supérieur à 0.00€ pour ouvrir la caisse.',
 
     // Client Modal
     'client_type_title' => 'Type de client ?',
@@ -304,6 +307,10 @@ $translations = [
     'prod_modal_pill_tariff' => 'TARIF',
     'prod_modal_pill_promo' => 'PROMO',
     'prod_modal_tab_tarifas_none' => 'Pas de tarifs ou promos actifs pour ce produit.',
+    'prod_modal_cost_history_none' => 'Pas de mouvements d\'achat ou d\'entrée enregistrés.',
+    'prod_modal_label_tags' => 'Étiquettes / Tags',
+    'prod_modal_tags_placeholder' => 'Appuyez sur Entrée pour ajouter...',
+    'prod_modal_tags_help' => 'Ajoutez des tags pour le classement (ex: Nouveau, Saison).',
 
     // Packs
     'prod_modal_pack_title_new' => 'Nouveau Pack de Vente',
@@ -486,10 +493,14 @@ $translations = [
     'roles_label_perms' => 'Permissions activées',
     'roles_perm_key' => 'Clé',
     'roles_btn_save' => 'Enregistrer la configuration',
+    'roles_btn_new' => 'Nouveau Rôle',
+    'roles_btn_clear' => 'Effacer / Nouveau',
     'roles_js_edit_title' => 'Modifier le rôle',
 
     // Role Names
     'role_admin' => 'Administrateur',
+    'role_administrador' => 'Administrateur',
+    'role_encargado' => 'Responsable',
     'role_superadmin' => 'Super Administrateur',
     'role_cajero' => 'Caissier',
     'role_dependiente' => 'Vendeur',
@@ -498,6 +509,10 @@ $translations = [
 
     // Role Descriptions
     'role_admin_desc' => 'Accès total à toutes les fonctions.',
+    'role_administrador_desc' => 'Accès total à toutes les fonctions.',
+    'role_superadmin_desc' => 'Contrôle total du système et configuration avancée.',
+    'role_encargado_desc' => 'Gestion du personnel, clôtures de caisse et contrôle des stocks.',
+    'role_supervisor_desc' => 'Supervision des ventes et autorisations spéciales TPV.',
     'role_cajero_desc' => 'Permissions basiques pour les ventes et la caisse.',
     'role_dependiente_desc' => 'Accès limité aux ventes et consultations.',
     'role_user_desc' => 'Accès en lecture seule.',
@@ -508,15 +523,17 @@ $translations = [
     'perm_gestionar_productos' => 'Gestion des produits',
     'perm_gestionar_clientes' => 'Gestion des clients',
     'perm_gestionar_configuracion' => 'Configuration du système',
+    'perm_aplicar_descuentos' => 'Appliquer des remises',
+    'perm_gestionar_devoluciones' => 'Gérer les retours',
+    'perm_anular_ventas' => 'Annuler des ventes / tickets',
+    'perm_ver_costes' => 'Voir les coûts et marges',
+    'perm_gestionar_proveedores' => 'Gérer les fournisseurs',
+    'perm_gestionar_inventario' => 'Gérer l\'inventaire',
+    'perm_gestionar_gastos' => 'Gérer les dépenses',
     'perm_ver_analitica' => 'Voir analyses et rapports',
     'perm_apertura_caja' => 'Ouverture de caisse',
     'perm_cerrar_caja' => 'Clôture de caisse',
-    'perm_devoluciones' => 'Gérer les retours',
-    'perm_tickets' => 'Gestion des tickets et factures',
-    'perm_tarifas' => 'Gestion des tarifs et prix',
-    'perm_proveedores' => 'Gestion des fournisseurs',
-    'perm_usuarios' => 'Gestion des utilisateurs et rôles',
-    'perm_compras' => 'Gestion des achats',
+    'perm_gestionar_usuarios' => 'Gestion des utilisateurs et rôles',
     'perm_ver_historial' => 'Voir ventes passées',
 
     // Providers
@@ -1333,6 +1350,7 @@ $translations = [
     'tpv_amount_to_add' => 'Montant à ajouter',
     'tpv_add' => 'AJOUTER',
     'tpv_change_to_return' => 'Rendre la monnaie',
+    'tpv_amount_received' => 'Montant Reçu (€)',
     'tpv_payment_deadline' => 'Date limite de paiement',
     'tpv_select_client_to_owe' => 'SÉLECTIONNEZ UN CLIENT POUR FAIRE CRÉDIT',
     'client_search_socio_placeholder' => 'DNI ou Nom du membre...',

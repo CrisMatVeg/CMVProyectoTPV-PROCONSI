@@ -31,31 +31,9 @@ class EntradaStockPDO
         string $notas = '',
         ?PDO $db = null
     ): array {
-        // Auto-migración: asegurar que la tabla entradas_stock existe
-        static $tablaCreada = false;
-        if (!$tablaCreada) {
-            try {
-                // Crear tabla si no existe
-                DBPDO::ejecutarConsulta("CREATE TABLE IF NOT EXISTS entradas_stock (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    id_producto INT NOT NULL,
-                    cantidad INT NOT NULL,
-                    precio_coste DECIMAL(10,4) NOT NULL DEFAULT 0,
-                    cmp_anterior DECIMAL(10,4) NOT NULL DEFAULT 0,
-                    cmp_resultante DECIMAL(10,4) NOT NULL DEFAULT 0,
-                    stock_anterior INT NOT NULL DEFAULT 0,
-                    stock_nuevo INT NOT NULL DEFAULT 0,
-                    id_usuario INT DEFAULT NULL,
-                    notas TEXT DEFAULT NULL,
-                    fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    INDEX idx_producto (id_producto)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        // [REMOVIDO] No ejecutar DDL en runtime para evitar implicit commits.
+        // La tabla entradas_stock debe existir previamente asegurada por scripts SQL.
 
-            } catch (\Throwable $e) {
-                error_log("EntradaStockPDO: Error auto-migrando tabla entradas_stock: " . $e->getMessage());
-            }
-            $tablaCreada = true;
-        }
 
         // 1. Obtener stock y CMP actuales del producto
         $sqlProd = "SELECT p.precio_coste, p.stock_actual, p.precio_venta, p.margen

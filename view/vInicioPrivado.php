@@ -7,14 +7,14 @@
                 <input
                     type="text"
                     id="searchInput"
-                    oninput="handleSearch(this.value)"
+                    oninput="app.handleSearch(this.value)"
                     placeholder="<?php echo L('tpv_search_placeholder'); ?>" />
             </div>
-            <button onclick="toggleAdvancedFilters()" class="btn-filter-toggle p-10 br-10 bg-surface border-2 cursor-pointer transition-all" title="<?php echo L('tpv_filters_advanced'); ?>">
-                <i class="fa-solid fa-filter"></i>
+            <button onclick="app.toggleAdvancedFilters()" class="btn-filter-toggle p-10 br-10 bg-surface border-2 cursor-pointer transition-all" title="<?php echo L('tpv_filters_advanced'); ?>" aria-label="<?php echo L('tpv_filters_advanced'); ?>" aria-expanded="false" aria-controls="advancedFilters" id="btnAdvancedFilters">
+                <i class="fa-solid fa-filter" aria-hidden="true"></i>
             </button>
-            <button onclick="abrirModalComodin()" class="btn-filter-toggle p-10 br-10 bg-accent text-white border-2 border-accent cursor-pointer transition-all" title="<?php echo L('tpv_add_custom_product'); ?>" style="margin-left: 8px;">
-                <i class="fa-solid fa-plus"></i> <i class="fa-solid fa-box-open"></i>
+            <button onclick="app.abrirModalComodin()" class="btn-filter-toggle p-10 br-10 bg-accent text-white border-2 border-accent cursor-pointer transition-all" title="<?php echo L('tpv_add_custom_product'); ?>" aria-label="<?php echo L('tpv_add_custom_product'); ?>" style="margin-left: 8px;">
+                <i class="fa-solid fa-plus" aria-hidden="true"></i> <i class="fa-solid fa-box-open" aria-hidden="true"></i>
             </button>
         </div>
 
@@ -42,15 +42,15 @@
             <div class="grid-4 gap-12 ai-end">
                 <div class="form-group">
                     <label class="form-label fs-11 tt-uppercase opacity-70"><?php echo L('tpv_price_min'); ?></label>
-                    <input type="number" id="filterPriceMin" class="form-input fs-13" placeholder="0.00" oninput="applyAdvancedFilters()">
+                    <input type="number" id="filterPriceMin" class="form-input fs-13" placeholder="0.00" oninput="app.applyAdvancedFilters()">
                 </div>
                 <div class="form-group">
                     <label class="form-label fs-11 tt-uppercase opacity-70"><?php echo L('tpv_price_max'); ?></label>
-                    <input type="number" id="filterPriceMax" class="form-input fs-13" placeholder="999.99" oninput="applyAdvancedFilters()">
+                    <input type="number" id="filterPriceMax" class="form-input fs-13" placeholder="999.99" oninput="app.applyAdvancedFilters()">
                 </div>
                 <div class="form-group">
                     <label class="form-label fs-11 tt-uppercase opacity-70"><?php echo L('tpv_stock'); ?></label>
-                    <select id="filterStock" class="form-input fs-13" onchange="applyAdvancedFilters()">
+                    <select id="filterStock" class="form-input fs-13" onchange="app.applyAdvancedFilters()">
                         <option value="all"><?php echo L('tpv_all'); ?></option>
                         <option value="in-stock"><?php echo L('tpv_in_stock'); ?></option>
                         <option value="low-stock"><?php echo L('tpv_low_stock'); ?></option>
@@ -58,7 +58,7 @@
                 </div>
                 <div class="form-group">
                     <label class="form-label fs-11 tt-uppercase opacity-70"><?php echo L('tpv_sort_by'); ?></label>
-                    <select id="filterSort" class="form-input fs-13" onchange="applyAdvancedFilters()">
+                    <select id="filterSort" class="form-input fs-13" onchange="app.applyAdvancedFilters()">
                         <option value="name-asc"><?php echo L('tpv_sort_name_asc'); ?></option>
                         <option value="name-desc"><?php echo L('tpv_sort_name_desc'); ?></option>
                         <option value="price-asc"><?php echo L('tpv_sort_price_asc'); ?></option>
@@ -75,6 +75,7 @@
                             <?php foreach ($atributosDisponibles as $attr): ?>
                                 <button class="attr-tab attr-tab-btn d-inline-flex ai-center gap-6"
                                     data-attr="<?php echo htmlspecialchars($attr); ?>"
+                                    onclick="app.selectTag('<?php echo htmlspecialchars($attr); ?>')"
                                     style="font-size: 11px; padding: 6px 14px;">
                                     <i class="fa-solid fa-tag" style="opacity: 0.5;"></i> <?php echo htmlspecialchars($attr); ?>
                                 </button>
@@ -86,23 +87,27 @@
         </div>
 
 
-        <div class="cat-tabs" id="catTabs">
-            <button class="cat-tab active" data-cat="all">
-                <i class="fa-solid fa-border-all"></i>
-                <span><?php echo L('tpv_cat_all'); ?></span>
-            </button>
-            <?php if (isset($avInicioPrivado) && is_array($avInicioPrivado) && isset($avInicioPrivado['categorias']) && is_array($avInicioPrivado['categorias'])): ?>
-                <?php foreach ($avInicioPrivado['categorias'] as $c): ?>
-                    <button class="cat-tab" data-cat="<?php echo htmlspecialchars($c['codigo']); ?>">
-                        <i class="fa-solid fa-layer-group"></i>
-                        <span><?php echo htmlspecialchars($c['nombre']); ?></span>
-                    </button>
-                <?php endforeach; ?>
-            <?php endif; ?>
-            <button class="cat-tab" data-cat="baja" style="color: var(--red); border-color: rgba(192, 57, 43, 0.2);">
-                <i class="fa-solid fa-arrow-trend-down"></i>
-                <span><?php echo L('tpv_cat_discontinued'); ?></span>
-            </button>
+        <div class="cat-tabs-container">
+            
+            <div class="cat-tabs" id="catTabs">
+                <button class="cat-tab active" data-cat="all" onclick="app.selectCategory('all')">
+                    <i class="fa-solid fa-border-all"></i>
+                    <span><?php echo L('tpv_cat_all'); ?></span>
+                </button>
+                <?php if (isset($avInicioPrivado) && is_array($avInicioPrivado) && isset($avInicioPrivado['categorias']) && is_array($avInicioPrivado['categorias'])): ?>
+                    <?php foreach ($avInicioPrivado['categorias'] as $c): ?>
+                        <button class="cat-tab" data-cat="<?php echo htmlspecialchars($c['codigo']); ?>" onclick="app.selectCategory('<?php echo htmlspecialchars($c['codigo']); ?>')">
+                            <i class="fa-solid fa-layer-group"></i>
+                            <span><?php echo htmlspecialchars($c['nombre']); ?></span>
+                        </button>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+                <button class="cat-tab" data-cat="baja" style="color: var(--red); border-color: rgba(192, 57, 43, 0.2);" onclick="app.selectCategory('baja')">
+                    <i class="fa-solid fa-arrow-trend-down"></i>
+                    <span><?php echo L('tpv_cat_discontinued'); ?></span>
+                </button>
+            </div>
+
         </div>
 
 
@@ -114,6 +119,9 @@
 
     <script>
         const DB_TARIFAS = <?php echo json_encode(TarifaPrecioPDO::listarActivas()); ?>;
+        window.TPV_LANG = {
+            'insufficient_cash': '<?php echo L('tpv_error_insufficient_cash'); ?>'
+        };
     </script>
 
     <!-- ORDER PANEL -->
@@ -124,9 +132,9 @@
                 <span class="order-count" id="orderCount">0</span>
             </div>
             <div class="d-flex ai-center gap-8">
-                <button id="btnResumeSale" class="btn-save px-10 py-4 fs-11 bg-accent border-0 br-6 shadow-sm ai-center gap-6" style="display: none;" onclick="resumeSale()" title="<?php echo L('tpv_resume'); ?>"><i class="fa-solid fa-play"></i> <?php echo L('tpv_resume'); ?></button>
-                <button class="btn-cancel px-10 py-4 fs-11 border-1 br-6 ai-center gap-6 bg-surface" onclick="postponeSale()" title="<?php echo L('tpv_postpone'); ?>"><i class="fa-solid fa-pause text-accent"></i> <?php echo L('tpv_postpone'); ?></button>
-                <button class="btn-clear" onclick="clearCart()"><?php echo L('tpv_clear'); ?></button>
+                <button id="btnResumeSale" class="btn-tpv-icon active-accent" style="display: none;" onclick="app.resumeSale()" title="<?php echo L('tpv_resume'); ?>" aria-label="<?php echo L('tpv_resume'); ?>"><i class="fa-solid fa-play" aria-hidden="true"></i></button>
+                <button id="btnPostponeSale" class="btn-tpv-icon" style="display: none;" onclick="app.postponeSale()" title="<?php echo L('tpv_postpone'); ?>" aria-label="<?php echo L('tpv_postpone'); ?>"><i class="fa-solid fa-pause" aria-hidden="true"></i></button>
+                <button class="btn-clear p-0 bg-transparent border-0 opacity-60 hover-opacity-100 fs-11 ml-8" onclick="app.clearCart()"><?php echo L('tpv_clear'); ?></button>
             </div>
         </div>
 
@@ -221,7 +229,7 @@
                     <i class="fa-solid fa-file-invoice"></i> <?php echo L('tpv_require_invoice'); ?>
                 </div>
                 <label class="switch">
-                    <input type="checkbox" id="facturaToggle">
+                    <input type="checkbox" id="facturaToggle" onchange="app.handleFacturaToggle(this.checked)">
                     <span class="slider"></span>
                 </label>
             </div>
@@ -229,7 +237,7 @@
             <button
                 class="charge-btn"
                 id="chargeBtn"
-                onclick="processPayment()"
+                onclick="app.processPayment()"
                 disabled>
                 <?php echo L('tpv_charge'); ?> <span id="chargeTotal">0,00 €</span>
             </button>
@@ -238,14 +246,15 @@
 </div>
 
 <!-- EDIT MODAL -->
-<div class="modal-overlay" id="editModal">
+<div class="modal-overlay" id="editModal" role="dialog" aria-modal="true" aria-labelledby="editModalTitle">
     <div class="modal modal-content gap-14 ai-stretch w-800" style="max-width: 800px; border-radius: 20px; overflow: hidden;">
         <div class="modal-header mb-0">
-            <div class="modal-title fs-16"><?php echo L('modal_edit_title'); ?></div>
-            <button onclick="document.getElementById('editModal').classList.remove('visible')" class="btn-close-modal">×</button>
+            <div class="modal-title fs-16" id="editModalTitle"><?php echo L('modal_edit_title'); ?></div>
+            <button onclick="document.getElementById('editModal').classList.remove('visible')" class="btn-close-modal" aria-label="<?php echo L('modal_cancel'); ?>">×</button>
         </div>
         <input type="hidden" id="editId" />
         <input type="hidden" id="editCost" />
+        <input type="hidden" id="editAtributos" />
         <div class="form-grid">
                 <div class="form-group">
                 <label class="form-label"><?php echo L('modal_label_img'); ?></label>
@@ -301,11 +310,11 @@
     </div>
 
     <!-- ADD MODAL -->
-    <div class="modal-overlay" id="addModal">
+    <div class="modal-overlay" id="addModal" role="dialog" aria-modal="true" aria-labelledby="addModalTitle">
         <div class="modal modal-content gap-14 ai-stretch w-800" style="max-width: 800px; border-radius: 20px; overflow: hidden;">
             <div class="modal-header mb-0">
-                <div class="modal-title fs-16"><?php echo L('modal_new_title'); ?></div>
-                <button onclick="document.getElementById('addModal').classList.remove('visible')" class="btn-close-modal">×</button>
+                <div class="modal-title fs-16" id="addModalTitle"><?php echo L('modal_new_title'); ?></div>
+                <button onclick="document.getElementById('addModal').classList.remove('visible')" class="btn-close-modal" aria-label="<?php echo L('modal_cancel'); ?>">×</button>
             </div>
             <div class="form-grid">
                 <div class="form-group">
@@ -362,24 +371,24 @@
 </div>
 
 <!-- DELETE CONFIRM MODAL -->
-<div class="modal-overlay" id="deleteModal">
-    <div class="modal modal-content gap-16" style="border-radius: 20px; overflow: hidden;">
-        <div class="modal-title"><?php echo L('modal_delete_title'); ?></div>
+<div class="modal-overlay" id="deleteModal" role="dialog" aria-modal="true" aria-labelledby="deleteModalTitle" style="display: flex !important; align-items: center !important; justify-content: center !important;">
+    <div class="modal modal-content gap-16" style="max-width: 420px; margin: 0 auto; align-self: center;">
+        <div class="modal-title" id="deleteModalTitle"><?php echo L('modal_delete_title'); ?></div>
         <div class="modal-sub">
             <?php echo L('modal_delete_confirm'); ?> <strong id="delName"></strong><?php echo L('modal_delete_warning'); ?>
         </div>
-        <div class="modal-footer full-width">
-            <button onclick="document.getElementById('deleteModal').classList.remove('visible')" class="btn-cancel"><?php echo L('modal_cancel'); ?></button>
-            <button id="delConfirmBtn" class="btn-save bg-red"><?php echo L('modal_delete_btn'); ?></button>
+        <div class="modal-footer d-flex jc-center gap-8 mt-24">
+            <button onclick="document.getElementById('deleteModal').classList.remove('visible')" class="btn-cancel br-12"><?php echo L('modal_cancel'); ?></button>
+            <button id="delConfirmBtn" class="btn-danger br-12"><?php echo L('modal_delete_btn'); ?></button>
         </div>
     </div>
 </div>
 
 
 <!-- MODAL APERTURA DE CAJA (antes de poder vender) -->
-<div class="modal-overlay" id="aperturaCajaModal">
+<div class="modal-overlay <?= isset($_SESSION['mensajeErrorCaja']) ? 'visible' : '' ?>" id="aperturaCajaModal" role="dialog" aria-modal="true" aria-labelledby="aperturaCajaModalTitle">
     <div class="modal modal-content gap-16 ai-stretch w-360" style="border-radius: 20px; overflow: hidden;">
-        <div class="modal-title text-center"><?php echo L('cash_open_title'); ?></div>
+        <div class="modal-title text-center" id="aperturaCajaModalTitle"><?php echo L('cash_open_title'); ?></div>
         <p class="text-muted fs-13 text-center">
             <?php echo L('cash_open_sub'); ?>
         </p>
@@ -409,7 +418,7 @@
 
                 <div class="form-group">
                     <label class="form-label fs-13"><?php echo L('cash_open_label_initial'); ?></label>
-                    <input type="number" step="0.01" min="0" name="fondoInicial" class="form-input font-mono fs-16 text-right" placeholder="0.00" value="<?= number_format($avInicioPrivado['fondoSugerido'], 2, '.', '') ?>" required autofocus>
+                    <input type="number" step="0.01" min="0.01" name="fondoInicial" class="form-input font-mono fs-16 text-right" placeholder="0.00" value="<?= number_format($avInicioPrivado['fondoSugerido'], 2, '.', '') ?>" required autofocus>
                 </div>
                 <div class="modal-footer full-width mt-10">
                     <button type="submit" name="abrirCaja" class="btn-save w-full h-48 fs-15 font-bold br-12 shadow-md">
@@ -422,12 +431,12 @@
 </div>
 
 <!-- MODAL 1: TIPO DE CLIENTE (aparece al pulsar Cobrar) -->
-<div class="modal-overlay" id="clienteModal">
+<div class="modal-overlay" id="clienteModal" role="dialog" aria-modal="true" aria-labelledby="clienteModalTitle">
     <div class="modal modal-content ai-stretch" style="max-width: 960px; width: 96vw; border-radius: 20px; overflow: hidden; padding: 0; gap: 0;">
         <!-- Header -->
         <div class="d-flex jc-space-between ai-center" style="padding: 18px 28px; border-bottom: 1px solid var(--border);">
-            <div class="modal-title fs-18 font-bold m-0"><?php echo L('client_type_title'); ?></div>
-            <button onclick="cerrarModalCliente()" class="btn-close-modal" style="background:none; border:none; font-size:24px; cursor:pointer; color:var(--text-muted);">&times;</button>
+            <div class="modal-title fs-18 font-bold m-0" id="clienteModalTitle"><?php echo L('client_type_title'); ?></div>
+            <button onclick="cerrarModalCliente()" class="btn-close-modal" style="background:none; border:none; font-size:24px; cursor:pointer; color:var(--text-muted);" aria-label="<?php echo L('modal_cancel'); ?>">&times;</button>
         </div>
 
         <!-- 2-column body -->
@@ -438,17 +447,17 @@
 
                 <!-- Tipo de cliente -->
                 <div class="grid-3 gap-8">
-                    <button id="btnParticular" onclick="seleccionarTipoCliente('particular')"
+                    <button id="btnParticular" onclick="app.seleccionarTipoCliente('particular')"
                         class="p-12-8 br-12 border-2 bg-surface2 cursor-pointer fs-12 d-flex flex-column ai-center gap-8 active-scale h-auto">
                         <i class="fa-solid fa-user fs-22"></i>
                         <span class="font-bold"><?php echo L('client_particular'); ?></span>
                     </button>
-                    <button id="btnSocio" onclick="seleccionarTipoCliente('socio')"
+                    <button id="btnSocio" onclick="app.seleccionarTipoCliente('socio')"
                         class="p-12-8 br-12 border-2 bg-surface2 cursor-pointer fs-12 d-flex flex-column ai-center gap-8 active-scale h-auto">
                         <i class="fa-solid fa-id-card fs-22 text-accent"></i>
                         <span class="font-bold"><?php echo L('client_socio'); ?></span>
                     </button>
-                    <button id="btnEmpresa" onclick="seleccionarTipoCliente('empresa')"
+                    <button id="btnEmpresa" onclick="app.seleccionarTipoCliente('empresa')"
                         class="p-12-8 br-12 border-2 bg-surface2 cursor-pointer fs-12 d-flex flex-column ai-center gap-8 active-scale h-auto">
                         <i class="fa-solid fa-building fs-22"></i>
                         <span class="font-bold"><?php echo L('client_empresa'); ?></span>
@@ -458,13 +467,13 @@
                 <!-- Buscador genérico -->
                 <div id="clienteBusquedaGenerica" class="d-none flex-column gap-8 p-12 bg-surface2 br-8 border-2">
                     <div class="d-flex gap-8">
-                        <input id="clienteSearch" class="form-input fs-13 flex-1" placeholder="<?php echo L('client_search_placeholder'); ?>" />
-                        <button type="button" onclick="buscarClienteGuardado()" class="btn-save w-auto p-4-12">
-                            <i class="fa-solid fa-search"></i>
+                        <input id="clienteSearch" class="form-input fs-13 flex-1" placeholder="<?php echo L('client_search_placeholder'); ?>" aria-label="<?php echo L('client_search_placeholder'); ?>" />
+                        <button type="button" onclick="app.buscarClienteGuardado()" class="btn-save w-auto p-4-12" aria-label="Buscar cliente">
+                            <i class="fa-solid fa-search" aria-hidden="true"></i>
                         </button>
                     </div>
                     <div id="clienteResultados" class="fs-12 mt-4 text-accent font-bold"></div>
-                    <button id="btnAddCliente" onclick="mostrarRegistroCliente()" class="cat-tab p-4-8 fs-11 d-none"><?php echo L('client_new_btn'); ?></button>
+                    <button id="btnAddCliente" onclick="app.mostrarRegistroCliente()" class="cat-tab p-4-8 fs-11 d-none"><?php echo L('client_new_btn'); ?></button>
                 </div>
 
                 <!-- Registro de Cliente -->
@@ -473,19 +482,19 @@
                     <input id="newClienteNombre" class="form-input fs-12" placeholder="<?php echo L('client_placeholder_name'); ?>" />
                     <input id="newClienteNif" class="form-input fs-12 font-mono" placeholder="NIF / CIF" />
                     <div class="d-flex gap-8">
-                        <button onclick="cancelarRegistroCliente()" class="btn-cancel fs-11 p-4"><?php echo L('modal_cancel'); ?></button>
-                        <button onclick="guardarNuevoCliente()" class="btn-save fs-11 p-4"><?php echo L('client_btn_save_use'); ?></button>
+                        <button onclick="app.cancelarRegistroCliente()" class="btn-cancel fs-11 p-4"><?php echo L('modal_cancel'); ?></button>
+                        <button onclick="app.guardarNuevoCliente()" class="btn-save fs-11 p-4"><?php echo L('client_btn_save_use'); ?></button>
                     </div>
                 </div>
 
                 <!-- Buscador de Socio -->
                 <div id="socioBusqueda" class="d-none flex-column gap-8 p-12 bg-surface2 br-8 border-2">
                     <div class="d-flex gap-8">
-                        <input id="socioSearch" class="form-input fs-13 flex-1" placeholder="<?php echo L('client_search_socio_placeholder'); ?>" />
-                        <button onclick="buscarSocio()" class="btn-save w-auto p-4-12"><i class="fa-solid fa-search"></i></button>
+                        <input id="socioSearch" class="form-input fs-13 flex-1" placeholder="<?php echo L('client_search_socio_placeholder'); ?>" aria-label="<?php echo L('client_search_socio_placeholder'); ?>" />
+                        <button onclick="app.buscarSocio()" class="btn-save w-auto p-4-12" aria-label="Buscar socio"><i class="fa-solid fa-search" aria-hidden="true"></i></button>
                     </div>
                     <div id="socioInfo" class="fs-12 mt-4 text-accent font-bold"></div>
-                    <button id="btnAddSocio" onclick="mostrarRegistroSocio()" class="cat-tab p-4-8 fs-11 d-none"><?php echo L('client_new_socio_btn'); ?></button>
+                    <button id="btnAddSocio" onclick="app.mostrarRegistroSocio()" class="cat-tab p-4-8 fs-11 d-none"><?php echo L('client_new_socio_btn'); ?></button>
                 </div>
 
                 <!-- Registro de Socio -->
@@ -494,8 +503,8 @@
                     <input id="newSocioNombre" class="form-input fs-12" placeholder="Nombre completo" />
                     <input id="newSocioNif" class="form-input fs-12 font-mono" placeholder="DNI / NIE" />
                     <div class="d-flex gap-8">
-                        <button onclick="cancelarRegistroSocio()" class="btn-cancel fs-11 p-4"><?php echo L('modal_cancel'); ?></button>
-                        <button onclick="guardarNuevoSocio()" class="btn-save fs-11 p-4"><?php echo L('client_btn_save_use'); ?></button>
+                        <button onclick="app.cancelarRegistroSocio()" class="btn-cancel fs-11 p-4"><?php echo L('modal_cancel'); ?></button>
+                        <button onclick="app.guardarNuevoSocio()" class="btn-save fs-11 p-4"><?php echo L('client_btn_save_use'); ?></button>
                     </div>
                 </div>
 
@@ -539,7 +548,7 @@
                         <div class="fs-11 text-muted" id="puntosCanjeMsg">Cargando puntos...</div>
                         <div class="d-flex ai-center gap-8 d-none" id="controlesCanjePuntos">
                             <select id="puntosAcanjearSelect" class="form-input fs-11 p-2-4 flex-1" style="height: auto;" onchange="updatePuntosDiscountPreview()"></select>
-                            <button type="button" id="btnCanjearPuntos" onclick="canjearPuntos()" class="btn-save fs-10 p-4-12 w-auto" style="background: var(--accent); white-space: nowrap;"><?php echo L('tpv_redeem_points'); ?></button>
+                            <button type="button" id="btnCanjearPuntos" onclick="app.canjearPuntos()" class="btn-save fs-10 p-4-12 w-auto" style="background: var(--accent); white-space: nowrap;"><?php echo L('tpv_redeem_points'); ?></button>
                         </div>
                     </div>
                     <div id="puntosAplicadosResumen" class="d-none mt-4 p-8 br-6 fs-12 bg-accent text-white d-flex jc-space-between ai-center">
@@ -547,7 +556,7 @@
                             <i class="fa-solid fa-check"></i>
                             <span><?php echo L('tpv_points_discount'); ?>: <strong id="puntosDiscountVal">-0,00 €</strong> (<span id="puntosRedeemedVal">0</span> pts)</span>
                         </div>
-                        <button onclick="quitarPuntosCanjeados()" class="btn-close-modal text-white" style="font-size:16px;">×</button>
+                        <button onclick="app.quitarPuntosCanjeados()" class="btn-close-modal text-white" style="font-size:16px;" aria-label="Quitar puntos canjeados">×</button>
                     </div>
                 </div>
 
@@ -577,22 +586,22 @@
 
                 <!-- Gestión de pago -->
                 <div id="cobroMixtoGestion" class="flex-column gap-8 br-8 border-2" style="padding: 16px 20px; background: var(--surface2);">
-                    <div class="form-label font-bold text-accent mb-4"><?php echo L('tpv_add_payment'); ?></div>
+                    <div id="labelAddPago" class="form-label font-bold text-accent mb-4"><?php echo L('tpv_add_payment'); ?></div>
 
                     <div class="d-flex gap-8 fw-wrap mb-8" id="selectorMetodoPago">
-                        <button id="btnEfectivo" onclick="selectModalPayment(this)" class="btn-tpv-method flex-1 py-10 px-8 br-8 border-2 transition d-flex flex-column ai-center gap-4 bg-surface" style="min-width:70px;">
+                        <button id="btnEfectivo" onclick="app.selectModalPayment(this)" class="btn-tpv-method flex-1 py-10 px-8 br-8 border-2 transition d-flex flex-column ai-center gap-4 bg-surface" style="min-width:70px;">
                             <i class="fa-solid fa-money-bill-1 fs-16"></i>
                             <span class="fs-11 font-bold"><?php echo L('tpv_method_cash'); ?></span>
                         </button>
-                        <button id="btnTarjeta" onclick="selectModalPayment(this)" class="btn-tpv-method flex-1 py-10 px-8 br-8 border-2 transition d-flex flex-column ai-center gap-4 bg-surface" style="min-width:70px;">
+                        <button id="btnTarjeta" onclick="app.selectModalPayment(this)" class="btn-tpv-method flex-1 py-10 px-8 br-8 border-2 transition d-flex flex-column ai-center gap-4 bg-surface" style="min-width:70px;">
                             <i class="fa-solid fa-credit-card fs-16"></i>
                             <span class="fs-11 font-bold"><?php echo L('tpv_method_card'); ?></span>
                         </button>
-                        <button id="btnBizum" onclick="selectModalPayment(this)" class="btn-tpv-method flex-1 py-10 px-8 br-8 border-2 transition d-flex flex-column ai-center gap-4 bg-surface" style="min-width:70px;">
+                        <button id="btnBizum" onclick="app.selectModalPayment(this)" class="btn-tpv-method flex-1 py-10 px-8 br-8 border-2 transition d-flex flex-column ai-center gap-4 bg-surface" style="min-width:70px;">
                             <i class="fa-solid fa-mobile-screen fs-16"></i>
                             <span class="fs-11 font-bold"><?php echo L('tpv_method_bizum'); ?></span>
                         </button>
-                        <button id="btnAcuenta" onclick="selectModalPayment(this)" class="btn-tpv-method flex-1 py-10 px-8 br-8 border-2 transition d-flex flex-column ai-center gap-4 bg-surface" style="min-width:70px;">
+                        <button id="btnAcuenta" onclick="app.selectModalPayment(this)" class="btn-tpv-method flex-1 py-10 px-8 br-8 border-2 transition d-flex flex-column ai-center gap-4 bg-surface" style="min-width:70px;">
                             <i class="fa-solid fa-file-invoice-dollar fs-16"></i>
                             <span class="fs-11 font-bold"><?php echo L('tpv_method_account'); ?></span>
                         </button>
@@ -602,16 +611,16 @@
                         <div class="form-group mb-8">
                             <label class="fs-13 font-bold mb-4 opacity-80" id="labelMontoPago"><?php echo L('tpv_amount_to_add'); ?> (€)</label>
                             <div class="d-flex gap-8 ai-center">
-                                <input id="mixPagoMonto" type="number" step="0.01" class="form-input font-mono fs-20 text-right flex-1 bg-surface1 border-0 br-8" placeholder="0,00" oninput="calcularCambioMix()" />
-                                <button id="mixBtnAddPago" onclick="addPagoMixto()" class="btn-save p-12-24 br-8 font-bold" style="height:unset; font-size:14px;"><?php echo L('tpv_add'); ?></button>
+                                <input id="mixPagoMonto" type="number" step="0.01" class="form-input font-mono fs-20 text-right flex-1 bg-surface1 border-0 br-8" placeholder="0,00" oninput="app.calcularCambioMix()" />
+                                <button id="mixBtnAddPago" onclick="app.addPagoMixto()" class="btn-save p-12-24 br-8 font-bold" style="height:unset; font-size:14px;"><?php echo L('tpv_add'); ?></button>
                             </div>
                             <div id="mixPagoStatusFeedback" class="mt-8 p-10 br-8 text-center font-bold fs-13 animate-fade-in" style="background: rgba(0,0,0,0.05);">
                                 <!-- Dinámico vía JS -->
                             </div>
                         </div>
-                        <!-- Cambio efectivo -->
-                        <div id="extraEfectivo" class="d-none mt-2 text-right">
-                            <span class="fs-13 font-bold text-accent"><?php echo L('tpv_change_to_return'); ?>: <span id="efectivoCambio" class="font-mono fs-16">0,00 €</span></span>
+                        <div id="extraEfectivo" class="d-none mt-12 p-12 br-8 bg-surface1 border-1 d-flex jc-space-between ai-center">
+                             <span class="fs-13 font-bold opacity-70"><?php echo L('tpv_change_to_return'); ?>:</span>
+                             <span id="efectivoCambio" class="fs-22 font-mono font-bold text-green">0,00 €</span>
                         </div>
                         <!-- A cuenta fecha -->
                         <div id="extraAcuenta" class="d-none mt-8 p-8 br-8 bg-surface1 border-1 border-dashed mb-8">
@@ -644,7 +653,7 @@
         <!-- Footer -->
         <div class="modal-footer" style="border-top: 1px solid var(--border); padding: 16px 28px;">
             <button onclick="cerrarModalCliente()" class="btn-cancel"><?php echo L('modal_cancel'); ?></button>
-            <button id="confirmarClienteBtn" onclick="ejecutarCobroFinal()" class="btn-save"><?php echo L('tpv_charge'); ?></button>
+            <button id="confirmarClienteBtn" onclick="app.confirmarCliente()" class="btn-save"><?php echo L('tpv_charge'); ?></button>
         </div>
     </div>
 </div>
@@ -656,17 +665,17 @@
 require_once __DIR__ . '/../model/TipoIVAPDO.php';
 $ivasVigentes = TipoIVAPDO::listarVigentesActuales();
 ?>
-<div id="modalComodin" class="modal-overlay">
-    <div class="modal modal-content ai-stretch w-450 p-32">
+<div id="modalComodin" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modalComodinTitle">
+    <div class="modal modal-content glass-effect ai-stretch w-450 p-32">
         <div class="d-flex ai-center gap-16 pb-16 border-bottom">
             <div class="modal-icon text-accent bg-accent-light m-0">
                 <i class="fa-solid fa-box-open"></i>
             </div>
             <div>
-                <div class="fs-18 fw-700"><?php echo L('tpv_custom_product_title'); ?></div>
+                <div class="fs-18 fw-700" id="modalComodinTitle"><?php echo L('tpv_custom_product_title'); ?></div>
                 <div class="fs-12 text-muted"><?php echo L('tpv_add_custom_product'); ?></div>
             </div>
-            <button onclick="cerrarModalComodin()" class="btn-close-modal" style="margin-left: auto;">&times;</button>
+            <button onclick="app.cerrarModalComodin()" class="btn-close-modal" style="margin-left: auto;" aria-label="<?php echo L('modal_cancel'); ?>">&times;</button>
         </div>
 
         <div class="modal-body p-0 mt-24 grid gap-32">
@@ -700,8 +709,8 @@ $ivasVigentes = TipoIVAPDO::listarVigentesActuales();
         </div>
 
         <div class="modal-footer full-width jc-end mt-24 pt-16 border-top">
-            <button onclick="cerrarModalComodin()" class="btn-cancel"><?php echo L('modal_cancel'); ?></button>
-            <button onclick="agregarComodin()" class="btn-save d-flex ai-center gap-8">
+            <button onclick="app.cerrarModalComodin()" class="btn-cancel"><?php echo L('modal_cancel'); ?></button>
+            <button onclick="app.agregarComodin()" class="btn-save d-flex ai-center gap-8">
                 <i class="fa-solid fa-plus"></i> <?php echo L('modal_add_item'); ?>
             </button>
         </div>

@@ -146,6 +146,19 @@ export const TicketManager = {
             el_tkEmail.value = v.cliente_email || "";
         }
 
+        // --- Comentarios / Observaciones ---
+        const el_tkCommentsSection = document.getElementById("tkCommentsSection");
+        const el_tkCommentsText = document.getElementById("tkCommentsText");
+        if (el_tkCommentsSection && el_tkCommentsText) {
+            if (v.comentarios && v.comentarios.trim() !== "") {
+                el_tkCommentsSection.classList.remove("d-none");
+                el_tkCommentsText.innerHTML = `<strong>Observaciones:</strong><br>${v.comentarios.replace(/\n/g, '<br>')}`;
+            } else {
+                el_tkCommentsSection.classList.add("d-none");
+                el_tkCommentsText.innerHTML = "";
+            }
+        }
+
         // --- Multi-Payment Breakdown ---
         const el_tkPagosSection = document.getElementById("tkPagosSection");
         const el_tkPagosLista = document.getElementById("tkPagosLista");
@@ -183,14 +196,14 @@ export const TicketManager = {
                     }).join("");
 
                 // Show change if cash was received (using global efectivo_recibido from sales header)
-                const cashPago = pagos.find(p => (p.metodo || p.metodo_pago) === 'efectivo');
+                const totalImporteEfectivo = pagos
+                    .filter(p => (p.metodo || p.metodo_pago) === 'efectivo')
+                    .reduce((sum, p) => sum + parseFloat(p.importe || 0), 0);
                 const efRecibido = parseFloat(v.efectivo_recibido || 0);
                 
-                if (cashPago && efRecibido > 0) {
-                    const importeEfectivo = parseFloat(cashPago.importe || 0);
-                    // Solo mostramos si el importe entregado es mayor que el pagado (hay cambio) o si explícitamente se quiere ver el desglose
-                    if (efRecibido > importeEfectivo) {
-                        const cambio = efRecibido - importeEfectivo;
+                if (totalImporteEfectivo > 0 && efRecibido > 0) {
+                    if (efRecibido > totalImporteEfectivo) {
+                        const cambio = efRecibido - totalImporteEfectivo;
                         el_tkPagosLista.innerHTML += `
                             <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; margin-top: 8px; border-top: 1px dashed var(--border); padding-top: 4px; opacity: 0.8;">
                                 <span style="font-weight: 500;">Efectivo entregado:</span>
@@ -279,25 +292,23 @@ export const TicketManager = {
         Utils.showToast("Enviando correo...", "info");
 
         try {
-            const resp = await fetch("./api/enviarVentaEmail.php", {
+            const data = await ApiService.request("./api/enviarVentaEmail.php", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     numTicket: this.currentTicketNum,
                     destinatario: email,
                     tipo: tipo,
                 }),
             });
-            const data = await resp.json();
 
             if (data.ok) {
                 Utils.showToast("Enviado con éxito", "success");
             } else {
-                throw new Error(data.error);
+                throw new Error(data.error || "Error al enviar el correo");
             }
         } catch (err) {
             console.error("Error email:", err);
-            Utils.showToast("Error al enviar: " + err.message, "error");
+            Utils.showToast(err.message, "error");
         }
     }
 };

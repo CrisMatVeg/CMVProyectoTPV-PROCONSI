@@ -18,9 +18,8 @@ class BackupPDO {
         $pass = PASSWORD;
         $filename = "backup_" . $db . "_" . date("Y-m-d_H-i-s") . ".sql";
         
-        // Ruta absoluta a mysqldump en este entorno XAMPP portable
-        $mysqldumpPath = 'C:\\Users\\PracticasSoftware4\\Downloads\\xampp-portable-windows-x64-8.2.12-0-VS16\\xampp\\mysql\\bin\\mysqldump.exe';
-        
+        // Usamos mysqldump disponible en el PATH del sistema para entornos de producción
+        $mysqldumpPath = 'mysqldump';        
         // Construir comando
         // Nota: Si hay contraseña, se añade -p, pero si está vacía no se pone nada tras -p
         $auth = "-u $user";

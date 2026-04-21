@@ -1,5 +1,7 @@
 <?php
 require_once './core/231018libreriaValidacion.php';
+require_once __DIR__ . '/config.php';
+
 require_once './model/Usuario.php';
 require_once './model/UsuarioPDO.php';
 require_once './model/Producto.php';
