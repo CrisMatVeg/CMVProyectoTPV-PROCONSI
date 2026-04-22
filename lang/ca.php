@@ -1618,8 +1618,8 @@ $translations = [
     'menu_idioma' => 'Idioma',
     'prod_pill_manual_adj' => 'Ajust manual',
     'promos_search_placeholder_cat' => 'Cerca per categoria...',
-    'prod_modal_mass_adj_step_reason' => 'Motiu de l'ajust',
+    'prod_modal_mass_adj_step_reason' => 'Motiu de l\'ajust',
     'prod_modal_mass_margin_step_reason' => 'Motiu del canvi de marge',
-    'prod_modal_mass_adj_placeholder_reason' => 'Ex: Liquidació d'estoc, ajust estacional...',
+    'prod_modal_mass_adj_placeholder_reason' => 'Ex: Liquidació d\'estoc, ajust estacional...',
 ];
 

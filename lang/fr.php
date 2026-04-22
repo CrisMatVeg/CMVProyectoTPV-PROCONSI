@@ -1583,7 +1583,7 @@ $translations = [
     'menu_idioma' => 'Langue',
     'prod_pill_manual_adj' => 'Ajustement manuel',
     'promos_search_placeholder_cat' => 'Rechercher par catégorie...',
-    'prod_modal_mass_adj_step_reason' => 'Motif de l'ajustement',
+    'prod_modal_mass_adj_step_reason' => 'Motif de l\'ajustement',
     'prod_modal_mass_margin_step_reason' => 'Motif du changement de marge',
     'prod_modal_mass_adj_placeholder_reason' => 'Ex : Liquidation de stock, ajustement saisonnier...',
 ];
