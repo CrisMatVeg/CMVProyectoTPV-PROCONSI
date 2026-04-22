@@ -266,6 +266,13 @@ document.addEventListener("DOMContentLoaded", function () {
 // ── Formato monetario ──────────────────────────────────────────────────────────
 function fmt(n) {
   const val = typeof n === "number" ? n : parseFloat(n) || 0;
+  // Si el nmero tiene ms de 2 decimales, los mostramos todos (hasta 10)
+  // para respetar la configuración de alta precisión.
+  const str = val.toString();
+  const parts = str.split('.');
+  if (parts.length > 1 && parts[1].length > 2) {
+    return val.toString().replace(".", ",") + " €";
+  }
   return val.toFixed(2).replace(".", ",") + " €";
 }
 
@@ -1398,7 +1405,7 @@ function mostrarTicket(v, isFromTPV = true) {
             ${
               !isFromTPV && !l.devuelta && v.estado === "completada"
                 ? `<div style="padding-left:12px; display:flex; align-items:center;">
-                  <button onclick="abrirModalDevolucion(${l.id}, ${v.numero_ticket}, '${v.fecha}', ${v.id_cliente || "null"}, ${l.meses_garantia || 24})" title="Devolver este producto" class="btn-icon text-red">
+                  <button onclick="abrirModalDevolucion(${l.id}, ${v.numero_ticket}, '${v.fecha}', ${v.id_cliente || "null"}, ${l.meses_garantia || 24}, '${l.nombre_producto.replace(/'/g, "\\'")}')" title="Devolver este producto" class="btn-icon text-red">
                     <i class="fa-solid fa-arrow-rotate-left"></i>
                   </button>
                 </div>`
@@ -2144,6 +2151,17 @@ function updateEditMargin() {
   }
 }
 
+function toggleEditPrecisionUI() {
+  const keepPrecision = document.getElementById('editMantenerPrecision').checked;
+  const inputVenta = document.getElementById('editPrice');
+  
+  if (!keepPrecision) {
+      const val = parseFloat(inputVenta.value.replace(',', '.')) || 0;
+      inputVenta.value = val.toFixed(2);
+  }
+}
+
+window.toggleEditPrecisionUI = toggleEditPrecisionUI;
 window.updateEditMargin = updateEditMargin;
 
 function editProduct(e, id) {
@@ -2314,6 +2332,7 @@ function abrirModalDevolucion(
   fechaVenta,
   idCliente,
   mesesGarantia,
+  nombreProducto
 ) {
   const modal = document.getElementById("returnModal");
   if (!modal) return;
@@ -2328,16 +2347,31 @@ function abrirModalDevolucion(
   const txtWarranty = document.getElementById("textWarranty");
   const optCash = document.getElementById("optCash");
   const optBalance = document.getElementById("optBalance");
+  const optCard = document.getElementById("optCard");
   const optExchange = document.getElementById("optExchange");
+
+  const productInfo = document.getElementById("returnProductInfo");
+  const productName = document.getElementById("returnProductName");
+  const productWarranty = document.getElementById("returnProductWarrantyBadge");
+  const productStatus = document.getElementById("returnProductStatusBadge");
 
   // Limpiar clases previas
   [stCommercial, stWarranty].forEach((el) =>
     el.classList.remove("status-ok", "status-warn", "status-err"),
   );
-  [optCash, optBalance, optExchange].forEach((el) => {
-    el.classList.remove("disabled");
-    el.querySelector("input").disabled = false;
+  [optCash, optBalance, optCard, optExchange].forEach((el) => {
+    if (el) {
+        el.classList.remove("disabled");
+        el.querySelector("input").disabled = false;
+    }
   });
+
+  // Mostrar info de producto
+  if (productInfo) {
+    productInfo.classList.remove("d-none");
+    if (productName) productName.innerText = nombreProducto || "Producto";
+    if (productWarranty) productWarranty.querySelector("span").innerText = `Garantía: ${mesesGarantia} meses`;
+  }
 
   // 2. Calcular plazos
   const dateVenta = new Date(fechaVenta.replace(" ", "T"));
@@ -2363,15 +2397,31 @@ function abrirModalDevolucion(
     optCash.querySelector("input").disabled = true;
     optBalance.classList.add("disabled");
     optBalance.querySelector("input").disabled = true;
+    if (optCard) {
+        optCard.classList.add("disabled");
+        optCard.querySelector("input").disabled = true;
+    }
   }
 
   // Plazo garantía
   if (diffMonths < mesesGarantia) {
     stWarranty.classList.add("status-ok");
     txtWarranty.innerText = `Hasta ${mesesGarantia} meses (OK)`;
+    if (productStatus) {
+        productStatus.classList.remove("d-none");
+        productStatus.style.background = "var(--green-light)";
+        productStatus.style.color = "var(--green)";
+        productStatus.querySelector("span").innerText = "Garantía VIGENTE";
+    }
   } else {
     stWarranty.classList.add("status-err");
     txtWarranty.innerText = `Garantía agotada`;
+    if (productStatus) {
+        productStatus.classList.remove("d-none");
+        productStatus.style.background = "var(--red-light)";
+        productStatus.style.color = "var(--red)";
+        productStatus.querySelector("span").innerText = "Garantía AGOTADA";
+    }
     optExchange.classList.add("disabled");
     optExchange.querySelector("input").disabled = true;
   }
@@ -2405,14 +2455,20 @@ function abrirModalAnulacionTicket(numTicket, fechaVenta, idCliente) {
   const txtWarranty = document.getElementById("textWarranty");
   const optCash = document.getElementById("optCash");
   const optBalance = document.getElementById("optBalance");
+  const optCard = document.getElementById("optCard");
   const optExchange = document.getElementById("optExchange");
+
+  const productInfo = document.getElementById("returnProductInfo");
+  if (productInfo) productInfo.classList.add("d-none");
 
   [stCommercial, stWarranty].forEach((el) =>
     el.classList.remove("status-ok", "status-warn", "status-err"),
   );
-  [optCash, optBalance, optExchange].forEach((el) => {
-    el.classList.remove("disabled");
-    el.querySelector("input").disabled = false;
+  [optCash, optBalance, optCard, optExchange].forEach((el) => {
+    if (el) {
+        el.classList.remove("disabled");
+        el.querySelector("input").disabled = false;
+    }
   });
 
   // La anulación de ticket COMPLETO es siempre por reembolso (comercial)
@@ -2428,9 +2484,11 @@ function abrirModalAnulacionTicket(numTicket, fechaVenta, idCliente) {
   } else {
     stCommercial.classList.add("status-err");
     txtCommercial.innerText = `Excedido (${diffDays} días)`;
-    [optCash, optBalance].forEach((el) => {
-      el.classList.add("disabled");
-      el.querySelector("input").disabled = true;
+    [optCash, optBalance, optCard].forEach((el) => {
+      if (el) {
+        el.classList.add("disabled");
+        el.querySelector("input").disabled = true;
+      }
     });
   }
 
@@ -2487,7 +2545,7 @@ async function confirmarDevolucion(idLinea, numTicket) {
     showToast(
       `<i class='fa-solid fa-check'></i> Abono <strong>A-${numAbono}</strong> generado correctamente`,
     );
-    const ventaActualizada = await cargarVenta(numTicket);
+    const ventaActualizada = await cargarVenta(numAbono);
     mostrarTicket(ventaActualizada, false);
     if (typeof updateVentaStatusUI === "function")
       updateVentaStatusUI(

@@ -18,7 +18,19 @@ export const ProductManager = {
         document.getElementById("editId").value = p.id;
         document.getElementById("editName").value = p.name;
         document.getElementById("editSku").value = p.codigo;
-        document.getElementById("editPrice").value = p.price;
+        const checkPrecision = document.getElementById("editMantenerPrecision");
+        if (checkPrecision) {
+            const precisionActiva = !!(parseInt(p.mantener_precision || 0));
+            checkPrecision.checked = precisionActiva;
+            
+            // Si la precisión está desactivada, forzamos el formato de 2 decimales
+            if (!precisionActiva) {
+                const pVenta = parseFloat(p.price) || 0;
+                document.getElementById("editPrice").value = pVenta.toFixed(2);
+            } else {
+                document.getElementById("editPrice").value = p.price;
+            }
+        }
         const editIvaEl = document.getElementById("editIva");
         if (editIvaEl) editIvaEl.value = p.iva || 21;
         document.getElementById("editMesesGarantia").value = p.meses_garantia || 24;
@@ -42,11 +54,12 @@ export const ProductManager = {
         const id = parseInt(document.getElementById("editId")?.value);
         const name = document.getElementById("editName")?.value.trim();
         const codigo = document.getElementById("editSku")?.value.trim();
-        const price = parseFloat(document.getElementById("editPrice")?.value);
-        const iva = parseFloat(document.getElementById("editIva")?.value) || 21;
+        const price = parseFloat(document.getElementById("editPrice")?.value.replace(',', '.')) || 0;
+        const iva = parseFloat(document.getElementById("editIva")?.value.replace(',', '.')) || 21;
         const mesesGarantia = parseInt(document.getElementById("editMesesGarantia")?.value) || 24;
         const icono = document.getElementById("editEmoji")?.value.trim();
         const atributos = document.getElementById("editAtributos")?.value || null;
+        const mantenerPrecision = document.getElementById("editMantenerPrecision")?.checked ? 1 : 0;
 
         try {
             const data = await ApiService.post('gestionProducto.php', {
@@ -58,12 +71,13 @@ export const ProductManager = {
                 iva,
                 meses_garantia: mesesGarantia,
                 icono,
-                atributos
+                atributos,
+                mantener_precision: mantenerPrecision
             });
 
             if (data.ok) {
                 const p = PRODUCTS.find((x) => x.id === id);
-                Object.assign(p, { name, codigo, price, iva, meses_garantia: mesesGarantia, icono, atributos });
+                Object.assign(p, { name, codigo, price, iva, meses_garantia: mesesGarantia, icono, atributos, mantener_precision: mantenerPrecision });
                 document.getElementById("editModal").classList.remove("visible");
                 Utils.showToast("Producto actualizado", "success");
                 // Trigger global refresh if needed
@@ -179,13 +193,14 @@ export const ProductManager = {
                     id: p.id,
                     name: p.nombre,
                     codigo: p.referencia,
-                    price: parseFloat(p.precio_venta),
+                    price: p.precio_venta, // Keeping as string/value from server
                     icono: p.icono || '📦',
                     cat: p.categoria,
                     stock: parseInt(p.stock),
                     inactive: !p.activo,
                     es_pack: p.es_pack === 1,
                     atributos: p.atributos,
+                    mantener_precision: p.mantener_precision,
                     componentes_pack: p.componentes_pack
                 }));
 

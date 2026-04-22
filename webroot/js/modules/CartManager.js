@@ -58,9 +58,10 @@ export const CartManager = {
 
     activeTariffs.forEach((t) => {
       const val = parseFloat(t.valor);
+      const keepPrecision = !!(parseInt(product.mantener_precision || 0));
       let variation = 0;
       if (t.tipo === "percent") {
-        variation = Math.round(finalPrice * (val / 100) * 100) / 100;
+        variation = keepPrecision ? (finalPrice * (val / 100)) : (Math.round(finalPrice * (val / 100) * 100) / 100);
       } else {
         variation = val;
       }

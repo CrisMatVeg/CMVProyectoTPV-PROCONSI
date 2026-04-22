@@ -17,12 +17,22 @@ export const TicketManager = {
         window.currentVentaPendiente = parseFloat(v.total) - parseFloat(v.pagado_a_cuenta || 0);
 
         const fmt2 = Utils.fmt2;
-
+        const el_tkTipoDoc = document.getElementById("tkTipoDoc");
+        if (el_tkTipoDoc) {
+            const isFactura = v.tipo_cliente === 'empresa' || v.es_factura == 1;
+            const isAbono = (v.tipo_documento || 'venta') === 'abono';
+            if (isAbono) el_tkTipoDoc.textContent = window.I18N?.ticket_type_abono || "TICKET DE ABONO";
+            else el_tkTipoDoc.textContent = isFactura ? (window.I18N?.invoice || "FACTURA") : (window.I18N?.ticket || "TICKET DE VENTA");
+        }
 
         const el_tkNum = document.getElementById("tkNumero");
         if (el_tkNum) {
             const esFactura = v.tipo_cliente === 'empresa' || v.es_factura == 1;
-            el_tkNum.textContent = formatTicketNumber(v.numero_ticket, v.fecha, esFactura);
+            const tipoDoc   = v.tipo_documento || 'venta';
+            el_tkNum.textContent = formatTicketNumber(v.numero_ticket, v.fecha, esFactura, tipoDoc);
+            // Mostrar badge visual para abonos
+            const badgeAbono = document.getElementById('tkBadgeAbono');
+            if (badgeAbono) badgeAbono.style.display = tipoDoc === 'abono' ? 'inline-flex' : 'none';
         }
 
         const el_tkFecha = document.getElementById("tkFecha");

@@ -34,6 +34,14 @@ export function showToast(msg, type = "info") {
 export function formatCurrency(val) {
     const n = parseFloat(val);
     if (isNaN(n)) return "0,00€";
+    
+    const str = n.toString();
+    const parts = str.split('.');
+    if (parts.length > 1 && parts[1].length > 2) {
+        // High precision format
+        return n.toString().replace(".", ",") + " €";
+    }
+    
     return n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
 }
 
@@ -43,8 +51,13 @@ export function formatCurrency(val) {
  * @param {string} fecha 
  * @param {boolean} esFactura 
  */
-export function formatTicketNumber(numero, fecha, esFactura) {
-    const prefix = esFactura ? 'F' : 'T';
+export function formatTicketNumber(numero, fecha, esFactura, tipoDocumento) {
+    let prefix;
+    if (tipoDocumento === 'abono') {
+        prefix = 'A';
+    } else {
+        prefix = esFactura ? 'F' : 'T';
+    }
     const d = new Date(fecha.replace(" ", "T"));
     const datePart = `${d.getDate()}${d.getMonth() + 1}${d.getFullYear()}`;
     return `${prefix}-${datePart}-${numero}`;
