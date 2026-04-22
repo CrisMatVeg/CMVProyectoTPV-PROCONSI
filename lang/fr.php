@@ -954,7 +954,6 @@ $translations = [
     'rates_label_type' => 'Type de Variation',
     'rates_label_value' => 'Valeur (+ ou -)',
     'rates_label_priority' => 'Priorité',
-    'rates_info_title' => 'Information :',
     'rates_info_help' => 'Les tarifs modifient le prix de BASE du produit. Ils s\'appliquent avant toute remise manuelle ou de fidélité.',
     'rates_label_date_range' => 'Plage de Dates',
     'rates_label_start_date' => 'Date de Début',
