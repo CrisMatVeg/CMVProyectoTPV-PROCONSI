@@ -221,8 +221,8 @@ class VeriFactuService
             // ImporteRectificacion: obligatorio para TipoRectificativa='S' (sustitución)
             // Contiene los importes de la factura ORIGINAL que se rectifica
             $importeRect = $doc->createElementNS($nsInfo, "sf:ImporteRectificacion");
-            $importeRect->appendChild($doc->createElementNS($nsInfo, "sf:BaseRectificada", $datos['base_rectificada'] ?? '0'));
-            $importeRect->appendChild($doc->createElementNS($nsInfo, "sf:CuotaRectificada", $datos['cuota_rectificada'] ?? '0'));
+            $importeRect->appendChild($doc->createElementNS($nsInfo, "sf:BaseRectificada", $this->fmtAmt($datos['base_rectificada'] ?? '0')));
+            $importeRect->appendChild($doc->createElementNS($nsInfo, "sf:CuotaRectificada", $this->fmtAmt($datos['cuota_rectificada'] ?? '0')));
             $alta->appendChild($importeRect);
         }
 
@@ -247,13 +247,14 @@ class VeriFactuService
         $detalle->appendChild($doc->createElementNS($nsInfo, "sf:ClaveRegimen", "01"));
         $detalle->appendChild($doc->createElementNS($nsInfo, "sf:CalificacionOperacion", "S1")); // S1 = Sujeta y No exenta
         $detalle->appendChild($doc->createElementNS($nsInfo, "sf:TipoImpositivo", "21.00"));
-        $detalle->appendChild($doc->createElementNS($nsInfo, "sf:BaseImponibleOimporteNoSujeto", $datos['base_imponible']));
-        $detalle->appendChild($doc->createElementNS($nsInfo, "sf:CuotaRepercutida", $datos['cuota_total']));
+        $detalle->appendChild($doc->createElementNS($nsInfo, "sf:BaseImponibleOimporteNoSujeto", $this->fmtAmt($datos['base_imponible'])));
+        $detalle->appendChild($doc->createElementNS($nsInfo, "sf:CuotaRepercutida", $this->fmtAmt($datos['importe_iva'] ?? ($datos['importe_total'] - $datos['base_imponible']))));
         $desglose->appendChild($detalle);
         $alta->appendChild($desglose);
 
-        $alta->appendChild($doc->createElementNS($nsInfo, "sf:CuotaTotal", $datos['cuota_total']));
-        $alta->appendChild($doc->createElementNS($nsInfo, "sf:ImporteTotal", $datos['importe_total']));
+        $cuotaTotal = $datos['importe_iva'] ?? ($datos['importe_total'] - $datos['base_imponible']);
+        $alta->appendChild($doc->createElementNS($nsInfo, "sf:CuotaTotal", $this->fmtAmt($cuotaTotal)));
+        $alta->appendChild($doc->createElementNS($nsInfo, "sf:ImporteTotal", $this->fmtAmt($datos['importe_total'])));
 
         // Encadenamiento
         $encadenamiento = $doc->createElementNS($nsInfo, "sf:Encadenamiento");
@@ -317,7 +318,7 @@ class VeriFactuService
         $nsInfo = "https://www2.agenciatributaria.gob.es/static_files/common/internet/dep/aplicaciones/es/aeat/tike/cont/ws/SuministroInformacion.xsd";
         $sistema = $doc->createElementNS($nsInfo, "sf:SistemaInformatico");
         // Fallback a los datos del emisor si no hay productor específico (VeriFactu requiere NIFs válidos)
-        $prodNombre = $this->config['verifactu_productor_nombre'] ?? (defined('EMPRESA_RAZON_SOCIAL') ? EMPRESA_RAZON_SOCIAL : 'ElectroBazar Software S.L.');
+        $prodNombre = $this->config['verifactu_productor_nombre'] ?? (defined('EMPRESA_RAZON_SOCIAL') ? EMPRESA_RAZON_SOCIAL : 'CERTIFICADO FISICA PRUEBAS');
         $prodNif    = $this->config['verifactu_productor_nif'] ?? (defined('EMPRESA_CIF') ? EMPRESA_CIF : '99999910G');
 
         $sistema->appendChild($doc->createElementNS($nsInfo, "sf:NombreRazon", $prodNombre));
@@ -330,5 +331,14 @@ class VeriFactuService
         $sistema->appendChild($doc->createElementNS($nsInfo, "sf:TipoUsoPosibleMultiOT", "N"));
         $sistema->appendChild($doc->createElementNS($nsInfo, "sf:IndicadorMultiplesOT", "N"));
         $parent->appendChild($sistema);
+    }
+
+    /**
+     * Formatea importes numéricos para el XML asegurando 2 decimales y punto.
+     * Preserva el signo (importante para abonos).
+     */
+    private function fmtAmt($val): string
+    {
+        return number_format((float)$val, 2, '.', '');
     }
 }
