@@ -2124,6 +2124,15 @@
   transform: translateY(-1px);
 }
 
+.btn-save:disabled, .btn-primary:disabled, .btn-add:disabled {
+  background: var(--surface2) !important;
+  color: var(--text-muted) !important;
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none !important;
+}
+
 .btn-danger {
   width: fit-content;
   min-width: 120px;

@@ -2084,10 +2084,14 @@ input:focus + .slider {
 }
 
 .config-nav-item.active {
-  background: var(--blue-light);
-  color: var(--accent);
-  border-color: var(--accent-soft);
-  box-shadow: 0 4px 12px rgba(26, 47, 191, 0.08);
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+  box-shadow: 0 8px 20px rgba(var(--accent-rgb, 26, 47, 191), 0.25);
+}
+
+.config-nav-item.active i {
+  color: white;
 }
 
 .config-panel {

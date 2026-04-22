@@ -51,7 +51,7 @@
                         <i class="fa-solid fa-list-check"></i> <span><?php echo L('config_section_logs'); ?></span>
                     </div>
                     <div class="config-nav-item" onclick="switchConfigTab('verifactu')" id="nav-verifactu" style="border-left: 3px solid var(--accent);">
-                        <i class="fa-solid fa-cloud-arrow-up"></i> <span class="font-bold">VeriFactu</span>
+                        <i class="fa-solid fa-cloud-arrow-up"></i> <span class="font-bold"><?php echo L('config_vf_title'); ?></span>
                     </div>
                 </div>
             </aside>
@@ -314,15 +314,15 @@
                             <div class="section-header ai-center jc-space-between mb-24 pr-0 pb-16 border-bottom">
                                 <div class="section-title">
                                     <h3 class="fs-20 font-bold text-accent d-flex ai-center gap-12 m-0">
-                                        <i class="fa-solid fa-cloud-arrow-up"></i> Monitorización y Certificación VeriFactu
+                                        <i class="fa-solid fa-cloud-arrow-up"></i> <?php echo L('config_vf_title'); ?>
                                     </h3>
-                                    <p class="fs-14 text-muted m-0 mt-4">Estado de la comunicación con la AEAT y Declaración Responsable</p>
+                                    <p class="fs-14 text-muted m-0 mt-4"><?php echo L('config_vf_sub'); ?></p>
                                 </div>
                                 <div class="d-flex ai-center gap-12">
-                                    <a href="verifactu_log.php" target="_blank" class="btn-filter bg-surface border-1 text-accent d-flex ai-center gap-8 no-print" style="text-decoration: none;" title="Ver registros detallados">
-                                        <i class="fa-solid fa-layer-group"></i> <span>Auditoría Detallada</span>
+                                    <a href="verifactu_log.php" target="_blank" class="btn-save compact d-flex ai-center gap-8 no-print" style="text-decoration: none; min-width: auto; padding: 8px 16px; height: 38px; border-radius: 8px; background: var(--accent); color: white;" title="<?php echo L('config_vf_audit_title'); ?>">
+                                        <i class="fa-solid fa-layer-group"></i> <span><?php echo L('config_vf_audit'); ?></span>
                                     </a>
-                                    <button type="button" onclick="cargarStatsVerifactu()" class="btn-filter no-print" title="Actualizar">
+                                    <button type="button" onclick="cargarStatsVerifactu()" class="btn-save compact no-print" style="border: 1px solid var(--border); min-width: auto; padding: 8px 12px; height: 38px; border-radius: 8px; background: var(--surface2); color: var(--accent);" title="<?php echo L('config_vf_update'); ?>">
                                         <i class="fa-solid fa-sync"></i>
                                     </button>
                                 </div>
@@ -335,7 +335,7 @@
                                         <i class="fa-solid fa-check-double fs-24"></i>
                                     </div>
                                     <div>
-                                        <div class="fs-12 text-muted tt-uppercase fw-bold ls-1 mb-4">Enviados</div>
+                                        <div class="fs-12 text-muted tt-uppercase fw-bold ls-1 mb-4"><?php echo L('config_vf_sent'); ?></div>
                                         <div class="fs-28 font-bold font-mono" id="vf-stats-enviados">0</div>
                                     </div>
                                 </div>
@@ -344,7 +344,7 @@
                                         <i class="fa-solid fa-clock-rotate-left fs-24"></i>
                                     </div>
                                     <div>
-                                        <div class="fs-12 text-muted tt-uppercase fw-bold ls-1 mb-4">Pendientes</div>
+                                        <div class="fs-12 text-muted tt-uppercase fw-bold ls-1 mb-4"><?php echo L('config_vf_pending'); ?></div>
                                         <div class="fs-28 font-bold font-mono" id="vf-stats-pendientes">0</div>
                                     </div>
                                 </div>
@@ -353,7 +353,7 @@
                                         <i class="fa-solid fa-triangle-exclamation fs-24"></i>
                                     </div>
                                     <div>
-                                        <div class="fs-12 text-muted tt-uppercase fw-bold ls-1 mb-4">Errores</div>
+                                        <div class="fs-12 text-muted tt-uppercase fw-bold ls-1 mb-4"><?php echo L('config_vf_errors'); ?></div>
                                         <div class="fs-28 font-bold font-mono" id="vf-stats-errores">0</div>
                                     </div>
                                 </div>
@@ -365,7 +365,7 @@
                                 <div class="p-24 br-16 border-1 bg-surface2 d-flex-column jc-between">
                                     <div>
                                         <h4 class="fs-14 font-bold text-accent mb-20 tt-uppercase d-flex ai-center gap-8">
-                                            <i class="fa-solid fa-user-gear"></i> Datos del Productor (RD 1007/2023)
+                                            <i class="fa-solid fa-user-gear"></i> <?php echo L('config_vf_prod_data'); ?>
                                         </h4>
                                         <div class="d-flex flex-column gap-20">
                                             <div class="form-group mb-0">
@@ -374,15 +374,15 @@
                                             </div>
                                             <div class="form-group mb-0">
                                                 <label class="form-label fs-11 font-bold text-muted mb-8 tt-uppercase ls-1"><?php echo L('verifactu_label_productor_nif'); ?></label>
-                                                <input type="text" name="verifactu_productor_nif" class="form-input p-12 font-mono bg-white br-8 border-1" value="<?php echo htmlspecialchars($avConfig['verifactu_productor_nif'] ?? 'B00000000'); ?>">
+                                                <input type="text" name="verifactu_productor_nif" class="form-input p-12 font-mono bg-white br-8 border-1" value="<?php echo htmlspecialchars($avConfig['verifactu_productor_nif'] ?? '99999910G'); ?>">
                                             </div>
                                             <div class="d-flex gap-16">
                                                 <div class="form-group mb-0 flex-1">
-                                                    <label class="form-label fs-11 font-bold text-muted mb-8 tt-uppercase ls-1">ID Sistema</label>
+                                                    <label class="form-label fs-11 font-bold text-muted mb-8 tt-uppercase ls-1"><?php echo L('config_vf_sys_id'); ?></label>
                                                     <input type="text" name="verifactu_id_sistema" class="form-input p-12 bg-white br-8 border-1" value="<?php echo htmlspecialchars($avConfig['verifactu_id_sistema'] ?? '01'); ?>">
                                                 </div>
                                                 <div class="form-group mb-0 flex-1">
-                                                    <label class="form-label fs-11 font-bold text-muted mb-8 tt-uppercase ls-1">Versión</label>
+                                                    <label class="form-label fs-11 font-bold text-muted mb-8 tt-uppercase ls-1"><?php echo L('config_vf_version'); ?></label>
                                                     <input type="text" name="verifactu_version_sistema" class="form-input p-12 bg-white br-8 border-1" value="<?php echo htmlspecialchars($avConfig['verifactu_version_sistema'] ?? '1.0.0'); ?>">
                                                 </div>
                                             </div>
@@ -390,7 +390,7 @@
                                     </div>
                                     <div class="mt-32">
                                         <button type="submit" name="guardarConfiguracion" class="btn-save w-full d-flex ai-center jc-center gap-12 py-14 shadow-sm" style="height: 48px;" onclick="document.getElementById('seccion_activa').value='VERIFACTU'">
-                                            <i class="fa-solid fa-floppy-disk"></i> Guardar Ajustes Productor
+                                            <i class="fa-solid fa-floppy-disk"></i> <?php echo L('config_vf_btn_save'); ?>
                                         </button>
                                     </div>
                                 </div>
@@ -408,13 +408,13 @@
                                         <div class="p-16 br-12 bg-white border-1 fs-12 mb-20 shadow-sm" style="border-left: 4px solid var(--accent);">
                                             <div class="d-flex ai-center gap-12 mb-8">
                                                 <div class="w-8 h-8 br-full bg-accent"></div>
-                                                <span class="text-muted tt-uppercase fw-bold ls-1" style="font-size: 10px;">Sistema Certificado</span>
+                                                <span class="text-muted tt-uppercase fw-bold ls-1" style="font-size: 10px;"><?php echo L('config_vf_certified'); ?></span>
                                             </div>
                                             <div class="font-bold text-accent mb-4 fs-14">
                                                 <?php echo htmlspecialchars($avConfig['verifactu_nombre_sistema'] ?? 'ElectroBazar TPV'); ?> v<?php echo htmlspecialchars($avConfig['verifactu_version_sistema'] ?? '1.0.0'); ?>
                                             </div>
                                             <div class="text-muted italic">
-                                                Producción solicitada por: <span class="font-bold text-text not-italic"><?php echo htmlspecialchars($avConfig['verifactu_productor_nombre'] ?? 'ElectroBazar Software S.L.'); ?></span>
+                                                <?php echo L('config_vf_requested_by'); ?> <span class="font-bold text-text not-italic"><?php echo htmlspecialchars($avConfig['verifactu_productor_nombre'] ?? 'ElectroBazar Software S.L.'); ?></span>
                                             </div>
                                         </div>
                                     </div>
@@ -431,16 +431,16 @@
                                 <table class="w-full border-collapse table-premium">
                                     <thead class="bg-surface2">
                                         <tr>
-                                            <th class="p-16 text-left">Ticket</th>
-                                            <th class="p-16 text-left">Estado</th>
-                                            <th class="p-16 text-center">Intentos</th>
-                                            <th class="p-16 text-left">Mensaje</th>
-                                            <th class="p-16 text-center">Acciones</th>
+                                            <th class="p-16 text-left"><?php echo L('config_vf_th_ticket'); ?></th>
+                                            <th class="p-16 text-left"><?php echo L('config_vf_th_state'); ?></th>
+                                            <th class="p-16 text-center"><?php echo L('config_vf_th_tries'); ?></th>
+                                            <th class="p-16 text-left"><?php echo L('config_vf_th_msg'); ?></th>
+                                            <th class="p-16 text-center"><?php echo L('config_vf_th_actions'); ?></th>
                                         </tr>
                                     </thead>
                                     <tbody id="vf-cola-body">
                                         <tr>
-                                            <td colspan="5" class="p-32 text-center text-muted italic">Cargando datos...</td>
+                                            <td colspan="5" class="p-32 text-center text-muted italic"><?php echo L('config_vf_loading'); ?></td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -641,14 +641,14 @@
 
                     // Actualizar tabla
                     if (data.items.length === 0) {
-                        tbody.innerHTML = '<tr><td colspan="5" class="p-32 text-center text-muted italic">No hay registros en la cola</td></tr>';
+                        tbody.innerHTML = '<tr><td colspan="5" class="p-32 text-center text-muted italic"><?php echo L('config_vf_no_records'); ?></td></tr>';
                     } else {
                         tbody.innerHTML = data.items.map(item => {
                             let statusClass = 'bg-surface2 text-muted';
                             let statusText = item.estado;
-                            if (item.estado === 'enviado') { statusClass = 'bg-green-light text-green'; statusText = 'Enviado'; }
-                            if (item.estado === 'pendiente') { statusClass = 'bg-amber-light text-amber'; statusText = 'Pendiente'; }
-                            if (item.estado === 'error_critico') { statusClass = 'bg-red-light text-red'; statusText = 'Error Crítico'; }
+                            if (item.estado === 'enviado') { statusClass = 'bg-green-light text-green'; statusText = '<?php echo L('verifactu_status_sent'); ?>'; }
+                            if (item.estado === 'pendiente') { statusClass = 'bg-amber-light text-amber'; statusText = '<?php echo L('verifactu_status_pending'); ?>'; }
+                            if (item.estado === 'error_critico') { statusClass = 'bg-red-light text-red'; statusText = '<?php echo L('verifactu_status_error'); ?>'; }
 
                             return `
                                 <tr class="hover-bg-surface2 transition-all border-top">
@@ -657,12 +657,12 @@
                                         <span class="badge-log ${statusClass} p-8 br-8 fs-11 tt-uppercase fw-bold">${statusText}</span>
                                     </td>
                                     <td class="p-16 text-center font-mono">${item.intentos}</td>
-                                    <td class="p-16 fs-12 lh-1-4" style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${item.ultimo_error || 'Sin errores'}">
-                                        ${item.ultimo_error || '<span class="text-muted italic">Ninguno</span>'}
+                                    <td class="p-16 fs-12 lh-1-4" style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${item.ultimo_error || '<?php echo L('config_vf_none'); ?>'}">
+                                        ${item.ultimo_error || '<span class="text-muted italic"><?php echo L('config_vf_none'); ?></span>'}
                                     </td>
                                     <td class="p-16 text-center">
                                         ${item.estado !== 'enviado' ? `
-                                            <button onclick="reintentarVerifactu(${item.id})" class="btn-action-icon text-accent" title="Reintentar ahora">
+                                            <button onclick="reintentarVerifactu(${item.id})" class="btn-action-icon text-accent" title="<?php echo L('config_vf_retry_now'); ?>">
                                                 <i class="fa-solid fa-rotate"></i>
                                             </button>
                                         ` : '<i class="fa-solid fa-check text-green fs-18"></i>'}
@@ -679,8 +679,8 @@
                 console.error('Error cargando VeriFactu:', err);
                 tbody.innerHTML = `<tr><td colspan="5" class="p-32 text-center text-red">
                     <i class="fa-solid fa-circle-exclamation fs-24 mb-12 d-block"></i>
-                    Error al conectar con la API: ${err.message}<br>
-                    <small class="text-muted">Verifique que las tablas de base de datos estén migradas correctamente.</small>
+                    <?php echo L('config_vf_api_error'); ?>: ${err.message}<br>
+                    <small class="text-muted"><?php echo L('config_vf_db_error'); ?></small>
                 </td></tr>`;
             });
     }
@@ -699,10 +699,10 @@
         .then(response => response.json())
         .then(data => {
             if (data.ok) {
-                showCustomAlert("Acción completada", "El registro se ha marcado para reintento inmediato.", "success");
+                showCustomAlert("<?php echo L('config_vf_retry_success_title'); ?>", "<?php echo L('config_vf_retry_success_msg'); ?>", "success");
                 cargarStatsVerifactu();
             } else {
-                showCustomAlert("Error", data.error || "No se pudo reintentar.", "error");
+                showCustomAlert("<?php echo L('error'); ?>", data.error || "<?php echo L('config_vf_retry_error_msg'); ?>", "error");
             }
         });
     }

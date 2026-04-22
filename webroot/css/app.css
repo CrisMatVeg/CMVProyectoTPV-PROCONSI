@@ -182,6 +182,13 @@ input, select, textarea { font-family: inherit; outline: none; }
 .text-accent { color: var(--accent) !important; }
 .text-green { color: var(--green) !important; }
 .text-red { color: var(--red) !important; }
+.bg-surface { background: var(--surface) !important; }
+.bg-surface2 { background: var(--surface2) !important; }
+.bg-blue-light { background: var(--blue-light) !important; }
+.bg-green-light { background: var(--green-light) !important; }
+.bg-red-light { background: var(--red-light) !important; }
+
+
 
 .fs-10 { font-size: 10px !important; }
 .fs-11 { font-size: 11px !important; }

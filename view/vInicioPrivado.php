@@ -284,8 +284,16 @@
                 <div class="form-group grid-col-span-2">
                     <div class="grid-2 gap-12">
                         <div class="form-group mb-0">
-                            <label class="form-label"><?php echo L('modal_label_price'); ?></label>
                             <input id="editPrice" class="form-input font-mono text-right fs-16" type="text" oninput="updateEditMargin()" placeholder="0.00" />
+                            
+                            <!-- Alta Precisión Checkbox TPV -->
+                            <div class="mt-8 d-flex ai-center gap-8 px-4 py-2 br-6 bg-surface2 border-1 transition-all hover-border-accent" style="width: fit-content;">
+                                <input type="checkbox" id="editMantenerPrecision" class="form-checkbox cursor-pointer" onchange="toggleEditPrecisionUI()">
+                                <label for="editMantenerPrecision" class="fs-11 fw-700 text-muted cursor-pointer" style="text-transform: uppercase; letter-spacing: 0.5px;">
+                                    <i class="fa-solid fa-bullseye mr-4 opacity-50"></i> <?php echo L('prod_label_precision_price'); ?>
+                                </label>
+                            </div>
+                            
                             <span class="form-error" id="err-editPrecio"></span>
                         </div>
                         <div class="form-group mb-0">

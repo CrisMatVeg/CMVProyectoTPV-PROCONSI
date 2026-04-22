@@ -124,7 +124,7 @@
 
         <div class="filter-item">
             <span class="filter-label"><?php echo L('prod_th_category'); ?></span>
-            <select id="filterCat" class="filter-control" onchange="applyFilters()" style="min-width: 180px;">
+            <select id="filterCat" class="filter-control" onchange="filtrarProductos()" style="min-width: 180px;">
                 <option value="all"><?php echo L('prod_filter_cat_all'); ?></option>
                 <?php foreach ($avProductos['categorias'] as $c): ?>
                     <option value="<?php echo htmlspecialchars($c['codigo']); ?>"><?php echo htmlspecialchars($c['nombre']); ?></option>
@@ -134,7 +134,7 @@
 
         <div class="filter-item">
             <span class="filter-label"><?php echo L('prod_th_status'); ?></span>
-            <select id="filterEstado" class="filter-control" onchange="applyFilters()" style="min-width: 150px;">
+            <select id="filterEstado" class="filter-control" onchange="filtrarProductos()" style="min-width: 150px;">
                 <option value="all"><?php echo L('prod_filter_status_all'); ?></option>
                 <option value="1"><?php echo L('prod_status_active'); ?></option>
                 <option value="0"><?php echo L('prod_status_inactive'); ?></option>
@@ -210,7 +210,13 @@
                             </div>
                         </td>
                         <td class="text-right font-bold font-mono">
-                            <?php echo number_format($p['precio_venta'], 2, ',', '.'); ?> €
+                            <?php 
+                            if (!empty($p['mantener_precision'])) {
+                                echo str_replace('.', ',', (string)$p['precio_venta']);
+                            } else {
+                                echo number_format($p['precio_venta'], 2, ',', '.');
+                            }
+                            ?> €
                         </td>
                         <td class="text-center">
                             <?php if ($p['activo']): ?>
@@ -801,6 +807,15 @@
                                 class="form-input text-right font-bold font-mono text-accent fs-18"
                                 oninput="calcularMargenDesdePrecio()"
                                 title="<?php echo L('prod_modal_tip_price_calc'); ?>">
+                            
+                            <!-- Alta Precisión Checkbox -->
+                            <div class="mt-8 d-flex ai-center gap-8 px-4 py-2 br-6 bg-surface2 border-1 transition-all hover-border-accent" style="width: fit-content;">
+                                <input type="checkbox" id="prodMantenerPrecision" class="form-checkbox cursor-pointer" onchange="togglePrecisionUI()">
+                                <label for="prodMantenerPrecision" class="fs-11 fw-700 text-muted cursor-pointer" style="text-transform: uppercase; letter-spacing: 0.5px;">
+                                    <i class="fa-solid fa-bullseye mr-4 opacity-50"></i> <?php echo L('prod_label_precision_price'); ?>
+                                </label>
+                            </div>
+                            
                             <span class="form-error" id="err-precio_venta"></span>
                         </div>
                     </div>
@@ -1261,6 +1276,7 @@
                     accion: 'listar',
                     term: currentFilters.term,
                     cat: currentFilters.cat,
+                    estado: currentFilters.estado,
                     minPrice: currentFilters.minPrice,
                     maxPrice: currentFilters.maxPrice,
                     limit: limit,
@@ -1325,7 +1341,7 @@
                             <span class="fs-9 tt-uppercase ${esCritico ? 'text-red font-bold' : 'text-muted'}"><?php echo L('prod_stock_min_label'); ?> ${stockMin}</span>
                         </div>
                     </td>
-                    <td class="text-right font-bold font-mono">${parseFloat(p.precio_venta).toLocaleString('es-ES', {minimumFractionDigits: 2})} €</td>
+                    <td class="text-right font-bold font-mono">${p.mantener_precision ? p.precio_venta.toString().replace('.', ',') : parseFloat(p.precio_venta).toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2})} €</td>
                     <td class="text-center">
                         <span class="status-pill ${statusClass}">
                             <i class="fa-solid ${statusIcon}"></i> ${statusText}
@@ -1377,6 +1393,7 @@
         currentFilters.cat  = document.getElementById('filterCat') ? document.getElementById('filterCat').value : '';
         currentFilters.minPrice = document.getElementById('filterPriceMin') ? document.getElementById('filterPriceMin').value : '';
         currentFilters.maxPrice = document.getElementById('filterPriceMax') ? document.getElementById('filterPriceMax').value : '';
+        currentFilters.estado = document.getElementById('filterEstado') ? document.getElementById('filterEstado').value : 'all';
         
         loadProducts(1);
     }, 400);
@@ -1442,7 +1459,7 @@
         const pctRE = aplicaRE ? infoIVA.re : 0;
 
         const base = total / (1 + (infoIVA.iva / 100) + (pctRE / 100));
-        document.getElementById('prodPrecioProveedor').value = base.toFixed(4);
+        document.getElementById('prodPrecioProveedor').value = base.toString();
     }
 
     function calcularPrecioDesdeMargen() {
@@ -1452,7 +1469,8 @@
 
         if (coste >= 0) {
             const precioVenta = coste * (1 + (margen / 100));
-            inputVenta.value = precioVenta.toFixed(2);
+            const keepPrecision = document.getElementById('prodMantenerPrecision')?.checked;
+            inputVenta.value = keepPrecision ? precioVenta.toString() : precioVenta.toFixed(2);
         }
     }
 
@@ -1466,6 +1484,17 @@
             inputMargen.value = margen.toFixed(2);
         } else {
             inputMargen.value = '0.00';
+        }
+    }
+
+    function togglePrecisionUI() {
+        const keepPrecision = document.getElementById('prodMantenerPrecision').checked;
+        const inputVenta = document.getElementById('prodPrecioVenta');
+        
+        if (!keepPrecision) {
+            // Si desactivamos, redondeamos el valor actual a 2 decimales
+            const val = parseFloat(inputVenta.value.replace(',', '.')) || 0;
+            inputVenta.value = val.toFixed(2);
         }
     }
 
@@ -1520,12 +1549,26 @@
             const selIva = document.getElementById('prodIvaTipo');
             if (selIva) selIva.value = producto.codigo_iva || 'GENERAL';
 
-            inputCoste.value = parseFloat(producto.precio_coste || 0).toFixed(2);
+            inputCoste.value = producto.precio_coste || '0';
             document.getElementById('prodPrecioVenta').value = producto.precio_venta || '0.00';
             inputStock.value = producto.stock !== undefined ? producto.stock : (producto.stock_actual || '0');
             document.getElementById('prodStockMin').value = producto.stock_minimo || '0';
             document.getElementById('prodMargen').value = producto.margen || '0.00';
-            document.getElementById('prodPrecioProveedor').value = parseFloat(producto.precio_proveedor || 0).toFixed(4);
+            document.getElementById('prodPrecioProveedor').value = producto.precio_proveedor || '0';
+            
+            const checkPrecision = document.getElementById('prodMantenerPrecision');
+            if (checkPrecision) {
+                const precisionActiva = !!(parseInt(producto.mantener_precision || 0));
+                checkPrecision.checked = precisionActiva;
+                
+                // Si la precisión está desactivada, forzamos el formato de 2 decimales en el input de venta
+                if (!precisionActiva) {
+                    const pVenta = parseFloat(producto.precio_venta) || 0;
+                    document.getElementById('prodPrecioVenta').value = pVenta.toFixed(2);
+                } else {
+                    document.getElementById('prodPrecioVenta').value = producto.precio_venta || '0';
+                }
+            }
 
             if (parseFloat(producto.margen || 0) <= 0) calcularMargenDesdePrecio();
 
@@ -1998,8 +2041,12 @@
         document.getElementById('prodPrecioVenta').value = '0.00';
         document.getElementById('prodStock').value = '0';
         document.getElementById('prodStockMin').value = '0';
-        document.getElementById('prodGarantia').value = '24';
         document.getElementById('prodMargen').value = '0.00';
+        document.getElementById('prodPrecioProveedor').value = '0.0000';
+            
+        const checkPrecision = document.getElementById('prodMantenerPrecision');
+        if (checkPrecision) checkPrecision.checked = false;
+        document.getElementById('prodGarantia').value = '24';
     }
 
     function switchModalTab(tabId, btn) {
@@ -2352,7 +2399,8 @@
             id_proveedor: document.getElementById('prodProveedor').value || null,
             aplica_re: 0,
             es_pack: 0,
-            componentes_pack: null
+            componentes_pack: null,
+            mantener_precision: document.getElementById('prodMantenerPrecision').checked ? 1 : 0
         };
 
         // Enviamos siempre el precio de coste y stock actual para permitir ajustes manuales tanto al añadir como al editar
@@ -2501,41 +2549,7 @@
     }
 
     // Lógica de filtrado y ordenación
-    function applyFilters() {
-        const term = document.getElementById('prodSearch').value.toLowerCase().trim();
-        const cat = document.getElementById('filterCat').value;
-        const estado = document.getElementById('filterEstado').value;
-        const priceMin = parseFloat(document.getElementById('filterPriceMin').value) || 0;
-        const priceMax = parseFloat(document.getElementById('filterPriceMax').value) || 999999;
 
-        const rows = document.querySelectorAll('.product-row');
-        let hasResults = false;
-
-        rows.forEach(row => {
-            const nombre = row.dataset.nombre;
-            const codigo = row.dataset.codigo;
-            const categoria = row.dataset.categoria;
-            const activo = row.dataset.activo;
-            const precio = parseFloat(row.dataset.precio);
-
-            const matchesTerm = !term || nombre.includes(term) || codigo.includes(term);
-            const matchesCat = cat === 'all' || categoria === cat;
-            const matchesEstado = estado === 'all' || activo === estado;
-            const matchesPrice = precio >= priceMin && precio <= priceMax;
-
-            if (matchesTerm && matchesCat && matchesEstado && matchesPrice) {
-                row.style.display = '';
-                hasResults = true;
-            } else {
-                row.style.display = 'none';
-            }
-        });
-
-        document.getElementById('noResults').classList.toggle('d-none', hasResults);
-    }
-
-    document.getElementById('filterPriceMin').addEventListener('input', applyFilters);
-    document.getElementById('filterPriceMax').addEventListener('input', applyFilters);
 
     function applySort() {
         const order = document.getElementById('sortOrder').value;
@@ -2846,9 +2860,6 @@
         });
     }
 
-    document.getElementById('prodSearch').addEventListener('input', applyFilters);
-    document.getElementById('filterCat').addEventListener('change', applyFilters);
-    document.getElementById('filterEstado').addEventListener('change', applyFilters);
 
     // Guardar Pack Form Submit Listener
     document.getElementById('formPack').addEventListener('submit', async (e) => {
@@ -3007,9 +3018,49 @@
     }
 
     // --- GESTIÓN DE CATEGORÍAS ---
+    
+    function activarEdicionCategoria(id) {
+        const row = document.getElementById('cat-row-' + id);
+        row.querySelectorAll('.cat-view-mode').forEach(el => el.classList.add('d-none'));
+        row.querySelectorAll('.cat-edit-mode').forEach(el => el.classList.remove('d-none'));
+    }
 
+    function cancelarEdicionCategoria(id) {
+        const row = document.getElementById('cat-row-' + id);
+        row.querySelectorAll('.cat-view-mode').forEach(el => el.classList.remove('d-none'));
+        row.querySelectorAll('.cat-edit-mode').forEach(el => el.classList.add('d-none'));
+    }
 
+    async function guardarEdicionCategoria(id) {
+        const row = document.getElementById('cat-row-' + id);
+        const nombre = row.querySelector('.cat-edit-name').value.trim();
+        const codigo = row.querySelector('.cat-edit-code').value.trim();
 
+        if (!nombre || !codigo) {
+            showCustomAlert("Error", "El nombre y el código no pueden estar vacíos.", 'warning');
+            return;
+        }
+
+        try {
+            const resp = await fetch('api/gestionCategoria.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ accion: 'editar', id, nombre, codigo })
+            });
+            const r = await resp.json();
+            if (r.ok) {
+                row.querySelector('.cat-name-label').textContent = nombre;
+                row.querySelector('.cat-code-label').textContent = codigo;
+                cancelarEdicionCategoria(id);
+                showCustomAlert("Éxito", "Categoría actualizada correctamente.", 'success');
+            } else {
+                showCustomAlert("Error", r.error || "No se pudo actualizar.", 'error');
+            }
+        } catch (e) {
+            console.error(e);
+            showCustomAlert("Error", "Error de conexión.", 'error');
+        }
+    }
 
     async function añadirCategoria() {
         const nombre = document.getElementById('newCatNombre').value.trim();
@@ -3254,12 +3305,6 @@
         }
     }
 
-    // Redefinimos applyFilters para que use la carga AJAX
-    window.applyFilters = function() {
-        if (typeof filtrarProductos === 'function') {
-            filtrarProductos();
-        }
-    };
 
     function ajustarStockManual(tipo) {
         const id = document.getElementById('prodId').value;
@@ -3571,15 +3616,23 @@
                     </thead>
                     <tbody class="divide-y" style="background: var(--surface);">
                         <?php foreach ($avProductos['categorias'] as $c): ?>
-                            <tr class="hover-bg-surface2 transition-all">
+                            <tr class="hover-bg-surface2 transition-all" id="cat-row-<?php echo $c['id']; ?>">
                                 <td class="p-20">
                                     <div class="d-flex ai-center gap-20">
                                         <div class="p-12 br-12 bg-surface2 text-muted border" style="width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;">
                                             <i class="fa-solid fa-folder-open fs-18"></i>
                                         </div>
-                                        <div>
-                                            <div class="font-bold fs-15" style="color: var(--text);"><?php echo htmlspecialchars($c['nombre']); ?></div>
-                                            <div class="fs-11 text-muted font-mono opacity-60"><?php echo htmlspecialchars($c['codigo']); ?></div>
+                                        <div class="flex-1">
+                                            <!-- View Mode -->
+                                            <div class="cat-view-mode">
+                                                <div class="font-bold fs-15 text-text cat-name-label"><?php echo htmlspecialchars($c['nombre']); ?></div>
+                                                <div class="fs-11 text-muted font-mono opacity-60 cat-code-label"><?php echo htmlspecialchars($c['codigo']); ?></div>
+                                            </div>
+                                            <!-- Edit Mode (Hidden) -->
+                                            <div class="cat-edit-mode d-none d-flex flex-column gap-8">
+                                                <input type="text" class="form-input h-32 fs-13 py-4 px-8 cat-edit-name" value="<?php echo htmlspecialchars($c['nombre']); ?>" style="border-radius: 6px;">
+                                                <input type="text" class="form-input h-24 fs-11 py-2 px-8 font-mono cat-edit-code" value="<?php echo htmlspecialchars($c['codigo']); ?>" style="border-radius: 6px;">
+                                            </div>
                                         </div>
                                     </div>
                                 </td>
@@ -3599,9 +3652,22 @@
                                     </div>
                                 </td>
                                 <td class="p-20 text-center">
-                                    <button onclick="eliminarCategoria(<?php echo $c['id']; ?>, '<?php echo addslashes(htmlspecialchars($c['nombre'])); ?>')" class="btn-icon text-red bg-red-soft p-12 br-12 transition-all hover-scale" title="<?php echo L('prod_modal_cat_tip_delete'); ?>" style="width: 42px; height: 42px;">
-                                        <i class="fa-solid fa-trash-can fs-16"></i>
-                                    </button>
+                                    <div class="cat-view-mode d-flex jc-center gap-8">
+                                        <button onclick="activarEdicionCategoria(<?php echo $c['id']; ?>)" class="btn-icon text-accent bg-accent-soft p-12 br-12 transition-all hover-scale" title="Editar nombre/código" style="width: 42px; height: 42px;">
+                                            <i class="fa-solid fa-pen-to-square fs-16"></i>
+                                        </button>
+                                        <button onclick="eliminarCategoria(<?php echo $c['id']; ?>, '<?php echo addslashes(htmlspecialchars($c['nombre'])); ?>')" class="btn-icon text-red bg-red-soft p-12 br-12 transition-all hover-scale" title="<?php echo L('prod_modal_cat_tip_delete'); ?>" style="width: 42px; height: 42px;">
+                                            <i class="fa-solid fa-trash-can fs-16"></i>
+                                        </button>
+                                    </div>
+                                    <div class="cat-edit-mode d-none d-flex jc-center gap-8">
+                                        <button onclick="guardarEdicionCategoria(<?php echo $c['id']; ?>)" class="btn-icon text-green bg-green-soft p-12 br-12 transition-all hover-scale" title="Guardar cambios" style="width: 42px; height: 42px;">
+                                            <i class="fa-solid fa-check fs-16"></i>
+                                        </button>
+                                        <button onclick="cancelarEdicionCategoria(<?php echo $c['id']; ?>)" class="btn-icon text-muted bg-surface2 p-12 br-12 transition-all hover-scale" title="Cancelar" style="width: 42px; height: 42px;">
+                                            <i class="fa-solid fa-xmark fs-16"></i>
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
