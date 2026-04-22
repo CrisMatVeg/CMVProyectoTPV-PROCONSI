@@ -9,7 +9,7 @@ require_once("./core/Language.php");
 session_start();
 
 // Determinar idioma (Prioridad: URL > Session > Usuario Logueado > Default 'es')
-if (isset($_GET['lang']) && in_array($_GET['lang'], ['es', 'en', 'fr', 'it', 'de'])) {
+if (isset($_GET['lang']) && in_array($_GET['lang'], ['es', 'en', 'fr', 'it', 'de', 'eu', 'ca', 'gl', 'ru', 'zh', 'ja'])) {
     $_SESSION['lang'] = $_GET['lang'];
     if (isset($_SESSION['usuarioActualTPV'])) {
         require_once("./model/UsuarioPDO.php");

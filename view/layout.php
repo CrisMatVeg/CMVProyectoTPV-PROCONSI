@@ -98,6 +98,9 @@
             voucherApplied: "<?php echo L('tpv_js_voucher_applied', true); ?>",
             fieldRequired: "<?php echo L('tpv_js_field_required', true); ?>",
             nameNifRequired: "<?php echo L('tpv_js_name_nif_required', true); ?>",
+            ticket_type_abono: "<?php echo L('ticket_type_abono', true); ?>",
+            invoice: "<?php echo L('ticket_type_invoice', true); ?>",
+            ticket: "<?php echo L('ticket_type_sale', true); ?>",
             clientRegistered: "<?php echo L('tpv_js_client_registered', true); ?>",
             newLabel: "<?php echo L('tpv_js_new_label', true); ?>",
             selectionRequired: "<?php echo L('tpv_js_selection_required', true); ?>",
@@ -105,6 +108,8 @@
             amountToAdd: "<?php echo L('tpv_js_amount_to_add', true); ?>",
             cashReceived: "<?php echo L('tpv_js_cash_received', true); ?>",
             amountOwed: "<?php echo L('tpv_js_amount_owed', true); ?>",
+            precisionLabel: "<?php echo L('prod_label_precision_price', true); ?>",
+            precisionTip: "<?php echo L('prod_tip_precision_price', true); ?>",
             paymentIdentified: "<?php echo L('tpv_js_payment_identified', true); ?>",
             clientIdentified: "<?php echo L('tpv_js_client_identified', true); ?>",
             apply: "<?php echo L('tpv_apply', true); ?>",
@@ -331,6 +336,30 @@
                             <a href="index.php?lang=de" class="lang-link <?php echo $lang === 'de' ? 'active' : ''; ?>">
                                 <img src="https://flagcdn.com/16x12/de.png" alt="DE">
                                 <span>Deutsch</span>
+                            </a>
+                            <a href="index.php?lang=eu" class="lang-link <?php echo $lang === 'eu' ? 'active' : ''; ?>">
+                                <img src="https://upload.wikimedia.org/wikipedia/commons/2/2d/Flag_of_the_Basque_Country.svg" alt="EU" style="width: 18px; height: 13px; object-fit: cover; border-radius: 2px;">
+                                <span>Euskara</span>
+                            </a>
+                            <a href="index.php?lang=ca" class="lang-link <?php echo $lang === 'ca' ? 'active' : ''; ?>">
+                                <img src="https://upload.wikimedia.org/wikipedia/commons/c/ce/Flag_of_Catalonia.svg" alt="CA" style="width: 18px; height: 13px; object-fit: cover; border-radius: 2px;">
+                                <span>Català</span>
+                            </a>
+                            <a href="index.php?lang=gl" class="lang-link <?php echo $lang === 'gl' ? 'active' : ''; ?>">
+                                <img src="https://upload.wikimedia.org/wikipedia/commons/6/64/Flag_of_Galicia.svg" alt="GL" style="width: 18px; height: 13px; object-fit: cover; border-radius: 2px;">
+                                <span>Galego</span>
+                            </a>
+                            <a href="index.php?lang=ru" class="lang-link <?php echo $lang === 'ru' ? 'active' : ''; ?>">
+                                <img src="https://flagcdn.com/16x12/ru.png" alt="RU">
+                                <span>Русский</span>
+                            </a>
+                            <a href="index.php?lang=zh" class="lang-link <?php echo $lang === 'zh' ? 'active' : ''; ?>">
+                                <img src="https://flagcdn.com/16x12/cn.png" alt="ZH">
+                                <span>中文</span>
+                            </a>
+                            <a href="index.php?lang=ja" class="lang-link <?php echo $lang === 'ja' ? 'active' : ''; ?>">
+                                <img src="https://flagcdn.com/16x12/jp.png" alt="JA">
+                                <span>日本語</span>
                             </a>
                         </div>
                     </div>
@@ -614,6 +643,18 @@
                 </div>
             </div>
 
+            <div id="returnProductInfo" class="mb-12 p-12 br-12 bg-surface2 border-1 d-none" style="border-style: dashed;">
+                <div class="fs-14 fw-700 mb-4" id="returnProductName">Nombre del Producto</div>
+                <div class="d-flex ai-center gap-8">
+                    <span class="fs-10 px-8 py-4 br-6 fw-700 d-inline-flex ai-center gap-4" id="returnProductWarrantyBadge" style="background:var(--surface3);">
+                        <i class="fa-solid fa-shield-halved"></i> <span>Garantía: -- meses</span>
+                    </span>
+                    <span class="fs-10 px-8 py-4 br-6 fw-700 d-inline-flex ai-center gap-4 d-none" id="returnProductStatusBadge">
+                        <i class="fa-solid fa-circle-check"></i> <span>En plazo</span>
+                    </span>
+                </div>
+            </div>
+
             <!-- Indicadores de Plazo -->
             <div class="d-grid grid-2 gap-12 w-100">
                 <div id="statusCommercial" class="p-16 br-12 border d-flex flex-column ai-center jc-center gap-8 transition shadow-sm">
@@ -653,15 +694,26 @@
                             <div class="fs-11 text-muted"><?php echo L('return_voucher_sub'); ?></div>
                         </div>
                     </label>
+                    <label class="method-option border br-12 p-16 d-flex ai-center gap-16 cp transition hover-bg-surface2" id="optCard">
+                        <div class="radio-custom d-flex ai-center jc-center">
+                            <input type="radio" name="metodoReembolso" value="tarjeta">
+                            <div class="radio-dot"></div>
+                        </div>
+                        <i class="fa-solid fa-credit-card fs-20 text-accent"></i>
+                        <div class="flex-1">
+                            <div class="fs-14 fw-700">Tarjeta</div>
+                            <div class="fs-11 text-muted">Devolución al terminal TPV</div>
+                        </div>
+                    </label>
                     <label class="method-option border br-12 p-16 d-flex ai-center gap-16 cp transition hover-bg-surface2" id="optExchange">
                         <div class="radio-custom d-flex ai-center jc-center">
                             <input type="radio" name="metodoReembolso" value="reemplazo">
                             <div class="radio-dot"></div>
                         </div>
-                        <i class="fa-solid fa-box-open fs-20 text-orange"></i>
+                        <i class="fa-solid fa-rotate fs-20 text-orange"></i>
                         <div class="flex-1">
-                            <div class="fs-14 fw-700"><?php echo L('return_warranty_desc'); ?></div>
-                            <div class="fs-11 text-muted"><?php echo L('return_warranty_sub'); ?></div>
+                            <div class="fs-14 fw-700">Sustitución / Cambio</div>
+                            <div class="fs-11 text-muted">Cambio por garantía (1:1)</div>
                         </div>
                     </label>
                 </div>
@@ -712,13 +764,15 @@
 
             <div class="form-group mb-0">
                 <label class="form-label fw-600 mb-8"><?php echo L('client_label_notes'); ?>:</label>
+
+                <!-- Motivo libre -->
                 <select id="returnReason" class="form-input mb-8">
-                    <option value="Defectuoso"><?php echo L('return_reason_defective'); ?></option>
-                    <option value="Garantía"><?php echo L('return_reason_warranty'); ?></option>
-                    <option value="Error de Facturación"><?php echo L('return_reason_error'); ?></option>
-                    <option value="Otro"><?php echo L('return_reason_other'); ?></option>
+                    <option value="Devolución de mercancía">Devolución de mercancía</option>
+                    <option value="Error en datos de factura">Error en datos / importe</option>
+                    <option value="Garantía / defecto">Defecto / garantía</option>
+                    <option value="Otro motivo">Otro motivo</option>
                 </select>
-                
+
                 <div class="d-flex ai-center gap-8 mb-12 p-8 br-8 bg-surface2 border-1" style="border-style: dashed;">
                     <input type="checkbox" id="returnReponerStock" checked style="width: 18px; height: 18px; cursor: pointer;">
                     <label for="returnReponerStock" class="fs-12 fw-600 cp"><?php echo L('return_label_reponer_stock'); ?></label>
@@ -726,6 +780,7 @@
 
                 <textarea id="returnNote" class="form-input fs-12" placeholder="<?php echo L('client_comments_placeholder', true); ?>" rows="2"></textarea>
             </div>
+
 
             <div class="modal-footer full-width gap-12 pt-16 border-top">
                 <button onclick="document.getElementById('returnModal').classList.remove('visible')" class="btn-cancel m-0"><?php echo L('modal_close'); ?></button>
@@ -901,7 +956,7 @@
     <script src="./webroot/js/validaciones.js?v=2"></script>
     <script src="./webroot/js/utils_global.js?v=16"></script>
     <?php if (isset($_SESSION['usuarioActualTPV']) && ($_SESSION['paginaEnCurso'] ?? '') !== 'Login'): ?>
-        <script src="./webroot/js/main.js?v=45"></script>
+        <script src="./webroot/js/main.js?v=46"></script>
         <script src="./webroot/js/app.js?v=44" type="module"></script>
     <?php endif; ?>
     <!-- SISTEMA DE MODALES GLOBALES (ALERTAS Y CONFIRMACIONES) -->
