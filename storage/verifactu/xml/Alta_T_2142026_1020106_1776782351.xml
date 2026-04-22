@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sfLR:RegFactuSistemaFacturacion xmlns:sf="https://www2.agenciatributaria.gob.es/static_files/common/internet/dep/aplicaciones/es/aeat/tike/cont/ws/SuministroInformacion.xsd" xmlns:sfLR="https://www2.agenciatributaria.gob.es/static_files/common/internet/dep/aplicaciones/es/aeat/tike/cont/ws/SuministroLR.xsd" Id="pfx5776b416-859b-c00b-f45b-5902a2d5ce5c">
+  <sfLR:Cabecera>
+    <sf:ObligadoEmision>
+      <sf:NombreRazon>CERTIFICADO FISICA PRUEBAS</sf:NombreRazon>
+      <sf:NIF>99999910G</sf:NIF>
+    </sf:ObligadoEmision>
+    <sf:RemisionVoluntaria>
+      <sf:Incidencia>N</sf:Incidencia>
+    </sf:RemisionVoluntaria>
+  </sfLR:Cabecera>
+  <sfLR:RegistroFactura>
+    <sf:RegistroAlta>
+      <sf:IDVersion>1.0</sf:IDVersion>
+      <sf:IDFactura>
+        <sf:IDEmisorFactura>99999910G</sf:IDEmisorFactura>
+        <sf:NumSerieFactura>T-2142026-1020106</sf:NumSerieFactura>
+        <sf:FechaExpedicionFactura>21-04-2026</sf:FechaExpedicionFactura>
+      </sf:IDFactura>
+      <sf:NombreRazonEmisor>CERTIFICADO FISICA PRUEBAS</sf:NombreRazonEmisor>
+      <sf:TipoFactura>F2</sf:TipoFactura>
+      <sf:DescripcionOperacion>Venta TPV</sf:DescripcionOperacion>
+      <sf:Desglose>
+        <sf:DetalleDesglose>
+          <sf:Impuesto>01</sf:Impuesto>
+          <sf:ClaveRegimen>01</sf:ClaveRegimen>
+          <sf:CalificacionOperacion>S1</sf:CalificacionOperacion>
+          <sf:TipoImpositivo>21.00</sf:TipoImpositivo>
+          <sf:BaseImponibleOimporteNoSujeto>216.85</sf:BaseImponibleOimporteNoSujeto>
+          <sf:CuotaRepercutida>45.54</sf:CuotaRepercutida>
+        </sf:DetalleDesglose>
+      </sf:Desglose>
+      <sf:CuotaTotal>45.54</sf:CuotaTotal>
+      <sf:ImporteTotal>262.39</sf:ImporteTotal>
+      <sf:Encadenamiento>
+        <sf:RegistroAnterior>
+          <sf:IDEmisorFactura>99999910G</sf:IDEmisorFactura>
+          <sf:NumSerieFactura>T-2142026-1020105</sf:NumSerieFactura>
+          <sf:FechaExpedicionFactura>21-04-2026</sf:FechaExpedicionFactura>
+          <sf:Huella>F8A075E06F1EA2ACB8C989683A6B8A641D3872788E87E5010E8ED93A24936034</sf:Huella>
+        </sf:RegistroAnterior>
+      </sf:Encadenamiento>
+      <sf:SistemaInformatico>
+        <sf:NombreRazon>CERTIFICADO FISICA PRUEBAS</sf:NombreRazon>
+        <sf:NIF>99999910G</sf:NIF>
+        <sf:NombreSistemaInformatico>ElectroBazar TPV</sf:NombreSistemaInformatico>
+        <sf:IdSistemaInformatico>01</sf:IdSistemaInformatico>
+        <sf:Version>1.0.0</sf:Version>
+        <sf:NumeroInstalacion>INST001</sf:NumeroInstalacion>
+        <sf:TipoUsoPosibleSoloVerifactu>S</sf:TipoUsoPosibleSoloVerifactu>
+        <sf:TipoUsoPosibleMultiOT>N</sf:TipoUsoPosibleMultiOT>
+        <sf:IndicadorMultiplesOT>N</sf:IndicadorMultiplesOT>
+      </sf:SistemaInformatico>
+      <sf:FechaHoraHusoGenRegistro>2026-04-21T16:39:11+02:00</sf:FechaHoraHusoGenRegistro>
+      <sf:TipoHuella>01</sf:TipoHuella>
+      <sf:Huella>C1A7DA9D05DB0CBA124D753E4CADB7D6793C8DF020CE1DAE9F1AB2782BA4C21E</sf:Huella>
+    </sf:RegistroAlta>
+  </sfLR:RegistroFactura>
+  <ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#" xmlns:xades="http://uri.etsi.org/01903/v1.3.2#" Id="Signature-eada9e6d">
+  <ds:SignedInfo><ds:CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>
+    <ds:SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"/>
+  <ds:Reference URI="#pfx5776b416-859b-c00b-f45b-5902a2d5ce5c"><ds:Transforms><ds:Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/></ds:Transforms><ds:DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><ds:DigestValue>25qRR6WcXTKR9RFTEK41RebgXPoM0jfaQeK/3tqERbA=</ds:DigestValue></ds:Reference></ds:SignedInfo><ds:SignatureValue>EEz95T6rIGHyEnTdXW2JvHHZ4lTmwRj5l7FMOaZAlbYQ6q+n+1UuvAxETZUFDsicNrXWhqkOuhdLTAlZG4RHMzDb3Q4mIfkS5azmG41qKztkHiXAVtYF9fxkgs4/EFEbFHkaJMQVj0Qg9uSBjnF5j8/VSwGJMllmZtFHp+YV0aP1QohYEyNUlfLNOUiwoC654Gvg8ts6QJ+eNtdM6K1cxgR8/A3zQMCF0eVka3E70R/mql4VDoIaZgi8HCImoulsjQ2xzDLWNnz38eLjKBwchmClYHeB7WgYAAkhKezKPqlAHYpAIm2vrF1SYTtMuRlTYUUz0HxYx2ZfmTQgauNCXg==</ds:SignatureValue>
+<ds:Object xmlns:xades="http://uri.etsi.org/01903/v1.3.2#"><xades:QualifyingProperties xmlns:xades="http://uri.etsi.org/01903/v1.3.2#" Target="#Signature-eada9e6d"><xades:SignedProperties xmlns:ds="http://www.w3.org/2000/09/xmldsig#" Id="SignedProperties-Signature-eada9e6d"><xades:SignedSignatureProperties xmlns:ds="http://www.w3.org/2000/09/xmldsig#"><xades:SigningTime>2026-04-21T16:39:11+02:00</xades:SigningTime><xades:SigningCertificate xmlns:ds="http://www.w3.org/2000/09/xmldsig#"><xades:Cert xmlns:ds="http://www.w3.org/2000/09/xmldsig#"><xades:CertDigest xmlns:ds="http://www.w3.org/2000/09/xmldsig#"><ds:DigestMethod xmlns:ds="http://www.w3.org/2000/09/xmldsig#" Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><ds:DigestValue xmlns:ds="http://www.w3.org/2000/09/xmldsig#">3B/2E//Yq77IZjAkSIFz0HMhqPybqWO8RWRN8+jdf7Q=</ds:DigestValue></xades:CertDigest><xades:IssuerSerial xmlns:ds="http://www.w3.org/2000/09/xmldsig#"><ds:X509IssuerName xmlns:ds="http://www.w3.org/2000/09/xmldsig#">CN=AC FNMT Usuarios, OU=Ceres, O=FNMT-RCM, C=ES</ds:X509IssuerName><ds:X509SerialNumber xmlns:ds="http://www.w3.org/2000/09/xmldsig#">113415154440417123775780134359582463769</ds:X509SerialNumber></xades:IssuerSerial></xades:Cert></xades:SigningCertificate></xades:SignedSignatureProperties></xades:SignedProperties></xades:QualifyingProperties></ds:Object></ds:Signature>
+</sfLR:RegFactuSistemaFacturacion>

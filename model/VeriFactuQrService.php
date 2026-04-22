@@ -24,7 +24,8 @@ class VeriFactuQrService
         $fecha = date('d-m-Y', strtotime($venta['fecha']));
         
         // El importe debe tener 2 decimales y "." como separador
-        $importe = number_format((float)$venta['total'], 2, '.', '');
+        // La AEAT siempre espera el valor absoluto (positivo), incluso en facturas rectificativas
+        $importe = number_format(abs((float)$venta['total']), 2, '.', '');
         
         // Separamos el formato T-DDMMYYYY-NNNN en serie (T-DDMMYYYY) y número (NNNN)
         $fullNum = $venta['numero_ticket_formato'] ?? $venta['numero_ticket'] ?? '';

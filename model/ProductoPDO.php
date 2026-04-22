@@ -21,20 +21,36 @@ class ProductoPDO
      * @param bool $soloActivos Si es true, solo devuelve productos con activo=1. Default true.
      * @return Producto[]
      */
-    public static function listarProductos(bool $soloActivos = true, int $limit = 50000, int $offset = 0, string $term = '', string $categoria = ''): array
+    public static function listarProductos(bool $soloActivos = true, int $limit = 50000, int $offset = 0, string $term = '', string $categoria = '', string $estado = 'all', $minPrice = null, $maxPrice = null): array
     {
         $hoy = date('Y-m-d');
         
         $where = " WHERE 1=1 ";
         $params = [];
 
-        // Filtro de actividad
-        if ($categoria === 'baja') {
+        // Filtro de actividad / estado
+        if ($estado === '1') {
+            $where .= " AND p.activo = 1 ";
+        } elseif ($estado === '0') {
+            $where .= " AND p.activo = 0 ";
+        } elseif ($estado === 'bajo_stock') {
+            $where .= " AND p.stock_actual <= p.stock_minimo AND p.stock_minimo > 0 AND p.activo = 1 ";
+        } elseif ($categoria === 'baja') {
             $where .= " AND p.activo = 0 ";
         } elseif ($soloActivos) {
             $where .= " AND p.activo = 1 ";
         }
         
+        // Filtros de precio
+        if ($minPrice !== null && $minPrice !== '') {
+            $where .= " AND p.precio_venta >= :minPrice ";
+            $params[':minPrice'] = (float)$minPrice;
+        }
+        if ($maxPrice !== null && $maxPrice !== '') {
+            $where .= " AND p.precio_venta <= :maxPrice ";
+            $params[':maxPrice'] = (float)$maxPrice;
+        }
+
         // Filtro de búsqueda
         if ($term !== '') {
             $where .= " AND (p.nombre LIKE :term OR p.referencia LIKE :term) ";
@@ -49,7 +65,7 @@ class ProductoPDO
 
         $sql = "SELECT p.id, p.referencia, p.nombre, p.descripcion, p.precio_coste, p.precio_venta, 
                        p.stock_actual, p.stock_minimo, p.meses_garantia, p.icono, p.categoria, 
-                       p.atributos, p.activo, p.codigo_iva, p.es_pack, p.id_proveedor, p.margen, p.precio_proveedor,
+                       p.atributos, p.activo, p.codigo_iva, p.es_pack, p.id_proveedor, p.margen, p.precio_proveedor, p.mantener_precision,
                        ti.codigo as codigo_iva_calculado, ti.porcentaje, pr.aplica_re
                 FROM productos p
                 LEFT JOIN tipos_iva ti ON ti.id = (
@@ -100,24 +116,42 @@ class ProductoPDO
                 $registro['id_proveedor'] ?? null,
                 $registro['porcentaje'] ?? 21.00,
                 $registro['margen'] ?? 0.00,
-                $registro['precio_proveedor'] ?? 0.00
+                $registro['precio_proveedor'] ?? 0.00,
+                $registro['mantener_precision'] ?? 0
             );
         }
 
         return $productos;
     }
 
-    public static function contarProductos(bool $soloActivos = true, string $term = '', string $categoria = ''): int
+    public static function contarProductos(bool $soloActivos = true, string $term = '', string $categoria = '', string $estado = 'all', $minPrice = null, $maxPrice = null): int
     {
         $where = " WHERE 1=1 ";
         $params = [];
 
-        if ($categoria === 'baja') {
+        // Filtro de actividad / estado
+        if ($estado === '1') {
+            $where .= " AND activo = 1 ";
+        } elseif ($estado === '0') {
+            $where .= " AND activo = 0 ";
+        } elseif ($estado === 'bajo_stock') {
+            $where .= " AND stock_actual <= stock_minimo AND stock_minimo > 0 AND activo = 1 ";
+        } elseif ($categoria === 'baja') {
             $where .= " AND activo = 0 ";
         } elseif ($soloActivos) {
             $where .= " AND activo = 1 ";
         }
         
+        // Filtros de precio
+        if ($minPrice !== null && $minPrice !== '') {
+            $where .= " AND precio_venta >= :minPrice ";
+            $params[':minPrice'] = (float)$minPrice;
+        }
+        if ($maxPrice !== null && $maxPrice !== '') {
+            $where .= " AND precio_venta <= :maxPrice ";
+            $params[':maxPrice'] = (float)$maxPrice;
+        }
+
         if ($term !== '') {
             $where .= " AND (nombre LIKE :term OR referencia LIKE :term) ";
             $params[':term'] = '%' . $term . '%';
@@ -200,8 +234,8 @@ class ProductoPDO
 
         $precioCoste = (float)($datos['precio_coste'] ?? 0);
 
-        $sql = "INSERT INTO productos (referencia, nombre, descripcion, precio_coste, precio_proveedor, precio_venta, stock_actual, stock_minimo, meses_garantia, icono, categoria, atributos, activo, codigo_iva, id_tipo_iva, es_pack, id_proveedor, margen) 
-                VALUES (:referencia, :nombre, :descripcion, :precio_coste, :precio_proveedor, :precio_venta, :stock_actual, :stock_minimo, :meses_garantia, :icono, :categoria, :atributos, :activo, :codigo_iva, :id_tipo_iva, :es_pack, :id_proveedor, :margen)";
+        $sql = "INSERT INTO productos (referencia, nombre, descripcion, precio_coste, precio_proveedor, precio_venta, stock_actual, stock_minimo, meses_garantia, icono, categoria, atributos, activo, codigo_iva, id_tipo_iva, es_pack, id_proveedor, margen, mantener_precision) 
+                VALUES (:referencia, :nombre, :descripcion, :precio_coste, :precio_proveedor, :precio_venta, :stock_actual, :stock_minimo, :meses_garantia, :icono, :categoria, :atributos, :activo, :codigo_iva, :id_tipo_iva, :es_pack, :id_proveedor, :margen, :mantener_precision)";
 
         require_once __DIR__ . '/TipoIVAPDO.php';
         $oIva = TipoIVAPDO::obtenerVigentePorCodigo($codigoIva, date('Y-m-d'));
@@ -212,7 +246,7 @@ class ProductoPDO
             ':nombre'         => mb_substr(trim($datos['nombre']), 0, 100),
             ':descripcion'    => $datos['descripcion'] ?? '',
             ':precio_coste'   => $precioCoste,
-            ':precio_venta'   => round((float)($datos['precio_venta'] ?? 0), 2),
+            ':precio_venta'   => !empty($datos['mantener_precision']) ? (float)($datos['precio_venta'] ?? 0) : round((float)($datos['precio_venta'] ?? 0), 2),
             ':stock_actual'   => (int)($datos['stock_actual'] ?? 0),
             ':stock_minimo'   => (int)($datos['stock_minimo'] ?? 0),
             ':meses_garantia' => (int)($datos['meses_garantia'] ?? 24),
@@ -225,7 +259,8 @@ class ProductoPDO
             ':es_pack'        => !empty($datos['es_pack']) ? 1 : 0,
             ':id_proveedor'   => $idProveedor,
             ':margen'         => (float)($datos['margen'] ?? 0),
-            ':precio_proveedor' => $precioProveedor
+            ':precio_proveedor' => $precioProveedor,
+            ':mantener_precision' => !empty($datos['mantener_precision']) ? 1 : 0
         ]);
 
 
@@ -294,7 +329,9 @@ class ProductoPDO
         $precioProveedor = isset($datos['precio_proveedor']) ? (float)$datos['precio_proveedor'] : (float)($prodAntiguo['precio_proveedor'] ?? 0);
         $precioCoste = isset($datos['precio_coste']) ? (float)$datos['precio_coste'] : (float)($prodAntiguo['precio_coste'] ?? 0);
         $stockActual = isset($datos['stock_actual']) ? (int)$datos['stock_actual'] : (int)($prodAntiguo['stock_actual'] ?? 0);
-        $precioVentaNuevo = round((float)($datos['precio_venta'] ?? 0), 2);
+        
+        $mantenerPrecision = isset($datos['mantener_precision']) ? (int)$datos['mantener_precision'] : (int)($prodAntiguo['mantener_precision'] ?? 0);
+        $precioVentaNuevo = $mantenerPrecision ? (float)($datos['precio_venta'] ?? 0) : round((float)($datos['precio_venta'] ?? 0), 2);
 
         require_once 'TipoIVAPDO.php';
         $oIva = TipoIVAPDO::obtenerVigentePorCodigo($codigoIva, date('Y-m-d'));
@@ -307,7 +344,7 @@ class ProductoPDO
                     categoria = :categoria, atributos = :atributos,
                     codigo_iva = :codigo_iva, id_tipo_iva = :id_tipo_iva,
                     id_proveedor = :id_proveedor, es_pack = :es_pack,
-                    margen = :margen
+                    margen = :margen, mantener_precision = :mantener_precision
                 WHERE id = :id";
         DBPDO::ejecutarConsulta($sql, [
             ':referencia'     => $ref,
@@ -327,6 +364,7 @@ class ProductoPDO
             ':es_pack'        => !empty($datos['es_pack']) ? 1 : 0,
             ':margen'         => (float)($datos['margen'] ?? 0),
             ':precio_proveedor' => $precioProveedor,
+            ':mantener_precision' => $mantenerPrecision,
             ':id'             => $id,
         ]);
 

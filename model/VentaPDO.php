@@ -444,7 +444,7 @@ class VentaPDO
             $tipoFC      = ($paramsVenta[':esFactura'] ? 'F1' : 'F2');
             $numFormated = self::formatTicketNumber($numTicket, time(), $paramsVenta[':esFactura'], 'venta');
             
-            self::procesarVeriFactu($db, $idVenta, $numFormated, $tipoFC, (float)$total, (float)$ivaAmt, $fechaFormat, $nifCliente, $nombreCliente);
+            self::procesarVeriFactu($db, $idVenta, $numFormated, $tipoFC, (float)$total, (float)$ivaAmt, $fechaFormat, $nifCliente ?? '', $nombreCliente ?? 'Cliente General');
 
             $db->commit();
 
@@ -1287,6 +1287,18 @@ class VentaPDO
      */
     public static function crearAbono(int $idVentaOrigen, array $lineasDevolver, string $motivo, string $metodoReembolso, int $idUsuario, bool $reponerStock = true): int
     {
+        $tipoRectificativa = 'S'; // Siempre Sustitución (S) en el flujo del TPV
+        $tipoR_auto = 'R1'; // Por defecto: Devoluciones, roturas, etc. (Art. 80.Uno, Dos y Seis)
+
+        $motivoLower = mb_strtolower($motivo);
+        if (strpos($motivoLower, 'concurso') !== false) {
+            $tipoR_auto = 'R2'; // Concurso de acreedores
+        } elseif (strpos($motivoLower, 'incobrable') !== false) {
+            $tipoR_auto = 'R3'; // Créditos incobrables
+        } elseif (strpos($motivoLower, 'error') !== false || strpos($motivoLower, 'otro') !== false || strpos($motivoLower, 'datos') !== false) {
+            $tipoR_auto = 'R4'; // Resto de causas (errores materiales, etc.)
+        }
+
         // 1. Obtener datos de la venta original
         $sqlV = "SELECT * FROM ventas WHERE id = :id";
         $qV   = DBPDO::ejecutarConsulta($sqlV, [':id' => $idVentaOrigen]);
@@ -1496,7 +1508,17 @@ class VentaPDO
 
             // [VERIFACTU] Encadenamiento y Huella (Abono)
             $fechaFormatAb = date('d-m-Y');
-            $tipoAb        = ($ventaOrigen['es_factura'] ? 'R1' : 'R5');
+
+            // Determinar el tipo R correcto:
+            //   - Si la original era F2 (ticket simplificado, es_factura=0) → siempre R5 (regla obligatoria AEAT)
+            //   - De lo contrario, usar el tipo mapeado automáticamente por el motivo
+            $esFacturaOrigen = (bool)$ventaOrigen['es_factura'];
+            if (!$esFacturaOrigen) {
+                $tipoAb = 'R5'; // Obligatorio para F2 independientemente del motivo
+            } else {
+                $tipoAb = $tipoR_auto;
+            }
+
             $numFormatedAb = self::formatTicketNumber($numTicket, time(), $ventaOrigen['es_factura'], 'abono');
 
             // Referencia a la factura/ticket original rectificado
@@ -1517,7 +1539,8 @@ class VentaPDO
                 $ventaOrigen['nif_cliente'] ?? '',
                 $ventaOrigen['nombre_cliente'] ?? '',
                 $serieOrigenAb, $fechaOrigenAb,
-                $baseOrigenAb, $cuotaOrigenAb
+                $baseOrigenAb, $cuotaOrigenAb,
+                $tipoRectificativa
             );
 
             $db->commit();
@@ -1578,11 +1601,18 @@ class VentaPDO
      * Obtiene el hash_actual del último registro de venta para el encadenamiento VeriFactu.
      * @param PDO|null $db Conexión opcional (para usar dentro de transacciones)
      */
-    public static function obtenerUltimoHash(?PDO $db = null): ?string
+    public static function obtenerUltimoHash(?PDO $db = null, int $idVenta = 0): ?string
     {
         $db = $db ?? DBPDO::getPDO();
-        $sql = "SELECT hash_actual FROM ventas WHERE hash_actual IS NOT NULL ORDER BY id DESC LIMIT 1";
-        $stmt = $db->query($sql);
+        $where = "WHERE hash_actual IS NOT NULL";
+        $params = [];
+        if ($idVenta > 0) {
+            $where .= " AND id < :id";
+            $params[':id'] = $idVenta;
+        }
+        $sql = "SELECT hash_actual FROM ventas $where ORDER BY id DESC LIMIT 1";
+        $stmt = $db->prepare($sql);
+        $stmt->execute($params);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         return $row ? $row['hash_actual'] : null;
     }
@@ -1599,14 +1629,14 @@ class VentaPDO
         // Estructura oficial: IDEmisorFactura, NumSerieFactura, FechaExpedicionFactura, TipoFactura, CuotaTotal, ImporteTotal, Huella, FechaHoraHusoGenRegistro
         
         $campos = [
-            'IDEmisorFactura'         => self::normalizarValorHash($datos['nif_emisor'] ?? ''),
-            'NumSerieFactura'         => self::normalizarValorHash($datos['numero_serie'] ?? ''),
-            'FechaExpedicionFactura'  => self::normalizarValorHash($datos['fecha_expedicion'] ?? ''),
-            'TipoFactura'             => self::normalizarValorHash($datos['tipo_factura'] ?? 'F1'),
-            'CuotaTotal'              => self::normalizarValorHash($datos['cuota_total'] ?? '0.00'),
-            'ImporteTotal'            => self::normalizarValorHash($datos['importe_total'] ?? '0.00'),
-            'Huella'                  => self::normalizarValorHash($hashAnterior ?? str_repeat('0', 64)),
-            'FechaHoraHusoGenRegistro'=> self::normalizarValorHash($datos['fecha_hora_gen'] ?? date('Y-m-d\TH:i:sP'))
+            'IDEmisorFactura'         => $datos['nif_emisor'] ?? '',
+            'NumSerieFactura'         => $datos['numero_serie'] ?? '',
+            'FechaExpedicionFactura'  => date('d-m-Y', strtotime($datos['fecha_expedicion'] ?? date('Y-m-d'))),
+            'TipoFactura'             => $datos['tipo_factura'] ?? 'F1',
+            'CuotaTotal'              => self::normalizarValorHash($datos['cuota_total'] ?? 0),
+            'ImporteTotal'            => self::normalizarValorHash($datos['importe_total'] ?? 0),
+            'Huella'                  => $hashAnterior ?? str_repeat('0', 64),
+            'FechaHoraHusoGenRegistro'=> $datos['fecha_hora_gen'] ?? date('Y-m-d\TH:i:sP')
         ];
 
         // 2. Concatenación con formato nombreCampo1=valorCampo1&nombreCampo2=valorCampo2...
@@ -1618,7 +1648,11 @@ class VentaPDO
 
         // 3. Cálculo del Hash (SHA256)
         $hashResult = strtoupper(hash('sha256', $cadena));
-        error_log("VeriFactu Hash Debug: Cadena=[$cadena] Hash=[$hashResult]");
+        
+        // Log detallado para diagnóstico de Error 2000 (Huella incorrecta)
+        error_log("VeriFactu Hash String: " . $cadena);
+        error_log("VeriFactu Hash Result: " . $hashResult);
+        
         return $hashResult;
     }
 
@@ -1640,21 +1674,37 @@ class VentaPDO
     private static function procesarVeriFactu(
         PDO $db, int $idVenta, string $numeroSerie, string $tipoFactura,
         float $total, float $iva, string $fechaExpedicion,
-        string $nifCliente = '', string $nombreCliente = '',
+        string $nifCliente = '', string $nombreCliente = 'Cliente General',
         string $facturaOrigenSerie = '', string $facturaOrigenFecha = '',
-        string $baseOrigenRectificada = '', string $cuotaOrigenRectificada = ''
+        string $baseOrigenRectificada = '', string $cuotaOrigenRectificada = '',
+        string $tipoRectificativa = 'S'
     ): void
     {
+        // 0. Asegurar formato de serie si viene solo el número (limpieza de inconsistencias)
+        if (is_numeric($numeroSerie) || !str_contains($numeroSerie, '-')) {
+            // Re-formateamos para asegurar consistencia con el hash que espera AEAT
+            $esFactura = ($tipoFactura[0] === 'F') ? 1 : 0;
+            $tipoInterno = ($tipoFactura[0] === 'R') ? 'abono' : 'venta';
+            $numeroSerie = self::formatTicketNumber((int)$numeroSerie, $fechaExpedicion, $esFactura, $tipoInterno);
+        }
+
+        // Ajuste automático: Si no hay NIF de cliente, forzamos factura simplificada (Ticket) 
+        // para cumplir con la normativa VeriFactu (Error 1189).
+        if (empty($nifCliente)) {
+            if ($tipoFactura === 'F1') $tipoFactura = 'F2';
+            if ($tipoFactura === 'R1') $tipoFactura = 'R5';
+        }
+
         require_once __DIR__ . '/ConfiguracionPDO.php';
         $nifEmisor = defined('EMPRESA_CIF') ? EMPRESA_CIF : (ConfiguracionPDO::obtenerValor('empresa_nif') ?? '00000000T');
 
-        // 1. Obtener el hash del registro anterior
-        $hashAnterior = self::obtenerUltimoHash($db);
+        // 1. Obtener hash anterior para el encadenamiento
+        $hashAnterior = self::obtenerUltimoHash($db, $idVenta);
 
         // 2. Normalizar valores para el Hash y el XML (Sincronización total)
-        $normCuota   = self::normalizarValorHash(abs($iva));
-        $normImporte = self::normalizarValorHash(abs($total));
-        $normBase    = self::normalizarValorHash(abs($total - $iva));
+        $normCuota   = self::normalizarValorHash($iva);
+        $normImporte = self::normalizarValorHash($total);
+        $normBase    = self::normalizarValorHash($total - $iva);
         $normHashAnt = $hashAnterior ?? str_repeat('0', 64); // No normalizar la huella!
 
         $fechaHoraGen = date('Y-m-d\TH:i:sP');
@@ -1678,23 +1728,24 @@ class VentaPDO
         $datosUltimo = self::obtenerDatosUltimoRegistro($db);
 
         $resultadoXML = $vfService->procesarAlta([
-            'numero_serie'     => $numeroSerie,
-            'fecha_expedicion' => $fechaExpedicion,
-            'tipo_factura'     => $tipoFactura,
-            'base_imponible'   => $normBase,
-            'cuota_total'      => $normCuota,
-            'importe_total'    => $normImporte,
-            'hash_actual'      => $hashActual,
-            'hash_anterior'    => $normHashAnt,
-            'fecha_hora_gen'   => $fechaHoraGen,
-            'destinatario_nif' => $nifCliente,
-            'destinatario_nombre' => $nombreCliente,
+            'numero_serie'              => $numeroSerie,
+            'fecha_expedicion'          => $fechaExpedicion,
+            'tipo_factura'              => $tipoFactura,
+            'tipo_rectificativa'        => $tipoRectificativa,
+            'base_imponible'            => $normBase,
+            'cuota_total'              => $normCuota,
+            'importe_total'            => $normImporte,
+            'hash_actual'              => $hashActual,
+            'hash_anterior'            => $normHashAnt,
+            'fecha_hora_gen'           => $fechaHoraGen,
+            'destinatario_nif'         => $nifCliente,
+            'destinatario_nombre'      => $nombreCliente,
             'factura_rectificada_serie' => $facturaOrigenSerie,
             'factura_rectificada_fecha' => $facturaOrigenFecha,
             'base_rectificada'          => $baseOrigenRectificada,
             'cuota_rectificada'         => $cuotaOrigenRectificada,
-            'serie_anterior'   => $datosUltimo['serie'] ?? '',
-            'fecha_anterior'   => $datosUltimo['fecha'] ?? ''
+            'serie_anterior'           => $datosUltimo['serie'] ?? '',
+            'fecha_anterior'           => $datosUltimo['fecha'] ?? ''
         ]);
 
         // 4. Encolar para envío a la AEAT (Asíncrono)
@@ -1716,10 +1767,11 @@ class VentaPDO
             'nif'      => $nifEmisor,
             'numserie' => $numeroSerie,
             'fecha'    => date('d-m-Y', strtotime($fechaExpedicion)),
+            // La AEAT siempre espera valor absoluto (positivo) en el campo importe del QR
             'importe'  => number_format(abs($total), 2, '.', ''),
-            'hash'     => substr($hashActual, 0, 8)
+            'hash'     => strtoupper(substr($hashActual, 0, 8))
         ];
-        $qrUrl = $qrBaseUrl . "?" . http_build_query($qrParams);
+        $qrUrl = $qrBaseUrl . "?" . http_build_query($qrParams, '', '&', PHP_QUERY_RFC3986);
 
         // 6. Persistir en la base de datos
         $xmlPath = $resultadoXML['ok'] ? $resultadoXML['path'] : null;
@@ -1817,11 +1869,8 @@ class VentaPDO
         // Si es numérico y no parece una huella (64 chars) ni un NIF/Serie (alfanumérico largo), forzamos formato estándar. 
         if (is_numeric($valor) && strlen($valor) < 20 && !preg_match('/^[A-Z]{1}/i', $valor)) {
             $f = (float)$valor;
-            // Formateamos a 2 decimales y limpiamos ceros sobrantes
+            // Formateamos siempre a 2 decimales para coincidir con el XML y la AEAT
             $valor = number_format($f, 2, '.', '');
-            if (strpos($valor, '.') !== false) {
-                $valor = rtrim(rtrim($valor, '0'), '.');
-            }
         }
         
         return $valor;

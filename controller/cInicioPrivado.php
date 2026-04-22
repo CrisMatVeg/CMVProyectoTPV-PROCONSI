@@ -31,9 +31,9 @@ foreach ($oProductos as $oProducto) {
         "id" => $oProducto->getId(),
         "name" => $oProducto->getNombre(),
         "codigo" => $oProducto->getReferencia(),
-        "price" => (float)$oProducto->getPrecioVenta(),
+        "price" => $oProducto->getPrecioVenta(),
         "iva" => (float)$oProducto->getIva(),
-        "precio_coste" => (float)$oProducto->getPrecioCoste(),
+        "precio_coste" => $oProducto->getPrecioCoste(),
         "stock_minimo" => (int)$oProducto->getStockMinimo(),
         "meses_garantia" => (int)$oProducto->getMesesGarantia(),
         "icono" => $icono,
@@ -43,7 +43,8 @@ foreach ($oProductos as $oProducto) {
         "inactive" => !$oProducto->getActivo(),
         "activo" => $oProducto->getActivo(),
         "es_pack" => $oProducto->getEsPack(),
-        "atributos" => $oProducto->getAtributos()
+        "atributos" => $oProducto->getAtributos(),
+        "mantener_precision" => $oProducto->getMantenerPrecision()
     ];
 }
 

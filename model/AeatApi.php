@@ -35,6 +35,7 @@ class AeatApi
      */
     public function enviarFactura(string $xmlContent)
     {
+        /*
         // Control de Flujo: Verificar si estamos en periodo de espera
         $esperaHasta = (int)ConfiguracionPDO::obtenerValor('verifactu_espera_hasta');
         if (time() < $esperaHasta) {
@@ -45,6 +46,7 @@ class AeatApi
                 'code' => 429
             ];
         }
+        */
 
         $ch = curl_init();
 

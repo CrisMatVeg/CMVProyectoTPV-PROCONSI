@@ -31,6 +31,7 @@ class Producto implements JsonSerializable
             'iva'            => $this->iva,
             'margen'         => $this->margen,
             'precio_proveedor' => $this->precio_proveedor,
+            'mantener_precision' => $this->mantener_precision,
         ];
     }
     private $id;
@@ -53,15 +54,16 @@ class Producto implements JsonSerializable
     private $iva;
     private $margen;
     private $precio_proveedor;
+    private $mantener_precision;
 
-    public function __construct($id, $referencia, $nombre, $descripcion, $precio_coste, $precio_venta, $stock_actual, $stock_minimo, $meses_garantia, $icono, $categoria, $atributos, $activo, $codigo_iva = 'GENERAL', $es_pack = 0, $aplica_re = 0, $id_proveedor = null, $iva = 21.00, $margen = 0.00, $precio_proveedor = 0.0000)
+    public function __construct($id, $referencia, $nombre, $descripcion, $precio_coste, $precio_venta, $stock_actual, $stock_minimo, $meses_garantia, $icono, $categoria, $atributos, $activo, $codigo_iva = 'GENERAL', $es_pack = 0, $aplica_re = 0, $id_proveedor = null, $iva = 21.00, $margen = 0.00, $precio_proveedor = 0.0000, $mantener_precision = 0)
     {
         $this->id = $id;
         $this->referencia = $referencia;
         $this->nombre = $nombre;
         $this->descripcion = $descripcion;
-        $this->precio_coste = (float)$precio_coste;
-        $this->precio_venta = (float)$precio_venta;
+        $this->precio_coste = $precio_coste;
+        $this->precio_venta = $precio_venta;
         $this->stock_actual = (int)$stock_actual;
         $this->stock_minimo = (int)$stock_minimo;
         $this->meses_garantia = (int)$meses_garantia;
@@ -75,7 +77,8 @@ class Producto implements JsonSerializable
         $this->id_proveedor = $id_proveedor;
         $this->iva = (float)$iva;
         $this->margen = (float)$margen;
-        $this->precio_proveedor = (float)$precio_proveedor;
+        $this->precio_proveedor = $precio_proveedor;
+        $this->mantener_precision = (int)$mantener_precision;
     }
 
     // Getters
@@ -166,5 +169,10 @@ class Producto implements JsonSerializable
     public function getMargen()
     {
         return $this->margen;
+    }
+
+    public function getMantenerPrecision()
+    {
+        return $this->mantener_precision;
     }
 }

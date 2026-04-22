@@ -110,9 +110,12 @@ try {
             $offset = isset($datos['offset']) ? (int)$datos['offset'] : 0;
             $term = isset($datos['term']) ? trim($datos['term']) : '';
             $cat = isset($datos['cat']) ? trim($datos['cat']) : '';
+            $estado = isset($datos['estado']) ? trim($datos['estado']) : 'all';
+            $minPrice = isset($datos['minPrice']) ? $datos['minPrice'] : null;
+            $maxPrice = isset($datos['maxPrice']) ? $datos['maxPrice'] : null;
 
-            $lista = ProductoPDO::listarProductos(false, $limit, $offset, $term, $cat);
-            $total = ProductoPDO::contarProductos(false, $term, $cat);
+            $lista = ProductoPDO::listarProductos(false, $limit, $offset, $term, $cat, $estado, $minPrice, $maxPrice);
+            $total = ProductoPDO::contarProductos(false, $term, $cat, $estado, $minPrice, $maxPrice);
 
             $formatted = array_map(function($p) {
                 $icono = $p->getIcono();
@@ -127,9 +130,9 @@ try {
                     'descripcion' => $p->getDescripcion(),
                     'icono' => $icono,
                     'es_pack' => (int)$p->isPack(),
-                    'precio_venta' => (float)$p->getPrecioVenta(),
-                    'precio_coste' => (float)$p->getPrecioCoste(),
-                    'precio_proveedor' => (float)$p->getPrecioProveedor(),
+                    'precio_venta' => $p->getPrecioVenta(),
+                    'precio_coste' => $p->getPrecioCoste(),
+                    'precio_proveedor' => $p->getPrecioProveedor(),
                     'margen' => (float)$p->getMargen(),
                     'id_proveedor' => $p->getIdProveedor(),
                     'categoria' => $p->getCategoria(),
@@ -139,6 +142,7 @@ try {
                     'meses_garantia' => (int)$p->getMesesGarantia(),
                     'activo' => (int)$p->getActivo(),
                     'atributos' => $p->getAtributos(),
+                    'mantener_precision' => (int)$p->getMantenerPrecision(),
                     'componentes_pack' => $p->isPack() ? ProductoPDO::obtenerComponentesPack($p->getId()) : []
                 ];
             }, $lista);
@@ -153,12 +157,13 @@ try {
                     'id'       => (int)$nuevo['id'],
                     'nombre'   => $nuevo['nombre'],
                     'referencia' => $nuevo['referencia'],
-                    'precio_venta' => (float)$nuevo['precio_venta'],
+                    'precio_venta' => $nuevo['precio_venta'],
                     'icono'    => $nuevo['icono'],
                     'categoria' => $nuevo['categoria'],
                     'stock'    => !empty($nuevo['es_pack']) ? ProductoPDO::calcularStockPack((int)$nuevo['id']) : (int)$nuevo['stock_actual'],
                     'inactive' => false,
                     'es_pack'  => (int)($nuevo['es_pack'] ?? 0),
+                    'mantener_precision' => (int)($nuevo['mantener_precision'] ?? 0),
                     'componentes_pack' => !empty($nuevo['es_pack']) ? ProductoPDO::obtenerComponentesPack((int)$nuevo['id']) : []
                 ]
             ]);

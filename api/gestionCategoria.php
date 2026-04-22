@@ -60,6 +60,18 @@ try {
             echo json_encode(['ok' => $res]);
             break;
 
+        case 'editar':
+            $id = (int)($input['id'] ?? 0);
+            $codigo = $input['codigo'] ?? '';
+            $nombre = $input['nombre'] ?? '';
+            if ($id <= 0 || empty($codigo) || empty($nombre)) {
+                echo json_encode(['ok' => false, 'error' => 'ID, código y nombre son obligatorios']);
+                break;
+            }
+            $res = CategoriaPDO::editar($id, $codigo, $nombre);
+            echo json_encode(['ok' => $res]);
+            break;
+
         default:
             echo json_encode(['ok' => false, 'error' => 'Acción desconocida']);
             break;

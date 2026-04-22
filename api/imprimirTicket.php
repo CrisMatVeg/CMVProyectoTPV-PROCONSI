@@ -74,10 +74,9 @@ try {
     $html = str_replace('{{QR_CODE_IMAGE}}', $qrBase64, $html);
     $html = str_replace('{{VERIFACTU_TEXT}}', $verifactuLabel, $html);
 
-    // Datos comunes
-    $formattedNum = VentaPDO::formatTicketNumber($venta['numero_ticket'], $venta['fecha'], $esFactura);
-    $html = str_replace('{{NUMERO_TICKET}}',     $formattedNum, $html);
-    $html = str_replace('{{FACTURA_NUM}}',       $formattedNum, $html);
+    // Datos comunes — usar $numFormated (ya incluye tipo_documento para el prefijo correcto A-/F-/T-)
+    $html = str_replace('{{NUMERO_TICKET}}',     $numFormated, $html);
+    $html = str_replace('{{FACTURA_NUM}}',       $numFormated, $html);
     $html = str_replace('{{FECHA}}',             date('d/m/Y H:i', strtotime($venta['fecha'])), $html);
     $html = str_replace('{{FECHA_EMISION}}',     date('d/m/Y', strtotime($venta['fecha'])), $html);
     $html = str_replace('{{FECHA_VENCIMIENTO}}', date('d/m/Y', strtotime($venta['fecha'])), $html);

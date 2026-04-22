@@ -33,9 +33,10 @@ try {
     $metodo = $input['metodoReembolso'] ?? 'efectivo';
     $reponerStock = (bool)($input['reponerStock'] ?? true);
 
-    if (!in_array($metodo, ['efectivo', 'vale', 'reemplazo'])) {
+    if (!in_array($metodo, ['efectivo', 'vale', 'reemplazo', 'tarjeta'])) {
         $metodo = 'efectivo';
     }
+
 
     // ── Validación de plazos ──────────────────────────────────────────────────
     $validarPlazos = function (string $fechaVenta, int $mesesGarantia, string $metodo, string $motivo) {

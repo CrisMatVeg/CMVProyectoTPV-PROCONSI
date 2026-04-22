@@ -71,8 +71,8 @@ foreach ($oProductos as $oProd) {
         'id'             => $oProd->getId(),
         'nombre'         => $oProd->getNombre(),
         'referencia'     => $oProd->getReferencia(),
-        'precio_venta'   => (float)$oProd->getPrecioVenta(),
-        'precio_coste'   => (float)$oProd->getPrecioCoste(),
+        'precio_venta'   => $oProd->getPrecioVenta(),
+        'precio_coste'   => $oProd->getPrecioCoste(),
         'iva'            => (float)$oProd->getIva(),
         'meses_garantia' => (int)$oProd->getMesesGarantia(),
         'stock_minimo'   => (int)$oProd->getStockMinimo(),
@@ -84,8 +84,9 @@ foreach ($oProductos as $oProd) {
         'atributos'      => $oProd->getAtributos(),
         'es_pack'        => $oProd->getEsPack(),
         'id_proveedor'   => $oProd->getIdProveedor(),
-        'precio_proveedor' => (float)$oProd->getPrecioProveedor(),
+        'precio_proveedor' => $oProd->getPrecioProveedor(),
         'margen'         => (float)$oProd->getMargen(),
+        'mantener_precision' => (int)$oProd->getMantenerPrecision(),
         'componentes_pack' => $oProd->getEsPack() ? ProductoPDO::obtenerComponentesPack($oProd->getId()) : []
     ];
 }
