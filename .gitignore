@@ -40,3 +40,6 @@ Desktop.ini
 # Configuración sensible local (opcional)
 # config/confDBPDO.php
 .env
+
+# Archivos generados de VeriFactu
+/storage/verifactu/xml/*.xml
