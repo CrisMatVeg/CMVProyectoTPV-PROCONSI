@@ -1,4 +1,4 @@
-</header>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <div class="main-full p-24">
 
     <!-- CABECERA DE SECCIÓN -->
@@ -16,8 +16,11 @@
         </div>
 
         <div class="cat-tabs m-0" style="margin-left: auto; flex: none; padding: 0; align-items: center;">
-            <a href="index.php?verCierres=0" class="cat-tab <?php echo !$avHistorial['verCierres'] ? 'active' : ''; ?>" style="text-decoration: none;">
+            <a href="index.php?verCierres=0&soloIncidencias=0" class="cat-tab <?php echo (!$avHistorial['verCierres'] && !($avHistorial['filtros']['soloIncidencias'] ?? false)) ? 'active' : ''; ?>" style="text-decoration: none;">
                 <i class="fa-solid fa-receipt"></i> <?php echo L('history_tab_sales'); ?>
+            </a>
+            <a href="index.php?verCierres=0&soloIncidencias=1" class="cat-tab <?php echo ($avHistorial['filtros']['soloIncidencias'] ?? false) ? 'active' : ''; ?> incident-tab" style="text-decoration: none;">
+                <i class="fa-solid fa-cloud-exclamation"></i> Incidencias VeriFactu
             </a>
             <a href="index.php?verCierres=1" class="cat-tab <?php echo $avHistorial['verCierres'] ? 'active' : ''; ?>" style="text-decoration: none;">
                 <i class="fa-solid fa-file-invoice-dollar"></i> <?php echo L('history_tab_closings'); ?>
@@ -26,9 +29,25 @@
     </div>
 
     <!-- PANEL DE FILTROS COMÚN -->
+    <?php if ($avHistorial['filtros']['soloIncidencias'] ?? false): ?>
+        <div class="alert alert-warning container-wider mb-24 d-flex ai-center gap-16" style="background: #fff8e1; border: 1.5px solid #ffe082; color: #795548; padding: 16px; border-radius: 12px;">
+            <i class="fa-solid fa-circle-exclamation fs-24" style="color: #f57c00;"></i>
+            <div class="flex-1">
+                <strong style="display: block; margin-bottom: 4px;">Incidencias VeriFactu — requieren intervención manual</strong>
+                <p class="m-0 fs-13">Solo se muestran los registros que necesitan acción manual. Los errores de conexión se reintentan automáticamente en la cola cada 60&nbsp;s — próximo reintento en <strong><span class="queue-countdown" style="font-variant-numeric: tabular-nums;">--</span></strong>.</p>
+                <ul class="m-0 mt-8 fs-12" style="padding-left: 18px; line-height: 1.8;">
+                    <li><i class="fa-solid fa-cloud-xmark text-red mr-4"></i><strong>Rechazado</strong> — use el botón <i class="fa-solid fa-wrench text-orange"></i> para corregir el NIF y/o nombre (la AEAT valida que coincidan con su censo) y reenviar con «Rechazo previo».</li>
+                    <li><i class="fa-solid fa-cloud-exclamation text-orange mr-4"></i><strong>Aceptado con errores</strong> — la factura queda registrada en la AEAT pero con aviso (ej: error de huella). Use el botón <i class="fa-solid fa-wrench text-orange"></i> para subsanar.</li>
+                </ul>
+            </div>
+            <a href="index.php?verCierres=0&soloIncidencias=0" class="btn-cancel" style="height: auto; padding: 8px 16px; font-size: 12px;">Ver todas las ventas</a>
+        </div>
+    <?php endif; ?>
+
     <div class="filters-panel container-wider">
         <form id="formFiltros" method="get" action="index.php" class="filters-form" novalidate>
             <input type="hidden" name="verCierres" value="<?php echo $avHistorial['verCierres'] ? '1' : '0'; ?>">
+            <input type="hidden" name="soloIncidencias" value="<?php echo ($avHistorial['filtros']['soloIncidencias'] ?? false) ? '1' : '0'; ?>">
             
             <!-- Selector de Periodo -->
             <div class="filter-group">
@@ -57,7 +76,7 @@
             <?php if (!$avHistorial['verCierres']): ?>
                 <div class="filter-group w-120">
                     <label><?php echo L('history_filter_ticket'); ?></label>
-                    <input type="text" name="numeroTicket" id="searchTicket" value="<?php echo $avHistorial['filtros']['ticket']; ?>" class="filter-input" placeholder="Ej: 1002">
+                    <input type="text" name="numeroTicket" id="searchTicket" value="<?php echo htmlspecialchars($avHistorial['filtros']['ticket'] ?? ''); ?>" class="filter-input" placeholder="Ej: 1002">
                 </div>
 
                 <div class="filter-group w-180">
@@ -66,7 +85,7 @@
                         <option value=""><?php echo L('history_filter_all_cashiers'); ?></option>
                         <?php foreach ($avHistorial['cajeros'] as $c): ?>
                             <option value="<?php echo $c->getId(); ?>" <?php echo $avHistorial['filtros']['cajero'] == $c->getId() ? 'selected' : ''; ?>>
-                                <?php echo $c->getNombreCompleto(); ?>
+                                <?php echo htmlspecialchars($c->getNombreCompleto()); ?>
                             </option>
                         <?php endforeach; ?>
                     </select>
@@ -138,8 +157,13 @@
                     <?php endif; ?>
 
                     <?php foreach ($avHistorial['ventas'] as $v): ?>
-                        <?php $esAbono = ($v['tipo_documento'] ?? 'venta') === 'abono'; ?>
-                        <tr <?php echo $esAbono ? 'style="background: rgba(192,57,43,0.03);"' : ''; ?>>
+                        <?php 
+                            $esAbono = ($v['tipo_documento'] ?? 'venta') === 'abono'; 
+                            $isIncident = ($v['estado_envio_aeat'] === 'error_critico' || $v['estado_envio_aeat'] === 'subsanacion_pendiente');
+                            $rowClass = $isIncident ? 'row-incident' : '';
+                            $rowStyle = $esAbono ? 'style="background: rgba(192,57,43,0.03);"' : '';
+                        ?>
+                        <tr class="<?php echo $rowClass; ?>" <?php echo $rowStyle; ?>>
                             <td class="ticket-num">
                                 <?php if ($esAbono): ?>
                                     <span style="display:inline-flex;align-items:center;gap:5px;">
@@ -192,15 +216,19 @@
                             <td class="text-center" id="status-venta-<?php echo $v['numero_ticket']; ?>">
                                 <?php if ($esAbono): ?>
                                     <span class="status-pill" style="background:var(--red-light);color:var(--red);border-color:var(--red);" title="Ticket de abono / devolución">
-                                        <i class="fa-solid fa-rotate-left"></i> Abono
+                                        <i class="fa-solid fa-file-circle-minus"></i> <?php echo L('history_status_abono_pill'); ?>
+                                    </span>
+                                <?php elseif ($v['estado'] === 'anulada'): ?>
+                                    <span class="status-pill" style="background:var(--red-light);color:var(--red);border-color:var(--red);" title="Ticket anulado fiscalmente">
+                                        <i class="fa-solid fa-rectangle-xmark"></i> <?php echo L('history_status_annulled_pill'); ?>
                                     </span>
                                 <?php elseif ($v['estado'] === 'completada'): ?>
                                     <span class="status-pill status-active" title="<?php echo L('history_status_completed'); ?>">
                                         <i class="fa-solid fa-check"></i>
                                     </span>
-                                <?php elseif ($v['estado'] === 'parcialmente_devuelta'): ?>
-                                    <span class="status-pill" style="background:#fff3e0;color:#e65100;border-color:#e65100;" title="Devolución parcial registrada">
-                                        <i class="fa-solid fa-rotate-left"></i> Parcial
+                                <?php elseif ($v['estado'] === 'parcialmente_devuelta' || $v['estado'] === 'devuelta'): ?>
+                                    <span class="status-pill" style="background:#fff3e0;color:#e65100;border-color:#e65100;" title="Venta rectificada (Devolución)">
+                                        <i class="fa-solid fa-triangle-exclamation"></i> <?php echo L('history_status_rectified_pill'); ?>
                                     </span>
                                 <?php elseif ($v['estado'] === 'pendiente_pago'): ?>
                                     <?php
@@ -212,30 +240,52 @@
                                         <i class="fa-solid <?php echo $vencida ? 'fa-triangle-exclamation' : 'fa-clock'; ?>"></i>
                                         <?php echo $vencida ? L('history_status_overdue', true) : L('tpv_pending', true); ?>
                                     </span>
-                                <?php elseif ($v['estado'] === 'devuelta'): ?>
-                                    <span class="status-pill" style="background: var(--red-light); color: var(--red); border-color: var(--red);" title="<?php echo L('history_status_returned'); ?>">
-                                        <i class="fa-solid fa-rotate-left"></i> <?php echo L('tpv_returned'); ?>
-                                    </span>
                                 <?php else: ?>
                                     <span class="status-pill" style="background: var(--surface2); color: var(--text-muted);" title="<?php echo L('history_status_canceled'); ?>">
                                         <i class="fa-solid fa-ban"></i> <?php echo L('tpv_canceled'); ?>
                                     </span>
                                 <?php endif; ?>
                             </td>
-                            <td class="text-center">
+                            <td class="text-center" style="min-width: 100px;">
                                 <?php
                                 $stVeri = $v['estado_envio_aeat'] ?? 'pendiente';
+                                $aeatError = !empty($v['aeat_error']) ? $v['aeat_error'] : '';
+                                
                                 if ($stVeri === 'enviado'): ?>
-                                    <span class="text-green" title="Enviado a la AEAT">
-                                        <i class="fa-solid fa-cloud-check fs-18"></i>
+                                    <span class="text-green" title="Enviado correctamente a la AEAT">
+                                        <i class="fa-solid fa-cloud-check fs-20"></i>
                                     </span>
-                                <?php elseif ($stVeri === 'error'): ?>
-                                    <span class="text-red" title="Error en el envío">
-                                        <i class="fa-solid fa-cloud-exclamation fs-18"></i>
+                                <?php elseif ($stVeri === 'error_critico' || $stVeri === 'subsanacion_pendiente'): ?>
+                                    <?php 
+                                        $color = ($stVeri === 'error_critico') ? 'red' : 'orange';
+                                        $icon = ($stVeri === 'error_critico') ? 'fa-cloud-xmark' : 'fa-cloud-exclamation';
+                                        // Extraer un "código" o etiqueta corta
+                                        $label = 'ERROR';
+                                        if (strpos($aeatError, 'Archivo XML no encontrado') !== false) $label = 'ERR_FILE';
+                                        elseif (preg_match('/\[(\d+)\]/', $aeatError, $matches)) $label = 'AEAT_' . $matches[1];
+                                        elseif (strlen($aeatError) > 0) $label = 'VER_ERR';
+                                    ?>
+                                    <div style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
+                                        <?php $jsonErr = htmlspecialchars(json_encode($aeatError), ENT_QUOTES, 'UTF-8'); ?>
+                                        <span style="color: var(--<?php echo $color; ?>); cursor: pointer;" onclick='Swal.fire({title: "Detalle del Error", text: <?php echo $jsonErr; ?>, icon: "error", confirmButtonColor: "var(--accent)"})'>
+                                            <i class="fa-solid <?php echo $icon; ?>" style="font-size: 20px;"></i>
+                                        </span>
+                                        <span onclick='Swal.fire({title: "Detalle del Error", text: <?php echo $jsonErr; ?>, icon: "error", confirmButtonColor: "var(--accent)"})' 
+                                              style="font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 4px; color: #fff; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px; background: var(--<?php echo $color; ?>);">
+                                            <?php echo $label; ?>
+                                        </span>
+                                    </div>
+                                <?php elseif ($stVeri === 'anulado_pendiente'): ?>
+                                    <span class="text-red" title="Anulación pendiente de envío a la AEAT">
+                                        <i class="fa-solid fa-cloud-minus fs-20 pulse-red"></i>
+                                    </span>
+                                <?php elseif ($stVeri === 'bloqueado'): ?>
+                                    <span style="color: #e65100;" title="Bloqueado: esperando subsanación del registro anterior con incidencia">
+                                        <i class="fa-solid fa-lock fs-18"></i>
                                     </span>
                                 <?php else: ?>
-                                    <span class="text-amber" title="Pendiente de envío">
-                                        <i class="fa-solid fa-cloud-arrow-up fs-18"></i>
+                                    <span class="text-amber" title="Pendiente de envío a la AEAT">
+                                        <i class="fa-solid fa-cloud-arrow-up fs-20"></i>
                                     </span>
                                 <?php endif; ?>
                             </td>
@@ -244,12 +294,61 @@
                                     <button title="Ver detalle" class="btn-icon" onclick="verTicket('<?php echo $v['numero_ticket']; ?>')">
                                         <i class="fa-solid <?php echo $esAbono ? 'fa-file-circle-minus' : 'fa-receipt'; ?>"></i>
                                     </button>
-                                    <button title="<?php echo !empty($v['es_factura']) ? L('history_btn_view_invoice', true) : L('history_btn_gen_invoice', true); ?>" class="btn-icon <?php echo !empty($v['es_factura']) ? 'text-accent' : ''; ?>" onclick="abrirModalFactura('<?php echo $v['id']; ?>', '<?php echo $v['numero_ticket']; ?>', '<?php echo addslashes(htmlspecialchars($v['nombre_cliente'] ?? '')); ?>', '<?php echo addslashes(htmlspecialchars($v['nif_cliente'] ?? '')); ?>', <?php echo !empty($v['es_factura']) ? 'true' : 'false'; ?>)">
+                                    <?php 
+                                        $isIssued = !empty($v['hash_actual']);
+                                        $isFactura = !empty($v['es_factura']);
+                                        $btnTitle = $isFactura ? L('history_btn_view_invoice', true) : ($isIssued ? 'Ticket inalterable (Emitido). Use anulación para cambiar a factura.' : L('history_btn_gen_invoice', true));
+                                        $btnClass = $isFactura ? 'text-accent' : ($isIssued ? 'opacity-40' : '');
+                                    ?>
+                                    <button title="<?php echo $btnTitle; ?>" class="btn-icon <?php echo $btnClass; ?>" 
+                                            onclick="abrirModalFactura('<?php echo $v['id_venta_proconsis']; ?>', '<?php echo $v['numero_ticket']; ?>', '<?php echo addslashes(htmlspecialchars($v['nombre_cliente'] ?? '')); ?>', '<?php echo addslashes(htmlspecialchars($v['nif_cliente'] ?? '')); ?>', <?php echo $isFactura ? 'true' : 'false'; ?><?php echo $isIssued ? ', true' : ', false'; ?>)">
                                         <i class="fa-solid fa-file-invoice"></i>
                                     </button>
                                     <?php if ($esAbono && !empty($v['numero_ticket_origen'])): ?>
                                         <button title="Ver venta origen: T-<?php echo $v['numero_ticket_origen']; ?>" class="btn-icon text-accent" onclick="verTicket('<?php echo $v['numero_ticket_origen']; ?>')">
                                             <i class="fa-solid fa-link"></i>
+                                        </button>
+                                    <?php endif; ?>
+                                    <?php if ($stVeri === 'error_critico'): ?>
+                                        <?php
+                                        $jsNombre = json_encode($v['nombre_cliente'] ?? '');
+                                        $jsNif = json_encode($v['nif_cliente'] ?? '');
+                                        $esFacturaCompleta = !empty($v['es_factura']) && !empty($v['nif_cliente']);
+                                        $isLocalError = (strpos($aeatError, 'Archivo XML no encontrado') !== false);
+                                        $usarSubsanacion = $esFacturaCompleta && !$isLocalError;
+                                        // Extraer nombre sugerido del mensaje AEAT (ej: "... NOMBRE_RAZON:Juan.")
+                                        $nombreSugeridoAeat = '';
+                                        if (preg_match('/NOMBRE_RAZON:([^.\n]+)/i', $aeatError, $mNR)) {
+                                            $nombreSugeridoAeat = trim($mNR[1]);
+                                        }
+                                        $jsNombreSugerido = json_encode($nombreSugeridoAeat);
+                                        ?>
+                                        <button title="<?php echo $usarSubsanacion ? 'Corregir NIF/Nombre y subsanar (rechazo previo)' : 'Regenerar como Simplificada y re-enviar'; ?>"
+                                                class="btn-icon <?php echo $usarSubsanacion ? 'text-orange pulse-orange' : 'text-accent pulse-blue btn-regen-tecnica'; ?>"
+                                                data-id="<?php echo $v['id_venta_proconsis']; ?>"
+                                                onclick='<?php echo $usarSubsanacion ? "abrirModalSubsanacion(" . $v['id_venta_proconsis'] . ", \"" . $v['numero_ticket'] . "\", " . $jsNombre . ", " . $jsNif . ", \"S\", " . $jsNombreSugerido . ", true)" : "confirmarRegeneracion(" . $v['id_venta_proconsis'] . ")"; ?>'>
+                                            <i class="fa-solid <?php echo $usarSubsanacion ? 'fa-wrench' : 'fa-rotate-right'; ?>"></i>
+                                        </button>
+                                    <?php elseif ($stVeri === 'subsanacion_pendiente'): ?>
+                                        <?php
+                                        $jsNombreAE = json_encode($v['nombre_cliente'] ?? '');
+                                        $jsNifAE    = json_encode($v['nif_cliente'] ?? '');
+                                        $isFacturaAE = !empty($v['es_factura']);
+                                        $nombreSugeridoAeat = '';
+                                        if (preg_match('/NOMBRE_RAZON:([^.\n]+)/i', $aeatError, $mNR)) {
+                                            $nombreSugeridoAeat = trim($mNR[1]);
+                                        }
+                                        $jsNombreSugeridoAE = json_encode($nombreSugeridoAeat);
+                                        ?>
+                                        <button title="Aceptado con errores — corregir datos y subsanar automáticamente"
+                                                class="btn-icon text-orange pulse-orange"
+                                                data-id="<?php echo $v['id_venta_proconsis']; ?>"
+                                                onclick='abrirModalSubsanacion(<?php echo $v['id_venta_proconsis']; ?>, "<?php echo $v['numero_ticket']; ?>", <?php echo $jsNombreAE; ?>, <?php echo $jsNifAE; ?>, "N", <?php echo $jsNombreSugeridoAE; ?>, <?php echo $isFacturaAE ? 'true' : 'false'; ?>)'>
+                                            <i class="fa-solid fa-wrench"></i>
+                                        </button>
+                                    <?php elseif ($stVeri === 'bloqueado'): ?>
+                                        <button title="Bloqueado: se enviará automáticamente cuando se resuelva el registro anterior" class="btn-icon opacity-40" disabled>
+                                            <i class="fa-solid fa-lock"></i>
                                         </button>
                                     <?php endif; ?>
                                 </div>
@@ -282,7 +381,8 @@
                     'ordenDir'      => $avHistorial['filtros']['ordenDir'] ?? 'DESC',
                     'numeroTicket'  => $avHistorial['filtros']['ticket'] ?? '',
                     'idCajero'      => $avHistorial['filtros']['cajero'] ?? '',
-                    'tipoDocumento' => $avHistorial['filtros']['tipoDocumento'] ?? 'todos'
+                    'tipoDocumento' => $avHistorial['filtros']['tipoDocumento'] ?? 'todos',
+                    'soloIncidencias' => ($avHistorial['filtros']['soloIncidencias'] ?? false) ? '1' : '0'
                 ];
                 $baseUrl = "index.php?" . http_build_query($params);
                 $isFirst = $avHistorial['paginacion']['actual'] <= 1;
@@ -489,6 +589,47 @@
             <div class="flex-1"></div>
             <button id="btnConfirmarFactura" class="btn-save w-auto px-32" onclick="confirmarGenerarFactura()">
                 <i class="fa-solid fa-file-invoice mr-8"></i> <?php echo L('history_modal_btn_gen'); ?>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL SUBSANACIÓN VERIFACTU -->
+<div id="modalSubsanacion" class="modal-overlay-bg">
+    <div class="modal-content" style="max-width: 600px; border-radius: 20px;">
+        <div class="modal-header">
+            <div>
+                <h2 style="margin:0 0 2px 0">Subsanar Registro VeriFactu <span id="subTicketBadge" class="badge bg-amber-light text-amber ml-8" style="font-size: 14px; padding: 4px 10px;"></span></h2>
+                <span style="font-size:12px; color: var(--text-muted); font-weight:400;">Corrija los datos identificativos que provocaron el error en la AEAT</span>
+            </div>
+            <button class="btn-close-modal" onclick="cerrarModalSubsanacion()">&times;</button>
+        </div>
+        <div class="p-24">
+            <input type="hidden" id="subVentaId" value="">
+            <input type="hidden" id="subTicketId" value="">
+            <input type="hidden" id="subRechazoPrevio" value="N">
+            <div class="form-group mb-16" id="subGroupNombre">
+                <label class="form-label fs-11 tt-uppercase">Nombre/Razón Social Cliente</label>
+                <input type="text" id="subNombreCliente" class="form-input" placeholder="Ej: Empresa S.L." maxlength="100">
+                <div id="subNombreHint" style="display:none; margin-top:6px; padding:7px 10px; background:#fff8e1; border:1px solid #ffe082; border-radius:7px; font-size:12px; color:#795548;">
+                    <i class="fa-solid fa-lightbulb mr-4" style="color:#f57c00;"></i>
+                    La AEAT indica que el nombre registrado para este NIF es: <strong id="subNombreHintVal"></strong>
+                    — <a href="#" style="color:var(--accent);" onclick="document.getElementById('subNombreCliente').value=document.getElementById('subNombreHintVal').textContent;document.getElementById('subNombreHint').style.display='none';return false;">usar este nombre</a>
+                </div>
+            </div>
+            <div class="form-group mb-0" id="subGroupNif">
+                <label class="form-label fs-11 tt-uppercase">NIF Cliente</label>
+                <input type="text" id="subNifCliente" class="form-input" placeholder="Ej: B12345678" maxlength="20">
+            </div>
+            <div class="mt-16 fs-12 text-muted italic">
+                <i class="fa-solid fa-info-circle mr-4"></i> Esto generará un nuevo registro de Alta con el flag de Subsanación.
+            </div>
+        </div>
+        <div class="modal-footer pt-16 border-top p-24">
+            <button class="btn-cancel" onclick="cerrarModalSubsanacion()"><?php echo L('modal_cancel'); ?></button>
+            <div class="flex-1"></div>
+            <button id="btnConfirmarSubsanacion" class="btn-save w-auto px-32" style="background: var(--orange); border-color: var(--orange);" onclick="confirmarSubsanacion()">
+                <i class="fa-solid fa-cloud-arrow-up mr-8"></i> Subsanar Registro
             </button>
         </div>
     </div>
@@ -756,6 +897,99 @@
 </style>
 
 <script>
+    // ── Contador regresivo cola VeriFactu ─────────────────────────────────────
+    (function () {
+        function tickCountdown() {
+            const secs = 60 - Math.floor((Date.now() / 1000) % 60);
+            document.querySelectorAll('.queue-countdown').forEach(el => {
+                el.textContent = secs + 's';
+                el.style.color = secs <= 10 ? '#f57c00' : '';
+            });
+        }
+        tickCountdown();
+        setInterval(tickCountdown, 1000);
+    })();
+
+    // ── Subsanación VeriFactu ────────────────────────────────────────────────
+    let currentSubsanacionId = null;
+
+    function abrirModalSubsanacion(idVenta, numTicket, nombre, nif, rechazoPrevio = 'N', aeatNombreSugerido = '') {
+        console.log("abrirModalSubsanacion RECIBE ID:", idVenta);
+        currentSubsanacionId = idVenta;
+        document.getElementById('subVentaId').value = idVenta;
+        document.getElementById('subTicketId').value = numTicket;
+        document.getElementById('subTicketBadge').innerText = 'T-' + numTicket;
+        document.getElementById('subNombreCliente').value = nombre || '';
+        document.getElementById('subNifCliente').value = nif || '';
+        document.getElementById('subRechazoPrevio').value = rechazoPrevio;
+
+        // Pista de nombre sugerido por la AEAT (extraída del mensaje de error 1239)
+        const hintEl  = document.getElementById('subNombreHint');
+        const hintVal = document.getElementById('subNombreHintVal');
+        if (aeatNombreSugerido && aeatNombreSugerido !== (nombre || '').trim()) {
+            hintVal.textContent = aeatNombreSugerido;
+            hintEl.style.display = 'block';
+        } else {
+            hintEl.style.display = 'none';
+        }
+
+        // Mostrar/Ocultar campos según si es Factura o Ticket
+        const isFactura = !!arguments[6]; 
+        document.getElementById('subGroupNombre').style.display = isFactura ? 'block' : 'none';
+        document.getElementById('subGroupNif').style.display    = isFactura ? 'block' : 'none';
+        
+        window._isFacturaSub = isFactura; // Guardar estado global temporal
+
+        document.getElementById('modalSubsanacion').style.display = 'flex';
+    }
+
+    function cerrarModalSubsanacion() {
+        currentSubsanacionId = null;
+        document.getElementById('modalSubsanacion').style.display = 'none';
+    }
+
+    async function confirmarSubsanacion() {
+        const idVenta = currentSubsanacionId;
+        const nombre = document.getElementById('subNombreCliente').value.trim();
+        const nif = document.getElementById('subNifCliente').value.trim();
+        const rechazoPrevio = document.getElementById('subRechazoPrevio').value;
+
+        if (!idVenta) {
+            showCustomAlert('Error', 'ID de venta no detectado. Cierre y abra de nuevo.', 'error');
+            return;
+        }
+
+        // Solo validar si es factura completa
+        if (window._isFacturaSub) {
+            if (!nombre || !nif) {
+                showCustomAlert('Datos Incompletos', 'Para subsanar una Factura Completa debe indicar Nombre y NIF válidos.', 'warning');
+                return;
+            }
+            if (typeof validarDocumento === 'function' && !validarDocumento(nif)) {
+                showCustomAlert('NIF Inválido', 'El formato del NIF/CIF introducido no es correcto.', 'warning');
+                return;
+            }
+        }
+
+        try {
+            const res = await fetch('api/verifactuSubsanar.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ idVenta, nombre, nif, rechazoPrevio })
+            });
+            const data = await res.json();
+            if (data.ok) {
+                cerrarModalSubsanacion();
+                showCustomAlert('Éxito', 'Registro de subsanación encolado correctamente.', 'success');
+                setTimeout(() => location.reload(), 1500);
+            } else {
+                showCustomAlert('Error', data.msg || 'No se pudo procesar la subsanación', 'error');
+            }
+        } catch (e) {
+            showCustomAlert('Error', 'Error de red al procesar subsanación', 'error');
+        }
+    }
+
     function verTicket(id) {
         if (!id) return;
         // Direct call to global function in main.js
@@ -767,7 +1001,12 @@
     }
 
     // ── Factura desde Historial ────────────────────────────────────────────────
-    function abrirModalFactura(idVenta, numTicket, nombreExistente, nifExistente, yaEsFactura) {
+    function abrirModalFactura(idVenta, numTicket, nombreExistente, nifExistente, yaEsFactura, isIssued = false) {
+        if (isIssued && !yaEsFactura) {
+            showCustomAlert('Inalterabilidad Fiscal', 'Este ticket ya ha sido emitido y encadenado. VeriFactu no permite convertirlo directamente a factura. Debe anular el ticket y emitir una nueva factura.', 'info');
+            return;
+        }
+
         document.getElementById('facVentaId').value = idVenta;
         document.getElementById('facTicketId').value = numTicket;
         document.getElementById('facNombreCliente').value = nombreExistente || '';
@@ -1146,6 +1385,158 @@
         document.getElementById('modalTurnoDetalle').style.display = 'none';
     }
 
+    // Funciones de subsanación: ver bloque principal de script al inicio del archivo
+
+    function confirmarRegeneracion(id) {
+        Swal.fire({
+            title: '¿Regenerar archivo?',
+            text: 'Este error es técnico (archivo perdido). El sistema generará un nuevo archivo con los datos actuales y lo enviará a Hacienda automáticamente.',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Sí, regenerar',
+            cancelButtonText: 'Cancelar',
+            confirmButtonColor: 'var(--accent)'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                const formData = new FormData();
+                formData.append('accion', 'regenerar');
+                formData.append('id_venta', id);
+                
+                fetch('index.php', { method: 'POST', body: formData })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.ok) {
+                        // Forzar el envío inmediato de la cola
+                        const formForce = new FormData();
+                        formForce.append('accion', 'forzar_envio');
+                        fetch('index.php', { method: 'POST', body: formForce })
+                        .finally(() => {
+                            Swal.fire({
+                                title: '¡Regenerado!',
+                                text: 'El archivo ha sido regenerado y enviado a Hacienda.',
+                                icon: 'success',
+                                timer: 2000
+                            }).then(() => location.reload());
+                        });
+                    } else {
+                        Swal.fire('Error', data.error || 'No se pudo regenerar el archivo', 'error');
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    Swal.fire('Error', 'Error de red al intentar regenerar', 'error');
+                });
+            }
+        });
+    }
+
+    async function confirmarSubsanacionMasivaTodo() {
+        const result = await Swal.fire({
+            title: 'Subsanación Masiva Global',
+            text: 'Se procesarán TODAS las incidencias técnicas y fiscales pendientes en la base de datos. Este proceso asegura el orden cronológico para no romper la cadena de hashes.',
+            icon: 'info',
+            showCancelButton: true,
+            confirmButtonText: 'Sí, procesar todo',
+            cancelButtonText: 'Cancelar',
+            confirmButtonColor: 'var(--accent)'
+        });
+
+        if (!result.isConfirmed) return;
+
+        Swal.fire({
+            title: 'Procesando Incidencias',
+            html: 'Conectando con el servidor...<br><small class="text-muted">Esto puede tardar unos minutos si hay muchos registros.</small>',
+            allowOutsideClick: false,
+            didOpen: () => {
+                Swal.showLoading();
+                
+                fetch('api/verifactuSubsanarMasivo.php')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.ok) {
+                        Swal.fire({
+                            title: '¡Proceso Completado!',
+                            text: data.msg,
+                            icon: 'success'
+                        }).then(() => location.reload());
+                    } else {
+                        Swal.fire('Error', data.msg || 'Error en el proceso masivo', 'error');
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    Swal.fire('Error', 'Error de red al intentar procesar masivamente', 'error');
+                });
+            }
+        });
+    }
+
+    function guardarSubsanacion(e) {
+        e.preventDefault();
+        const form = document.getElementById('formSubsanacion');
+        const formData = new FormData(form);
+        formData.append('accion', 'subsanar');
+
+        // Mostrar loader o deshabilitar botón
+        const btn = form.querySelector('button[type="submit"]');
+        const originalHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-8"></i> Procesando...';
+
+        fetch('index.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(async r => {
+            const text = await r.text();
+            try {
+                return JSON.parse(text);
+            } catch (e) {
+                console.error("Respuesta no válida:", text);
+                throw new Error("El servidor devolvió una respuesta inesperada. Revisa la consola.");
+            }
+        })
+        .then(data => {
+            if (data.ok) {
+                // Forzar el envío inmediato de la cola
+                const formForce = new FormData();
+                formForce.append('accion', 'forzar_envio');
+                fetch('index.php', { method: 'POST', body: formForce })
+                .finally(() => {
+                    if (window.Swal) {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Subsanación Enviada',
+                            text: 'El registro se ha corregido y enviado correctamente a la AEAT.',
+                            timer: 2000
+                        }).then(() => location.reload());
+                    } else {
+                        showCustomAlert('Subsanación Enviada', 'Subsanación generada y enviada correctamente.', 'success');
+                        setTimeout(() => location.reload(), 2000);
+                    }
+                });
+            } else {
+                if (window.Swal) {
+                    Swal.fire('Error', data.error || 'No se pudo procesar la subsanación', 'error');
+                } else {
+                    showCustomAlert('Error', data.error || 'No se pudo procesar la subsanación', 'error');
+                }
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            if (window.Swal) {
+                Swal.fire('Error', 'Error de red o servidor', 'error');
+            } else {
+                showCustomAlert('Error', 'Error de red o servidor', 'error');
+            }
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        });
+    }
+
     // ── Lógica de Filtros Avanzados ──────────────────────────────────────────
     document.addEventListener('DOMContentLoaded', () => {
         const form = document.getElementById('formFiltros');
@@ -1191,3 +1582,46 @@
         }
     });
 </script>
+
+
+<style>
+    .row-incident {
+        background-color: rgba(255, 152, 0, 0.05) !important;
+    }
+    .row-incident:hover {
+        background-color: rgba(255, 152, 0, 0.1) !important;
+    }
+    .incident-tab {
+        border-color: #ff9800 !important;
+        color: #ef6c00 !important;
+    }
+    .incident-tab.active {
+        background: #ff9800 !important;
+        color: white !important;
+        border-color: #ef6c00 !important;
+    }
+    .incident-tab i {
+        color: inherit !important;
+        background: transparent !important;
+    }
+    .pulse-orange {
+        animation: pulse-orange 2s infinite;
+        background: rgba(255, 152, 0, 0.1) !important;
+        border-color: #ff9800 !important;
+    }
+    .pulse-blue {
+        animation: pulse-blue 2s infinite;
+        background: rgba(52, 152, 219, 0.1) !important;
+        border-color: #3498db !important;
+    }
+    @keyframes pulse-orange {
+        0% { box-shadow: 0 0 0 0 rgba(255, 152, 0, 0.4); }
+        70% { box-shadow: 0 0 0 10px rgba(255, 152, 0, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(255, 152, 0, 0); }
+    }
+    @keyframes pulse-blue {
+        0% { box-shadow: 0 0 0 0 rgba(52, 152, 219, 0.4); }
+        70% { box-shadow: 0 0 0 10px rgba(52, 152, 219, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(52, 152, 219, 0); }
+    }
+</style><style>.pulse-red { animation: pulse-red-icon 2s infinite; } @keyframes pulse-red-icon { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.6; transform: scale(1.2); } 100% { opacity: 1; transform: scale(1); } }</style>

@@ -29,6 +29,11 @@ try {
             echo json_encode(['ok' => true, 'stats' => $stats, 'items' => $items]);
             break;
 
+        case 'resumen':
+            $resumen = $service->obtenerResumenEstado();
+            echo json_encode(['ok' => true, 'resumen' => $resumen]);
+            break;
+
         case 'retry':
             $id = (int)($_POST['id'] ?? 0);
             if ($id > 0) {
@@ -37,6 +42,29 @@ try {
             } else {
                 echo json_encode(['ok' => false, 'error' => 'ID no válido']);
             }
+            break;
+
+        case 'queue_data':
+            // Devuelve stats + cola completa para el polling en tiempo real del log viewer
+            $stats  = $service->obtenerEstadisticas();
+            $resumen = $service->obtenerResumenEstado();
+            $queue  = $service->listarColaPendiente();
+            $logs   = $service->listarUltimosMovimientos(50);
+            echo json_encode([
+                'ok'     => true,
+                'stats'  => $stats,
+                'resumen'=> $resumen,
+                'queue'  => $queue,
+                'logs'   => $logs,
+                'ts'     => time()
+            ]);
+            break;
+
+        case 'heartbeat':
+            // Procesa la cola si hay lotes listos (respetando el timer de 60s)
+            $resultado = $service->procesarCola();
+            $resumen   = $service->obtenerResumenEstado();
+            echo json_encode(['ok' => true, 'procesado' => $resultado, 'resumen' => $resumen]);
             break;
 
         default:

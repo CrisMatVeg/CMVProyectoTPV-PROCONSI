@@ -651,7 +651,7 @@ class VentaPDO
         if ($numTicket) {
             $whereClause .= " AND v_sub.numero_ticket LIKE :ticket";
             $params[':ticket'] = '%' . $numTicket . '%';
-        } else {
+        } elseif (!$soloIncidencias) {
             $whereClause .= " AND v_sub.fecha >= :desde AND v_sub.fecha <= :hasta";
             $params[':desde'] = $desde . ' 00:00:00';
             $params[':hasta'] = $hasta . ' 23:59:59';
@@ -667,10 +667,14 @@ class VentaPDO
             $params[':tipoDoc'] = $tipoDocumento;
         }
 
+        if ($soloIncidencias) {
+            $whereClause .= " AND v_sub.estado_envio_aeat IN ('error_critico', 'subsanacion_pendiente')";
+        }
+
         // Técnica: Late Row Lookup. Primero obtenemos solo los IDs de forma eficiente.
         $innerJoin = ($ordenPor === 'nombre_cajero') ? "JOIN usuarios u_sub ON v_sub.id_usuario = u_sub.id" : "";
         
-        $sql = "SELECT v.*, u.nombre as nombre_cajero, vo.numero_ticket as numero_ticket_origen
+        $sql = "SELECT v.*, u.nombre as nombre_cajero, vo.numero_ticket as numero_ticket_origen, c_aeat.ultimo_error as aeat_error, v.id as id_venta_proconsis, v.id as id
                 FROM (
                     SELECT v_sub.id 
                     FROM ventas v_sub
@@ -682,6 +686,9 @@ class VentaPDO
                 JOIN ventas v ON v.id = sub.id
                 LEFT JOIN usuarios u ON v.id_usuario = u.id
                 LEFT JOIN ventas vo ON v.id_venta_origen = vo.id
+                LEFT JOIN cola_envios c_aeat ON c_aeat.id = (
+                    SELECT MAX(id) FROM cola_envios WHERE id_venta = v.id
+                )
                 ORDER BY $campoFinalOrder $ordenDir";
         
         // PDO no permite bindParam en LIMIT/OFFSET en algunas versiones si no se emula,
@@ -692,7 +699,7 @@ class VentaPDO
         return $q->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    public static function contarVentas(string $desde, string $hasta, ?int $idUsuario = null, ?string $numTicket = null, string $tipoDocumento = 'todos'): int
+    public static function contarVentas(string $desde, string $hasta, ?int $idUsuario = null, ?string $numTicket = null, string $tipoDocumento = 'todos', bool $soloIncidencias = false): int
     {
         $sql = "SELECT COUNT(*) FROM ventas v WHERE 1=1";
         $params = [];
@@ -700,7 +707,7 @@ class VentaPDO
         if ($numTicket) {
             $sql .= " AND v.numero_ticket LIKE :ticket";
             $params[':ticket'] = '%' . $numTicket . '%';
-        } else {
+        } elseif (!$soloIncidencias) {
             $sql .= " AND v.fecha >= :desde AND v.fecha <= :hasta";
             $params[':desde'] = $desde . ' 00:00:00';
             $params[':hasta'] = $hasta . ' 23:59:59';
@@ -715,6 +722,10 @@ class VentaPDO
             $sql .= " AND v.tipo_documento = 'venta'";
         } elseif ($tipoDocumento === 'abono') {
             $sql .= " AND v.tipo_documento = 'abono'";
+        }
+
+        if ($soloIncidencias) {
+            $sql .= " AND v.estado_envio_aeat IN ('error_critico', 'subsanacion_pendiente')";
         }
 
         $q = DBPDO::ejecutarConsulta($sql, $params);
@@ -756,6 +767,168 @@ class VentaPDO
         ]);
 
         return true;
+    }
+
+    public static function subsanarVenta(int $idVenta, string $nombre, string $nif, bool $rechazoPrevio = false): bool
+    {
+        $db = DBPDO::getPDO();
+        $db->beginTransaction();
+        try {
+            // 0. Obtener IDENTIFICADOR ORIGINAL antes de cualquier cambio
+            // El ID (Serie+Numero+Fecha) de una factura para la AEAT es INMUTABLE.
+            $sqlOrig = "SELECT numero_ticket, fecha, es_factura, nif_cliente, tipo_documento, estado_envio_aeat, hash_anterior FROM ventas WHERE id = :id";
+            $vOrig = DBPDO::ejecutarConsulta($sqlOrig, [':id' => $idVenta], $db)->fetch();
+            if (!$vOrig) throw new Exception("Venta no encontrada.");
+
+            // error_critico (rechazado)    → Alta por Rechazo (Subsanacion=S, RechazoPrevio=X)
+            // subsanacion_pendiente (aceptado con errores) → Alta de Subsanación (Subsanacion=S, RechazoPrevio=N)
+            $esRechazo            = ($vOrig['estado_envio_aeat'] === 'error_critico');
+            $esAceptadoConErrores = ($vOrig['estado_envio_aeat'] === 'subsanacion_pendiente');
+            
+            $flagSubsanacion      = 'S'; // Se está subsanando
+            $flagRechazoPrevio    = $esRechazo ? 'S' : 'N'; // S activará el flag 'X' en VeriFactuService
+
+            require_once __DIR__ . '/ConfiguracionPDO.php';
+            $nifEmisor = defined('EMPRESA_CIF') ? EMPRESA_CIF : (ConfiguracionPDO::obtenerValor('empresa_nif') ?? '00000000T');
+
+            // Usamos el identificador que ya conoce la AEAT (o el que se generó originalmente)
+            $esFacturaOld = !empty($vOrig['es_factura']) && !empty($vOrig['nif_cliente']);
+            $numeroSerieOriginal = self::formatTicketNumber($vOrig['numero_ticket'], $vOrig['fecha'], $esFacturaOld, $vOrig['tipo_documento']);
+
+            // 1. Actualizar datos en la venta.
+            // Solo convertir a factura (es_factura=1) si se aportan nombre y NIF,
+            // o si ya era factura. Para tickets regenerados sin datos de cliente
+            // (confirmarRegeneracion) no hay que alterar el tipo de documento.
+            $hayDatosCliente = ($nombre !== '' || $nif !== '');
+            if ($hayDatosCliente || !empty($vOrig['es_factura'])) {
+                DBPDO::ejecutarConsulta(
+                    "UPDATE ventas SET nombre_cliente = :nombre, nif_cliente = :nif, es_factura = 1 WHERE id = :id",
+                    [':id' => $idVenta, ':nombre' => $nombre, ':nif' => $nif],
+                    $db
+                );
+            }
+
+            // 2. Obtener datos para VeriFactu (con los importes y demás)
+            $datosVf = self::getVentaParaVeriFactu($idVenta, $db);
+            if (!$datosVf) throw new Exception("getVentaParaVeriFactu retornó null para ID $idVenta");
+            
+            if (empty($datosVf['fecha_expedicion'])) {
+                 // Inspeccionar por qué está vacía
+                 $stmtDebug = $db->prepare("SELECT id, fecha, numero_ticket FROM ventas WHERE id = ?");
+                 $stmtDebug->execute([$idVenta]);
+                 $rowDebug = $stmtDebug->fetch(PDO::FETCH_ASSOC);
+                 throw new Exception("CRITICAL: fecha_expedicion vacía para ID $idVenta. DatosVf: " . json_encode($datosVf) . " | DB Row: " . json_encode($rowDebug));
+            }
+            
+            // FORZAR el identificador original y el tipo de registro
+            $datosVf['numero_serie'] = $numeroSerieOriginal;
+            $datosVf['subsanacion']  = $flagSubsanacion;
+            $datosVf['rechazo_previo'] = $flagRechazoPrevio;
+
+            // Sincronizar tipo_factura con el prefijo del numero_serie para evitar errores de huella (2000)
+            // Si empieza por T, debe ser F2 (Simplificada), si empieza por F debe ser F1 (Factura)
+            $prefix = substr($numeroSerieOriginal, 0, 1);
+            $datosVf['tipo_factura'] = ($prefix === 'F') ? 'F1' : 'F2';
+
+            // 3. Obtener el hash anterior (SIEMPRE EL ÚLTIMO GLOBAL)
+            // Para evitar romper la cadena de las ventas que se hicieron DESPUÉS de esta,
+            // la subsanación debe enviarse como un nuevo eslabón al FINAL de la cadena actual.
+            $datosUltimo = self::obtenerUltimoHash($db);
+            $hashAnterior = $datosUltimo['hash'] ?? str_repeat('0', 64);
+            $serieAnt = $datosUltimo['serie'] ?? '';
+            $fechaAnt = $datosUltimo['fecha'] ?? '';
+
+            $datosVf['serie_anterior'] = $serieAnt;
+            $datosVf['fecha_anterior'] = $fechaAnt;
+            $datosVf['hash_anterior']  = $hashAnterior;
+
+            $fechaHoraGen = date('Y-m-d\\TH:i:sP');
+
+            // 4. Recalcular el hash del registro
+            // La CuotaTotal del hash debe coincidir EXACTAMENTE con lo que VeriFactuService
+            // pondrá en <CuotaTotal> del XML: la suma de cuotas de los desgloses.
+            // Si se usara cuota_total (iva_amt de BD), habría divergencia → error 2000.
+            $cuotaParaHash = 0;
+            foreach ($datosVf['desgloses'] as $d) {
+                $cuotaParaHash += ($d['cuota'] ?? 0) + ($d['cuota_re'] ?? 0);
+            }
+            if ($cuotaParaHash == 0) {
+                $cuotaParaHash = $datosVf['cuota_total'];
+            }
+
+            $datosVf['nif_emisor'] = $nifEmisor;
+            $datosVf['fecha_hora_gen'] = $fechaHoraGen;
+            $hashActual = self::generarHashVeriFactu([
+                'nif_emisor'       => $nifEmisor,
+                'numero_serie'     => $datosVf['numero_serie'],
+                'fecha_expedicion' => $datosVf['fecha_expedicion'],
+                'tipo_factura'     => $datosVf['tipo_factura'],
+                'cuota_total'      => $cuotaParaHash,
+                'importe_total'    => $datosVf['importe_total'],
+                'fecha_hora_gen'   => $fechaHoraGen
+            ], $hashAnterior);
+
+            // 5. Preparar datos finales para el XML
+            $datosVf['fecha_hora_gen'] = $fechaHoraGen;
+            $datosVf['hash_actual']    = $hashActual;
+
+            // 6. Generar XML firmado
+            require_once __DIR__ . '/VeriFactuService.php';
+            $vf    = new VeriFactuService();
+            $resVf = $vf->procesarAlta($datosVf);
+            if (!$resVf['ok']) throw new Exception("Error al generar XML: " . $resVf['error']);
+
+            // 7. Persistir y encolar
+            // IMPORTANTE: NO actualizamos hash_actual en la tabla 'ventas' si ya tiene uno,
+            // para no romper la referencia de las ventas posteriores que ya apuntan al hash original.
+            // Solo actualizamos el estado. El nuevo hash vive en verifactu_logs.
+            DBPDO::ejecutarConsulta(
+                "UPDATE ventas SET estado_envio_aeat = 'pendiente' WHERE id = :id",
+                [':id' => $idVenta],
+                $db
+            );
+
+            $stmtLog = $db->prepare("INSERT INTO verifactu_logs (id_venta, tipo_registro, numero_serie, xml_path, hash_anterior, hash_actual, estado)
+                                     VALUES (:id, :tipo, :serie, :path, :ant, :act, 'pendiente')");
+            $stmtLog->execute([
+                ':id'    => $idVenta,
+                ':tipo'  => ($esRechazo ? 'AltaPorRechazo' : 'AltaPorSubsanacion'),
+                ':serie' => $datosVf['numero_serie'],
+                ':path'  => $resVf['path'],
+                ':ant'   => $hashAnterior,
+                ':act'   => $hashActual
+            ]);
+
+            require_once __DIR__ . '/AeatQueueService.php';
+            $queueSvc = new AeatQueueService();
+            
+            // 6.5 LIMPIEZA: Eliminar cualquier rastro anterior en la cola para esta venta
+            // Esto evita duplicados visuales y técnicos en el dashboard y el procesador.
+            DBPDO::ejecutarConsulta("DELETE FROM cola_envios WHERE id_venta = :id", [':id' => $idVenta], $db);
+
+            $queueSvc->encolar($idVenta, $resVf['path']);
+
+            $db->commit();
+
+            // Tras subsanar el registro bloqueante, regenerar y encolar los bloqueados posteriores
+            $queueSvc->desbloquearRegistrosSiguientes($idVenta);
+
+            return true;
+        } catch (Exception $e) {
+            if ($db->inTransaction()) $db->rollBack();
+            throw $e;
+        }
+    }
+
+    public static function regenerarVentaAlta(int $idVenta): bool
+    {
+        try {
+            self::regenerarRegistroVeriFactu($idVenta);
+            return true;
+        } catch (Exception $e) {
+            error_log("Error en regenerarVentaAlta: " . $e->getMessage());
+            throw $e;
+        }
     }
 
     public static function obtenerVentasPorCliente(int $idCliente, int $limit = 50, int $offset = 0): array
