@@ -138,18 +138,33 @@
 <script>
 
     (function initThemeSelectors() {
+        const mode = document.body.dataset.themeMode || 'light';
+        const accent = document.body.dataset.themeAccent || 'blue';
+        const font = document.body.dataset.themeFont || 'dm-mono';
+
         if (typeof applyTheme === 'function') {
-            const mode = document.body.dataset.themeMode || 'light';
-            const accent = document.body.dataset.themeAccent || 'blue';
-            const font = document.body.dataset.themeFont || 'dm-mono';
             applyTheme(mode, accent, font);
         }
-        
+
+        // Guardar valores originales (del servidor/BD) para poder revertirlos si el usuario cancela
+        const origMode = mode, origAccent = accent, origFont = font;
+        const btnVolver = document.querySelector('[name="volver"]');
+        if (btnVolver) {
+            btnVolver.addEventListener('click', function () {
+                localStorage.setItem('theme-mode', origMode);
+                localStorage.setItem('theme-accent', origAccent);
+                localStorage.setItem('theme-font', origFont);
+                document.body.dataset.themeMode = origMode;
+                document.body.dataset.themeAccent = origAccent;
+                document.body.dataset.themeFont = origFont;
+            });
+        }
+
         const modeInput = document.getElementById('theme_mode_input');
         const accentInput = document.getElementById('theme_accent_input');
         const fontInput = document.getElementById('theme_font_input');
-        if (modeInput) modeInput.value = document.body.dataset.themeMode || 'light';
-        if (accentInput) accentInput.value = document.body.dataset.themeAccent || 'blue';
-        if (fontInput) fontInput.value = document.body.dataset.themeFont || 'dm-mono';
+        if (modeInput) modeInput.value = mode;
+        if (accentInput) accentInput.value = accent;
+        if (fontInput) fontInput.value = font;
     })();
 </script>
