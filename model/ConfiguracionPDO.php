@@ -82,8 +82,17 @@ class ConfiguracionPDO
             foreach ($configuraciones as $clave => $valor) {
                 // Solo guardar si la clave no está vacía
                 if (!empty($clave)) {
+                    $oldValue = self::obtenerValor($clave);
                     $valGuardar = ($clave === 'smtp_pass') ? self::encrypt($valor) : $valor;
                     $stmt->execute([':valor' => $valGuardar, ':clave' => $clave]);
+
+                    // Si la configuración es fiscal, registrar evento VeriFactu
+                    if (strpos($clave, 'verifactu_') === 0 || strpos($clave, 'empresa_') === 0) {
+                         if ($oldValue !== (string)$valor) {
+                             require_once __DIR__ . '/VeriFactuEventService.php';
+                             VeriFactuEventService::logConfigChange($clave, $oldValue, $valor);
+                         }
+                    }
                 }
             }
  

@@ -76,9 +76,10 @@ class CompraPDO
 
             // 2. Actualizar Stock y CMP para cada línea
             foreach ($albaran['lineas'] as $l) {
-                $ivaUnitario = $l['precio_coste_neto'] * ($l['iva_pct'] / 100);
+                // El IVA soportado NO forma parte del coste: es un impuesto repercutido al cliente.
+                // Solo el recargo de equivalencia (RE) es un coste real no recuperable.
                 $reUnitario = ($oProv->getAplicaRe()) ? $l['precio_coste_neto'] * ($l['re_pct'] / 100) : 0;
-                $costeAdquisicionUnitario = $l['precio_coste_neto'] + $ivaUnitario + $reUnitario;
+                $costeAdquisicionUnitario = $l['precio_coste_neto'] + $reUnitario;
 
                 $notas = "Albarán validado: " . $albaran['numero_albaran'];
                 $idUsuario = (isset($_SESSION['usuarioActualTPV']) && is_object($_SESSION['usuarioActualTPV']) && method_exists($_SESSION['usuarioActualTPV'], 'getId')) 

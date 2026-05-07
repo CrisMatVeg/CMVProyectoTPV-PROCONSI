@@ -35,10 +35,13 @@ class EntradaStockPDO
         // La tabla entradas_stock debe existir previamente asegurada por scripts SQL.
 
 
-        // 1. Obtener stock y CMP actuales del producto
-        $sqlProd = "SELECT p.precio_coste, p.stock_actual, p.precio_venta, p.margen
-                    FROM productos p WHERE p.id = :id";
-        
+        // 1. Obtener stock y CMP actuales del producto (con IVA para recalcular PVP correctamente)
+        $sqlProd = "SELECT p.precio_coste, p.stock_actual, p.precio_venta, p.margen,
+                           COALESCE(t.porcentaje, 21.0) AS iva_pct
+                    FROM productos p
+                    LEFT JOIN tipos_iva t ON p.id_tipo_iva = t.id
+                    WHERE p.id = :id";
+
         $stmt = ($db) ? $db->prepare($sqlProd) : null;
         if ($db) {
             $stmt->execute([':id' => $idProducto]);
@@ -56,6 +59,7 @@ class EntradaStockPDO
         $cmpActual      = (float)$prod['precio_coste'];
         $pvpActual      = (float)$prod['precio_venta'];
         $margen         = (float)($prod['margen'] ?? 0);
+        $ivaPct         = (float)($prod['iva_pct'] ?? 21.0);
 
         // IMPORTANTE: Para el cálculo del CMP, si el stock actual es negativo,
         // lo tratamos como 0 para no "corromper" la media ponderada con deudas de stock.
@@ -73,9 +77,10 @@ class EntradaStockPDO
         }
 
         // 2b. AJUSTE AUTOMÁTICO DE PVP SI HAY MARGEN DEFINIDO
+        // PVP = CMP × (1 + margen%) × (1 + IVA%)  — el CMP NO incluye IVA
         $pvpNuevo = $pvpActual;
         if ($margen > 0) {
-            $pvpNuevo = round($cmpNuevo * (1 + ($margen / 100)), 2);
+            $pvpNuevo = round($cmpNuevo * (1 + ($margen / 100)) * (1 + ($ivaPct / 100)), 2);
         }
 
         // 3. Actualizar el producto: precio_coste (CMP), stock y PVP (si cambió)
