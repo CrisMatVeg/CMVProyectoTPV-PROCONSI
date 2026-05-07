@@ -89,6 +89,7 @@ class PDFServiceV2
         $pdf->Cell(20, 5, self::decode("IMPORTE"), 0, 1, 'R');
         $pdf->Ln(1);
 
+        $subtotalReal = 0;
         $pdf->SetFont('Courier', '', 8);
         foreach ($venta['lineas'] as $l) {
             $nombre = self::decode($l['nombre_producto']);
@@ -97,6 +98,24 @@ class PDFServiceV2
             $subTexto = (int)$l['cantidad'] . " x " . number_format($l['precio_unitario'], 2, ',', '.') . " " . chr(128);
             $pdf->Cell(40, 4, self::decode($subTexto), 0, 0);
             $pdf->Cell(20, 4, self::formatEuros($l['total_linea']), 0, 1, 'R');
+            
+            $subtotalReal += (float)$l['total_linea'];
+
+            // Descuentos de línea
+            if (!empty($l['descuentos'])) {
+                $pdf->SetFont('Courier', 'I', 7);
+                foreach ($l['descuentos'] as $d) {
+                    $nombreDesc = $d['nombre_descuento'] ?: $d['nombre'] ?: ucfirst($d['tipo_descuento']);
+                    // Filtrar cupones y globales
+                    if (($d['tipo_descuento'] ?? '') === 'cupon') continue;
+                    if (!empty($venta['descuento_label']) && $nombreDesc === $venta['descuento_label']) continue;
+
+                    $vDescontado = (float)($d['valor_descontado'] ?? 0);
+                    $signo = ($vDescontado >= 0) ? '+' : '-';
+                    $pdf->Cell(0, 3, self::decode("  └─ [" . $nombreDesc . "] " . $signo . number_format(abs($vDescontado), 2, ',', '.') . " " . chr(128)), 0, 1);
+                }
+                $pdf->SetFont('Courier', '', 8);
+            }
 
             if (!empty($l['meses_garantia']) && $l['meses_garantia'] > 0) {
                 $pdf->SetFont('Courier', 'I', 7);
@@ -110,12 +129,17 @@ class PDFServiceV2
         $pdf->Cell(0, 0, '', 'T');
         $pdf->Ln(2);
 
-        $pdf->Cell(40, 4, self::decode("Subtotal:"), 0, 0);
-        $pdf->Cell(20, 4, self::formatEuros($venta['subtotal']), 0, 1, 'R');
+        $totalVenta = (float)$venta['total'];
+        $diff = $subtotalReal - $totalVenta;
 
-        if (!empty($venta['descuento_amt']) && (float)$venta['descuento_amt'] > 0) {
-            $pdf->Cell(40, 4, self::decode("Descuento (" . round($venta['descuento_pct']) . "%):"), 0, 0);
-            $pdf->Cell(20, 4, "- " . self::formatEuros($venta['descuento_amt']), 0, 1, 'R');
+        $pdf->Cell(40, 4, self::decode("Subtotal:"), 0, 0);
+        $pdf->Cell(20, 4, self::formatEuros($subtotalReal), 0, 1, 'R');
+
+        if ($diff > 0.01 || (!empty($venta['descuento_amt']) && (float)$venta['descuento_amt'] > 0)) {
+            $amtToShow = $diff > 0.01 ? $diff : (float)$venta['descuento_amt'];
+            $label = !empty($venta['descuento_label']) ? $venta['descuento_label'] : (!empty($venta['descuento_pct']) ? $venta['descuento_pct'] . '%' : 'Global');
+            $pdf->Cell(40, 4, self::decode("Descuento (" . $label . "):"), 0, 0);
+            $pdf->Cell(20, 4, "- " . self::formatEuros($amtToShow), 0, 1, 'R');
         }
 
         $breakdown = self::getVatBreakdown($venta);
@@ -143,7 +167,7 @@ class PDFServiceV2
         $pdf->Ln(2);
         $pdf->SetFont('Courier', 'B', 12);
         $pdf->Cell(30, 8, self::decode("TOTAL"), 0, 0);
-        $pdf->Cell(30, 8, self::formatEuros($venta['total']), 0, 1, 'R');
+        $pdf->Cell(30, 8, self::formatEuros($totalVenta), 0, 1, 'R');
         $pdf->Ln(2);
 
         $pdf->SetFont('Courier', '', 8);
@@ -275,17 +299,50 @@ class PDFServiceV2
         $pdf->SetTextColor(0);
         $pdf->SetFont('Arial', '', 10);
         $fill = false;
+        $subtotalReal = 0;
         foreach ($venta['lineas'] as $l) {
             $pdf->SetFillColor(245, 245, 245);
-            $pdf->Cell(85, 8, self::decode($l['nombre_producto']), 'B', 0, 'L', $fill);
-            $pdf->Cell(20, 8, (int)$l['cantidad'], 'B', 0, 'C', $fill);
-            $pdf->Cell(30, 8, self::formatEuros($l['precio_unitario']), 'B', 0, 'R', $fill);
-            $pdf->Cell(25, 8, "0,00", 'B', 0, 'R', $fill);
-            $pdf->Cell(30, 8, self::formatEuros($l['total_linea']), 'B', 1, 'R', $fill);
+            
+            $lineDescSum = 0;
+            $lineSpecificDescs = [];
+            if (!empty($l['descuentos'])) {
+                foreach ($l['descuentos'] as $d) {
+                    $nombreDesc = $d['nombre_descuento'] ?: $d['nombre'] ?: ucfirst($d['tipo_descuento']);
+                    if (($d['tipo_descuento'] ?? '') === 'cupon') continue;
+                    if (!empty($venta['descuento_label']) && $nombreDesc === $venta['descuento_label']) continue;
+                    
+                    $val = (float)($d['valor_descontado'] ?? 0);
+                    $lineDescSum += abs($val);
+                    $lineSpecificDescs[] = "[" . $nombreDesc . "] " . (($val >= 0) ? '+' : '-') . number_format(abs($val), 2, ',', '.') . " " . chr(128);
+                }
+            }
+
+            $h = 8;
+            if (!empty($lineSpecificDescs)) $h = 12; // Un poco más de espacio si hay detalles
+
+            $pdf->Cell(85, $h, self::decode($l['nombre_producto']), 'B', 0, 'L', $fill);
+            $pdf->Cell(20, $h, (int)$l['cantidad'], 'B', 0, 'C', $fill);
+            $pdf->Cell(30, $h, self::formatEuros($l['precio_unitario']), 'B', 0, 'R', $fill);
+            $pdf->Cell(25, $h, self::formatEuros($lineDescSum), 'B', 0, 'R', $fill);
+            $pdf->Cell(30, $h, self::formatEuros($l['total_linea']), 'B', 1, 'R', $fill);
+            
+            if (!empty($lineSpecificDescs)) {
+                $pdf->SetFont('Arial', 'I', 7);
+                $pdf->SetY($pdf->GetY() - ($h - 4));
+                $pdf->SetX(15);
+                $pdf->Cell(80, 4, self::decode(implode(" | ", $lineSpecificDescs)), 0, 1, 'L');
+                $pdf->SetFont('Arial', '', 10);
+                $pdf->SetY($pdf->GetY() + ($h - 8));
+            }
+
+            $subtotalReal += (float)$l['total_linea'];
             $fill = !$fill;
         }
 
         $pdf->Ln(5);
+
+        $totalVenta = (float)$venta['total'];
+        $diff = $subtotalReal - $totalVenta;
 
         $breakdown = self::getVatBreakdown($venta);
         if (empty($breakdown)) {
@@ -306,10 +363,12 @@ class PDFServiceV2
             }
         }
 
-        if (!empty($venta['descuento_amt']) && (float)$venta['descuento_amt'] > 0) {
+        if ($diff > 0.01 || (!empty($venta['descuento_amt']) && (float)$venta['descuento_amt'] > 0)) {
+            $amtToShow = $diff > 0.01 ? $diff : (float)$venta['descuento_amt'];
+            $label = !empty($venta['descuento_label']) ? $venta['descuento_label'] : (!empty($venta['descuento_pct']) ? $venta['descuento_pct'] . '%' : 'Global');
             $pdf->SetX(130);
-            $pdf->Cell(40, 6, "Descuento:", 0, 0, 'R');
-            $pdf->Cell(30, 6, "- " . self::formatEuros($venta['descuento_amt']), 0, 1, 'R');
+            $pdf->Cell(40, 6, self::decode("Descuento (" . $label . "):"), 0, 0, 'R');
+            $pdf->Cell(30, 6, "- " . self::formatEuros($amtToShow), 0, 1, 'R');
         }
 
         $valesAmt = 0;
@@ -328,7 +387,7 @@ class PDFServiceV2
         $pdf->SetFont('Arial', 'B', 14);
         $pdf->SetX(130);
         $pdf->Cell(40, 10, "TOTAL A PAGAR:", 'T', 0, 'R');
-        $pdf->Cell(30, 10, self::formatEuros($venta['total']), 'T', 1, 'R');
+        $pdf->Cell(30, 10, self::formatEuros($totalVenta), 'T', 1, 'R');
 
         $pdf->Ln(10);
 
