@@ -46,7 +46,7 @@ class VeriFactuService
             $doc->appendChild($root);
 
             // 2. Cabecera
-            $this->addCabecera($doc, $root);
+            $this->addCabecera($doc, $root, ($datos['incidencia'] ?? 'N') === 'S');
 
             // 3. Registro Factura
             $registroNode = $doc->createElementNS($nsLR, "sfLR:RegistroFactura");
@@ -79,7 +79,7 @@ class VeriFactuService
             $root->setAttributeNS('http://www.w3.org/2000/xmlns/', 'xmlns:sf', $nsInfo);
             $doc->appendChild($root);
 
-            $this->addCabecera($doc, $root);
+            $this->addCabecera($doc, $root, ($datos['incidencia'] ?? 'N') === 'S');
 
             $registroNode = $doc->createElementNS($nsLR, "sfLR:RegistroFactura");
             $anulNode = $doc->createElementNS($nsInfo, "sf:RegistroAnulacion");
@@ -104,6 +104,10 @@ class VeriFactuService
         $xsdPath = dirname(__DIR__) . '/schemas/SuministroLR.xsd';
         $validation = $this->firma->validarEsquema($doc, $xsdPath);
         if (!$validation['ok']) {
+            $debugPath = dirname(__DIR__) . '/storage/debug/failed_' . time() . '.xml';
+            if (!is_dir(dirname($debugPath))) mkdir(dirname($debugPath), 0777, true);
+            file_put_contents($debugPath, $doc->saveXML());
+            error_log("VeriFactu Validation Error. XML saved to $debugPath. Errors: " . implode(", ", $validation['errors']));
             throw new Exception("Error de validación XSD antes de firmar ($prefijo): " . implode(", ", $validation['errors']));
         }
 
@@ -159,13 +163,76 @@ class VeriFactuService
             'ok' => true,
             'path' => $savePath,
             'hash' => $datos['hash_actual'],
-            'nombre_archivo' => $fileName
+            'nombre_archivo' => $fileName,
+            'doc' => $doc // Retornar el objeto DOM por si se necesita procesar más
         ];
+    }
+
+    /**
+     * Genera un XML de lote combinando varios XMLs individuales.
+     * @param array $rutasXmls Lista de rutas a archivos XML individuales.
+     * @return string Contenido del XML de lote firmado.
+     */
+    public function generarXmlLote(array $rutasXmls): string
+    {
+        if (empty($rutasXmls)) throw new Exception("No hay XMLs para procesar en el lote.");
+
+        $docLote = new DOMDocument('1.0', 'UTF-8');
+        $docLote->formatOutput = true;
+
+        $nsLR = "https://www2.agenciatributaria.gob.es/static_files/common/internet/dep/aplicaciones/es/aeat/tike/cont/ws/SuministroLR.xsd";
+        $nsInfo = "https://www2.agenciatributaria.gob.es/static_files/common/internet/dep/aplicaciones/es/aeat/tike/cont/ws/SuministroInformacion.xsd";
+
+        $root = $docLote->createElementNS($nsLR, "sfLR:RegFactuSistemaFacturacion");
+        $root->setAttributeNS('http://www.w3.org/2000/xmlns/', 'xmlns:sf', $nsInfo);
+        $docLote->appendChild($root);
+
+        // 1. Añadir Cabecera (con incidencia si alguno de los registros falló antes)
+        $this->addCabecera($docLote, $root, $datos['incidencia'] ?? false);
+
+        // 2. Añadir Registros
+        foreach ($rutasXmls as $path) {
+            if (!file_exists($path)) continue;
+
+            $tempDoc = new DOMDocument();
+            $tempDoc->load($path);
+
+            $registros = $tempDoc->getElementsByTagNameNS($nsLR, 'RegistroFactura');
+            if ($registros->length > 0) {
+                $node = $docLote->importNode($registros->item(0), true);
+                
+                // Limpieza: Si el registro individual ya venía con firma, la AEAT suele preferir 
+                // una única firma para el lote entero. Eliminamos ds:Signature si existe en el nodo.
+                $signatures = $node->getElementsByTagNameNS('http://www.w3.org/2000/09/xmldsig#', 'Signature');
+                while ($signatures->length > 0) {
+                    $node->removeChild($signatures->item(0));
+                }
+
+                $root->appendChild($node);
+            }
+        }
+
+        // 3. Firma del Lote completo
+        $certPath = defined('VERIFACTU_CERT_PATH') ? VERIFACTU_CERT_PATH : ($this->config['verifactu_cert_path'] ?? '');
+        $certPass = defined('VERIFACTU_CERT_PASS') ? VERIFACTU_CERT_PASS : ($this->config['verifactu_cert_pass'] ?? '1234');
+        $certPath = str_replace('\\', '/', $certPath);
+
+        if (!empty($certPath) && file_exists($certPath)) {
+            $this->firma->cargarCertificadoP12($certPath, $certPass);
+            $docLote = $this->firma->firmarXAdES($docLote);
+        }
+
+        // 4. Limpieza de namespaces redundantes
+        $xmlOutput = $docLote->saveXML();
+        $xmlOutput = str_replace(' xmlns:sf="' . self::NS_INFO . '"', '', $xmlOutput);
+        $xmlOutput = str_replace('<sfLR:RegFactuSistemaFacturacion', '<sfLR:RegFactuSistemaFacturacion xmlns:sf="' . self::NS_INFO . '"', $xmlOutput);
+
+        return $xmlOutput;
     }
 
 
 
-    private function addCabecera(DOMDocument $doc, DOMElement $parent)
+    private function addCabecera(DOMDocument $doc, DOMElement $parent, bool $hayIncidencia = false)
     {
         $nsLR = "https://www2.agenciatributaria.gob.es/static_files/common/internet/dep/aplicaciones/es/aeat/tike/cont/ws/SuministroLR.xsd";
         $nsInfo = "https://www2.agenciatributaria.gob.es/static_files/common/internet/dep/aplicaciones/es/aeat/tike/cont/ws/SuministroInformacion.xsd";
@@ -178,7 +245,7 @@ class VeriFactuService
         $cabecera->appendChild($obligado);
         
         $remision = $doc->createElementNS($nsInfo, "sf:RemisionVoluntaria");
-        $remision->appendChild($doc->createElementNS($nsInfo, "sf:Incidencia", "N"));
+        $remision->appendChild($doc->createElementNS($nsInfo, "sf:Incidencia", $hayIncidencia ? "S" : "N"));
         $cabecera->appendChild($remision);
         
         $parent->appendChild($cabecera);
@@ -195,8 +262,20 @@ class VeriFactuService
         $idFactura->appendChild($doc->createElementNS($nsInfo, "sf:NumSerieFactura", $datos['numero_serie']));
         $idFactura->appendChild($doc->createElementNS($nsInfo, "sf:FechaExpedicionFactura", $datos['fecha_expedicion']));
         $alta->appendChild($idFactura);
-        
-        $alta->appendChild($doc->createElementNS($nsInfo, "sf:NombreRazonEmisor", defined('EMPRESA_RAZON_SOCIAL') ? EMPRESA_RAZON_SOCIAL : ($this->config['empresa_nombre'] ?? 'Empresa Test')));
+
+        // NombreRazonEmisor (Obligatorio en XSD después de IDFactura)
+        $razonEmisor = defined('EMPRESA_RAZON_SOCIAL') ? EMPRESA_RAZON_SOCIAL : ($this->config['empresa_nombre'] ?? 'Empresa S.L.');
+        $alta->appendChild($doc->createElementNS($nsInfo, "sf:NombreRazonEmisor", $razonEmisor));
+        // Bloque de Subsanación/Rechazo (Ajustado a normativa AEAT)
+        if (($datos['subsanacion'] ?? 'N') === 'S') {
+            $alta->appendChild($doc->createElementNS($nsInfo, "sf:Subsanacion", "S"));
+            if (($datos['rechazo_previo'] ?? 'N') === 'S') {
+                $alta->appendChild($doc->createElementNS($nsInfo, "sf:RechazoPrevio", "X"));
+            } else {
+                $alta->appendChild($doc->createElementNS($nsInfo, "sf:RechazoPrevio", "N"));
+            }
+        }
+
         $tipoFactura = $datos['tipo_factura'] ?? 'F1';
         $alta->appendChild($doc->createElementNS($nsInfo, "sf:TipoFactura", $tipoFactura));
 
@@ -219,41 +298,103 @@ class VeriFactuService
             }
 
             // ImporteRectificacion: obligatorio para TipoRectificativa='S' (sustitución)
-            // Contiene los importes de la factura ORIGINAL que se rectifica
-            $importeRect = $doc->createElementNS($nsInfo, "sf:ImporteRectificacion");
-            $importeRect->appendChild($doc->createElementNS($nsInfo, "sf:BaseRectificada", $this->fmtAmt($datos['base_rectificada'] ?? '0')));
-            $importeRect->appendChild($doc->createElementNS($nsInfo, "sf:CuotaRectificada", $this->fmtAmt($datos['cuota_rectificada'] ?? '0')));
-            $alta->appendChild($importeRect);
+            // Según AEAT: Si la factura no es por sustitución, este bloque NO debe tener valor.
+            if (($datos['tipo_rectificativa'] ?? 'S') === 'S') {
+                $importeRect = $doc->createElementNS($nsInfo, "sf:ImporteRectificacion");
+                $importeRect->appendChild($doc->createElementNS($nsInfo, "sf:BaseRectificada", $this->fmtAmt($datos['base_rectificada'] ?? '0')));
+                $importeRect->appendChild($doc->createElementNS($nsInfo, "sf:CuotaRectificada", $this->fmtAmt($datos['cuota_rectificada'] ?? '0')));
+                $alta->appendChild($importeRect);
+            }
         }
 
         $descOp = $esRectificativa ? 'Abono/Rectificativa TPV' : 'Venta TPV';
-        $alta->appendChild($doc->createElementNS($nsInfo, "sf:DescripcionOperacion", $descOp));
+        $alta->appendChild($doc->createElementNS($nsInfo, "sf:DescripcionOperacion", $datos['descripcion'] ?? 'Venta TPV'));
 
-        // Bloque Destinatarios (Obligatorio para F1, F3, R1, R2, R3, R4)
-        // Según XSD debe ir después de DescripcionOperacion y antes de Desglose
-        if (!empty($datos['destinatario_nif']) && !empty($datos['destinatario_nombre'])) {
+        // [ANTI-1150] Para tickets (F2) de importe elevado, activamos el indicador del Art. 6.1.d
+        // En el XSD va después de DescripcionOperacion
+        if ($tipoFactura === 'F2') {
+            $alta->appendChild($doc->createElementNS($nsInfo, "sf:FacturaSinIdentifDestinatarioArt61d", "S"));
+        }
+
+        // Bloque Destinatarios (Obligatorio para F1, F3, R1, R2, R3, R4. Opcional para F2, R5)
+        // Para evitar errores 1239, solo lo incluimos si es una factura ordinaria/rectificativa ordinaria
+        // y tenemos los datos. En simplificadas (F2, R5) lo omitimos siempre.
+        $omitirDestinatario = in_array($tipoFactura, ['F2', 'R5']);
+        
+        if (!$omitirDestinatario && !empty($datos['destinatario_nif']) && !empty($datos['destinatario_nombre'])) {
             $destinatarios = $doc->createElementNS($nsInfo, "sf:Destinatarios");
             $idDestinatario = $doc->createElementNS($nsInfo, "sf:IDDestinatario");
             $idDestinatario->appendChild($doc->createElementNS($nsInfo, "sf:NombreRazon", $datos['destinatario_nombre']));
-            $idDestinatario->appendChild($doc->createElementNS($nsInfo, "sf:NIF", $datos['destinatario_nif']));
+            
+            $idType = $datos['destinatario_id_type'] ?? '01';
+            if ($idType === '01' || empty($idType)) {
+                // NIF Español estándar
+                $idDestinatario->appendChild($doc->createElementNS($nsInfo, "sf:NIF", $datos['destinatario_nif']));
+            } else {
+                // Otros tipos (Pasaporte, NIF-IVA, etc.)
+                $idOtro = $doc->createElementNS($nsInfo, "sf:IDOtro");
+                $idOtro->appendChild($doc->createElementNS($nsInfo, "sf:CodigoPais", $datos['destinatario_pais'] ?? 'ES'));
+                $idOtro->appendChild($doc->createElementNS($nsInfo, "sf:IDType", $idType));
+                $idOtro->appendChild($doc->createElementNS($nsInfo, "sf:ID", $datos['destinatario_nif']));
+                $idDestinatario->appendChild($idOtro);
+            }
+            
             $destinatarios->appendChild($idDestinatario);
             $alta->appendChild($destinatarios);
         }
 
         // Desglose
         $desglose = $doc->createElementNS($nsInfo, "sf:Desglose");
-        $detalle = $doc->createElementNS($nsInfo, "sf:DetalleDesglose");
-        $detalle->appendChild($doc->createElementNS($nsInfo, "sf:Impuesto", "01"));
-        $detalle->appendChild($doc->createElementNS($nsInfo, "sf:ClaveRegimen", "01"));
-        $detalle->appendChild($doc->createElementNS($nsInfo, "sf:CalificacionOperacion", "S1")); // S1 = Sujeta y No exenta
-        $detalle->appendChild($doc->createElementNS($nsInfo, "sf:TipoImpositivo", "21.00"));
-        $detalle->appendChild($doc->createElementNS($nsInfo, "sf:BaseImponibleOimporteNoSujeto", $this->fmtAmt($datos['base_imponible'])));
-        $detalle->appendChild($doc->createElementNS($nsInfo, "sf:CuotaRepercutida", $this->fmtAmt($datos['importe_iva'] ?? ($datos['importe_total'] - $datos['base_imponible']))));
-        $desglose->appendChild($detalle);
+        
+        $desgloses = $datos['desgloses'] ?? [];
+        if (empty($desgloses)) {
+            // Fallback: Si no hay desglose detallado, intentamos calcular uno genérico
+            $cuotaTotal = $datos['cuota_total'] ?? ($datos['importe_total'] - $datos['base_imponible']);
+            $rawRate = 21.00;
+            if ($datos['base_imponible'] > 0) {
+                $rawRate = ($cuotaTotal / $datos['base_imponible']) * 100;
+            }
+            
+            // Snapping a tipos impositivos estándar de España para evitar Error 1124 (20.98 -> 21.00)
+            $standardRates = [21.00, 10.00, 4.00, 0.00];
+            $rate = 21.00;
+            $minDiff = 999;
+            foreach ($standardRates as $r) {
+                $diff = abs($rawRate - $r);
+                if ($diff < $minDiff) {
+                    $minDiff = $diff;
+                    $rate = $r;
+                }
+            }
+
+            $desgloses[] = [
+                'base' => $datos['base_imponible'],
+                'cuota' => $cuotaTotal,
+                'tipo' => $rate
+            ];
+        }
+
+        $cuotaTotalTotal = 0;
+        foreach ($desgloses as $d) {
+            $detalle = $doc->createElementNS($nsInfo, "sf:DetalleDesglose");
+            $detalle->appendChild($doc->createElementNS($nsInfo, "sf:Impuesto", "01")); // 01 = IVA
+            $detalle->appendChild($doc->createElementNS($nsInfo, "sf:ClaveRegimen", "01")); // 01 = General
+            $detalle->appendChild($doc->createElementNS($nsInfo, "sf:CalificacionOperacion", "S1")); // S1 = Sujeta y No exenta
+            $detalle->appendChild($doc->createElementNS($nsInfo, "sf:TipoImpositivo", $this->fmtAmt($d['tipo'])));
+            $detalle->appendChild($doc->createElementNS($nsInfo, "sf:BaseImponibleOimporteNoSujeto", $this->fmtAmt($d['base'])));
+            $detalle->appendChild($doc->createElementNS($nsInfo, "sf:CuotaRepercutida", $this->fmtAmt($d['cuota'])));
+            
+            if (isset($d['cuota_re']) && $d['cuota_re'] > 0) {
+                $detalle->appendChild($doc->createElementNS($nsInfo, "sf:TipoRecargoEquivalencia", $this->fmtAmt($d['tipo_re'])));
+                $detalle->appendChild($doc->createElementNS($nsInfo, "sf:CuotaRecargoEquivalencia", $this->fmtAmt($d['cuota_re'])));
+            }
+
+            $desglose->appendChild($detalle);
+            $cuotaTotalTotal += $d['cuota'] + ($d['cuota_re'] ?? 0);
+        }
         $alta->appendChild($desglose);
 
-        $cuotaTotal = $datos['importe_iva'] ?? ($datos['importe_total'] - $datos['base_imponible']);
-        $alta->appendChild($doc->createElementNS($nsInfo, "sf:CuotaTotal", $this->fmtAmt($cuotaTotal)));
+        $alta->appendChild($doc->createElementNS($nsInfo, "sf:CuotaTotal", $this->fmtAmt($cuotaTotalTotal)));
         $alta->appendChild($doc->createElementNS($nsInfo, "sf:ImporteTotal", $this->fmtAmt($datos['importe_total'])));
 
         // Encadenamiento
@@ -265,7 +406,7 @@ class VeriFactuService
             $regAnt->appendChild($doc->createElementNS($nsInfo, "sf:IDEmisorFactura", defined('EMPRESA_CIF') ? EMPRESA_CIF : ($this->config['empresa_nif'] ?? '00000000T')));
             $regAnt->appendChild($doc->createElementNS($nsInfo, "sf:NumSerieFactura", $datos['serie_anterior'] ?? ''));
             $regAnt->appendChild($doc->createElementNS($nsInfo, "sf:FechaExpedicionFactura", $datos['fecha_anterior'] ?? ''));
-            $regAnt->appendChild($doc->createElementNS($nsInfo, "sf:Huella", $datos['hash_anterior']));
+            $regAnt->appendChild($doc->createElementNS($nsInfo, "sf:Huella", strtoupper($datos['hash_anterior'])));
             $encadenamiento->appendChild($regAnt);
         }
         $alta->appendChild($encadenamiento);
@@ -274,6 +415,7 @@ class VeriFactuService
         $this->addSistemaInformatico($doc, $alta);
 
         $alta->appendChild($doc->createElementNS($nsInfo, "sf:FechaHoraHusoGenRegistro", $datos['fecha_hora_gen']));
+
         $alta->appendChild($doc->createElementNS($nsInfo, "sf:TipoHuella", "01"));
         $alta->appendChild($doc->createElementNS($nsInfo, "sf:Huella", strtoupper($datos['hash_actual'])));
     }
@@ -300,7 +442,7 @@ class VeriFactuService
             $regAnt->appendChild($doc->createElementNS($nsInfo, "sf:IDEmisorFactura", defined('EMPRESA_CIF') ? EMPRESA_CIF : ($this->config['empresa_nif'] ?? '00000000T')));
             $regAnt->appendChild($doc->createElementNS($nsInfo, "sf:NumSerieFactura", $datos['serie_anterior'] ?? ''));
             $regAnt->appendChild($doc->createElementNS($nsInfo, "sf:FechaExpedicionFactura", $datos['fecha_anterior'] ?? ''));
-            $regAnt->appendChild($doc->createElementNS($nsInfo, "sf:Huella", $datos['hash_anterior']));
+            $regAnt->appendChild($doc->createElementNS($nsInfo, "sf:Huella", strtoupper($datos['hash_anterior'])));
             $encadenamiento->appendChild($regAnt);
         }
         $anul->appendChild($encadenamiento);

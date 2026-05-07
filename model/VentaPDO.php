@@ -459,20 +459,26 @@ class VentaPDO
             }
 
             // [VERIFACTU] Encadenamiento y Huella
-            $fechaFormat = date('d-m-Y'); // DD-MM-YYYY de acuerdo al XSD de la AEAT
+            $fechaFormat = date('d-m-Y'); 
             $tipoFC      = ($paramsVenta[':esFactura'] ? 'F1' : 'F2');
             $numFormated = self::formatTicketNumber($numTicket, time(), $paramsVenta[':esFactura'], 'venta');
             
-            self::procesarVeriFactu($db, $idVenta, $numFormated, $tipoFC, (float)$total, (float)$ivaAmt, $fechaFormat, $nifCliente ?? '', $nombreCliente ?? 'Cliente General');
+            self::procesarVeriFactu(
+                $db, $idVenta, $numFormated, $tipoFC, 
+                (float)$total, (float)$ivaAmt, $fechaFormat, 
+                $nifCliente ?? '', $nombreCliente ?? 'Cliente General',
+                '', '', '', '', 'S', null,
+                $idTypeAEAT, $codigoPaisAEAT
+            );
 
             $db->commit();
 
-            // [NUEVO] Envío VeriFactu FUERA de la transacción para evitar conflictos
+            // Intento de envío — Respeta el Natural Batching (60s)
             try {
                 require_once __DIR__ . '/AeatQueueService.php';
-                (new AeatQueueService())->enviarEspecifico((int)$idVenta);
+                (new AeatQueueService())->procesarCola();
             } catch (\Exception $eVf) {
-                error_log("Error en envío inmediato VeriFactu: " . $eVf->getMessage());
+                error_log("Error al disparar la cola VeriFactu: " . $eVf->getMessage());
             }
 
             return $numTicket;
@@ -506,14 +512,14 @@ class VentaPDO
         return $q->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    public static function obtenerVentaPorTicket(int $numTicket): ?array
+    public static function obtenerVentaPorTicket(int $numTicket, ?PDO $db = null): ?array
     {
         $sqlVenta = "SELECT v.*, u.nombre AS nombre_cajero, c.puntos AS puntos_cliente_actual, c.email AS cliente_email
                      FROM ventas v
                      LEFT JOIN usuarios u ON v.id_usuario = u.id
                      LEFT JOIN clientes c ON v.id_cliente = c.id
                      WHERE v.numero_ticket = :t";
-        $q = DBPDO::ejecutarConsulta($sqlVenta, [':t' => $numTicket]);
+        $q = DBPDO::ejecutarConsulta($sqlVenta, [':t' => $numTicket], $db);
         $venta = $q->fetch(PDO::FETCH_ASSOC);
         if (!$venta) return null;
 
@@ -521,7 +527,7 @@ class VentaPDO
                       FROM lineas_venta lv
                       WHERE lv.id_venta = :v 
                       ORDER BY lv.id ASC";
-        $qL = DBPDO::ejecutarConsulta($sqlLineas, [':v' => $venta['id']]);
+        $qL = DBPDO::ejecutarConsulta($sqlLineas, [':v' => $venta['id']], $db);
         $lineasRaw = $qL->fetchAll(PDO::FETCH_ASSOC);
 
         // Map already returned quantities from Abonos without mutating original lines
@@ -532,7 +538,7 @@ class VentaPDO
                                JOIN ventas v ON lv.id_venta = v.id
                                WHERE v.id_venta_origen = :idv AND v.tipo_documento = 'abono'
                                GROUP BY lv.id_producto";
-            $qAb = DBPDO::ejecutarConsulta($sqlTodosAbonos, [':idv' => $venta['id']]);
+            $qAb = DBPDO::ejecutarConsulta($sqlTodosAbonos, [':idv' => $venta['id']], $db);
             while($row = $qAb->fetch(PDO::FETCH_ASSOC)) {
                 $devueltosPorProducto[$row['id_producto']] = (int)$row['devueltos'];
             }
@@ -587,7 +593,7 @@ class VentaPDO
                      LEFT JOIN promociones p ON (lvd.tipo_descuento = 'promocion' OR lvd.tipo_descuento = 'cupon') AND lvd.id_origen = p.id
                      WHERE lvd.id_linea_venta IN ($placeholders)";
             
-            $qD = DBPDO::ejecutarConsulta($sqlD, array_values($lineIds));
+            $qD = DBPDO::ejecutarConsulta($sqlD, array_values($lineIds), $db);
             while ($d = $qD->fetch(PDO::FETCH_ASSOC)) {
                 $descuentosPorLinea[$d['id_linea_venta']][] = $d;
             }
@@ -609,7 +615,7 @@ class VentaPDO
                           FROM ventas v
                           WHERE v.id_venta_origen = :idv AND v.tipo_documento = 'abono'
                           ORDER BY v.fecha ASC";
-            $qA = DBPDO::ejecutarConsulta($sqlAbonos, [':idv' => $venta['id']]);
+            $qA = DBPDO::ejecutarConsulta($sqlAbonos, [':idv' => $venta['id']], $db);
             $venta['abonos'] = $qA->fetchAll(PDO::FETCH_ASSOC);
         } else {
             $venta['abonos'] = [];
@@ -617,16 +623,17 @@ class VentaPDO
 
         return $venta;
     }
-    public static function obtenerVentaPorId(int $id): ?array
+    public static function obtenerVentaPorId(int $id, ?PDO $db = null): ?array
     {
+        $db = $db ?? DBPDO::getPDO();
         $sql = "SELECT numero_ticket FROM ventas WHERE id = :id";
-        $q = DBPDO::ejecutarConsulta($sql, [':id' => $id]);
+        $q = DBPDO::ejecutarConsulta($sql, [':id' => $id], $db);
         $row = $q->fetch(PDO::FETCH_ASSOC);
         if (!$row) return null;
-        return self::obtenerVentaPorTicket((int)$row['numero_ticket']);
+        return self::obtenerVentaPorTicket((int)$row['numero_ticket'], $db);
     }
 
-    public static function buscarVentas(string $desde, string $hasta, ?int $idUsuario = null, ?string $numTicket = null, string $tipoDocumento = 'todos', int $limit = 50, int $offset = 0, string $ordenPor = 'fecha', string $ordenDir = 'ASC'): array
+    public static function buscarVentas(string $desde, string $hasta, ?int $idUsuario = null, ?string $numTicket = null, string $tipoDocumento = 'todos', int $limit = 50, int $offset = 0, string $ordenPor = 'fecha', string $ordenDir = 'ASC', bool $soloIncidencias = false): array
     {
         // Whitelist para evitar inyección SQL en ORDER BY
         $columnasPermitidas = ['fecha', 'numero_ticket', 'total', 'nombre_cajero'];
@@ -722,6 +729,14 @@ class VentaPDO
     {
         $nombreCliente = mb_substr(trim($nombreCliente), 0, 100);
         $nifCliente    = mb_substr(trim($nifCliente), 0, 20);
+
+        // [VERIFACTU] Si ya tiene huella, no podemos convertirla directamente 
+        // porque cambiaría el ID del registro (prefijo T a F) y rompería la cadena.
+        $sqlCheck = "SELECT hash_actual FROM ventas WHERE id = :id";
+        $stmtCheck = DBPDO::ejecutarConsulta($sqlCheck, [':id' => $idVenta]);
+        if ($stmtCheck->fetchColumn()) {
+            throw new Exception("Inalterabilidad VeriFactu: No se puede convertir un ticket ya emitido en factura. Debe anularlo y emitir una nueva venta o usar factura rectificativa.");
+        }
 
         if ($nombreCliente === '' || $nifCliente === '') {
             return false;
@@ -1537,13 +1552,33 @@ class VentaPDO
             //   - Si la original era F2 (ticket simplificado, es_factura=0) → siempre R5 (regla obligatoria AEAT)
             //   - De lo contrario, usar el tipo mapeado automáticamente por el motivo
             $esFacturaOrigen = (bool)$ventaOrigen['es_factura'];
-            if (!$esFacturaOrigen) {
-                $tipoAb = 'R5'; // Obligatorio para F2 independientemente del motivo
+            // Forzamos R5 si la original era simplificada (F2) o si es una rectificativa TOTAL (Anulación)
+            if (!$esFacturaOrigen || $esRectificativaTotal) {
+                $tipoAb = 'R5';
             } else {
                 $tipoAb = $tipoR_auto;
             }
 
             $numFormatedAb = self::formatTicketNumber($numTicket, time(), $ventaOrigen['es_factura'], 'abono');
+
+            // [NUEVO] Lógica de cumplimiento AEAT: Diferenciar entre rectificativa parcial y total
+            //   - Rectificativa Parcial (Devolución): Tipo 'I' (Diferencias), enviamos importe negativo.
+            //   - Rectificativa Total (Anulación): Tipo 'S' (Sustitución), enviamos importe 0.00.
+            
+            // El valor de esRectificativaTotal ya ha sido calculado arriba antes del INSERT
+
+            // Actualizar estado de la venta original según si se ha devuelto todo o no
+            $nuevoEstado = $esRectificativaTotal ? 'devuelta' : 'parcialmente_devuelta';
+            DBPDO::ejecutarConsulta(
+                "UPDATE ventas SET estado = :estado WHERE id = :id",
+                [':estado' => $nuevoEstado, ':id' => $idVentaOrigen]
+            );
+
+            // FLUJO RECTIFICACIÓN (Verde):
+            // Generamos abono normal (Tipo I o S según si es total) para que ambos salgan en Verde
+            // [NUEVO] Si es total (Sustitución por cero), la cuota también debe ser 0 para evitar error de signos
+            $ivaAeat   = $esRectificativaTotal ? 0.0 : -$totalIvaAbono;
+            $skipVerifactuAbono = false;
 
             // Referencia a la factura/ticket original rectificado
             $serieOrigenAb = self::formatTicketNumber(
@@ -1559,20 +1594,22 @@ class VentaPDO
 
             self::procesarVeriFactu(
                 $db, $idAbono, $numFormatedAb, $tipoAb,
-                (float)$totalAbono, (float)$totalIvaAbono, $fechaFormatAb,
+                (float)$totalAeat, (float)$ivaAeat, $fechaFormatAb,
                 $ventaOrigen['nif_cliente'] ?? '',
                 $ventaOrigen['nombre_cliente'] ?? '',
                 $serieOrigenAb, $fechaOrigenAb,
                 $baseOrigenAb, $cuotaOrigenAb,
-                $tipoRectificativa
+                $tipoRectificativa, null,
+                $ventaOrigen['aeat_id_type'] ?? '01',
+                $ventaOrigen['aeat_codigo_pais'] ?? 'ES'
             );
 
             $db->commit();
 
-            // [NUEVO] Envío VeriFactu FUERA de la transacción para evitar conflictos (Abono)
+            // [NUEVO] Envío VeriFactu FUERA de la transacción para evitar conflictos
             try {
                 require_once __DIR__ . '/AeatQueueService.php';
-                (new AeatQueueService())->enviarEspecifico((int)$idAbono);
+                (new AeatQueueService())->procesarCola(); 
             } catch (\Exception $eVf) {
                 error_log("Error en envío inmediato VeriFactu (Abono): " . $eVf->getMessage());
             }
@@ -1621,25 +1658,7 @@ class VentaPDO
      * ============================================================
      */
 
-    /**
-     * Obtiene el hash_actual del último registro de venta para el encadenamiento VeriFactu.
-     * @param PDO|null $db Conexión opcional (para usar dentro de transacciones)
-     */
-    public static function obtenerUltimoHash(?PDO $db = null, int $idVenta = 0): ?string
-    {
-        $db = $db ?? DBPDO::getPDO();
-        $where = "WHERE hash_actual IS NOT NULL";
-        $params = [];
-        if ($idVenta > 0) {
-            $where .= " AND id < :id";
-            $params[':id'] = $idVenta;
-        }
-        $sql = "SELECT hash_actual FROM ventas $where ORDER BY id DESC LIMIT 1";
-        $stmt = $db->prepare($sql);
-        $stmt->execute($params);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        return $row ? $row['hash_actual'] : null;
-    }
+
 
     /**
      * Genera la cadena normalizada y el hash SHA256 según el Reglamento VeriFactu.
@@ -1650,8 +1669,7 @@ class VentaPDO
     public static function generarHashVeriFactu(array $datos, ?string $hashAnterior = null): string
     {
         // 1. Recopilación de campos (Tipo: Alta de factura)
-        // Estructura oficial: IDEmisorFactura, NumSerieFactura, FechaExpedicionFactura, TipoFactura, CuotaTotal, ImporteTotal, Huella, FechaHoraHusoGenRegistro
-        
+        // La AEAT exige un formato de cadena de consulta (Query String) para el cálculo del hash
         $campos = [
             'IDEmisorFactura'         => $datos['nif_emisor'] ?? '',
             'NumSerieFactura'         => $datos['numero_serie'] ?? '',
@@ -1659,23 +1677,26 @@ class VentaPDO
             'TipoFactura'             => $datos['tipo_factura'] ?? 'F1',
             'CuotaTotal'              => self::normalizarValorHash($datos['cuota_total'] ?? 0),
             'ImporteTotal'            => self::normalizarValorHash($datos['importe_total'] ?? 0),
-            'Huella'                  => $hashAnterior ?? str_repeat('0', 64),
+            'Huella'                  => strtoupper($hashAnterior ?? str_repeat('0', 64)),
             'FechaHoraHusoGenRegistro'=> $datos['fecha_hora_gen'] ?? date('Y-m-d\TH:i:sP')
         ];
 
-        // 2. Concatenación con formato nombreCampo1=valorCampo1&nombreCampo2=valorCampo2...
-        $cadena = "";
-        foreach ($campos as $nombre => $valor) {
-            if ($cadena !== "") $cadena .= "&";
-            $cadena .= $nombre . "=" . $valor;
-        }
+        // 2. Construcción de la cadena con formato KEY=VALUE&KEY=VALUE...
+        // El orden debe ser EXACTAMENTE el especificado por la AEAT.
+        $cadena = "IDEmisorFactura=" . $campos['IDEmisorFactura']
+                . "&NumSerieFactura=" . $campos['NumSerieFactura']
+                . "&FechaExpedicionFactura=" . $campos['FechaExpedicionFactura']
+                . "&TipoFactura=" . $campos['TipoFactura']
+                . "&CuotaTotal=" . $campos['CuotaTotal']
+                . "&ImporteTotal=" . $campos['ImporteTotal']
+                . "&Huella=" . $campos['Huella']
+                . "&FechaHoraHusoGenRegistro=" . $campos['FechaHoraHusoGenRegistro'];
 
-        // 3. Cálculo del Hash (SHA256)
+        // 3. Cálculo del Hash (SHA256) en mayúsculas
         $hashResult = strtoupper(hash('sha256', $cadena));
         
-        // Log detallado para diagnóstico de Error 2000 (Huella incorrecta)
-        error_log("VeriFactu Hash String: " . $cadena);
-        error_log("VeriFactu Hash Result: " . $hashResult);
+        // DEBUG: Guardar la cadena exacta para inspección
+        file_put_contents(dirname(__DIR__) . '/storage/debug_hash.txt', "CADENA: $cadena\nHASH: $hashResult\n\n", FILE_APPEND);
         
         return $hashResult;
     }
@@ -1701,111 +1722,99 @@ class VentaPDO
         string $nifCliente = '', string $nombreCliente = 'Cliente General',
         string $facturaOrigenSerie = '', string $facturaOrigenFecha = '',
         string $baseOrigenRectificada = '', string $cuotaOrigenRectificada = '',
-        string $tipoRectificativa = 'S'
+        string $tipoRectificativa = 'S', ?int $relativeToId = null,
+        ?string $aeatIdType = '01', ?string $aeatCodigoPais = 'ES'
     ): void
     {
-        // 0. Asegurar formato de serie si viene solo el número (limpieza de inconsistencias)
-        if (is_numeric($numeroSerie) || !str_contains($numeroSerie, '-')) {
-            // Re-formateamos para asegurar consistencia con el hash que espera AEAT
-            $esFactura = ($tipoFactura[0] === 'F') ? 1 : 0;
-            $tipoInterno = ($tipoFactura[0] === 'R') ? 'abono' : 'venta';
-            $numeroSerie = self::formatTicketNumber((int)$numeroSerie, $fechaExpedicion, $esFactura, $tipoInterno);
-        }
+        // 1. Obtener datos COMPLETOS y CONSISTENTES mediante getVentaParaVeriFactu
+        // Esto garantiza que el desglose de IVA sea matemáticamente correcto (Error 1142)
+        $datosVf = self::getVentaParaVeriFactu($idVenta, $db);
+        if (!$datosVf) return;
 
-        // Ajuste automático: Si no hay NIF de cliente, forzamos factura simplificada (Ticket) 
-        // para cumplir con la normativa VeriFactu (Error 1189).
-        if (empty($nifCliente)) {
-            if ($tipoFactura === 'F1') $tipoFactura = 'F2';
-            if ($tipoFactura === 'R1') $tipoFactura = 'R5';
-        }
+        // 2. Sobrescribir identificadores si es necesario (ej. para rectificativas o series específicas)
+        // Aunque getVentaParaVeriFactu ya intenta detectarlos, procesarVeriFactu puede recibir
+        // parámetros forzados desde el flujo de anulación o venta.
+        $datosVf['numero_serie']     = $numeroSerie;
+        $datosVf['tipo_factura']     = $tipoFactura;
+        $datosVf['destinatario_nif'] = $nifCliente;
+        $datosVf['destinatario_nombre'] = $nombreCliente;
+        
+        // 3. Obtener el hash anterior (SIEMPRE EL ÚLTIMO GLOBAL)
+        $datosUltimo = self::obtenerUltimoHash($db, $relativeToId);
+        $hashAnterior = $datosUltimo['hash'] ?? str_repeat('0', 64);
+        $serieAnt = $datosUltimo['serie'] ?? '';
+        $fechaAnt = $datosUltimo['fecha'] ?? '';
 
-        require_once __DIR__ . '/ConfiguracionPDO.php';
-        $nifEmisor = defined('EMPRESA_CIF') ? EMPRESA_CIF : (ConfiguracionPDO::obtenerValor('empresa_nif') ?? '00000000T');
-
-        // 1. Obtener hash anterior para el encadenamiento
-        $hashAnterior = self::obtenerUltimoHash($db, $idVenta);
-
-        // 2. Normalizar valores para el Hash y el XML (Sincronización total)
-        $normCuota   = self::normalizarValorHash($iva);
-        $normImporte = self::normalizarValorHash($total);
-        $normBase    = self::normalizarValorHash($total - $iva);
-        $normHashAnt = $hashAnterior ?? str_repeat('0', 64); // No normalizar la huella!
+        $datosVf['serie_anterior'] = $serieAnt;
+        $datosVf['fecha_anterior'] = $fechaAnt;
+        $datosVf['hash_anterior']  = $hashAnterior;
 
         $fechaHoraGen = date('Y-m-d\TH:i:sP');
-        $datosHash = [
-            'nif_emisor'       => $nifEmisor,
-            'numero_serie'     => $numeroSerie,
-            'fecha_expedicion' => $fechaExpedicion,
-            'tipo_factura'     => $tipoFactura,
-            'cuota_total'      => $normCuota,
-            'importe_total'    => $normImporte,
-            'fecha_hora_gen'   => $fechaHoraGen
-        ];
-        
-        $hashActual = self::generarHashVeriFactu($datosHash, $normHashAnt);
+        $datosVf['fecha_hora_gen'] = $fechaHoraGen;
 
-        // 3. Generar XML VeriFactu
+        // 4. Recalcular el hash usando la cuota_total consistente (suma de desgloses)
+        $cuotaParaHash = 0;
+        foreach ($datosVf['desgloses'] as $d) {
+            $cuotaParaHash += ($d['cuota'] ?? 0) + ($d['cuota_re'] ?? 0);
+        }
+
+        $hashActual = self::generarHashVeriFactu([
+            'nif_emisor'       => defined('EMPRESA_CIF') ? EMPRESA_CIF : '00000000T',
+            'numero_serie'     => $datosVf['numero_serie'],
+            'fecha_expedicion' => $datosVf['fecha_expedicion'],
+            'tipo_factura'     => $datosVf['tipo_factura'],
+            'cuota_total'      => $cuotaParaHash,
+            'importe_total'    => $datosVf['importe_total'],
+            'fecha_hora_gen'   => $fechaHoraGen
+        ], $hashAnterior);
+
+        $datosVf['hash_actual'] = $hashActual;
+
+        $datosVf['destinatario_id_type']     = $aeatIdType ?? '01';
+        $datosVf['destinatario_pais']        = $aeatCodigoPais ?? 'ES';
+        $datosVf['factura_rectificada_serie'] = $facturaOrigenSerie;
+        $datosVf['factura_rectificada_fecha'] = $facturaOrigenFecha;
+        $datosVf['base_rectificada']          = $baseOrigenRectificada;
+        $datosVf['cuota_rectificada']         = $cuotaOrigenRectificada;
+        $datosVf['tipo_rectificativa']        = $tipoRectificativa;
+
+        // 5. Generar XML VeriFactu firmado
         require_once __DIR__ . '/VeriFactuService.php';
         $vfService = new VeriFactuService();
-        
-        // Necesitamos datos del registro anterior para el XML
-        $datosUltimo = self::obtenerDatosUltimoRegistro($db);
+        $resultadoXML = $vfService->procesarAlta($datosVf);
 
-        $resultadoXML = $vfService->procesarAlta([
-            'numero_serie'              => $numeroSerie,
-            'fecha_expedicion'          => $fechaExpedicion,
-            'tipo_factura'              => $tipoFactura,
-            'tipo_rectificativa'        => $tipoRectificativa,
-            'base_imponible'            => $normBase,
-            'cuota_total'              => $normCuota,
-            'importe_total'            => $normImporte,
-            'hash_actual'              => $hashActual,
-            'hash_anterior'            => $normHashAnt,
-            'fecha_hora_gen'           => $fechaHoraGen,
-            'destinatario_nif'         => $nifCliente,
-            'destinatario_nombre'      => $nombreCliente,
-            'factura_rectificada_serie' => $facturaOrigenSerie,
-            'factura_rectificada_fecha' => $facturaOrigenFecha,
-            'base_rectificada'          => $baseOrigenRectificada,
-            'cuota_rectificada'         => $cuotaOrigenRectificada,
-            'serie_anterior'           => $datosUltimo['serie'] ?? '',
-            'fecha_anterior'           => $datosUltimo['fecha'] ?? ''
-        ]);
+        // 4. Encolar para envío a la AEAT
 
-        // 4. Encolar para envío a la AEAT (Asíncrono)
         require_once __DIR__ . '/AeatQueueService.php';
         $queueService = new AeatQueueService();
         if (isset($resultadoXML['ok']) && $resultadoXML['ok']) {
             $queueService->encolar($idVenta, $resultadoXML['path']);
         } else {
-            // Guardar el error en la cola o en log si falló la creación del XML
             $errorMsg = $resultadoXML['error'] ?? 'Error desconocido al generar XML';
             error_log("VeriFactu Error: $errorMsg");
-            // Opcionalmente encolar con estado 'error'
             $queueService->encolarError($idVenta, "Error generación XML: $errorMsg");
         }
 
         // 5. Construir URL del código QR para cotejo AEAT
+        $nifEmisor = defined('EMPRESA_CIF') ? EMPRESA_CIF : '00000000T';
         $qrBaseUrl = defined('VERIFACTU_URL_QR_PRUEBAS') ? VERIFACTU_URL_QR_PRUEBAS : 'https://prewww2.aeat.es/wlpl/TIKE-CONT/ValidarQR';
         $qrParams = [
             'nif'      => $nifEmisor,
             'numserie' => $numeroSerie,
             'fecha'    => date('d-m-Y', strtotime($fechaExpedicion)),
-            // La AEAT siempre espera valor absoluto (positivo) en el campo importe del QR
-            'importe'  => number_format(abs($total), 2, '.', ''),
+            // El importe debe ser el total firmado (con signo en caso de abonos por diferencias)
+            'importe'  => number_format($total, 2, '.', ''),
             'hash'     => strtoupper(substr($hashActual, 0, 8))
         ];
         $qrUrl = $qrBaseUrl . "?" . http_build_query($qrParams, '', '&', PHP_QUERY_RFC3986);
 
-        // 6. Persistir en la base de datos
+        // 6. Actualizar información fiscal y QR en ventas
+        // El estado_envio_aeat YA ha sido actualizado por $queueService->encolar()
         $xmlPath = $resultadoXML['ok'] ? $resultadoXML['path'] : null;
-        $estadoEnvio = ($resultadoXML['ok']) ? 'pendiente' : 'error';
-
         $sql = "UPDATE ventas 
                 SET hash_actual = :hashActual, 
                     hash_anterior = :hashAnterior,
                     fecha_hora_gen_fiscal = :fechaHora,
-                    estado_envio_aeat = :estado,
                     codigo_qr = :xmlPath,
                     qr_verifactu = :qrUrl
                 WHERE id = :id";
@@ -1815,11 +1824,23 @@ class VentaPDO
             ':hashActual'   => $hashActual,
             ':hashAnterior' => $hashAnterior,
             ':fechaHora'    => $fechaHoraGen,
-            ':estado'       => $estadoEnvio,
             ':xmlPath'      => $xmlPath,
             ':qrUrl'        => $qrUrl,
             ':id'           => $idVenta
         ]);
+
+        // [NUEVO] Registrar en verifactu_logs para mantener la cadena única
+        if ($resultadoXML['ok']) {
+            $stmtLog = $db->prepare("INSERT INTO verifactu_logs (id_venta, tipo_registro, numero_serie, xml_path, hash_anterior, hash_actual, estado)
+                                     VALUES (:id, 'Alta', :serie, :path, :ant, :act, 'pendiente')");
+            $stmtLog->execute([
+                ':id'    => $idVenta,
+                ':serie' => $numeroSerie,
+                ':path'  => $xmlPath,
+                ':ant'   => $hashAnterior,
+                ':act'   => $hashActual
+            ]);
+        }
     }
 
     /**
@@ -1901,27 +1922,426 @@ class VentaPDO
     }
 
     /**
-     * Obtiene los datos de serie y fecha del último registro fiscal para el encadenamiento XML.
+     * Obtiene los datos de serie y fecha del último registro fiscal absoluto para el encadenamiento XML.
+     * Consulta tanto la tabla de ventas (altas) como verifactu_logs (anulaciones/altas extra).
      */
-    public static function obtenerDatosUltimoRegistro(?PDO $db = null): array
+    public static function obtenerUltimoHash(?PDO $db = null, ?int $relativeToId = null): array
     {
         $db = $db ?? DBPDO::getPDO();
-        $sql = "SELECT numero_ticket, fecha, es_factura, hash_actual 
-                FROM ventas 
-                WHERE hash_actual IS NOT NULL 
-                ORDER BY id DESC LIMIT 1";
-        $stmt = $db->query($sql);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
         
-        if (!$row) return [];
+        $whereLog = $relativeToId ? "AND id_venta < " . (int)$relativeToId : "";
+        $whereVenta = $relativeToId ? "AND id < " . (int)$relativeToId : "";
 
-        $numFormated = self::formatTicketNumber($row['numero_ticket'], $row['fecha'], $row['es_factura']);
-        $fechaFormat = date('d-m-Y', strtotime($row['fecha']));
+        // 1. Intentamos obtener el registro más reciente de los logs (excluyendo rechazos críticos)
+        $sqlLogs = "SELECT numero_serie as serie, DATE_FORMAT(fecha_registro, '%d-%m-%Y') as fecha, hash_actual as hash 
+                    FROM verifactu_logs 
+                    WHERE estado IN ('pendiente', 'enviado', 'subsanacion_pendiente')
+                    $whereLog
+                    ORDER BY id DESC LIMIT 1 FOR UPDATE";
+        $stmtLogs = $db->query($sqlLogs);
+        $resLogs = $stmtLogs->fetch(PDO::FETCH_ASSOC);
+
+        if ($resLogs) return $resLogs;
+
+        // 2. Fallback a la tabla de ventas (excluyendo rechazos críticos)
+        $sqlVentas = "SELECT numero_ticket, fecha, es_factura, hash_actual 
+                      FROM ventas 
+                      WHERE hash_actual IS NOT NULL 
+                      AND estado_envio_aeat NOT IN ('error_critico')
+                      $whereVenta
+                      ORDER BY id DESC LIMIT 1 FOR UPDATE";
+        $stmtVentas = $db->query($sqlVentas);
+        $resVentas = $stmtVentas->fetch(PDO::FETCH_ASSOC);
+
+        if (!$resVentas) return [];
 
         return [
-            'serie' => $numFormated,
-            'fecha' => $fechaFormat,
-            'hash'  => $row['hash_actual']
+            'serie' => self::formatTicketNumber($resVentas['numero_ticket'], $resVentas['fecha'], $resVentas['es_factura']),
+            'fecha' => date('d-m-Y', strtotime($resVentas['fecha'])),
+            'hash'  => $resVentas['hash_actual']
         ];
+    }
+
+    /**
+     * Prepara y genera un registro de ANULACIÓN para VeriFactu.
+     * @param PDO $db Conexión activa (dentro de transacción)
+     * @param int $idVenta ID de la venta original a anular
+     */
+    public static function procesarAnulacionVeriFactu($db, $idVenta)
+    {
+        // 1. Obtener datos de la venta original
+        $stmt = $db->prepare("SELECT * FROM ventas WHERE id = :id");
+        $stmt->execute([':id' => $idVenta]);
+        $venta = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$venta) return;
+
+        // 2. Preparar datos para RegistroAnulacion
+        require_once __DIR__ . '/VeriFactuService.php';
+        $vfs = new VeriFactuService();
+        
+        $numFormated = self::formatTicketNumber(
+            $venta['numero_ticket'],
+            $venta['fecha'],
+            $venta['es_factura'],
+            $venta['tipo_documento']
+        );
+        $fechaExp = date('d-m-Y', strtotime($venta['fecha']));
+        $fechaGen = date('Y-m-d\TH:i:sP');
+
+        // Calcular Hash Anterior para la anulación
+        $hashAnt = self::obtenerUltimoHash($db);
+
+        require_once __DIR__ . '/ConfiguracionPDO.php';
+        $nifEmisor = defined('EMPRESA_CIF') ? EMPRESA_CIF : (ConfiguracionPDO::obtenerValor('empresa_nif') ?? '00000000T');
+
+        $datos = [
+            'numero_serie'     => $numFormated,
+            'fecha_expedicion' => $fechaExp,
+            'hash_anterior'    => $hashAnt['hash'] ?? str_repeat('0', 64),
+            'serie_anterior'   => $hashAnt['serie'] ?? '',
+            'fecha_anterior'   => $hashAnt['fecha'] ?? '',
+            'fecha_hora_gen'   => $fechaGen
+        ];
+
+        // [NUEVO] Cálculo de huella para Anulación según especificación AEAT
+        // Formato: IDEmisorFacturaAnulada=...&NumSerieFacturaAnulada=...&FechaExpedicionFacturaAnulada=...&Huella=...&FechaHoraHusoGenRegistro=...
+        $cadena = "IDEmisorFacturaAnulada=" . $nifEmisor .
+                  "&NumSerieFacturaAnulada=" . $numFormated .
+                  "&FechaExpedicionFacturaAnulada=" . $fechaExp .
+                  "&Huella=" . $datos['hash_anterior'] .
+                  "&FechaHoraHusoGenRegistro=" . $fechaGen;
+        
+        $hashActual = strtoupper(hash('sha256', $cadena));
+        $datos['hash_actual'] = $hashActual;
+        
+        // Log para diagnóstico
+        error_log("VeriFactu Anulacion Hash String: " . $cadena);
+        error_log("VeriFactu Anulacion Hash Result: " . $hashActual);
+
+        // Procesar XML de anulación
+        $res = $vfs->procesarAnulacion($datos);
+        
+        if ($res['ok']) {
+            $stmtLog = $db->prepare("INSERT INTO verifactu_logs (id_venta, tipo_registro, numero_serie, xml_path, hash_anterior, hash_actual, estado)
+                                     VALUES (:id, 'Anulacion', :serie, :path, :ant, :act, 'pendiente')");
+            $stmtLog->execute([
+                ':id'    => $idVenta,
+                ':serie' => $numFormated,
+                ':path'  => $res['path'],
+                ':ant'   => $datos['hash_anterior'],
+                ':act'   => $hashActual
+            ]);
+
+            // [NUEVO] Actualizar la venta con la huella de anulación para que el QR sea consistente
+            $stmtUpd = $db->prepare("UPDATE ventas SET hash_actual = :hash WHERE id = :id");
+            $stmtUpd->execute([':hash' => $hashActual, ':id' => $idVenta]);
+
+            // [IMPORTANTE] Encolar para el envío real a la AEAT
+            require_once __DIR__ . '/AeatQueueService.php';
+            (new AeatQueueService())->encolar($idVenta, $res['path']);
+
+            // Reforzar el estado para distinguir anulación en la UI
+            $db->prepare("UPDATE ventas SET estado_envio_aeat = 'anulado_pendiente' WHERE id = :id AND estado_envio_aeat = 'pendiente'")
+               ->execute([':id' => $idVenta]);
+        }
+    }
+
+    /**
+     * Anula una venta completa fiscalmente (RegistroAnulacion) sin generar un ticket de abono.
+     * Actualiza el estado de la venta original a 'anulada'.
+     *
+     * @param int    $idVenta       ID de la venta a anular
+     * @param string $motivo        Motivo de la anulación
+     * @param string $metodoReembolso 'efectivo', 'vale'
+     * @param int    $idUsuario     ID del usuario que procesa
+     * @param bool   $reponerStock  Si se deben reponer productos al inventario
+     * @return bool
+     */
+    public static function anularVentaFiscalmente(int $idVenta, string $motivo, string $metodoReembolso, int $idUsuario, bool $reponerStock = true): bool
+    {
+        $db = DBPDO::getPDO();
+        $db->beginTransaction();
+
+        try {
+            // 1. Obtener datos de la venta original
+            $venta = self::obtenerVentaPorId($idVenta);
+            if (!$venta) throw new \Exception('Venta no encontrada.');
+
+            // 2. Reponer stock (Solo si se solicita)
+            if ($reponerStock) {
+                require_once __DIR__ . '/ProductoPDO.php';
+                require_once __DIR__ . '/MovimientoStockPDO.php';
+                foreach ($venta['lineas'] as $linea) {
+                    if (!empty($linea['id_producto'])) {
+                        ProductoPDO::aumentarStock((int)$linea['id_producto'], (int)$linea['cantidad']);
+                        MovimientoStockPDO::registrarMovimiento((int)$linea['id_producto'], 'anulacion', (int)$linea['cantidad'], $idUsuario, "Anulación Ticket #".$venta['numero_ticket'], $db);
+                    }
+                }
+            }
+
+            // 3. Gestionar reembolso (Solo devolvemos lo que realmente se pagó)
+            $montoAReembolsar = (float)$venta['total'];
+            if (($venta['estado'] ?? '') === 'pendiente_pago' || ($venta['estado'] ?? '') === 'parcialmente_devuelta') {
+                $montoAReembolsar = (float)($venta['pagado_a_cuenta'] ?? 0);
+            }
+
+            $idCliente = $venta['id_cliente'] ? (int)$venta['id_cliente'] : null;
+
+            if ($montoAReembolsar > 0.005) {
+                if ($metodoReembolso === 'vale') {
+                    require_once __DIR__ . '/ValePDO.php';
+                    $codigoVale = ValePDO::crearVale($idCliente, $idVenta, $montoAReembolsar);
+                    require_once __DIR__ . '/LogPDO.php';
+                    LogPDO::addLog('GENERACION_VALE', "Vale generado (#$codigoVale) por $montoAReembolsar€ por anulación de Ticket #".$venta['numero_ticket']);
+                } elseif ($metodoReembolso === 'efectivo') {
+                    require_once __DIR__ . '/CajaTurnoPDO.php';
+                    $turno = CajaTurnoPDO::obtenerTurnoAbierto();
+                    if ($turno) {
+                        CajaTurnoPDO::registrarRetiro(
+                            (int)$turno['id'],
+                            $idUsuario,
+                            $montoAReembolsar,
+                            "Reembolso efectivo por anulación Ticket #".$venta['numero_ticket']
+                        );
+                    }
+                }
+            }
+
+            // 4. Revertir puntos del cliente (si es socio)
+            if ($idCliente) {
+                require_once __DIR__ . '/ClientePDO.php';
+                $puntosGanados = (int)($venta['puntos_ganados'] ?? 0);
+                $puntosCanjeados = (int)($venta['puntos_canjeados'] ?? 0);
+
+                if ($puntosGanados > 0) {
+                    ClientePDO::restarPuntos($idCliente, $puntosGanados);
+                }
+                if ($puntosCanjeados > 0) {
+                    ClientePDO::sumarPuntos($idCliente, $puntosCanjeados);
+                }
+            }
+
+            // 4. Actualizar estado de la venta original a 'anulada'
+            DBPDO::ejecutarConsulta(
+                "UPDATE ventas SET estado = :estado, comentarios = :coment WHERE id = :id",
+                [
+                    ':estado' => 'anulada', 
+                    ':coment' => $venta['comentarios'] . " | ANULADA: $motivo",
+                    ':id'     => $idVenta
+                ]
+            );
+
+            // 5. Enviar RegistroAnulacion a VeriFactu
+            self::procesarAnulacionVeriFactu($db, $idVenta);
+
+            $db->commit();
+
+            // 6. Procesar cola VeriFactu de forma inmediata (fuera de transacción)
+            try {
+                require_once __DIR__ . '/AeatQueueService.php';
+                (new AeatQueueService())->procesarCola(); 
+            } catch (\Exception $eVf) {
+                error_log("Error en envío inmediato VeriFactu (Anulación): " . $eVf->getMessage());
+            }
+
+            return true;
+        } catch (\Throwable $e) {
+            if ($db->inTransaction()) $db->rollBack();
+            throw $e;
+        }
+    }
+
+    /**
+     * Obtiene los datos de una venta formateados para VeriFactu.
+     */
+    public static function getVentaParaVeriFactu(int $idVenta, ?PDO $db = null)
+    {
+        $db = $db ?? DBPDO::getPDO();
+        $sql = "SELECT v.*, u.nombre as nombre_cajero 
+                FROM ventas v 
+                LEFT JOIN usuarios u ON v.id_usuario = u.id 
+                WHERE v.id = :id";
+        $stmt = DBPDO::ejecutarConsulta($sql, [':id' => $idVenta], $db);
+        $v = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$v) return null;
+
+        $esAbono = ($v['tipo_documento'] ?? 'venta') === 'abono';
+        $numeroSerie = self::formatTicketNumber($v['numero_ticket'], $v['fecha'], !empty($v['es_factura']), $v['tipo_documento'] ?? 'venta');
+        
+        $tipoFactura = $esAbono ? 'R1' : ($v['es_factura'] ? 'F1' : 'F2');
+        
+        // [REGLA FISCAL] Si no hay NIF, no puede ser F1 ni R1 (deben ser Simplificadas F2 o R5)
+        if (empty($v['nif_cliente']) || trim($v['nif_cliente']) === '') {
+            if ($tipoFactura === 'F1') $tipoFactura = 'F2';
+            if ($tipoFactura === 'R1') $tipoFactura = 'R5';
+        }
+
+        // Recuperar datos del anterior para el encadenamiento
+        $serieAnt = '';
+        $fechaAnt = '';
+        if (!empty($v['hash_anterior']) && $v['hash_anterior'] !== str_repeat('0', 64)) {
+            // Buscar en logs vinculando con ventas para obtener la FECHA REAL del ticket
+            $sqlLog = "SELECT l.numero_serie, v.fecha 
+                       FROM verifactu_logs l 
+                       JOIN ventas v ON l.id_venta = v.id 
+                       WHERE l.hash_actual = :h LIMIT 1";
+            $resLog = DBPDO::ejecutarConsulta($sqlLog, [':h' => $v['hash_anterior']], $db)->fetch();
+            if ($resLog) {
+                $serieAnt = $resLog['numero_serie'];
+                $fechaAnt = date('d-m-Y', strtotime($resLog['fecha']));
+            } else {
+                // Fallback a ventas directamente
+                $sqlV = "SELECT numero_ticket, fecha, es_factura, tipo_documento FROM ventas WHERE hash_actual = :h LIMIT 1";
+                $resV = DBPDO::ejecutarConsulta($sqlV, [':h' => $v['hash_anterior']], $db)->fetch();
+                if ($resV) {
+                    $serieAnt = self::formatTicketNumber($resV['numero_ticket'], $resV['fecha'], $resV['es_factura'], $resV['tipo_documento']);
+                    $fechaAnt = date('d-m-Y', strtotime($resV['fecha']));
+                }
+            }
+        }
+
+        // Obtener el desglose de IVA real por líneas (para evitar Error 1142)
+        $sqlL = "SELECT iva_aplicado, SUM(total_linea) as total_bruto 
+                 FROM lineas_venta 
+                 WHERE id_venta = :id 
+                 GROUP BY iva_aplicado";
+        $stmtL = DBPDO::ejecutarConsulta($sqlL, [':id' => $idVenta], $db);
+        $lineasIva = $stmtL->fetchAll(PDO::FETCH_ASSOC);
+
+        // [RECALCULO ROBUSTO PARA EVITAR ERROR 1142]
+        // No podemos confiar en los campos base_imponible e iva_amt de la tabla si hay descuentos,
+        // ya que la AEAT exige una coherencia exacta entre Base * Tipo = Cuota.
+        // Redistribuimos el total real cobrado entre los tipos de IVA presentes.
+        
+        $totalVenta = (float)$v['total'];
+        $totalBrutoVenta = 0;
+        foreach ($lineasIva as $l) $totalBrutoVenta += (float)$l['total_bruto'];
+        
+        $desgloses = [];
+        $runningTotalNeto = 0;
+        $countGroups = count($lineasIva);
+        
+        foreach ($lineasIva as $index => $l) {
+            $rawRate = (float)$l['iva_aplicado'];
+            
+            // Forzar a tipos estándar de España
+            $standardRates = [21.00, 10.00, 4.00, 0.00];
+            $ivaRate = 21.00;
+            $minDiff = 999;
+            foreach ($standardRates as $sr) {
+                if (abs($rawRate - $sr) < $minDiff) {
+                    $minDiff = abs($rawRate - $sr);
+                    $ivaRate = $sr;
+                }
+            }
+
+            // 1. Distribuir el total de la venta proporcionalmente a este grupo de IVA
+            if ($index === $countGroups - 1) {
+                $totalNetoGrupo = round($totalVenta - $runningTotalNeto, 2);
+            } else {
+                if ($totalBrutoVenta > 0) {
+                    $totalNetoGrupo = round(($l['total_bruto'] / $totalBrutoVenta) * $totalVenta, 2);
+                } else {
+                    $totalNetoGrupo = 0;
+                }
+                $runningTotalNeto += $totalNetoGrupo;
+            }
+
+            // 2. Calcular Base e IVA para que sumen el TotalNetoGrupo y cumplan Base * Tipo = Cuota
+            // Base = Total / (1 + Tipo)
+            $baseG = round($totalNetoGrupo / (1 + $ivaRate / 100), 2);
+            $cuotaG = round($totalNetoGrupo - $baseG, 2);
+            
+            // Validar coherencia fiscal (Error 1142)
+            $cuotaLegal = round($baseG * ($ivaRate / 100), 2);
+            if (abs($cuotaG - $cuotaLegal) > 0.001) {
+                // Si hay descuadre de 1 céntimo, ajustamos la base para que la cuota sea legal
+                $baseG = round($totalNetoGrupo - $cuotaLegal, 2);
+                $cuotaG = $cuotaLegal;
+                
+                // Re-verificar si al ajustar la base, la cuota legal cambia (recursivo conceptual)
+                $cuotaFinal = round($baseG * ($ivaRate / 100), 2);
+                if (abs($baseG + $cuotaFinal - $totalNetoGrupo) > 0.001) {
+                    // Si no cuadra, priorizamos Base + Cuota = Total y dejamos que el margen de error
+                    // de la AEAT (0.01) absorba la diferencia si es posible.
+                }
+            }
+
+            $desgloses[] = [
+                'tipo'     => $ivaRate,
+                'base'     => $baseG,
+                'cuota'    => $cuotaG,
+                'tipo_re'  => 0,
+                'cuota_re' => 0
+            ];
+        }
+
+        // Asegurar que el importe total que enviamos es la suma exacta de lo calculado
+        $baseTotalCalculada = 0;
+        $cuotaTotalCalculada = 0;
+        foreach ($desgloses as $d) {
+            $baseTotalCalculada += $d['base'];
+            $cuotaTotalCalculada += $d['cuota'];
+        }
+        $importeTotalFinal = round($baseTotalCalculada + $cuotaTotalCalculada, 2);
+
+        return [
+            'numero_serie'              => $numeroSerie,
+            'fecha_expedicion'          => date('d-m-Y', strtotime($v['fecha'])),
+            'tipo_factura'              => $tipoFactura,
+            'tipo_rectificativa'        => $v['tipo_rectificativa'] ?? ($esAbono ? 'S' : null),
+            'base_imponible'            => $baseTotalCalculada,
+            'cuota_total'               => $cuotaTotalCalculada,
+            'importe_total'             => $importeTotalFinal,
+            'hash_actual'              => $v['hash_actual'],
+            'hash_anterior'            => $v['hash_anterior'],
+            'fecha_hora_gen'           => !empty($v['fecha_hora_gen_fiscal']) ? date('Y-m-d\TH:i:sP', strtotime($v['fecha_hora_gen_fiscal'])) : date('Y-m-d\TH:i:sP'),
+            'destinatario_nif'         => $v['nif_cliente'],
+            'destinatario_nombre'      => $v['nombre_cliente'],
+            'destinatario_id_type'     => $v['aeat_id_type'] ?? '01',
+            'destinatario_pais'        => $v['aeat_codigo_pais'] ?? 'ES',
+            'factura_rectificada_serie' => $v['num_ticket_origen_completo'] ?? null,
+            'factura_rectificada_fecha' => !empty($v['fecha_ticket_origen']) ? date('d-m-Y', strtotime($v['fecha_ticket_origen'])) : null,
+            'serie_anterior'           => $serieAnt,
+            'fecha_anterior'           => $fechaAnt,
+            'desgloses'                => $desgloses
+        ];
+    }
+
+    /**
+     * Regenera el registro VeriFactu para una venta existente (útil para corregir errores de Hash 2000).
+     */
+    public static function regenerarRegistroVeriFactu(int $idVenta): void
+    {
+        $db = DBPDO::getPDO();
+        $q = DBPDO::ejecutarConsulta("SELECT * FROM ventas WHERE id = :id", [':id' => $idVenta]);
+        $v = $q->fetch(PDO::FETCH_ASSOC);
+        if (!$v) throw new \Exception("Venta no encontrada");
+
+        $ticket = $v['numero_ticket'];
+        $esFactura = (bool)$v['es_factura'];
+        $tipoDoc = $v['tipo_documento'] ?? 'venta';
+        $tipo = ($esFactura ? 'F1' : 'F2');
+        if ($tipoDoc === 'abono') $tipo = ($esFactura ? 'R1' : 'R5');
+
+        // Formatear correctamente la serie para que coincida con lo que la AEAT devuelve
+        // y con lo que analizarResultadoLinea busca. Sin esto se generaba el XML con el
+        // numero_ticket raw (ej: "1020315") y el sistema no encontraba la respuesta → error 500.
+        $ticketFormateado = self::formatTicketNumber($ticket, $v['fecha'], $esFactura && !empty($v['nif_cliente']), $tipoDoc);
+
+        // Borrar envío previo en cola para que no haya duplicados locales
+        DBPDO::ejecutarConsulta("DELETE FROM cola_envios WHERE id_venta = :id", [':id' => $idVenta]);
+
+        // Formatear fecha a d-m-Y (según XSD)
+        $fechaFmt = date('d-m-Y', strtotime($v['fecha']));
+
+        self::procesarVeriFactu(
+            $db, $idVenta, $ticketFormateado, $tipo,
+            (float)$v['total'], (float)$v['iva_amt'], $fechaFmt,
+            $v['nif_cliente'] ?? '', $v['nombre_cliente'] ?? 'Cliente General',
+            '', '', '', '', 'S', $idVenta, // Pasamos el ID para el encadenamiento relativo
+            $v['aeat_id_type'] ?? '01', $v['aeat_codigo_pais'] ?? 'ES'
+        );
     }
 }

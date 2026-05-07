@@ -13,7 +13,7 @@ class AeatApi
 {
     private $config;
     private $endpoint;
-    private $timeout = 10;
+    private $timeout = 120;
 
     public function __construct()
     {
@@ -111,6 +111,9 @@ class AeatApi
             ];
         }
 
+        // [DEBUG] Loguear respuesta siempre para ver el motivo del rechazo
+        error_log("VeriFactu AEAT Response ($httpCode): " . substr($response, 0, 1000));
+        
         curl_close($ch);
 
         // Detectar fallos SOAP incluso con HTTP 200
@@ -183,25 +186,43 @@ class AeatApi
             }
         }
 
-        // 2. Extraer estado de la operación
+        // 2. Extraer estado de la operación (Soporta lotes)
         $estados = $xml->xpath('//r:EstadoRegistro');
         if (!empty($estados)) {
-            $estado = (string)$estados[0];
-            if ($estado === 'Correcto') {
+            $total = count($estados);
+            $correctos = 0;
+            $primerError = "";
+
+            foreach ($estados as $index => $nodoEstado) {
+                $estado = (string)$nodoEstado;
+                if ($estado === 'Correcto') {
+                    $correctos++;
+                } else {
+                    if (empty($primerError)) {
+                        $codigos = $xml->xpath('//r:CodigoErrorRegistro');
+                        $errores = $xml->xpath('//r:DescripcionErrorRegistro');
+                        
+                        $codigo = !empty($codigos[$index]) ? (string)$codigos[$index] : "500";
+                        $mensaje = !empty($errores[$index]) ? (string)$errores[$index] : "Error desconocido";
+                        
+                        $primerError = "[$codigo] $mensaje";
+                        $resCode = $codigo;
+                    }
+                }
+            }
+
+            if ($correctos === $total) {
                 return [
                     'success' => true,
-                    'message' => "Recibido satisfactoriamente por la AEAT",
-                    'code' => $httpCode
+                    'message' => "Lote aceptado: $correctos de $total registros procesados correctamente.",
+                    'code' => $httpCode,
+                    'raw_response' => $response
                 ];
             } else {
-                // Buscar errores detallados
-                $errores = $xml->xpath('//r:DescripcionErrorRegistro');
-                $msgError = !empty($errores) ? (string)$errores[0] : $estado;
-                
                 return [
                     'success' => false,
-                    'message' => "La AEAT rechazó el registro: $msgError",
-                    'code' => $httpCode,
+                    'message' => "La AEAT rechazó parte del lote ($correctos/$total correctos). $primerError",
+                    'code' => $resCode ?? $httpCode,
                     'raw_response' => $response
                 ];
             }

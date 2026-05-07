@@ -24,8 +24,8 @@ class VeriFactuQrService
         $fecha = date('d-m-Y', strtotime($venta['fecha']));
         
         // El importe debe tener 2 decimales y "." como separador
-        // La AEAT siempre espera el valor absoluto (positivo), incluso en facturas rectificativas
-        $importe = number_format(abs((float)$venta['total']), 2, '.', '');
+        $valImporte = isset($venta['total_aeat']) ? (float)$venta['total_aeat'] : (float)$venta['total'];
+        $importe = number_format($valImporte, 2, '.', '');
         
         // Separamos el formato T-DDMMYYYY-NNNN en serie (T-DDMMYYYY) y número (NNNN)
         $fullNum = $venta['numero_ticket_formato'] ?? $venta['numero_ticket'] ?? '';
@@ -39,7 +39,7 @@ class VeriFactuQrService
             $numero = $fullNum;
         }
 
-        // URL CORRECTA del motor de cotejo de la AEAT (Nueva para VeriFactu)
+        // URL de verificación oficial de la AEAT
         $baseUrl = defined('VERIFACTU_URL_QR_PRUEBAS') 
             ? VERIFACTU_URL_QR_PRUEBAS 
             : "https://prewww2.aeat.es/wlpl/TIKE-CONT/ValidarQR";

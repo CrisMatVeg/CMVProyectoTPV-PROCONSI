@@ -17,7 +17,7 @@ echo "[" . date('Y-m-d H:i:s') . "] Iniciando procesamiento de cola AEAT...\n";
 
 try {
     $service = new AeatQueueService();
-    $resultado = $service->procesarCola();
+    $resultado = $service->procesarCola(true); // Forzado para el cron
 
     echo "[RESULTADO] Éxitos: {$resultado['exitos']}, Fallos: {$resultado['fallos']}\n";
     
