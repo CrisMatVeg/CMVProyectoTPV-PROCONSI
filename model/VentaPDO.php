@@ -238,7 +238,7 @@ class VentaPDO
             ':esFactura'     => (!empty($datos['esFactura']) || $total >= 3000 ? 1 : 0),
             ':comentarios'   => isset($datos['comentarios']) ? $datos['comentarios'] : null,
             ':idTurno'       => isset($datos['idTurno']) ? (int)$datos['idTurno'] : null,
-            ':puntosGanados' => (int)($datos['puntosGanados'] ?? 0),
+            ':puntosGanados' => ($idCliente && $estado === 'completada') ? (int)floor($total) : 0,
             ':puntosCanjeados' => (int)($datos['puntosCanjeados'] ?? 0),
             ':puntosDescuentoAmt' => (float)($datos['puntosDescuentoAmt'] ?? 0.00)
         ];
