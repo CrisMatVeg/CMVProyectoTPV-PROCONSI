@@ -323,22 +323,25 @@ class VentaPDO
                     }
                 }
 
-                $precioBaseSnapshot = isset($linea['basePriceSnapshot']) ? (float)$linea['basePriceSnapshot'] : $precioUnit;
-                $descuentosLog      = isset($linea['descuentos']) ? $linea['descuentos'] : [];
-                
-                // Si NO vienen descuentos del frontend, intentamos recalcular (fallback compatibilidad legacy)
-                // Usamos la snapshot ya proporcionada si existe para evitar variaciones por tarifas expiradas
-                if (empty($descuentosLog) && $idProducto > 0) {
+                // PriceEngine es la fuente autoritativa de precio y descuentos para productos reales.
+                // Los comodines (id <= 0) usan el precio introducido manualmente.
+                if ($idProducto > 0) {
                     try {
                         require_once __DIR__ . '/PriceEngine.php';
                         $breakdown          = PriceEngine::calculate($idProducto, $idCliente, $qty, $datos['codigoCupon'] ?? null);
-                        if (!isset($linea['basePriceSnapshot'])) {
-                            $precioBaseSnapshot = $breakdown['precio_base'];
-                        }
+                        $precioUnit         = round($breakdown['precio_unitario_final'], 2);
+                        $totalLinea         = round($precioUnit * $qty, 2);
+                        $precioBaseSnapshot = $breakdown['precio_base'];
                         $descuentosLog      = $breakdown['descuentos'];
                     } catch (\Throwable $e) {
-                        // Si falla el motor de precios, mantenemos los valores básicos de la línea
+                        // Fallback: mantener precio del frontend si PriceEngine falla
+                        $precioBaseSnapshot = isset($linea['basePriceSnapshot']) ? (float)$linea['basePriceSnapshot'] : $precioUnit;
+                        $descuentosLog      = isset($linea['descuentos']) ? $linea['descuentos'] : [];
                     }
+                } else {
+                    // Comodín: precio introducido manualmente, sin tarifas
+                    $precioBaseSnapshot = $precioUnit;
+                    $descuentosLog      = [];
                 }
 
                 $sqlLinea = "INSERT INTO lineas_venta 

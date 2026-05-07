@@ -33,8 +33,9 @@ class PriceEngine
         $precioActual = $precioBase;
         $descuentos = [];
 
-        // 1. Aplicar Tarifas (Acumulativas por prioridad)
+        // 1. Aplicar la tarifa de mayor prioridad (solo una)
         $tarifas = self::obtenerTarifasAplicables($idProducto, $idCliente);
+        $tarifas = array_slice($tarifas, 0, 1);
         foreach ($tarifas as $t) {
             $importeVariacion = 0;
             if ($t['tipo'] === 'percent') {
@@ -54,28 +55,30 @@ class PriceEngine
             }
         }
 
+        // [MODIFICADO] Guardamos el precio tras tarifas como el precio "autoritativo" de la línea.
+        // Las promociones y cupones NO deben restar de este precio unitario para evitar dobles descuentos 
+        // y para cumplir con el requerimiento de que el precio del producto no cambie visualmente.
+        $precioTrasTarifas = $precioActual;
+
         // 2. Aplicar Promociones de volumen / Bundle
-        // Nota: Las promociones tipo 'bundle' suelen requerir contexto de carrito completo,
-        // pero aquí implementamos la lógica por línea si es aplicable.
         $promos = self::obtenerPromocionesAplicables($idProducto, $idCliente, $cantidad);
         foreach ($promos as $p) {
             $importePromo = 0;
             if ($p['tipo'] === 'percent') {
-                $importePromo = round($precioActual * ($p['valor'] / 100), 2);
+                $importePromo = round($precioTrasTarifas * ($p['valor'] / 100), 2);
             } elseif ($p['tipo'] === 'amount') {
                 $importePromo = (float)$p['valor'];
             } elseif ($p['tipo'] === 'bundle' && $p['bundle_buy_qty'] > 0) {
                 // Ejemplo 3x2: compras 3, pagas 2. 
-                // Descuento unitario = (Precio * (Buy - Pay)) / Buy
                 $unidadesGratis = floor($cantidad / $p['bundle_buy_qty']) * ($p['bundle_buy_qty'] - $p['bundle_pay_qty']);
                 if ($unidadesGratis > 0) {
-                    $importeTotalPromo = $precioActual * $unidadesGratis;
+                    $importeTotalPromo = $precioTrasTarifas * $unidadesGratis;
                     $importePromo = round($importeTotalPromo / $cantidad, 2);
                 }
             }
 
             if ($importePromo > 0) {
-                $precioActual -= $importePromo;
+                // [IMPORTANTE] NO restamos de $precioActual (que se convertirá en precio_unitario_final)
                 $descuentos[] = [
                     'id_origen' => $p['id'],
                     'tipo_descuento' => 'promocion',
@@ -91,13 +94,13 @@ class PriceEngine
             if ($cupon) {
                 $importeCupon = 0;
                 if ($cupon['tipo'] === 'percent') {
-                    $importeCupon = round($precioActual * ($cupon['valor'] / 100), 2);
+                    $importeCupon = round($precioTrasTarifas * ($cupon['valor'] / 100), 2);
                 } else {
                     $importeCupon = (float)$cupon['valor'];
                 }
 
                 if ($importeCupon > 0) {
-                    $precioActual -= $importeCupon;
+                    // [IMPORTANTE] NO restamos de $precioActual
                     $descuentos[] = [
                         'id_origen' => $cupon['id'],
                         'tipo_descuento' => 'cupon',
@@ -110,8 +113,8 @@ class PriceEngine
 
         return [
             'precio_base' => $precioBase,
-            'precio_unitario_final' => round($precioActual, 2),
-            'total_descuento_unitario' => round($precioBase - $precioActual, 2),
+            'precio_unitario_final' => round($precioTrasTarifas, 2),
+            'total_descuento_unitario' => round($precioBase - $precioTrasTarifas, 2),
             'descuentos' => $descuentos
         ];
     }
@@ -307,16 +310,35 @@ class PriceEngine
             if ($ahoraHora < $hInicio || $ahoraHora > $hFin) return false;
         }
 
-        // 4. Validar Segmento de Clientes (Roles) - Solo si no es cliente específico
-        if (!$isSpecificClient && !empty($item['roles_segmento'])) {
-            if (!$idCliente) return false;
-            
-            // Obtener rol del cliente
-            $c = DBPDO::ejecutarConsulta("SELECT rol FROM clientes WHERE id = :id", [':id' => $idCliente])->fetch();
-            $rolCliente = strtolower($c['rol'] ?? 'general');
-            
-            $segmentosPermitidos = array_map('trim', explode(',', strtolower($item['roles_segmento'])));
-            if (!in_array($rolCliente, $segmentosPermitidos)) return false;
+        // 4. Validar Segmento de Clientes (Roles / tipo_cliente)
+        if (!$isSpecificClient) {
+            $hasRoles = !empty($item['roles_segmento']);
+            $hasLegacyType = (!empty($item['tipo_cliente']) && $item['tipo_cliente'] !== 'todos');
+
+            if ($hasRoles || $hasLegacyType) {
+                if (!$idCliente) return false;
+
+                // Obtener rol del cliente
+                $c = DBPDO::ejecutarConsulta("SELECT rol FROM clientes WHERE id = :id", [':id' => $idCliente])->fetch();
+                $rolCliente = strtolower($c['rol'] ?? 'general');
+
+                // Validar contra roles_segmento (nuevo)
+                if ($hasRoles) {
+                    $segmentosPermitidos = array_map('trim', explode(',', strtolower($item['roles_segmento'])));
+                    if (!in_array($rolCliente, $segmentosPermitidos)) return false;
+                }
+
+                // Validar contra tipo_cliente (legacy)
+                if ($hasLegacyType) {
+                    $tipoReq = strtolower($item['tipo_cliente']);
+                    if ($tipoReq === 'mayorista') {
+                        // El mayorista es un ROL ahora
+                        if ($rolCliente !== 'mayorista') return false;
+                    } elseif ($tipoReq !== $rolCliente) {
+                        return false;
+                    }
+                }
+            }
         }
 
         // 5. Soporte Legacy "Solo Socios" - Solo si no es cliente específico

@@ -21,11 +21,14 @@ class ProductoPDO
      * @param bool $soloActivos Si es true, solo devuelve productos con activo=1. Default true.
      * @return Producto[]
      */
-    public static function listarProductos(bool $soloActivos = true, int $limit = 50000, int $offset = 0, string $term = '', string $categoria = '', string $estado = 'all', $minPrice = null, $maxPrice = null): array
+    public static function listarProductos(bool $soloActivos = true, int $limit = 50000, int $offset = 0, string $term = '', string $categoria = '', string $estado = 'all', $minPrice = null, $maxPrice = null, string $tag = '', bool $excluirPacks = false, string $sortBy = ''): array
     {
         $hoy = date('Y-m-d');
-        
+
         $where = " WHERE 1=1 ";
+        if ($excluirPacks) {
+            $where .= " AND p.es_pack = 0 ";
+        }
         $params = [];
 
         // Filtro de actividad / estado
@@ -63,8 +66,27 @@ class ProductoPDO
             $params[':categoria'] = $categoria;
         }
 
-        $sql = "SELECT p.id, p.referencia, p.nombre, p.descripcion, p.precio_coste, p.precio_venta, 
-                       p.stock_actual, p.stock_minimo, p.meses_garantia, p.icono, p.categoria, 
+        // Filtro de Atributos (Tags)
+        if (isset($tag) && $tag !== '') {
+            // Intentamos usar JSON_CONTAINS si está disponible, o un LIKE como fallback seguro para el array JSON
+            $where .= " AND (JSON_CONTAINS(p.atributos, JSON_QUOTE(:tag)) OR p.atributos LIKE :tagLike OR p.atributos = :tagPlain) ";
+            $params[':tag'] = $tag;
+            $params[':tagLike'] = '%"' . $tag . '"%';
+            $params[':tagPlain'] = $tag;
+        }
+
+        $allowedSorts = [
+            'name_asc'   => 'p.nombre ASC',
+            'name_desc'  => 'p.nombre DESC',
+            'price_asc'  => 'p.precio_venta ASC',
+            'price_desc' => 'p.precio_venta DESC',
+            'stock_asc'  => 'p.stock_actual ASC',
+            'stock_desc' => 'p.stock_actual DESC',
+        ];
+        $orderBy = $allowedSorts[$sortBy] ?? 'p.id DESC';
+
+        $sql = "SELECT p.id, p.referencia, p.nombre, p.descripcion, p.precio_coste, p.precio_venta,
+                       p.stock_actual, p.stock_minimo, p.meses_garantia, p.icono, p.categoria,
                        p.atributos, p.activo, p.codigo_iva, p.es_pack, p.id_proveedor, p.margen, p.precio_proveedor, p.mantener_precision,
                        ti.codigo as codigo_iva_calculado, ti.porcentaje, pr.aplica_re
                 FROM productos p
@@ -80,7 +102,7 @@ class ProductoPDO
                 LEFT JOIN proveedores pr ON p.id_proveedor = pr.id
                 $where
                 GROUP BY p.id
-                ORDER BY p.id ASC
+                ORDER BY {$orderBy}
                 LIMIT :limit OFFSET :offset";
         
         $sql = str_replace([':limit', ':offset'], [(int)$limit, (int)$offset], $sql);
@@ -124,10 +146,64 @@ class ProductoPDO
         return $productos;
     }
 
-    public static function contarProductos(bool $soloActivos = true, string $term = '', string $categoria = '', string $estado = 'all', $minPrice = null, $maxPrice = null): int
+    public static function listarPacks(): array
+    {
+        $hoy = date('Y-m-d');
+        $sql = "SELECT p.*, ti.porcentaje, pr.aplica_re
+                FROM productos p
+                LEFT JOIN tipos_iva ti ON ti.id = (
+                    SELECT id FROM tipos_iva t2
+                    WHERE t2.codigo = p.codigo_iva
+                      AND t2.activo = 1
+                      AND t2.fecha_inicio <= '$hoy'
+                      AND (t2.fecha_fin IS NULL OR t2.fecha_fin >= '$hoy')
+                    ORDER BY t2.fecha_inicio DESC
+                    LIMIT 1
+                )
+                LEFT JOIN proveedores pr ON p.id_proveedor = pr.id
+                WHERE p.es_pack = 1
+                ORDER BY p.id DESC";
+
+        $consulta = DBPDO::ejecutarConsulta($sql);
+        $packs = [];
+        while ($registro = $consulta->fetch(PDO::FETCH_ASSOC)) {
+            $stock = self::calcularStockPack((int)$registro['id']);
+            $p = new Producto(
+                $registro['id'],
+                $registro['referencia'],
+                $registro['nombre'],
+                $registro['descripcion'],
+                $registro['precio_coste'],
+                $registro['precio_venta'],
+                $stock,
+                $registro['stock_minimo'],
+                $registro['meses_garantia'],
+                $registro['icono'],
+                $registro['categoria'],
+                $registro['atributos'],
+                $registro['activo'],
+                $registro['codigo_iva'],
+                1, // es_pack
+                $registro['aplica_re'] ?? 0,
+                $registro['id_proveedor'] ?? null,
+                $registro['porcentaje'] ?? 21.00,
+                $registro['margen'] ?? 0.00,
+                $registro['precio_proveedor'] ?? 0.00,
+                $registro['mantener_precision'] ?? 0
+            );
+            $packs[] = $p;
+        }
+        return $packs;
+    }
+
+    public static function contarProductos(bool $soloActivos = true, string $term = '', string $categoria = '', string $estado = 'all', $minPrice = null, $maxPrice = null, string $tag = '', bool $excluirPacks = false): int
     {
         $where = " WHERE 1=1 ";
         $params = [];
+
+        if ($excluirPacks) {
+            $where .= " AND es_pack = 0 ";
+        }
 
         // Filtro de actividad / estado
         if ($estado === '1') {
@@ -162,6 +238,14 @@ class ProductoPDO
             $params[':categoria'] = $categoria;
         }
 
+        // Filtro de Atributos (Tags)
+        if (isset($tag) && $tag !== '') {
+            $where .= " AND (JSON_CONTAINS(atributos, JSON_QUOTE(:tag)) OR atributos LIKE :tagLike OR atributos = :tagPlain) ";
+            $params[':tag'] = $tag;
+            $params[':tagLike'] = '%"' . $tag . '"%';
+            $params[':tagPlain'] = $tag;
+        }
+
         $sql = "SELECT COUNT(*) FROM productos $where";
         $q = DBPDO::ejecutarConsulta($sql, $params);
         return (int)$q->fetchColumn();
@@ -191,17 +275,12 @@ class ProductoPDO
         return !empty($maxPacks) ? (int)min($maxPacks) : 0;
     }
 
-    public static function calcularPrecioCoste(float $precioProveedor, string $codigoIva, float $porcentajeRE): float
+    public static function calcularPrecioCoste(float $precioProveedor, float $porcentajeRE): float
     {
-        require_once __DIR__ . '/TipoIVAPDO.php';
-        $tipoIva = TipoIVAPDO::obtenerVigentePorCodigo($codigoIva, date('Y-m-d'));
-
-        $porcentajeIva = (float)($tipoIva['porcentaje'] ?? 21.00);
-
-        // Formula: PVP_Base + IVA + RE
-        // Coste = Proveedor * (1 + (IVA/100) + (RE/100))
-        $totalSurcharge = 1 + ($porcentajeIva / 100) + ($porcentajeRE / 100);
-        return round($precioProveedor * $totalSurcharge, 4);
+        // Coste neto = precio_proveedor × (1 + RE/100)
+        // El IVA soportado NO se incluye: queda neutralizado por el IVA repercutido al cliente.
+        // Solo el recargo de equivalencia es un coste real no recuperable.
+        return round($precioProveedor * (1 + ($porcentajeRE / 100)), 4);
     }
 
     /**
@@ -445,9 +524,12 @@ class ProductoPDO
      */
     public static function recalcularPreciosCosteGlobal(): void
     {
-        $sql = "SELECT p.id, p.precio_proveedor, p.precio_coste, p.codigo_iva, pv.aplica_re 
+        $sql = "SELECT p.id, p.precio_proveedor, p.precio_coste,
+                       pv.aplica_re,
+                       COALESCE(t.recargo_equivalencia, 0) AS re_pct
                 FROM productos p
                 LEFT JOIN proveedores pv ON p.id_proveedor = pv.id
+                LEFT JOIN tipos_iva t ON p.id_tipo_iva = t.id
                 WHERE p.es_pack = 0";
         $stmt = DBPDO::ejecutarConsulta($sql);
         $productos = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -458,11 +540,8 @@ class ProductoPDO
                 continue;
             }
 
-            $nuevoCoste = self::calcularPrecioCoste(
-                (float)$p['precio_proveedor'],
-                $p['codigo_iva'],
-                (int)($p['aplica_re'] ?? 0)
-            );
+            $reActual = ($p['aplica_re']) ? (float)$p['re_pct'] : 0.0;
+            $nuevoCoste = self::calcularPrecioCoste((float)$p['precio_proveedor'], $reActual);
 
             DBPDO::ejecutarConsulta(
                 "UPDATE productos SET precio_coste = :coste WHERE id = :id",
@@ -508,22 +587,35 @@ class ProductoPDO
     {
         if ($atributos === null || $atributos === '' || $atributos === 'null' || $atributos === '[]') return null;
 
+        $finalArray = [];
+
         if (is_string($atributos)) {
             $decoded = json_decode($atributos, true);
-            if (json_last_error() !== JSON_ERROR_NONE || $decoded === null) return null;
-            $atributos = $decoded;
-        }
-
-        if (empty($atributos)) return null;
-
-        if (is_array($atributos)) {
-            $clean = array_values(array_filter(array_map('trim', $atributos), function ($x) {
-                return $x !== '';
-            }));
-            if (count($clean) > 0) {
-                return json_encode($clean, JSON_UNESCAPED_UNICODE);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                $finalArray = $decoded;
+            } else {
+                // Not a JSON array, treat as comma-separated string
+                $finalArray = explode(',', $atributos);
             }
+        } elseif (is_array($atributos)) {
+            $finalArray = $atributos;
         }
+
+        if (empty($finalArray)) return null;
+
+        // Flatten (one level) and clean
+        $clean = [];
+        array_walk_recursive($finalArray, function($a) use (&$clean) {
+            $val = trim((string)$a);
+            if ($val !== '') $clean[] = $val;
+        });
+
+        $clean = array_values(array_unique($clean));
+
+        if (count($clean) > 0) {
+            return json_encode($clean, JSON_UNESCAPED_UNICODE);
+        }
+        
         return null;
     }
 
@@ -551,11 +643,12 @@ class ProductoPDO
 
     /**
      * Actualiza el stock y el Coste Medio Ponderado (CMP) tras una compra.
-     * Formula: Nuevo Coste = (Stock * Coste Antiguo + Cantidad Comprada * Coste Adquisicion) / (Stock + Cantidad Comprada)
-     * 
+     * Formula: Nuevo CMP = (Stock * CMP_anterior + Cantidad * CosteAdquisicion) / (Stock + Cantidad)
+     * CosteAdquisicion = precio_neto + RE (sin IVA — el IVA es un impuesto repercutido, no un coste)
+     *
      * @param int $id ID del producto
      * @param int $cantidad Cantidad comprada
-     * @param float $costeAdquisicion Coste total unitario de esta entrada (incluyendo IVA/RE si aplica)
+     * @param float $costeAdquisicion Coste unitario de esta entrada (neto + RE, sin IVA)
      * @param PDO|null $db Opcional: conexión PDO con transacción activa
      */
     public static function actualizarStockYCoste(int $id, int $cantidad, float $costeAdquisicion, $db = null): void
@@ -568,7 +661,24 @@ class ProductoPDO
         $pvpActual     = (float)$producto['precio_venta'];
         $margen        = (float)($producto['margen'] ?? 0);
 
-        // Si el stock actual es 0 o negativo, el nuevo coste es directamente el de adquisición
+        // Obtener IVA y RE del producto antes de calcular PVP
+        $sqlIVA = "SELECT t.porcentaje, t.recargo_equivalencia, pr.aplica_re
+                  FROM productos p
+                  LEFT JOIN tipos_iva t ON p.id_tipo_iva = t.id
+                  LEFT JOIN proveedores pr ON p.id_proveedor = pr.id
+                  WHERE p.id = :id";
+        if ($db) {
+            $stmtIVA = $db->prepare($sqlIVA);
+            $stmtIVA->execute([':id' => $id]);
+            $infoIVA = $stmtIVA->fetch(PDO::FETCH_ASSOC);
+        } else {
+            $qIVA = DBPDO::ejecutarConsulta($sqlIVA, [':id' => $id]);
+            $infoIVA = $qIVA->fetch(PDO::FETCH_ASSOC);
+        }
+        $ivaPct = (float)($infoIVA['porcentaje'] ?? 21.0);
+        $re_val = ($infoIVA['aplica_re'] && $infoIVA['recargo_equivalencia']) ? (float)$infoIVA['recargo_equivalencia'] : 0;
+
+        // Calcular nuevo CMP
         if ($stockAnterior <= 0) {
             $nuevoCoste = $costeAdquisicion;
         } else {
@@ -576,14 +686,14 @@ class ProductoPDO
         }
         $nuevoCoste = round($nuevoCoste, 4);
 
-        // Si hay margen definido, recalcular PVP automáticamente (igual que EntradaStockPDO)
+        // PVP = CMP × (1 + margen%) × (1 + IVA%) — el CMP no incluye IVA
         $pvpNuevo = $pvpActual;
         if ($margen > 0) {
-            $pvpNuevo = round($nuevoCoste * (1 + ($margen / 100)), 2);
+            $pvpNuevo = round($nuevoCoste * (1 + ($margen / 100)) * (1 + ($ivaPct / 100)), 2);
         }
 
-        $sql = "UPDATE productos SET 
-                stock_actual  = stock_actual + :cantidad, 
+        $sql = "UPDATE productos SET
+                stock_actual  = stock_actual + :cantidad,
                 precio_coste  = :nuevo_coste,
                 precio_venta  = :pvp
                 WHERE id = :id";
@@ -595,41 +705,17 @@ class ProductoPDO
             ':id'          => $id
         ];
 
+        // Revertir costeAdquisicion a precio_proveedor neto (sin RE, sin IVA)
+        // costeAdquisicion = neto × (1 + RE%) → neto = costeAdquisicion / (1 + RE%)
+        $neto = ($re_val > 0) ? $costeAdquisicion / (1 + ($re_val / 100)) : $costeAdquisicion;
+        $sqlProv = "UPDATE productos SET precio_proveedor = :neto WHERE id = :id";
+
         if ($db) {
-            $stmt = $db->prepare($sql);
-            $stmt->execute($params);
-            
-            // IMPORTANTE: Actualizar también precio_proveedor (revirtiendo IVA/RE)
-            // Obtenemos los datos del IVA para este producto
-            $sqlIVA = "SELECT t.porcentaje, t.recargo_equivalencia, pr.aplica_re 
-                      FROM productos p 
-                      LEFT JOIN tipos_iva t ON p.id_tipo_iva = t.id 
-                      LEFT JOIN proveedores pr ON p.id_proveedor = pr.id
-                      WHERE p.id = :id";
-            $stmtIVA = $db->prepare($sqlIVA);
-            $stmtIVA->execute([':id' => $id]);
-            $infoIVA = $stmtIVA->fetch(PDO::FETCH_ASSOC);
-
-            $re_val = ($infoIVA['aplica_re'] && $infoIVA['recargo_equivalencia']) ? (float)$infoIVA['recargo_equivalencia'] : 0;
-            $neto = $costeAdquisicion / (1 + ($infoIVA['porcentaje'] / 100) + ($re_val / 100));
-
-            $sqlProv = "UPDATE productos SET precio_proveedor = :neto WHERE id = :id";
+            $db->prepare($sql)->execute($params);
             $db->prepare($sqlProv)->execute([':neto' => round($neto, 4), ':id' => $id]);
         } else {
             DBPDO::ejecutarConsulta($sql, $params);
-            
-            $sqlIVA = "SELECT t.porcentaje, t.recargo_equivalencia, pr.aplica_re 
-                      FROM productos p 
-                      LEFT JOIN tipos_iva t ON p.id_tipo_iva = t.id 
-                      LEFT JOIN proveedores pr ON p.id_proveedor = pr.id
-                      WHERE p.id = :id";
-            $qIVA = DBPDO::ejecutarConsulta($sqlIVA, [':id' => $id]);
-            $infoIVA = $qIVA->fetch(PDO::FETCH_ASSOC);
-
-            $re_val = ($infoIVA['aplica_re'] && $infoIVA['recargo_equivalencia']) ? (float)$infoIVA['recargo_equivalencia'] : 0;
-            $neto = $costeAdquisicion / (1 + ($infoIVA['porcentaje'] / 100) + ($re_val / 100));
-
-            DBPDO::ejecutarConsulta("UPDATE productos SET precio_proveedor = :neto WHERE id = :id", [':neto' => round($neto, 4), ':id' => $id]);
+            DBPDO::ejecutarConsulta($sqlProv, [':neto' => round($neto, 4), ':id' => $id]);
         }
 
         // Auditoría si el PVP cambió
@@ -749,14 +835,21 @@ class ProductoPDO
             }
         }
 
-        $q = DBPDO::ejecutarConsulta("SELECT id, precio_coste, precio_venta FROM productos WHERE {$where}", $params);
+        $q = DBPDO::ejecutarConsulta(
+            "SELECT p.id, p.precio_coste, p.precio_venta, COALESCE(t.porcentaje, 21.0) AS iva_pct
+             FROM productos p
+             LEFT JOIN tipos_iva t ON p.id_tipo_iva = t.id
+             WHERE {$where}",
+            $params
+        );
         $productos = $q->fetchAll(PDO::FETCH_ASSOC);
 
         $actualizados = 0;
         $idUsuario = isset($_SESSION['usuarioActualTPV']) ? $_SESSION['usuarioActualTPV']->getId() : null;
 
         foreach ($productos as $p) {
-            $pvpNuevo = round((float)$p['precio_coste'] * (1 + ($margen / 100)), 2);
+            $ivaPct   = (float)($p['iva_pct'] ?? 21.0);
+            $pvpNuevo = round((float)$p['precio_coste'] * (1 + ($margen / 100)) * (1 + ($ivaPct / 100)), 2);
             $pvpActual = (float)$p['precio_venta'];
 
             DBPDO::ejecutarConsulta(
@@ -843,10 +936,17 @@ class ProductoPDO
             if ($pvpNuevo === $pvpActual) continue;
 
             // Recalcular el nuevo margen si el coste es mayor a 0
-            $sqlProd = DBPDO::ejecutarConsulta("SELECT precio_coste FROM productos WHERE id = ?", [$p['id']]);
+            // Margen = (PVP_sin_IVA / coste - 1) × 100
+            $sqlProd = DBPDO::ejecutarConsulta(
+                "SELECT p.precio_coste, COALESCE(t.porcentaje, 21.0) AS iva_pct
+                 FROM productos p LEFT JOIN tipos_iva t ON p.id_tipo_iva = t.id WHERE p.id = ?",
+                [$p['id']]
+            );
             $rowProd = $sqlProd->fetch();
-            $coste = (float)($rowProd['precio_coste'] ?? 0);
-            $nuevoMargen = ($coste > 0) ? (($pvpNuevo / $coste) - 1) * 100 : 0;
+            $coste    = (float)($rowProd['precio_coste'] ?? 0);
+            $ivaPct   = (float)($rowProd['iva_pct'] ?? 21.0);
+            $pvpSinIva = $pvpNuevo / (1 + ($ivaPct / 100));
+            $nuevoMargen = ($coste > 0) ? (($pvpSinIva / $coste) - 1) * 100 : 0;
 
             DBPDO::ejecutarConsulta(
                 "UPDATE productos SET precio_venta = :pvp, margen = :margen WHERE id = :id",
