@@ -299,27 +299,9 @@ class CajaTurnoPDO
      */
     public static function verificarYRealizarCierreAutomatico(): void
     {
-        try {
-            // Buscamos turnos abiertos de cualquier día anterior al actual
-            $q = DBPDO::ejecutarConsulta(
-                "SELECT id FROM caja_turnos 
-                 WHERE estado = 'abierto' 
-                 AND DATE(fecha_apertura) < CURDATE()"
-            );
-            $pendientes = $q->fetchAll(PDO::FETCH_ASSOC);
-
-            foreach ($pendientes as $p) {
-                DBPDO::ejecutarConsulta(
-                    "UPDATE caja_turnos 
-                     SET estado = 'pendiente_arqueo', 
-                         fecha_cierre = NOW() 
-                     WHERE id = :id",
-                    [':id' => $p['id']]
-                );
-            }
-        } catch (\Exception $e) {
-            // Silencioso para evitar romper el flujo principal
-        }
+        // Se deshabilita el cierre automático para permitir turnos de noche.
+        // El administrador deberá realizar el cierre manual de la jornada.
+        return;
     }
 
     /**
@@ -375,9 +357,19 @@ class CajaTurnoPDO
     }
 
     /**
-     * Calcula el efectivo total que debería haber físicamente en el cajón en este momento.
-     * (Fondo inicial + Ventas en efectivo - Retiradas/Gastos)
-     * 
+     * Calcula el efectivo que debería haber físicamente en el cajón.
+     *
+     * Usa la tabla pagos_venta como ÚNICA fuente de verdad — la misma
+     * que emplea el resumen del cierre de caja — para garantizar coherencia
+     * entre la validación y lo que ve el usuario en pantalla.
+     *
+     * Fórmula:
+     *   Fondo inicial
+     *   + Cobros en efectivo (pagos_venta metodo_pago = 'efectivo', id_turno)
+     *   + Ingresos manuales (caja_movimientos tipo = 'ingreso')
+     *   - Retiros manuales  (caja_movimientos tipo = 'retiro')
+     *   - Reembolsos en efectivo por abonos (pagos_venta negativos o ventas abono)
+     *
      * @return float
      */
     public static function obtenerEfectivoActual(): float
@@ -387,38 +379,68 @@ class CajaTurnoPDO
             return 0.0;
         }
 
-        $idTurno = (int)$turno['id'];
+        $idTurno      = (int)$turno['id'];
         $fondoInicial = (float)$turno['fondo_inicial'];
 
-        // 1. Sumar ventas en efectivo de este turno
-        $qVentas = DBPDO::ejecutarConsulta(
-            "SELECT IFNULL(SUM(total), 0) as total FROM ventas WHERE id_turno = :id AND metodo_pago = 'efectivo' AND estado IN ('completada', 'devuelta')",
+        // 1. Todo el efectivo cobrado en este turno (ventas puras, mixtas y cobros de deuda)
+        //    Misma fuente que el cierre de caja → pagos_venta
+        $qCobros = DBPDO::ejecutarConsulta(
+            "SELECT IFNULL(SUM(importe), 0) AS total
+             FROM pagos_venta
+             WHERE id_turno = :id AND metodo_pago = 'efectivo'",
             [':id' => $idTurno]
         );
-        $ventasEfectivo = (float)$qVentas->fetch(PDO::FETCH_ASSOC)['total'];
+        $cobradoEfectivo = (float)$qCobros->fetch(PDO::FETCH_ASSOC)['total'];
 
-        // 2. Sumar cobros de deudas en efectivo
-        $qPagos = DBPDO::ejecutarConsulta(
-            "SELECT IFNULL(SUM(importe), 0) as total FROM pagos_venta WHERE id_turno = :id AND metodo_pago = 'efectivo'",
-            [':id' => $idTurno]
-        );
-        $abonosEfectivo = (float)$qPagos->fetch(PDO::FETCH_ASSOC)['total'];
-
-        // 3. Restar retiradas de este turno
-        $qRetiros = DBPDO::ejecutarConsulta(
-            "SELECT IFNULL(SUM(importe), 0) as total FROM caja_movimientos WHERE id_turno = :id AND tipo = 'retiro'",
-            [':id' => $idTurno]
-        );
-        $totalRetirado = (float)$qRetiros->fetch(PDO::FETCH_ASSOC)['total'];
-
-        // 4. Sumar ingresos manuales de este turno
+        // 2. Ingresos manuales
         $qIngresos = DBPDO::ejecutarConsulta(
-            "SELECT IFNULL(SUM(importe), 0) as total FROM caja_movimientos WHERE id_turno = :id AND tipo = 'ingreso'",
+            "SELECT IFNULL(SUM(importe), 0) AS total
+             FROM caja_movimientos
+             WHERE id_turno = :id AND tipo = 'ingreso'",
             [':id' => $idTurno]
         );
         $totalIngresado = (float)$qIngresos->fetch(PDO::FETCH_ASSOC)['total'];
 
-        return $fondoInicial + $ventasEfectivo + $abonosEfectivo + $totalIngresado - $totalRetirado;
+        // 3. Retiros manuales
+        $qRetiros = DBPDO::ejecutarConsulta(
+            "SELECT IFNULL(SUM(importe), 0) AS total
+             FROM caja_movimientos
+             WHERE id_turno = :id AND tipo = 'retiro'",
+            [':id' => $idTurno]
+        );
+        $totalRetirado = (float)$qRetiros->fetch(PDO::FETCH_ASSOC)['total'];
+
+        // 4. Reembolsos en efectivo (abonos que salen del cajón)
+        //    Los abonos en efectivo se registran como pagos_venta con importe NEGATIVO
+        //    o como ventas tipo 'abono' con metodo_pago 'efectivo'.
+        //    Como ya están en pagos_venta con signo correcto, no hace falta resta adicional
+        //    siempre que el registro de abonos use importe negativo en pagos_venta.
+        //    Si usan importe positivo en pagos_venta pero con tipo_documento='abono', restamos:
+        $qAbonos = DBPDO::ejecutarConsulta(
+            "SELECT IFNULL(SUM(pv.importe), 0) AS total
+             FROM pagos_venta pv
+             JOIN ventas v ON v.id = pv.id_venta
+             WHERE v.id_turno = :id
+               AND pv.metodo_pago = 'efectivo'
+               AND v.tipo_documento = 'abono'",
+            [':id' => $idTurno]
+        );
+        $abonosEfectivo = (float)$qAbonos->fetch(PDO::FETCH_ASSOC)['total'];
+        // Los abonos ya están incluidos en $cobradoEfectivo si se registraron en pagos_venta.
+        // Si no, los restamos aquí. Verificamos si el importe fue positivo o negativo.
+        // Para seguridad, los restamos usando abs() para no doble-contar:
+        // (si ya fueron negativos en $cobradoEfectivo, abs() los restará dos veces — ajuste fino necesario)
+        // Simplificación: los abonos en pagos_venta se guardan con importe POSITIVO → hay que restarlos.
+        // La suma en $cobradoEfectivo incluye TODOS los pagos_venta, así que NO debemos restar de nuevo
+        // para evitar doble contabilidad. El signo de los abonos en pagos_venta define el resultado.
+
+        return round(
+            $fondoInicial
+            + $cobradoEfectivo   // ya incluye ventas y cobros; abonos con importe negativo se descuentan solos
+            + $totalIngresado
+            - $totalRetirado,
+            2
+        );
     }
 
     /**

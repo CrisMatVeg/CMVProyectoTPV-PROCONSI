@@ -132,4 +132,28 @@ class CierreFiscalPDO
         $res = $q->fetch(PDO::FETCH_ASSOC);
         return (int)($res['total'] ?? 0);
     }
+    /**
+     * Obtiene un cierre específico por su ID con detalles de tickets y deudas.
+     */
+    public static function obtenerCierrePorId(int $id): ?array
+    {
+        $sql = "SELECT 
+                cf.*,
+                u.nombre as nombre_usuario,
+                COUNT(DISTINCT v.id) as num_tickets,
+                COALESCE(MIN(v.fecha), cf.fecha) as primera_venta,
+                COALESCE(MAX(v.fecha), cf.fecha) as ultima_venta,
+                COALESCE(SUM(d.importe), 0) as deuda_generada,
+                COALESCE(SUM(CASE WHEN v.metodo_pago = 'a_cuenta' THEN v.total ELSE 0 END), 0) as total_a_cuenta
+            FROM cierres_fiscales cf
+            JOIN usuarios u ON cf.id_usuario = u.id
+            LEFT JOIN ventas v ON v.num_z = cf.id
+            LEFT JOIN caja_deudas d ON d.id_cierre_fiscal = cf.id
+            WHERE cf.id = :id
+            GROUP BY cf.id";
+        
+        $q = DBPDO::ejecutarConsulta($sql, [':id' => $id]);
+        $res = $q->fetch(PDO::FETCH_ASSOC);
+        return $res ?: null;
+    }
 }

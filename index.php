@@ -42,7 +42,7 @@ if (isset($_GET['menu']) && isset($controller[$_GET['menu']])) {
 if (isset($_SESSION['usuarioActualTPV'])) {
     // Centralizar estado de caja para toda la App
     require_once 'model/CajaTurnoPDO.php';
-    CajaTurnoPDO::verificarYRealizarCierreAutomatico();
+    // CajaTurnoPDO::verificarYRealizarCierreAutomatico();
 
     // [NUEVO] Procesar apertura de caja ANTES de obtener el turno abierto
     // Esto evita que el usuario tenga que pulsar dos veces para ver el TPV abierto
