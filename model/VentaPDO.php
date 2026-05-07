@@ -101,14 +101,15 @@ class VentaPDO
         $totalNetoCalculado = round($totalReal - $descAmt, 2);
         if ($totalNetoCalculado < 0) $totalNetoCalculado = 0;
 
-        // 3. Ajustar Base e IVA proporcionalmente para que la suma cuadre con el Total Neto.
-        if ($totalReal > 0) {
-            $factorEscala = $totalNetoCalculado / $totalReal;
-            $base   = round($totalBase * $factorEscala, 2);
-            $ivaAmt = round($totalIva * $factorEscala, 2);
-            // El Total final es la suma de base + iva (para evitar descuadres de redondeo)
-            $total = round($base + $ivaAmt, 2);
-        } else {
+        // 3. [MODIFICADO] Según requerimiento del usuario: los descuentos/promos NO afectan a la base imponible ni al IVA.
+        // Se mantienen los valores originales (brutos) para base e IVA.
+        $base   = round($totalBase, 2);
+        $ivaAmt = round($totalIva, 2);
+        
+        // El Total de la venta es el neto tras aplicar descuentos
+        $total  = $totalNetoCalculado;
+
+        if ($totalReal <= 0) {
             $base   = 0;
             $ivaAmt = 0;
             $total  = 0;
