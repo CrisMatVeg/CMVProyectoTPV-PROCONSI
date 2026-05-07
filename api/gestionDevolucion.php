@@ -200,22 +200,42 @@ try {
             }
         }
 
-        if ($importeTotalDevolver <= 0) throw new Exception('No hay importe pendiente de devolver.');
-        if ($metodo === 'efectivo' && $importeTotalDevolver > $efectivoDisponible + 0.009) {
-            throw new Exception('No hay suficiente efectivo en caja para anular este ticket.');
+        $montoAReembolsar = (float)$venta['total'];
+        if (($venta['estado'] ?? '') === 'pendiente_pago' || ($venta['estado'] ?? '') === 'parcialmente_devuelta') {
+            $montoAReembolsar = (float)($venta['pagado_a_cuenta'] ?? 0);
         }
 
-        $numAbono = VentaPDO::crearAbono(
-            (int)$venta['id'],
-            $lineasADevolver,
-            $motivo,
-            $metodo,
-            $idUsuario,
-            $reponerStock
-        );
+        $esAnulacion = (bool)($input['esAnulacion'] ?? false);
 
-        LogPDO::addLog('ABONO_GENERADO', "Abono #$numAbono (anulación completa ticket #$numTicket, $importeTotalDevolver€) - Motivo: $motivo");
-        echo json_encode(['ok' => true, 'numTicketAbono' => $numAbono]);
+        if (!$esAnulacion && $metodo === 'efectivo' && $montoAReembolsar > $efectivoDisponible + 0.009) {
+            throw new Exception('No hay suficiente efectivo en caja para reembolsar esta anulación (Requerido: '.number_format($montoAReembolsar, 2).', Disponible: '.number_format($efectivoDisponible, 2).')');
+        }
+
+        if ($esAnulacion) {
+            // FLUJO ANULACIÓN: No genera abono, solo anula la original
+            VentaPDO::anularVentaFiscalmente(
+                (int)$venta['id'],
+                $motivo,
+                $metodo,
+                $idUsuario,
+                $reponerStock
+            );
+            LogPDO::addLog('VENTA_ANULADA', "Venta #$numTicket anulada fiscalmente - Reembolso: " . number_format($montoAReembolsar, 2) . "€ ($metodo) - Motivo: $motivo");
+            echo json_encode(['ok' => true, 'anulacionCompleta' => true]);
+        } else {
+            // FLUJO RECTIFICACIÓN: Genera abono
+            $numAbono = VentaPDO::crearAbono(
+                (int)$venta['id'],
+                $lineasADevolver,
+                $motivo,
+                $metodo,
+                $idUsuario,
+                $reponerStock
+            );
+
+            LogPDO::addLog('ABONO_GENERADO', "Abono #$numAbono (anulación completa ticket #$numTicket, $importeTotalDevolver€) - Motivo: $motivo");
+            echo json_encode(['ok' => true, 'numTicketAbono' => $numAbono]);
+        }
 
     } else {
         throw new Exception('Acción no válida');

@@ -140,6 +140,17 @@ class VentaPDO
             }
         }
 
+        // Validar que los pagos mixtos cubren el total
+        if ($metodoPago === 'mixto' && !empty($datos['pagos'])) {
+            $sumaPagos = array_sum(array_map(fn($p) => (float)($p['importe'] ?? 0), $datos['pagos']));
+            if ($sumaPagos < $total - 0.02) {
+                throw new \Exception(
+                    "Pagos mixtos insuficientes: la suma (" . number_format($sumaPagos, 2, ',', '.') .
+                    "€) no cubre el total (" . number_format($total, 2, ',', '.') . "€)."
+                );
+            }
+        }
+
         $totalPagadoCalculado = 0;
         $pagadoACuenta = 0;
         $fechaLimite = null;
@@ -1311,6 +1322,8 @@ class VentaPDO
         if (!$ventaOrigen) throw new \Exception('Venta de origen no encontrada.');
 
         // 2. Calcular totales del abono a partir de las líneas a devolver
+        $totalBaseAbono = 0;
+        $totalIvaAbono  = 0;
         $totalAbono     = 0;
         $lineasAbono    = []; // Enriquecidas con datos completos de la línea original
 
@@ -1368,6 +1381,25 @@ class VentaPDO
         // El número de ticket se obtendrá dentro de la transacción para asegurar atomicidad
         // $numTicket = self::obtenerSiguienteTicket();
 
+        // Determinar si es rectificativa total (Sustitución) o parcial (Diferencias)
+        $totalVentaOriginal = abs((float)$ventaOrigen['total']);
+        $sqlSumPrev = "SELECT COALESCE(SUM(ABS(total)), 0) AS total_ya_abonado
+                       FROM ventas
+                       WHERE id_venta_origen = :idv AND tipo_documento = 'abono'";
+        $qSumPrev = DBPDO::ejecutarConsulta($sqlSumPrev, [':idv' => $idVentaOrigen]);
+        $totalYaAbonadoPrev = (float)($qSumPrev->fetch(PDO::FETCH_ASSOC)['total_ya_abonado'] ?? 0);
+        
+        $esRectificativaTotal = (($totalYaAbonadoPrev + $totalAbono) >= $totalVentaOriginal - 0.01);
+
+        // Calcular valores VeriFactu antes del INSERT
+        if ($esRectificativaTotal) {
+            $tipoRectificativa = 'S'; // Sustitución
+            $totalAeat = 0.0;
+        } else {
+            $tipoRectificativa = 'I'; // Diferencias
+            $totalAeat = -$totalAbono;
+        }
+
         // 4. INSERT en ventas (importe NEGATIVO para el abono)
         $sqlAbono = "INSERT INTO ventas
             (numero_ticket, fecha, id_usuario, id_cliente, tipo_cliente, nombre_cliente, nif_cliente,
@@ -1375,14 +1407,14 @@ class VentaPDO
              base_imponible, iva_pct, iva_amt, total, efectivo_recibido,
              estado, pagado_a_cuenta, fecha_limite_pago, es_factura, comentarios, id_turno,
              puntos_ganados, puntos_canjeados, puntos_descuento_amt,
-             tipo_documento, id_venta_origen)
+             tipo_documento, id_venta_origen, tipo_rectificativa, total_aeat)
         VALUES
             (:ticket, NOW(), :usuario, :cliente, :tipo, :nombre, :nif,
              :metodo, :subtotal, 0, 0, NULL,
              :base, 21.00, :iva, :total, 0,
              'completada', 0, NULL, :esFactura, :comentarios, :idTurno,
              0, 0, 0,
-             'abono', :ventaOrigen)";
+             'abono', :ventaOrigen, :tipoRect, :totalAeat)";
 
         require_once __DIR__ . '/CajaTurnoPDO.php';
         $turno   = CajaTurnoPDO::obtenerTurnoAbierto();
@@ -1404,6 +1436,8 @@ class VentaPDO
             ':comentarios' => 'Abono por devolución. Motivo: ' . mb_substr($motivo, 0, 200),
             ':idTurno'     => $idTurno,
             ':ventaOrigen' => $idVentaOrigen,
+            ':tipoRect'    => $tipoRectificativa,
+            ':totalAeat'   => $totalAeat,
         ];
 
         $db = DBPDO::getPDO();
@@ -1491,25 +1525,7 @@ class VentaPDO
             }
             // 'reemplazo': solo se repone stock (ya hecho arriba); no hay reembolso dinerario
 
-            // 8. Actualizar estado de la venta original
-            // Calcular el total ya abonado para esta venta
-            $sqlSumAbonos = "SELECT COALESCE(SUM(ABS(total)), 0) AS total_abonado
-                             FROM ventas
-                             WHERE id_venta_origen = :idv AND tipo_documento = 'abono'";
-            $qSum = DBPDO::ejecutarConsulta($sqlSumAbonos, [':idv' => $idVentaOrigen]);
-            $rowSum = $qSum->fetch(PDO::FETCH_ASSOC);
-            $totalAbonado = (float)($rowSum['total_abonado'] ?? 0);
-            $totalVentaOriginal = abs((float)$ventaOrigen['total']);
 
-            if ($totalAbonado >= $totalVentaOriginal - 0.01) {
-                $nuevoEstado = 'devuelta';
-            } else {
-                $nuevoEstado = 'parcialmente_devuelta';
-            }
-            DBPDO::ejecutarConsulta(
-                "UPDATE ventas SET estado = :estado WHERE id = :id",
-                [':estado' => $nuevoEstado, ':id' => $idVentaOrigen]
-            );
 
             // [VERIFACTU] Encadenamiento y Huella (Abono)
             $fechaFormatAb = date('d-m-Y');
