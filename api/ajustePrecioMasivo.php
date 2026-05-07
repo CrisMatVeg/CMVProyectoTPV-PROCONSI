@@ -16,8 +16,8 @@ try {
         throw new Exception('Método no permitido', 405);
     }
 
-    if (!isset($_SESSION['usuarioActualTPV']) || $_SESSION['usuarioActualTPV']->getRol() !== 'admin') {
-        throw new Exception('No autorizado', 401);
+    if (!isset($_SESSION['usuarioActualTPV']) || !$_SESSION['usuarioActualTPV']->tienePermiso('gestionar_tarifas')) {
+        throw new Exception('No autorizado', 403);
     }
 
     $input = json_decode(file_get_contents('php://input'), true) ?? [];

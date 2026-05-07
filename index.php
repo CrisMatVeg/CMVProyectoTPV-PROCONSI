@@ -96,34 +96,42 @@ if (isset($_SESSION['usuarioActualTPV'])) {
         header('Location: index.php');
         exit;
     }
+    if (isset($_REQUEST['irHistorial']) && $_SERVER['REQUEST_METHOD'] !== 'POST') {
+        $_SESSION['paginaEnCurso'] = 'Historial';
+        $params = $_GET;
+        unset($params['irHistorial']);
+        $qs = http_build_query($params);
+        header('Location: index.php' . ($qs ? '?' . $qs : ''));
+        exit;
+    }
     if (isset($_REQUEST['irCierreCaja']) && ($_SESSION['usuarioActualTPV']->tienePermiso('cerrar_caja') || $_SESSION['usuarioActualTPV']->tienePermiso('cerrar_turno')) 
-        && !isset($_POST['doCierre']) && !isset($_POST['doCierreZ']) && !isset($_POST['doCierreTurno']) && !isset($_POST['abrirCaja']) && !isset($_POST['realizarArqueoPendiente'])) {
+        && !isset($_POST['doCierre']) && !isset($_POST['doCierreZ']) && !isset($_POST['doCierreTurno']) && !isset($_POST['abrirCaja']) && !isset($_POST['realizarArqueoPendiente']) && !isset($_REQUEST['accion'])) {
         $_SESSION['paginaEnCurso'] = 'cierreCaja';
         header('Location: index.php');
         exit;
     }
-    if (isset($_REQUEST['irProveedores']) && $_SESSION['usuarioActualTPV']->getRol() === 'admin') {
+    if (isset($_REQUEST['irProveedores']) && $_SESSION['usuarioActualTPV']->tienePermiso('gestionar_proveedores') && !isset($_REQUEST['accion'])) {
         if ($_SESSION['paginaEnCurso'] !== 'Proveedores') {
             $_SESSION['paginaEnCurso'] = 'Proveedores';
             header('Location: index.php');
             exit;
         }
     }
-    if (isset($_REQUEST['irCompras']) && $_SESSION['usuarioActualTPV']->getRol() === 'admin') {
+    if (isset($_REQUEST['irCompras']) && $_SESSION['usuarioActualTPV']->tienePermiso('gestionar_inventario') && !isset($_REQUEST['accion'])) {
         if ($_SESSION['paginaEnCurso'] !== 'Compras') {
             $_SESSION['paginaEnCurso'] = 'Compras';
             header('Location: index.php');
             exit;
         }
     }
-    if (isset($_REQUEST['irConfiguracion']) && $_SESSION['usuarioActualTPV']->getRol() === 'admin') {
+    if (isset($_REQUEST['irConfiguracion']) && $_SESSION['usuarioActualTPV']->tienePermiso('gestionar_configuracion') && !isset($_REQUEST['accion'])) {
         if ($_SESSION['paginaEnCurso'] !== 'Configuracion') {
             $_SESSION['paginaEnCurso'] = 'Configuracion';
             header('Location: index.php');
             exit;
         }
     }
-    if (isset($_REQUEST['irUsuarios']) && $_SESSION['usuarioActualTPV']->getRol() === 'admin') {
+    if (isset($_REQUEST['irUsuarios']) && $_SESSION['usuarioActualTPV']->tienePermiso('gestionar_usuarios') && !isset($_REQUEST['accion'])) {
         if ($_SESSION['paginaEnCurso'] !== 'Usuarios') {
             $_SESSION['paginaEnCurso'] = 'Usuarios';
             header('Location: index.php');
@@ -131,7 +139,7 @@ if (isset($_SESSION['usuarioActualTPV'])) {
         }
     }
 
-    if (isset($_REQUEST['irAnalitica']) && $_SESSION['usuarioActualTPV']->getRol() === 'admin') {
+    if (isset($_REQUEST['irAnalitica']) && $_SESSION['usuarioActualTPV']->tienePermiso('ver_analitica') && !isset($_REQUEST['accion'])) {
         if ($_SESSION['paginaEnCurso'] !== 'Analitica') {
             $_SESSION['paginaEnCurso'] = 'Analitica';
             header('Location: index.php');

@@ -72,8 +72,9 @@ try {
 
         // Lógica de producto inactivo por defecto si falta precio o stock (solo al añadir)
         if ($accion === 'añadir') {
+            $isPack = !empty($datos['es_pack']);
             $hasPrice = !empty($datos['precio_venta']) && (float)$datos['precio_venta'] > 0;
-            $hasStock = !empty($datos['stock_actual']) && (int)$datos['stock_actual'] > 0;
+            $hasStock = (!empty($datos['stock_actual']) && (int)$datos['stock_actual'] > 0) || $isPack;
             
             if (!$hasPrice || !$hasStock) {
                 $datos['activo'] = 0;
@@ -110,12 +111,15 @@ try {
             $offset = isset($datos['offset']) ? (int)$datos['offset'] : 0;
             $term = isset($datos['term']) ? trim($datos['term']) : '';
             $cat = isset($datos['cat']) ? trim($datos['cat']) : '';
+            $tag = isset($datos['tag']) ? trim($datos['tag']) : '';
             $estado = isset($datos['estado']) ? trim($datos['estado']) : 'all';
             $minPrice = isset($datos['minPrice']) ? $datos['minPrice'] : null;
             $maxPrice = isset($datos['maxPrice']) ? $datos['maxPrice'] : null;
+            $excluirPacks = !empty($datos['excluir_packs']);
+            $sortBy = isset($datos['sort_by']) ? trim($datos['sort_by']) : '';
 
-            $lista = ProductoPDO::listarProductos(false, $limit, $offset, $term, $cat, $estado, $minPrice, $maxPrice);
-            $total = ProductoPDO::contarProductos(false, $term, $cat, $estado, $minPrice, $maxPrice);
+            $lista = ProductoPDO::listarProductos(false, $limit, $offset, $term, $cat, $estado, $minPrice, $maxPrice, $tag, $excluirPacks, $sortBy);
+            $total = ProductoPDO::contarProductos(false, $term, $cat, $estado, $minPrice, $maxPrice, $tag, $excluirPacks);
 
             $formatted = array_map(function($p) {
                 $icono = $p->getIcono();
@@ -137,6 +141,7 @@ try {
                     'id_proveedor' => $p->getIdProveedor(),
                     'categoria' => $p->getCategoria(),
                     'codigo_iva' => $p->getCodigoIva(),
+                    'iva' => (float)$p->getIva(),
                     'stock' => (int)$p->getStockActual(),
                     'stock_minimo' => (int)$p->getStockMinimo(),
                     'meses_garantia' => (int)$p->getMesesGarantia(),

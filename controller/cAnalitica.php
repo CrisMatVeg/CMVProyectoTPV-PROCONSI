@@ -12,8 +12,8 @@ if (!isset($_SESSION['usuarioActualTPV'])) {
     exit;
 }
 
-// Solo administradores
-if ($_SESSION['usuarioActualTPV']->getRol() !== 'admin') {
+// Solo administradores o gestores de analítica
+if (!$_SESSION['usuarioActualTPV']->tienePermiso('ver_analitica')) {
     $_SESSION['paginaEnCurso'] = 'Dashboard';
     header('Location: index.php');
     exit;

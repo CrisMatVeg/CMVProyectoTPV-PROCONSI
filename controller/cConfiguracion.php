@@ -3,8 +3,8 @@
 require_once 'model/ConfiguracionPDO.php';
 require_once 'model/TipoIVAPDO.php';
 
-// Solo administradores pueden acceder
-if (!isset($_SESSION['usuarioActualTPV']) || $_SESSION['usuarioActualTPV']->getRol() !== 'admin') {
+// Solo administradores o gestores de configuración pueden acceder
+if (!isset($_SESSION['usuarioActualTPV']) || !$_SESSION['usuarioActualTPV']->tienePermiso('gestionar_configuracion')) {
     header('Location: index.php?irDashboard=1');
     exit;
 }

@@ -25,6 +25,13 @@ try {
         exit;
     }
 
+    $usuario = $_SESSION['usuarioActualTPV'];
+    if (!$usuario->tienePermiso('gestionar_proveedores')) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'No tienes permiso para gestionar proveedores']);
+        exit;
+    }
+
     $method = $_SERVER['REQUEST_METHOD'];
 
     switch ($method) {

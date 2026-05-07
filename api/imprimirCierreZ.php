@@ -22,23 +22,22 @@ try {
     $idCierre = isset($_GET['id']) ? (int)$_GET['id'] : 0;
     if ($idCierre <= 0) throw new Exception('ID de cierre inválido');
 
-    $cierres = CierreFiscalPDO::listarCierres();
-    $cierre = null;
-    foreach ($cierres as $c) { if ((int)$c['id'] === $idCierre) { $cierre = $c; break; } }
+    $cierre = CierreFiscalPDO::obtenerCierrePorId($idCierre);
     if (!$cierre) throw new Exception('Cierre no encontrado');
 
     $qTurnos = DBPDO::ejecutarConsulta(
         "SELECT ct.*, u1.nombre as nombre_usuario_apertura, u2.nombre as nombre_usuario_cierre
          FROM caja_turnos ct LEFT JOIN usuarios u1 ON ct.id_usuario_apertura = u1.id LEFT JOIN usuarios u2 ON ct.id_usuario_cierre = u2.id
-         WHERE ct.id_cierre_fiscal = :id ORDER BY ct.fecha_apertura ASC", [':id' => $idCierre]
+         WHERE ct.num_z = :id ORDER BY ct.fecha_apertura ASC", [':id' => $idCierre]
     );
     $turnos = $qTurnos->fetchAll(PDO::FETCH_ASSOC);
 
-    $qRetiros = DBPDO::ejecutarConsulta(
-        "SELECT cr.*, u.nombre as nombre_usuario FROM caja_retiros cr LEFT JOIN usuarios u ON cr.id_usuario = u.id
-         WHERE cr.id_turno IN (SELECT id FROM caja_turnos WHERE id_cierre_fiscal = :id) ORDER BY cr.created_at ASC", [':id' => $idCierre]
+    $qMovs = DBPDO::ejecutarConsulta(
+        "SELECT cm.*, u.nombre as nombre_usuario 
+         FROM caja_movimientos cm LEFT JOIN usuarios u ON cm.id_usuario = u.id
+         WHERE cm.id_turno IN (SELECT id FROM caja_turnos WHERE num_z = :id) ORDER BY cm.created_at ASC", [':id' => $idCierre]
     );
-    $retiros = $qRetiros->fetchAll(PDO::FETCH_ASSOC);
+    $movimientos = $qMovs->fetchAll(PDO::FETCH_ASSOC);
 
     $appConfig = ConfiguracionPDO::obtenerConfiguracion();
     $templatePath = __DIR__ . '/../cierres-electrobazar.html';
@@ -47,7 +46,9 @@ try {
     $fmt = fn($n) => number_format((float)$n, 2, ',', '.') . ' €';
 
     $rango = 'Sin actividad';
-    if (!empty($cierre['primera_venta']) && !empty($cierre['ultima_venta'])) $rango = substr($cierre['primera_venta'], 11, 5) . 'h → ' . substr($cierre['ultima_venta'], 11, 5) . 'h';
+    if (!empty($cierre['primera_venta']) && !empty($cierre['ultima_venta'])) {
+        $rango = date('H:i', strtotime($cierre['primera_venta'])) . 'h → ' . date('H:i', strtotime($cierre['ultima_venta'])) . 'h';
+    }
 
     $deuda = (float)($cierre['deuda_generada'] ?? 0);
     $deudaStr = ($deuda >= 0 ? '+' : '') . $fmt($deuda);
@@ -55,8 +56,8 @@ try {
 
     $turnosRows = '';
     foreach ($turnos as $t) {
-        $hApe = !empty($t['fecha_apertura']) ? substr($t['fecha_apertura'], 11, 5) . 'h' : '-';
-        $hCie = !empty($t['fecha_cierre']) ? substr($t['fecha_cierre'], 11, 5) . 'h' : 'Abierto';
+        $hApe = !empty($t['fecha_apertura']) ? date('H:i', strtotime($t['fecha_apertura'])) . 'h' : '-';
+        $hCie = !empty($t['fecha_cierre']) ? date('H:i', strtotime($t['fecha_cierre'])) . 'h' : 'Abierto';
         $resp = htmlspecialchars($t['nombre_usuario_apertura'] ?? '?');
         $respCie = (!empty($t['nombre_usuario_cierre']) && $t['nombre_usuario_cierre'] !== $t['nombre_usuario_apertura']) ? ' / ' . htmlspecialchars($t['nombre_usuario_cierre']) : '';
         $efectivo = $fmt($t['efectivo_real'] ?? 0);
@@ -64,14 +65,15 @@ try {
     }
     if (empty($turnosRows)) $turnosRows = "<tr><td colspan='4' style='text-align:center; padding:12px; color:#999;'>Sin turnos registrados</td></tr>";
 
-    $retirosRows = '';
-    foreach ($retiros as $r) {
-        $hora = !empty($r['created_at']) ? substr($r['created_at'], 11, 5) . 'h' : '-';
-        $concepto = htmlspecialchars($r['concepto'] ?? 'Operación de caja');
-        $importe = $fmt($r['importe'] ?? 0);
-        $retirosRows .= "<tr><td class='font-mono'>{$hora}</td><td>{$concepto}</td><td class='text-right font-bold' style='color:#dc2626;'>{$importe}</td></tr>";
+    $movsRows = '';
+    foreach ($movimientos as $m) {
+        $hora = !empty($m['created_at']) ? date('H:i', strtotime($m['created_at'])) . 'h' : '-';
+        $tipo = ($m['tipo'] === 'retiro') ? '<span style="color:#dc2626;">[R]</span>' : '<span style="color:#16a34a;">[I]</span>';
+        $concepto = htmlspecialchars($m['concepto'] ?? 'Operación de caja');
+        $importe = $fmt($m['importe'] ?? 0);
+        $movsRows .= "<tr><td class='font-mono'>{$hora}</td><td>{$tipo} {$concepto}</td><td class='text-right font-bold'>{$importe}</td></tr>";
     }
-    if (empty($retirosRows)) $retirosRows = "<tr><td colspan='3' style='text-align:center; padding:12px; color:#999;'>Sin movimientos adicionales</td></tr>";
+    if (empty($movsRows)) $movsRows = "<tr><td colspan='3' style='text-align:center; padding:12px; color:#999;'>Sin movimientos adicionales</td></tr>";
 
     $reemplazos = [
         '{{EMPRESA_NOMBRE}}' => htmlspecialchars($appConfig['empresa_nombre'] ?? 'ElectroBazar'),
@@ -85,9 +87,10 @@ try {
         '{{TOTAL_EFECTIVO}}' => $fmt($cierre['total_efectivo']),
         '{{TOTAL_TARJETA}}' => $fmt($cierre['total_tarjeta']),
         '{{TOTAL_BIZUM}}' => $fmt($cierre['total_bizum'] ?? 0),
+        '{{TOTAL_FINANCIADO}}' => $fmt($cierre['total_a_cuenta'] ?? 0),
         '{{TOTAL_GENERAL}}' => $fmt($cierre['total_general']),
         '{{TURNOS_ROWS}}' => $turnosRows,
-        '{{RETIROS_ROWS}}' => $retirosRows,
+        '{{RETIROS_ROWS}}' => $movsRows,
         '{{FECHA_GENERACION}}' => date('d/m/Y H:i'),
     ];
     foreach ($reemplazos as $key => $val) { $html = str_replace($key, $val, $html); }

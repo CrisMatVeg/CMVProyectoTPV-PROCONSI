@@ -98,7 +98,7 @@ if ($turnoActual) {
 
 
 if (isset($_POST['registrarRetiro']) && $turnoActual) {
-    $importe = max(0, (float)($_POST['importeRetiro'] ?? 0));
+    $importe = (float)($_POST['importeRetiro'] ?? 0);
     $concepto = trim($_POST['conceptoRetiro'] ?? '');
     if ($importe > 0) {
         CajaTurnoPDO::registrarRetiro(
@@ -109,11 +109,14 @@ if (isset($_POST['registrarRetiro']) && $turnoActual) {
         );
         LogPDO::addLog('MOVIMIENTO_DINERO', "Retiro/Gasto de caja: " . number_format($importe, 2, ',', '.') . "€ - Concepto: $concepto");
         $turnoActual = CajaTurnoPDO::obtenerTurnoAbierto();
+        $mensajeExito = "Retiro de caja registrado correctamente.";
+    } else {
+        $mensajeError = "El importe del retiro debe ser mayor que cero.";
     }
 }
 
 if (isset($_POST['registrarIngreso']) && $turnoActual) {
-    $importe = max(0, (float)($_POST['importeIngreso'] ?? 0));
+    $importe = (float)($_POST['importeIngreso'] ?? 0);
     $concepto = trim($_POST['conceptoIngreso'] ?? '');
     if ($importe > 0) {
         CajaTurnoPDO::registrarIngreso(
@@ -124,6 +127,9 @@ if (isset($_POST['registrarIngreso']) && $turnoActual) {
         );
         LogPDO::addLog('MOVIMIENTO_DINERO', "Ingreso manual a caja: " . number_format($importe, 2, ',', '.') . "€ - Concepto: $concepto");
         $turnoActual = CajaTurnoPDO::obtenerTurnoAbierto();
+        $mensajeExito = "Ingreso a caja registrado correctamente.";
+    } else {
+        $mensajeError = "El importe del ingreso debe ser mayor que cero.";
     }
 }
 

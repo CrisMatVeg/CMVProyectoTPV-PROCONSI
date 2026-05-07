@@ -17,8 +17,8 @@ try {
     require_once __DIR__ . '/../model/Usuario.php';
 
     // session_start(); // Handled by csrf_check.php
-    if (!isset($_SESSION['usuarioActualTPV']) || $_SESSION['usuarioActualTPV']->getRol() !== 'admin') {
-        http_response_code(401);
+    if (!isset($_SESSION['usuarioActualTPV']) || !$_SESSION['usuarioActualTPV']->tienePermiso('gestionar_promociones')) {
+        http_response_code(403);
         echo json_encode(['ok' => false, 'error' => 'No autorizado']);
         exit;
     }
@@ -96,7 +96,12 @@ function validarPromocion(array $d): array {
     if (empty($d['descripcion'])) $err['descripcion'] = 'La descripción es obligatoria';
     if (!in_array($tipo, ['percent', 'amount', 'bundle', 'fixed_bundle'], true)) $err['tipo'] = 'Tipo no válido';
     if ($tipo === 'percent' || $tipo === 'amount' || $tipo === 'fixed_bundle') {
-        if (!isset($d['valor']) || !is_numeric($d['valor']) || (float)$d['valor'] <= 0) $err['valor'] = 'Valor inválido';
+        $val = isset($d['valor']) ? (float)$d['valor'] : 0;
+        if (!is_numeric($d['valor'] ?? null) || $val <= 0) {
+            $err['valor'] = 'El valor debe ser mayor que 0';
+        } elseif ($tipo === 'percent' && $val > 100) {
+            $err['valor'] = 'El porcentaje no puede ser superior al 100%';
+        }
     }
     if ($tipo === 'bundle' || $tipo === 'fixed_bundle') {
         if (empty($d['bundle_buy_qty']) || !is_numeric($d['bundle_buy_qty']) || (int)$d['bundle_buy_qty'] <= 1) $err['bundle_buy_qty'] = 'Cantidad de compra inválida (mín. 2)';

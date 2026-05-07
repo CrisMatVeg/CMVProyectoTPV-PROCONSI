@@ -130,9 +130,9 @@ try {
         exit;
     }
 
-    if ($_SESSION['usuarioActualTPV']->getRol() !== 'admin') {
-        http_response_code(401);
-        echo json_encode(['ok' => false, 'error' => 'No autorizado']);
+    if (!$_SESSION['usuarioActualTPV']->tienePermiso('gestionar_clientes')) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'No tienes permiso para gestionar clientes']);
         exit;
     }
 

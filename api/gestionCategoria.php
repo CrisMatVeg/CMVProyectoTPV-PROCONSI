@@ -18,9 +18,9 @@ try {
     // session_start(); // Handled by csrf_check.php
 
     // Solo administradores
-    if (!isset($_SESSION['usuarioActualTPV']) || $_SESSION['usuarioActualTPV']->getRol() !== 'admin') {
-        http_response_code(401);
-        echo json_encode(['ok' => false, 'error' => 'No autorizado']);
+    if (!isset($_SESSION['usuarioActualTPV']) || !$_SESSION['usuarioActualTPV']->tienePermiso('gestionar_productos')) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'No autorizado para gestionar categorías']);
         exit;
     }
 

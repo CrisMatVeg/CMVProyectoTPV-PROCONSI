@@ -50,7 +50,7 @@ try {
 
     $operador = $venta['nombre_cajero'] ?? '—';
 
-    if ($venta['estado'] === 'devuelta') {
+    if ($venta['estado'] === 'devuelta' || $venta['estado'] === 'anulada') {
         if ($esFactura) {
             $html = str_replace('<div class="factura-title">FACTURA</div>', '<div class="factura-title">FACTURA</div><div style="color:red; font-weight:bold; font-size:18px;">ANULADA</div>', $html);
         } else {
@@ -84,10 +84,11 @@ try {
     $html = str_replace('{{METODO_PAGO}}',       ucfirst($venta['metodo_pago']), $html);
 
     // Total y desglose IVA calculados desde líneas
-    $totalReal = array_sum(array_map(fn($l) => (float)$l['total_linea'], $venta['lineas']));
+    $subtotalReal = array_sum(array_map(fn($l) => (float)$l['total_linea'], $venta['lineas']));
+    $totalVenta   = (float)$venta['total'];
 
-    $html = str_replace('{{SUBTOTAL}}', $fmt($totalReal), $html);
-    $html = str_replace('{{TOTAL}}',    $fmt($totalReal), $html);
+    $html = str_replace('{{SUBTOTAL}}', $fmt($subtotalReal), $html);
+    $html = str_replace('{{TOTAL}}',    $fmt($totalVenta),    $html);
 
     $ivaGrupos = [];
     foreach ($venta['lineas'] as $l) {
@@ -125,12 +126,18 @@ try {
     $html = str_replace('{{IVA_AMT}}',             $fmt($venta['iva_amt']), $html);
 
     // Descuentos
+    $diff = $subtotalReal - $totalVenta;
     $descAmt = (float)($venta['descuento_amt'] ?? 0);
     $descPct = (float)($venta['descuento_pct'] ?? 0);
-    if ($descAmt > 0) {
+    $descLabel = $venta['descuento_label'] ?? '';
+
+    if ($diff > 0.01 || $descAmt > 0) {
+        $amtToShow = $diff > 0.01 ? $diff : $descAmt;
         $html = str_replace('{{DISPLAY_DESCUENTO}}', '', $html);
-        $html = str_replace('{{DESCUENTO_AMT}}',     $fmt($descAmt), $html);
-        $html = str_replace('{{DESCUENTO_PCT}}',     $descPct > 0 ? $descPct : 'Global', $html);
+        $html = str_replace('{{DESCUENTO_AMT}}',     '− ' . $fmt($amtToShow), $html);
+        
+        $label = $descLabel ? $descLabel : ($descPct > 0 ? $descPct . '%' : 'Global');
+        $html = str_replace('{{DESCUENTO_PCT}}',     $label, $html);
     } else {
         $html = str_replace('{{DISPLAY_DESCUENTO}}', 'display: none;', $html);
         $html = str_replace('{{DESCUENTO_AMT}}',     '0,00 €', $html);
@@ -256,10 +263,15 @@ try {
             $descLineasHTML = '';
             if (!empty($l['descuentos'])) {
                 foreach ($l['descuentos'] as $d) {
-                    if (($d['tipo_descuento'] ?? '') === 'tarifa') continue;
-                    $nombreDesc  = $d['nombre_descuento'] ?: ucfirst($d['tipo_descuento']);
-                    $vDescontado = (float)$d['valor_descontado'];
-                    $signo       = ($vDescontado >= 0) ? '+' : '-';
+                    $nombreDesc = $d['nombre_descuento'] ?: $d['nombre'] ?: ucfirst($d['tipo_descuento']);
+                    
+                    // FILTRO: No mostrar si es un cupón (ya sale en el total general)
+                    if (($d['tipo_descuento'] ?? '') === 'cupon') continue;
+                    // FILTRO: No mostrar si el nombre coincide exactamente con el descuento general del ticket
+                    if (!empty($venta['descuento_label']) && $nombreDesc === $venta['descuento_label']) continue;
+                    
+                    $vDescontado = (float)($d['valor_descontado'] ?? 0);
+                    $signo       = ($vDescontado >= 0) ? '+' : '−';
                     $valor       = $fmt(abs($vDescontado));
                     $descLineasHTML .= "<div style='font-size:9px; color:#666; margin-left:10px;'>└─ [$nombreDesc] $signo$valor</div>";
                 }

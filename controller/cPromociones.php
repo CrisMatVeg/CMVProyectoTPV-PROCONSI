@@ -11,7 +11,7 @@ if (!isset($_SESSION['usuarioActualTPV'])) {
     exit;
 }
 
-if ($_SESSION['usuarioActualTPV']->getRol() !== 'admin') {
+if (!$_SESSION['usuarioActualTPV']->tienePermiso('gestionar_promociones')) {
     $_SESSION['paginaEnCurso'] = 'Dashboard';
     header('Location: index.php');
     exit;

@@ -16,8 +16,8 @@ try {
     require_once __DIR__ . '/../model/Usuario.php';
 
     // session_start(); // Handled by csrf_check.php
-    if (!isset($_SESSION['usuarioActualTPV']) || $_SESSION['usuarioActualTPV']->getRol() !== 'admin') {
-        http_response_code(401);
+    if (!isset($_SESSION['usuarioActualTPV']) || !$_SESSION['usuarioActualTPV']->tienePermiso('gestionar_iva')) {
+        http_response_code(403);
         echo json_encode(['ok' => false, 'error' => 'No autorizado']);
         exit;
     }

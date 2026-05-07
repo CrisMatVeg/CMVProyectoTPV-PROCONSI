@@ -18,7 +18,7 @@ class UsuarioPDO
      * @param string $password Contraseña en texto plano
      * @return Usuario|null Devuelve el objeto Usuario si es válido, null en caso contrario.
      */
-    public static function validarUsuario($login, $password = null)
+    public static function validarUsuario($login, $password = null, $soloActivos = true)
     {
         if ($password != null) {
             // Usamos SHA2 de MySQL para compatibilidad con el script de creación
@@ -37,8 +37,12 @@ class UsuarioPDO
 
         $objetoResultado = $consulta->fetch(PDO::FETCH_ASSOC);
 
-        if (!$objetoResultado || !$objetoResultado['activo']) {
-            return null; // No loguear si está inactivo
+        if (!$objetoResultado) {
+            return null;
+        }
+
+        if ($soloActivos && !$objetoResultado['activo']) {
+            return null;
         }
 
         // Normalización de rol (Legacy compatibility)
@@ -167,7 +171,7 @@ class UsuarioPDO
      */
     public static function buscarPorEmail($email)
     {
-        $sql = "SELECT * FROM usuarios WHERE email = :email AND activo = 1";
+        $sql = "SELECT * FROM usuarios WHERE email = :email";
         $consulta = DBPDO::ejecutarConsulta($sql, [':email' => $email]);
         $row = $consulta->fetch(PDO::FETCH_ASSOC);
 
@@ -205,8 +209,7 @@ class UsuarioPDO
     {
         $sql = "SELECT id FROM usuarios 
                 WHERE token_recuperacion = :token 
-                AND token_expiracion > NOW() 
-                AND activo = 1";
+                AND token_expiracion > NOW()";
         $consulta = DBPDO::ejecutarConsulta($sql, [':token' => $token]);
         $row = $consulta->fetch(PDO::FETCH_ASSOC);
         return $row ? $row['id'] : null;

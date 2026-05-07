@@ -11,10 +11,10 @@ require_once __DIR__ . '/../model/ProductoPDO.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
-// Solo POST
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    echo json_encode(['ok' => false, 'mensaje' => 'Método no permitido.']);
+// Seguridad
+if (!isset($_SESSION['usuarioActualTPV']) || !$_SESSION['usuarioActualTPV']->tienePermiso('gestionar_tarifas')) {
+    http_response_code(403);
+    echo json_encode(['ok' => false, 'mensaje' => 'No autorizado']);
     exit;
 }
 

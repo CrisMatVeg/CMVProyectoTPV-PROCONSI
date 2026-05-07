@@ -12,8 +12,8 @@ if (!isset($_SESSION['usuarioActualTPV'])) {
     exit;
 }
 
-// Solo administradores
-if ($_SESSION['usuarioActualTPV']->getRol() !== 'admin') {
+// Solo administradores o gestores de productos
+if (!$_SESSION['usuarioActualTPV']->tienePermiso('gestionar_productos')) {
     $_SESSION['paginaEnCurso'] = 'Dashboard';
     header('Location: index.php');
     exit;
@@ -55,19 +55,17 @@ $pag = isset($_GET['p']) ? max(1, (int)$_GET['p']) : 1;
 $limit = 50;
 $offset = ($pag - 1) * $limit;
 
-$totalProductos = ProductoPDO::contarProductos(false);
+$totalProductos = ProductoPDO::contarProductos(false, '', '', 'all', null, null, '', true);
 $totalPaginas = ceil($totalProductos / $limit);
 
-// Obtener la lista de productos paginada
-$oProductos = ProductoPDO::listarProductos(false, $limit, $offset);
-$listaProductos = [];
-foreach ($oProductos as $oProd) {
+// Helper para mapear objetos Producto a arrays para la vista
+function mapProducto(Producto $oProd) {
     $icono = $oProd->getIcono();
-    if ($icono && strlen($icono) > 10) {
+    if ($icono && strlen($icono) > 200 && strpos($icono, 'data:image') === false) {
         $icono = 'data:image/png;base64,' . base64_encode($icono);
     }
 
-    $listaProductos[] = [
+    return [
         'id'             => $oProd->getId(),
         'nombre'         => $oProd->getNombre(),
         'referencia'     => $oProd->getReferencia(),
@@ -91,6 +89,13 @@ foreach ($oProductos as $oProd) {
     ];
 }
 
+// Obtener la lista de productos paginada (sin packs)
+$oProductos = ProductoPDO::listarProductos(false, $limit, $offset, '', '', 'all', null, null, '', true);
+$listaProductos = array_map('mapProducto', $oProductos);
+
+// Obtener la lista completa de packs para la pestaña específica
+$oPacks = ProductoPDO::listarPacks();
+$listaPacks = array_map('mapProducto', $oPacks);
 
 // Obtener tipos de IVA y el general vigente para usarlo en la UI
 require_once 'model/TipoIVAPDO.php';
@@ -104,6 +109,7 @@ $listaProveedores = ProveedorPDO::listarTodos(true); // Solo activos
 
 $avProductos = [
     'productos'  => $listaProductos,
+    'packs'      => $listaPacks,
     'usuario'    => $_SESSION['usuarioActualTPV']->getNombre(),
     'ivaGeneral' => $ivaGeneralActual,
     'tipos_iva'  => $tiposIva,

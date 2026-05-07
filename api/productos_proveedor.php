@@ -10,10 +10,16 @@ require_once __DIR__ . '/../model/ProductoPDO.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
-// Verificar sesión
+// Verificar sesión y permisos
 if (!isset($_SESSION['usuarioActualTPV'])) {
     http_response_code(401);
     echo json_encode(['success' => false, 'error' => 'Sesión no iniciada']);
+    exit;
+}
+
+if (!$_SESSION['usuarioActualTPV']->tienePermiso('gestionar_proveedores') && !$_SESSION['usuarioActualTPV']->tienePermiso('gestionar_productos')) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'error' => 'No tienes permiso para gestionar la vinculación de productos']);
     exit;
 }
 

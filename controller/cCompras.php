@@ -3,9 +3,9 @@ require_once 'model/CompraPDO.php';
 require_once 'model/ProveedorPDO.php';
 require_once 'model/ProductoPDO.php';
 
-// Verificar sesión
-if (!isset($_SESSION['usuarioActualTPV'])) {
-    $_SESSION['paginaEnCurso'] = 'Login';
+// Verificar sesión y permisos
+if (!isset($_SESSION['usuarioActualTPV']) || !$_SESSION['usuarioActualTPV']->tienePermiso('gestionar_inventario')) {
+    $_SESSION['paginaEnCurso'] = 'Dashboard';
     header('Location: index.php');
     exit;
 }

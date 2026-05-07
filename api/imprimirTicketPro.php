@@ -39,7 +39,17 @@ try {
 
     // [VERIFACTU] Generación de QR y URL de Verificación
     $nifEmisor = $appConfig['empresa_nif'] ?? '';
-    $numFormated = VentaPDO::formatTicketNumber($venta['numero_ticket'], $venta['fecha'], $venta['es_factura'] ?? ($esAbono ? false : $esFactura), ($venta['tipo_documento'] ?? 'venta'));
+    
+    // Intentar recuperar la serie original enviada a la AEAT para evitar desincronización si cambia el formato
+    $stmtSerie = DBPDO::ejecutarConsulta("SELECT numero_serie FROM verifactu_logs WHERE id_venta = ? LIMIT 1", [$venta['id']]);
+    $serieGuardada = $stmtSerie->fetchColumn();
+    
+    if ($serieGuardada) {
+        $numFormated = $serieGuardada;
+    } else {
+        $numFormated = VentaPDO::formatTicketNumber($venta['numero_ticket'], $venta['fecha'], $venta['es_factura'] ?? ($esAbono ? false : $esFactura), ($venta['tipo_documento'] ?? 'venta'));
+    }
+    
     $venta['numero_ticket_formato'] = $numFormated;
     
     $qrUrl = VeriFactuQrService::generarUrlAEAT($venta, $nifEmisor);
@@ -57,7 +67,10 @@ try {
     $html = file_get_contents($templatePath);
     $fmt2 = fn($n) => number_format((float)$n, 2, ',', '.') . ' €';
 
-    $totalReal = array_sum(array_map(fn($l) => (float)$l['total_linea'], $venta['lineas']));
+    $subtotalReal = array_sum(array_map(fn($l) => (float)$l['total_linea'], $venta['lineas']));
+    $totalVenta   = (float)$venta['total'];
+    $diff         = $subtotalReal - $totalVenta;
+
     $ivaGruposPro = [];
     foreach ($venta['lineas'] as $l) {
         if (!empty($l['devuelta'])) continue;
@@ -92,7 +105,7 @@ try {
         if ($venta['metodo_pago'] === 'mixto') {
              $efectivoCambio = max(0, (float)$venta['efectivo_recibido'] - $importeEfectivoMixto);
         } else {
-             $efectivoCambio = max(0, (float)$venta['efectivo_recibido'] - $totalReal);
+             $efectivoCambio = max(0, (float)$venta['efectivo_recibido'] - $totalVenta);
         }
     }
 
@@ -113,11 +126,11 @@ try {
         }
         $detallesPago = implode('<br>', $detallesHtml);
         if ($venta['estado'] === 'pendiente_pago') {
-            $pendiente = max(0, $totalReal - $totalPagos);
+            $pendiente = max(0, $totalVenta - $totalPagos);
             $detallesPago .= '<br><b>Pendiente: ' . $fmt2($pendiente) . '</b>';
         }
     } elseif ($venta['estado'] === 'pendiente_pago' && $venta['metodo_pago'] === 'a_cuenta') {
-        $pendiente = max(0, $totalReal - (float)($venta['pagado_a_cuenta'] ?? 0));
+        $pendiente = max(0, $totalVenta - (float)($venta['pagado_a_cuenta'] ?? 0));
         $detallesPago .= '<b>Pendiente: ' . $fmt2($pendiente) . '</b>';
     }
 
@@ -126,16 +139,20 @@ try {
         foreach ($venta['lineas'] as $l) {
             $desc = htmlspecialchars($l['nombre_producto']);
             $detalle = !empty($l['numeros_serie']) ? "SN: " . htmlspecialchars($l['numeros_serie']) : "";
-            $descLineaTotal = 0; $desgloseTarifas = "";
+            $lineSpecificDescSum = 0; $lineSpecificDetails = "";
             if (!empty($l['descuentos'])) {
                 foreach ($l['descuentos'] as $d) {
-                    if (($d['tipo_descuento'] ?? '') === 'tarifa') continue;
-                    $vDescontado = (float)$d['valor_descontado']; $signo = ($vDescontado >= 0) ? '+' : '-'; $descLineaTotal += $vDescontado;
-                    $tName = $d['nombre_descuento'] ?: ucfirst($d['tipo_descuento']);
-                    $desgloseTarifas .= "<div style='font-size:8px; color:#666; margin-top:2px;'>- $tName ($signo" . $fmt2(abs($vDescontado)) . ")</div>";
+                    $nombreDesc = $d['nombre_descuento'] ?: $d['nombre'] ?: ucfirst($d['tipo_descuento']);
+                    if (($d['tipo_descuento'] ?? '') === 'cupon') continue;
+                    if (!empty($venta['descuento_label']) && $nombreDesc === $venta['descuento_label']) continue;
+                    
+                    $vDescontado = (float)($d['valor_descontado'] ?? 0); 
+                    $signo = ($vDescontado >= 0) ? '+' : '−'; 
+                    $lineSpecificDescSum += abs($vDescontado);
+                    $lineSpecificDetails .= "<div style='font-size:8px; color:#666; margin-top:2px;'>- $nombreDesc ($signo" . $fmt2(abs($vDescontado)) . ")</div>";
                 }
             }
-            $lineasHTML .= "<tr><td>$desc" . ($detalle ? "<span class='small'>$detalle</span>" : "") . "$desgloseTarifas</td><td style='text-align:center;'>" . (int)$l['cantidad'] . "</td><td>" . $fmt2($l['precio_unitario']) . "</td><td>" . ($descLineaTotal > 0 ? $fmt2($descLineaTotal) : "0,00") . "</td><td>" . $fmt2($l['total_linea']) . "</td></tr>";
+            $lineasHTML .= "<tr><td>$desc" . ($detalle ? "<span class='small'>$detalle</span>" : "") . "$lineSpecificDetails</td><td style='text-align:center;'>" . (int)$l['cantidad'] . "</td><td>" . $fmt2($l['precio_unitario']) . "</td><td>" . ($lineSpecificDescSum > 0 ? $fmt2($lineSpecificDescSum) : "0,00") . "</td><td>" . $fmt2($l['total_linea']) . "</td></tr>";
         }
         // Para abonos: mostrar número A-... y referencia al documento original
         $esTipoAbono = ($venta['tipo_documento'] ?? 'venta') === 'abono';
@@ -178,16 +195,20 @@ try {
     } else {
         $lineasHTML = "";
         foreach ($venta['lineas'] as $l) {
-            $nombre = htmlspecialchars($l['nombre_producto']); $desgloseTarifas = "";
+            $nombre = htmlspecialchars($l['nombre_producto']); 
+            $lineSpecificDetails = "";
             if (!empty($l['descuentos'])) {
                 foreach ($l['descuentos'] as $d) {
-                    if (($d['tipo_descuento'] ?? '') === 'tarifa') continue;
-                    $vDescontado = (float)$d['valor_descontado']; $signo = ($vDescontado >= 0) ? '+' : '-';
-                    $tName = $d['nombre_descuento'] ?: ucfirst($d['tipo_descuento']);
-                    $desgloseTarifas .= "<div style='font-size:9px; color:#666; margin-left:14px;'>└─ $tName ($signo" . $fmt2(abs($vDescontado)) . ")</div>";
+                    $nombreDesc = $d['nombre_descuento'] ?: $d['nombre'] ?: ucfirst($d['tipo_descuento']);
+                    if (($d['tipo_descuento'] ?? '') === 'cupon') continue;
+                    if (!empty($venta['descuento_label']) && $nombreDesc === $venta['descuento_label']) continue;
+                    
+                    $vDescontado = (float)($d['valor_descontado'] ?? 0); 
+                    $signo = ($vDescontado >= 0) ? '+' : '−';
+                    $lineSpecificDetails .= "<div style='font-size:9px; color:#666; margin-left:14px;'>└─ $nombreDesc ($signo" . $fmt2(abs($vDescontado)) . ")</div>";
                 }
             }
-            $lineasHTML .= "<div class='item'><span class='item-desc'>$nombre$desgloseTarifas</span><span class='item-price'>" . $fmt2($l['total_linea']) . "</span></div>";
+            $lineasHTML .= "<div class='item'><span class='item-desc'>$nombre$lineSpecificDetails</span><span class='item-price'>" . $fmt2($l['total_linea']) . "</span></div>";
             $lineasHTML .= "<div class='item-detail'>Ref: " . htmlspecialchars($l['codigo_producto']) . " · " . (int)$l['cantidad'] . " ud x " . $fmt2($l['precio_unitario']) . "</div>";
             if (!empty($l['numeros_serie'])) $lineasHTML .= "<div class='item-detail' style='margin-bottom:4px;'>S/N: " . htmlspecialchars($l['numeros_serie']) . "</div>";
         }
@@ -196,22 +217,25 @@ try {
         $refOriginalTicket = $esTipoAbono && !empty($venta['numero_ticket_origen'])
             ? 'ABONO s/ ref: ' . VentaPDO::formatTicketNumber($venta['numero_ticket_origen'], $venta['fecha'], false, 'venta')
             : '';
+        
+        $descLabelText = !empty($venta['descuento_label']) ? $venta['descuento_label'] : (!empty($venta['descuento_pct']) ? $venta['descuento_pct'] . '%' : 'Global');
+
         $reemplazos = [
             '{{NUMERO_TICKET}}' => $numFormated,
             '{{FECHA}}' => $fechaStr,
             '{{OPERADOR}}' => htmlspecialchars($venta['nombre_cajero'] ?? 'Sistema'),
             '{{LINEAS}}' => $lineasHTML,
-            '{{SUBTOTAL}}' => $fmt2($totalReal),
-            '{{DESCUENTO_PCT}}' => (float)$venta['descuento_pct'],
-            '{{DESCUENTO_AMT}}' => $fmt2($venta['descuento_amt']),
+            '{{SUBTOTAL}}' => $fmt2($subtotalReal),
+            '{{DESCUENTO_PCT}}' => $descLabelText,
+            '{{DESCUENTO_AMT}}' => '− ' . $fmt2($diff),
             '{{IVA_DESGLOSE}}' => $ivaDesgloseTicketHtml,
             '{{IVA_DESGLOSE_BOTTOM}}' => $ivaDesgloseTicketHtml,
-            '{{TOTAL}}' => $fmt2($totalReal),
+            '{{TOTAL}}' => $fmt2($totalVenta),
             '{{METODO_PAGO}}' => ucfirst($venta['metodo_pago']),
             '{{PAGO_DETALLE}}' => $detallesPago,
             '{{EFECTIVO_RECIBIDO}}' => $fmt2($venta['efectivo_recibido'] ?? 0),
             '{{EFECTIVO_CAMBIO}}' => $fmt2($efectivoCambio),
-            '{{DISPLAY_DESCUENTO}}' => (float)$venta['descuento_amt'] > 0 ? '' : 'display:none;',
+            '{{DISPLAY_DESCUENTO}}' => $diff > 0.01 ? '' : 'display:none;',
             '{{DISPLAY_EFECTIVO}}' => $tieneEfectivo ? '' : 'display:none;',
             '{{EMPRESA_NOMBRE}}' => htmlspecialchars($appConfig['empresa_nombre'] ?? ''),
             '{{EMPRESA_RAZON_SOCIAL}}' => htmlspecialchars($appConfig['empresa_razon_social'] ?? ''),

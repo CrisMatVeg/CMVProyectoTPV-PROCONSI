@@ -17,8 +17,8 @@ try {
     require_once __DIR__ . '/../model/Usuario.php';
 
     // session_start(); // Handled by csrf_check.php
-    if (!isset($_SESSION['usuarioActualTPV']) || $_SESSION['usuarioActualTPV']->getRol() !== 'admin') {
-        http_response_code(401);
+    if (!isset($_SESSION['usuarioActualTPV']) || !$_SESSION['usuarioActualTPV']->tienePermiso('gestionar_tarifas')) {
+        http_response_code(403);
         echo json_encode(['ok' => false, 'error' => 'No autorizado']);
         exit;
     }
@@ -113,8 +113,11 @@ function validarTarifa(array $d): array
     if (!in_array($d['tipo'] ?? '', ['percent', 'amount'], true)) {
         $err['tipo'] = 'Tipo no válido';
     }
-    if (!isset($d['valor']) || !is_numeric($d['valor'])) {
-        $err['valor'] = 'Valor inválido';
+    $val = isset($d['valor']) ? (float)$d['valor'] : 0;
+    if (!is_numeric($d['valor'] ?? null) || $val <= 0) {
+        $err['valor'] = 'El valor debe ser mayor que 0';
+    } elseif (($d['tipo'] ?? '') === 'percent' && $val > 100) {
+        $err['valor'] = 'El porcentaje no puede ser superior al 100%';
     }
 
     $scope = $d['scope'] ?? 'todos';
@@ -137,6 +140,8 @@ function esTarifaCondicional(array $d): bool
 {
     return (!empty($d['tipo_cliente']) || 
             !empty($d['roles_segmento']) || 
+            !empty($d['cliente_ids']) || 
+            !empty($d['id_cliente']) || 
             !empty($d['dias_semana']) || 
             !empty($d['hora_inicio']) || 
             !empty($d['hora_fin']) || 

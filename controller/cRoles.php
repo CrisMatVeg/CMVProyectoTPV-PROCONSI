@@ -12,8 +12,8 @@ if (!isset($_SESSION['usuarioActualTPV'])) {
     exit;
 }
 
-// Solo administradores (aunque luego podríamos afinar con permisos específicos)
-if ($_SESSION['usuarioActualTPV']->getRol() !== 'admin') {
+// Solo administradores o gestores de personal
+if (!$_SESSION['usuarioActualTPV']->tienePermiso('gestionar_usuarios')) {
     $_SESSION['paginaEnCurso'] = 'Dashboard';
     header('Location: index.php');
     exit;

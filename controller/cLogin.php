@@ -61,25 +61,40 @@ if (isset($_REQUEST['acceder'])) {
         $password = $_REQUEST['password'] == null ? '' : $_REQUEST['password'];
 
         // Llamar al modelo
-        $usuario = UsuarioPDO::validarUsuario($login, $password);
+        // Primero comprobamos si el usuario existe pero está de baja
+        $usuarioCheck = UsuarioPDO::validarUsuario($login, null, false);
 
-        if ($usuario) {
-            // Guardar usuario en sesión para la app
-            $_SESSION['usuarioActualTPV'] = $usuario;
-
-            // Log: LOGIN
-            LogPDO::addLog('LOGIN', 'El usuario ha iniciado sesión correctamente');
-
-            // Redirigir al Dashboard
-            $_SESSION['paginaEnCurso'] = 'Dashboard';
-            header('Location: index.php');
-            exit;
-        } else {
-            // Usuario o contraseña incorrecta
-            $aErrores['username'] = 'El nombre de usuario o la contraseña no son correctos.';
-            $aRespuestas['username'] = ''; // Borrado de datos de inputs
+        if ($usuarioCheck && !$usuarioCheck->getActivo()) {
+            $aErrores['username'] = 'Este usuario está dado de baja.';
+            $aRespuestas['username'] = '';
             $aRespuestas['password'] = '';
             $entradaOK = false;
+        } else {
+            // Si el usuario no existe o está activo, intentamos validar las credenciales
+            $usuario = UsuarioPDO::validarUsuario($login, $password);
+
+            if ($usuario) {
+                // Guardar usuario en sesión para la app
+                $_SESSION['usuarioActualTPV'] = $usuario;
+
+                // Log: LOGIN
+                LogPDO::addLog('LOGIN', 'El usuario ha iniciado sesión correctamente');
+
+                // [VERIFACTU] Log técnico de inicio de uso del sistema
+                require_once __DIR__ . '/../model/VeriFactuEventService.php';
+                VeriFactuEventService::logStartup();
+
+                // Redirigir al Dashboard
+                $_SESSION['paginaEnCurso'] = 'Dashboard';
+                header('Location: index.php');
+                exit;
+            } else {
+                // Usuario o contraseña incorrecta
+                $aErrores['username'] = 'El nombre de usuario o la contraseña no son correctos.';
+                $aRespuestas['username'] = ''; // Borrado de datos de inputs
+                $aRespuestas['password'] = '';
+                $entradaOK = false;
+            }
         }
     }
 } else {

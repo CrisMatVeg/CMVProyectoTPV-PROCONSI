@@ -50,9 +50,29 @@ if (isset($_POST['enviarSolicitud'])) {
     }
 
     if (empty($aErrores['email'])) {
+        // 1. Intentar buscar por el email introducido
         $usuario = UsuarioPDO::buscarPorEmail($email);
         
+        // 2. Si no se encuentra por email, intentamos buscar si el valor introducido coincide con un LOGIN
+        // (Esto permite a usuarios sin email o que no lo recuerdan usar su nombre de usuario)
+        if (!$usuario) {
+            $usuario = UsuarioPDO::validarUsuario($email, null, false);
+        }
+        
         if ($usuario) {
+            // Determinar el email de destino
+            $emailDestino = $usuario->getEmail();
+            
+            // Si el usuario no tiene email asignado, usamos el que acaba de introducir
+            if (empty($emailDestino)) {
+                $emailDestino = $email;
+                // Opcionalmente actualizamos el email del usuario para futuras ocasiones
+                DBPDO::ejecutarConsulta("UPDATE usuarios SET email = :email WHERE id = :id", [
+                    ':email' => $email,
+                    ':id' => $usuario->getId()
+                ]);
+            }
+            
             // Generar Token
             $token = bin2hex(random_bytes(32));
             $expiracion = date('Y-m-d H:i:s', strtotime('+2 hours'));
@@ -74,7 +94,7 @@ if (isset($_POST['enviarSolicitud'])) {
             $mail->SMTPSecure = $conf['smtp_secure'] ?? 'tls';
             
             $mail->setFrom($conf['smtp_user'] ?? 'no-reply@tpv.com', $empresa);
-            $mail->addAddress($usuario->getEmail(), $usuario->getNombre());
+            $mail->addAddress($emailDestino, $usuario->getNombre());
             $mail->isHTML(true);
             $mail->Subject = "Recuperación de contraseña - $empresa";
             
@@ -92,14 +112,13 @@ if (isset($_POST['enviarSolicitud'])) {
             
             if ($mail->send()) {
                 $showSuccess = true;
-                LogPDO::addLog('PASSWORD_REQUEST', "Solicitud de recuperación para el email: $email");
+                LogPDO::addLog('PASSWORD_REQUEST', "Solicitud de recuperación para el usuario: " . $usuario->getLogin() . " enviada a $emailDestino");
             } else {
                 $aErrores['general'] = "Error al enviar el correo: " . $mail->getErrorInfo();
                 error_log($mail->getErrorInfo());
             }
         } else {
             // Por seguridad, mostramos el mismo mensaje de éxito aunque no exista el usuario
-            // para evitar enumeración de cuentas.
             $showSuccess = true;
             LogPDO::addLog('PASSWORD_REQUEST_ATTEMPT', "Intento fallido de recuperación para: $email (No existe)");
         }
