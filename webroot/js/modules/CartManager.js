@@ -15,9 +15,12 @@ export const CartManager = {
     let finalPrice = basePrice;
     const appliedTariffs = [];
     const now = new Date();
-    const currentTime = now.getHours().toString().padStart(2, "0") + ":" +
-                        now.getMinutes().toString().padStart(2, "0") + ":" +
-                        now.getSeconds().toString().padStart(2, "0");
+    const currentTime =
+      now.getHours().toString().padStart(2, "0") +
+      ":" +
+      now.getMinutes().toString().padStart(2, "0") +
+      ":" +
+      now.getSeconds().toString().padStart(2, "0");
 
     const activeTariffs = AppConfig.tarifas.filter((t) => {
       const currentDate = now.toISOString().split("T")[0];
@@ -25,7 +28,7 @@ export const CartManager = {
 
       if (t.fecha_aplicacion && currentDate < t.fecha_aplicacion) return false;
       if (t.fecha_fin && currentDate > t.fecha_fin) return false;
-      
+
       if (t.dias_semana) {
         const allowedDays = t.dias_semana.split(",").map(Number);
         if (!allowedDays.includes(currentDay)) return false;
@@ -36,18 +39,55 @@ export const CartManager = {
         try {
           const ids = JSON.parse(t.producto_ids) || [];
           if (!ids.includes(parseInt(product.id))) return false;
-        } catch (e) { return false; }
+        } catch (e) {
+          return false;
+        }
       }
 
       if (t.hora_inicio && currentTime < t.hora_inicio) return false;
       if (t.hora_fin && currentTime > t.hora_fin) return false;
 
-      if (t.es_solo_socios && (!socio || parseInt(socio.es_socio) !== 1)) return false;
-      if (t.id_cliente && (!socio || parseInt(socio.id) !== parseInt(t.id_cliente))) return false;
-      
-      if (t.tipo_cliente !== "todos") {
-        if (!socio || (t.tipo_cliente === "mayorista" && parseInt(socio.es_mayorista) !== 1) || (t.tipo_cliente !== "mayorista" && socio.tipo !== t.tipo_cliente)) {
+      // 3. Segmentación Cliente
+      if (t.es_solo_socios && (!socio || parseInt(socio.es_socio) !== 1))
+        return false;
+
+      // 3.1. Cliente Específico (id_cliente o cliente_ids)
+      let isSpecificMatch = false;
+      if (t.id_cliente && socio && parseInt(socio.id) === parseInt(t.id_cliente)) {
+        isSpecificMatch = true;
+      }
+      if (!isSpecificMatch && t.cliente_ids && socio) {
+        try {
+          const ids = JSON.parse(t.cliente_ids);
+          if (Array.isArray(ids) && ids.includes(parseInt(socio.id))) {
+            isSpecificMatch = true;
+          }
+        } catch (e) {}
+      }
+
+      // Si la tarifa especifica clientes y este no lo es, fuera.
+      if ((t.id_cliente || t.cliente_ids) && !isSpecificMatch) return false;
+
+      // 3.2. Roles / Segmentos (Solo si no es match específico)
+      if (!isSpecificMatch) {
+        const rolCliente = socio && socio.rol ? socio.rol.toLowerCase() : "general";
+
+        // Comprobar roles_segmento (nuevo formato)
+        if (t.roles_segmento) {
+          const segmentos = t.roles_segmento
+            .toLowerCase()
+            .split(",")
+            .map((s) => s.trim());
+          if (!segmentos.includes(rolCliente)) return false;
+        }
+        // Comprobar tipo_cliente (legacy)
+        else if (t.tipo_cliente && t.tipo_cliente !== "todos") {
+          const tipoReq = t.tipo_cliente.toLowerCase();
+          if (tipoReq === "mayorista") {
+            if (rolCliente !== "mayorista" && (!socio || parseInt(socio.es_mayorista) !== 1)) return false;
+          } else if (tipoReq !== rolCliente) {
             return false;
+          }
         }
       }
 
@@ -56,39 +96,71 @@ export const CartManager = {
 
     activeTariffs.sort((a, b) => b.prioridad - a.prioridad);
 
-    activeTariffs.forEach((t) => {
+    // Solo aplicar la tarifa de mayor prioridad
+    activeTariffs.slice(0, 1).forEach((t) => {
       const val = parseFloat(t.valor);
-      const keepPrecision = !!(parseInt(product.mantener_precision || 0));
+      const keepPrecision = !!parseInt(product.mantener_precision || 0);
       let variation = 0;
       if (t.tipo === "percent") {
-        variation = keepPrecision ? (finalPrice * (val / 100)) : (Math.round(finalPrice * (val / 100) * 100) / 100);
+        variation = keepPrecision
+          ? finalPrice * (val / 100)
+          : Math.round(finalPrice * (val / 100) * 100) / 100;
       } else {
         variation = val;
       }
-      
+
       if (variation !== 0) {
         finalPrice += variation;
         appliedTariffs.push({
           id_origen: t.id,
-          tipo_descuento: 'tarifa',
+          tipo_descuento: "tarifa",
           nombre: t.nombre,
-          valor_descontado: variation
+          valor_descontado: variation,
         });
       }
     });
 
-    return { 
-        price: Math.max(0, finalPrice), 
-        appliedTariffs, 
-        basePrice 
+    return {
+      price: Math.max(0, finalPrice),
+      appliedTariffs,
+      basePrice,
     };
+  },
+
+  /**
+   * Recalculate all items in cart based on current socio
+   */
+  recalculateCartPrices() {
+    const cart = AppState.cart;
+    let changed = false;
+    Object.keys(cart).forEach((key) => {
+      const item = cart[key];
+      // Skip custom products (comodines)
+      if (String(key).startsWith("comodin_") || item.id === -1) return;
+      // Skip items already validated by the server API in the active checkout session
+      if (item._tariffApplied) return;
+
+      const product = AppConfig.products.find((p) => String(p.id) === String(item.id));
+      if (!product) return;
+
+      const effective = this.getEffectivePrice(product, AppState.socioActual);
+      if (item.price !== effective.price) {
+        item.price = effective.price;
+        item.appliedTariffs = effective.appliedTariffs;
+        item.basePriceSnapshot = effective.basePrice;
+        changed = true;
+      }
+    });
+    if (changed) {
+      AppState.cart = cart;
+    }
   },
 
   /**
    * Core Cart Actions
    */
   addToCart(id) {
-    const product = AppConfig.products.find(p => String(p.id) === String(id));
+    const product = AppConfig.products.find((p) => String(p.id) === String(id));
     if (!product || product.inactive || product.stock <= 0) return false;
 
     const cart = AppState.cart; // Read ONCE into a local variable
@@ -96,16 +168,16 @@ export const CartManager = {
       if (cart[id].qty >= product.stock) return "stock_limit";
       cart[id].qty++;
     } else {
-      const effective = this.getEffectivePrice(product, AppState.socioActual);
+      const basePrice = parseFloat(product.price || 0);
       cart[id] = {
         ...product,
         qty: 1,
-        price: effective.price,
-        appliedTariffs: effective.appliedTariffs,
-        basePriceSnapshot: effective.basePrice,
+        price: basePrice,
+        appliedTariffs: [],
+        basePriceSnapshot: basePrice,
         iva: parseFloat(product.iva || 21),
         cartKey: String(id),
-        serials: []
+        serials: [],
       };
     }
     AppState.cart = cart; // Write back via setter to persist
@@ -132,6 +204,16 @@ export const CartManager = {
 
     AppState.cart = cart;
     return true;
+  },
+
+  removeFromCart(id) {
+    const cart = AppState.cart;
+    if (cart[id]) {
+      delete cart[id];
+      AppState.cart = cart;
+      return true;
+    }
+    return false;
   },
 
   changeQty(id, delta) {
@@ -174,6 +256,29 @@ export const CartManager = {
   /**
    * Bundle & Promo Logic
    */
+  applyDiscountCode(code) {
+    if (!code) {
+      AppState.currentPromo = null;
+      return { ok: false, error: "Código vacío" };
+    }
+    const cleanCode = code.trim().toUpperCase();
+    const promo = AppConfig.promos.find(p => p.codigo && p.codigo.toUpperCase() === cleanCode);
+    
+    if (promo) {
+      const totals = this.calculateTotals();
+      const minSub = parseFloat(promo.min_subtotal) || 0;
+      
+      if (totals.subtotal < minSub) {
+        return { ok: false, error: `Pedido mínimo: ${Utils.formatCurrency(minSub)}` };
+      }
+      
+      AppState.currentPromo = { ...promo, _manual: true };
+      return { ok: true, promo };
+    }
+    
+    return { ok: false, error: "Código no válido" };
+  },
+
   autoApplyBundles() {
     if (AppState.currentPromo && AppState.currentPromo.codigo) return;
 
@@ -219,9 +324,9 @@ export const CartManager = {
     let subtotal = 0;
     let bundleDiscountTotal = 0;
 
-    // 1. Calculate base subtotal
+    // 1. Calculate base subtotal (pre-promo)
     items.forEach((item) => {
-      const p = parseFloat(item.price || 0);
+      let p = parseFloat(item.price || 0);
       const q = parseInt(item.qty || 0);
       subtotal += p * q;
     });
@@ -293,9 +398,10 @@ export const CartManager = {
     const subtotalFinal = Math.max(0, subtotal - totalDiscount);
 
     // 5. Derive Base and Tax from PVP (which already contains VAT)
-    // Loyalty points are a payment method, so they shouldn't reduce the taxable base
-    const subtotalTaxable = Math.max(0, subtotal - bundleDiscountTotal - generalDiscount - socioAmt);
-    const discountFactor = subtotal > 0 ? subtotalTaxable / subtotal : 1;
+    // Según requerimientos del usuario: los descuentos/promos NO afectan a la base imponible ni al IVA.
+    // Se calculan sobre el subtotal bruto (post-tarifa, pre-promo).
+    const subtotalTaxable = subtotal; 
+    const discountFactor = 1.0; 
     let totalBase = 0;
     let totalTax = 0;
     const breakdown = {};
@@ -303,10 +409,10 @@ export const CartManager = {
     items.forEach((item) => {
       const p = parseFloat(item.price || 0);
       const q = parseInt(item.qty || 0);
-      const itemPvpOrig = p * q;
-      const itemPvpFinal = Math.max(0, itemPvpOrig * discountFactor);
+
+      const itemPvpFinal = p * q;
       
-      const rate = (item.iva !== undefined && item.iva !== null) ? parseFloat(item.iva) : 25;
+      const rate = (item.iva !== undefined && item.iva !== null) ? parseFloat(item.iva) : 21;
       const base = itemPvpFinal / (1 + rate / 100);
       const tax = itemPvpFinal - base;
  

@@ -294,30 +294,32 @@
             </div>
 
             <!-- Tabla de líneas -->
-            <div class="table-container mb-16" style="max-height: 320px; overflow-y: auto;">
-                <table class="data-table mb-0" style="min-width: 700px;">
-                    <thead style="position: sticky; top: 0; z-index: 10;">
-                        <tr>
-                            <th class="pl-20"><?php echo L('prod_th_name'); ?></th>
-                            <th class="w-100 text-center"><?php echo L('prod_th_qty'); ?></th>
-                            <th class="w-180 text-right"><?php echo L('purchase_th_cost_net'); ?></th>
-                            <th class="w-70 text-center"><?php echo L('modal_label_iva'); ?></th>
-                            <th class="w-70 text-center th-re">RE</th>
-                            <th class="w-140 text-right"><?php echo L('purchase_th_line_total'); ?></th>
-                            <th class="w-50"></th>
-                        </tr>
-                    </thead>
-                    <tbody id="albLineas">
-                        <tr id="albEmptyRow">
-                            <td colspan="7">
-                                <div class="empty-lines-state">
-                                    <i class="fa-solid fa-box-open"></i>
-                                    <?php echo L('purchase_empty_lines'); ?>
-                                </div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+            <div class="table-container mb-16">
+                <div style="max-height: 320px; overflow-y: auto; overflow-x: auto;">
+                    <table class="data-table mb-0" style="min-width: 700px;">
+                        <thead style="position: sticky; top: 0; z-index: 10;">
+                            <tr>
+                                <th class="pl-20"><?php echo L('prod_th_name'); ?></th>
+                                <th class="w-100 text-center"><?php echo L('prod_th_qty'); ?></th>
+                                <th class="w-180 text-right"><?php echo L('purchase_th_cost_net'); ?></th>
+                                <th class="w-70 text-center"><?php echo L('modal_label_iva'); ?></th>
+                                <th class="w-70 text-center th-re">RE</th>
+                                <th class="w-140 text-right"><?php echo L('purchase_th_line_total'); ?></th>
+                                <th class="w-50"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="albLineas">
+                            <tr id="albEmptyRow">
+                                <td colspan="7">
+                                    <div class="empty-lines-state">
+                                        <i class="fa-solid fa-box-open"></i>
+                                        <?php echo L('purchase_empty_lines'); ?>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             <!-- Info de stock -->
@@ -772,8 +774,14 @@
     }
 
     async function ejecutarGuardarAlbaran(prov_id, numero) {
+        if (!prov_id || !numero || albLineas.length === 0) {
+            console.error("Faltan datos para guardar albarán", { prov_id, numero, lineas: albLineas.length });
+            return showCustomAlert(<?php echo json_encode(L('warning')); ?>, <?php echo json_encode(L('purchase_js_incomplete_fields')); ?>, 'warning');
+        }
+
         const btn = document.getElementById('btnGuardarAlbaran');
         btn.disabled = true;
+        
         try {
             const r = await fetch('api/compras.php', {
                 method: 'POST',
@@ -785,10 +793,17 @@
                     lineas: albLineas
                 })
             });
+
+            if (!r.ok) throw new Error(`HTTP Error: ${r.status}`);
+
             const res = await r.json();
             if (res.success) {
                 // Notificar al TPV que el stock ha cambiado
                 sessionStorage.setItem('tpv_refresh_stock', Date.now());
+
+                showNotification(<?php echo json_encode(L('purchase_js_saved_ok')); ?>, 'success');
+                
+                // Si venía de pedido automático, ver si hay más en la cola
                 const queueData = sessionStorage.getItem('tpv_pedido_auto_data');
                 let hasMore = false;
                 try {
@@ -797,16 +812,17 @@
                 } catch(e){}
 
                 if (hasMore) {
-                   showNotification('<i class="fa-solid fa-spinner fa-spin"></i> ' + <?php echo json_encode(L('purchase_js_saved_loading_next')); ?>, 'info');
-                   setTimeout(() => window.location.reload(), 1500);
+                    setTimeout(() => window.location.reload(), 1500);
                 } else {
-                   window.location.reload();
+                    window.location.reload();
                 }
             } else {
-                showCustomAlert(<?php echo json_encode(L('prod_js_error')); ?>, res.error || <?php echo json_encode(L('prod_js_error')); ?>, 'error');
+                console.error("Error API registrar_albaran:", res.error);
+                showCustomAlert(<?php echo json_encode(L('prod_js_error')); ?>, res.error || "Error desconocido al guardar", 'error');
             }
         } catch (e) {
-            showCustomAlert(<?php echo json_encode(L('prod_js_error')); ?>, <?php echo json_encode(L('prod_js_error')); ?>, 'error');
+            console.error("Exception en ejecutarGuardarAlbaran:", e);
+            showCustomAlert(<?php echo json_encode(L('prod_js_error')); ?>, <?php echo json_encode(L('tpv_js_conn_error')); ?>, 'error');
         } finally {
             btn.disabled = false;
         }

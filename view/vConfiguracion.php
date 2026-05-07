@@ -554,6 +554,11 @@
                                                 case 'MOVIMIENTO_DINERO': $badgeClass = 'bg-amber-light text-amber'; $iconAction = 'fa-money-bill-transfer'; break;
                                                 case 'APERTURA_CAJA': $badgeClass = 'bg-accent-soft text-accent'; $iconAction = 'fa-key'; break;
                                                 case 'CIERRE_CAJA': $badgeClass = 'bg-red-light text-red'; $iconAction = 'fa-lock'; break;
+                                                // VeriFactu Specific
+                                                case 'VF_ENVIO_EXITO': $badgeClass = 'bg-green-light text-green'; $iconAction = 'fa-cloud-arrow-up'; break;
+                                                case 'VF_ENVIO_ERROR': $badgeClass = 'bg-red-light text-red'; $iconAction = 'fa-triangle-exclamation'; break;
+                                                case 'VF_ENVIO_REINTENTO': $badgeClass = 'bg-surface2 text-amber'; $iconAction = 'fa-clock-rotate-left'; break;
+                                                case 'VF_SUBSANACION': $badgeClass = 'bg-amber-light text-orange'; $iconAction = 'fa-wrench'; break;
                                             }
                                         ?>
                                             <tr class="hover-bg-surface2 transition-all border-top">

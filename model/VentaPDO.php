@@ -50,7 +50,7 @@ class VentaPDO
             $prefix = $esFactura ? 'F' : 'T';
         }
         $time = is_numeric($fecha) ? $fecha : strtotime($fecha);
-        $datePart = date('jnY', $time); // j=dia sin ceros, n=mes sin ceros, Y=año 4 digitos
+        $datePart = date('dmY', $time); // d=dia con ceros, m=mes sin ceros, Y=año 4 digitos
         return "{$prefix}-{$datePart}-{$numero}";
     }
 

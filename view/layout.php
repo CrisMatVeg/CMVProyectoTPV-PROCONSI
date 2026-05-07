@@ -8,7 +8,7 @@
     <title>TPV · ElectroBazar</title>
     <link rel="icon" type="image/x-icon" href="./favicon.ico">
     <link rel="stylesheet" href="./webroot/css/estilos.css?v=40" />
-    <link rel="stylesheet" href="./webroot/css/components.css?v=46" />
+    <link rel="stylesheet" href="./webroot/css/components.css?v=47" />
     <link rel="stylesheet" href="./webroot/css/app.css?v=46" />
     <!-- Generación de PDF en cliente -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -135,7 +135,12 @@
             pointsRedeemedLabel: "<?php echo L('points_redeemed_label', true); ?>",
             customDescError: "<?php echo L('tpv_custom_desc_error', true); ?>",
             customPriceError: "<?php echo L('tpv_custom_price_error', true); ?>",
-            stock: "<?php echo L('tpv_stock', true); ?>"
+            stock: "<?php echo L('tpv_stock', true); ?>",
+            statusCompleted: "<?php echo L('history_status_completed', true); ?>",
+            statusAnnulled: "<?php echo L('history_status_annulled_pill', true); ?>",
+            statusRectified: "<?php echo L('history_status_rectified_pill', true); ?>",
+            statusAbono: "<?php echo L('history_status_abono_pill', true); ?>",
+            pending: "<?php echo L('tpv_pending', true); ?>"
         };
 
         // Global Fetch Wrapper for CSRF Protection
@@ -272,20 +277,22 @@
             <?php
             $pendientesArqueo = CajaTurnoPDO::obtenerTurnosPendientesArqueo();
             if (!empty($pendientesArqueo)): ?>
-                <a href="index.php?irCierreCaja" class="status-indicator" style="background: var(--orange); color: white; padding: 2px 10px; border-radius: 20px; font-size: 10px; font-weight: bold; text-transform: uppercase; text-decoration: none; display: inline-flex; align-items: center; gap: 5px;" title="Hay cierres de días anteriores sin contar">
+                <a href="index.php?irCierreCaja" class="status-pill pill-orange" title="Hay cierres de días anteriores sin contar">
                     <i class="fa-solid fa-triangle-exclamation"></i> <?php echo L('label_arqueo_pending'); ?>
                 </a>
             <?php endif; ?>
 
+
             <?php if (isset($_SESSION['cajaAbierta']) && $_SESSION['cajaAbierta']): ?>
-                <span class="status-indicator" style="background: var(--green); color: white; padding: 2px 8px; border-radius: 20px; font-size: 10px; font-weight: bold; text-transform: uppercase;">
+                <span class="status-pill pill-green">
                     <i class="fa-solid fa-circle-check"></i> <?php echo L('label_abierta'); ?>
                 </span>
             <?php else: ?>
-                <span class="status-indicator" style="background: var(--red); color: white; padding: 2px 8px; border-radius: 20px; font-size: 10px; font-weight: bold; text-transform: uppercase;">
+                <span class="status-pill pill-red">
                     <i class="fa-solid fa-circle-xmark"></i> <?php echo L('label_cerrada'); ?>
                 </span>
             <?php endif; ?>
+
             &nbsp;·&nbsp; <?php echo L('label_register'); ?> #1 &nbsp;·&nbsp; <span id="clock">--:--</span> &nbsp;·&nbsp;
             <span id="datestr">--</span>
         </div>
@@ -364,19 +371,32 @@
                         </div>
                     </div>
 
+                    <?php 
+                    $tienePermisoDashboard = $_SESSION['usuarioActualTPV']->tienePermiso('gestionar_productos') 
+                        || $_SESSION['usuarioActualTPV']->tienePermiso('ver_historial') 
+                        || $_SESSION['usuarioActualTPV']->tienePermiso('gestionar_usuarios')
+                        || $_SESSION['usuarioActualTPV']->tienePermiso('gestionar_clientes')
+                        || $_SESSION['usuarioActualTPV']->tienePermiso('gestionar_proveedores')
+                        || $_SESSION['usuarioActualTPV']->tienePermiso('gestionar_inventario')
+                        || $_SESSION['usuarioActualTPV']->tienePermiso('ver_analitica');
+                    
+                    if ($tienePermisoDashboard): ?>
                     <form method="post" action="index.php">
                         <button type="submit" name="irDashboard" class="topbar-btn" title="Panel de Control">
                             <i class="fa-solid fa-gauge-high"></i>
                             <span><?php echo L('menu_inicio'); ?></span>
                         </button>
                     </form>
+                    <?php endif; ?>
 
+                    <?php if ($_SESSION['usuarioActualTPV']->tienePermiso('acceso_tpv')): ?>
                     <form method="post" action="index.php">
                         <button type="submit" name="irTPV" class="topbar-btn" title="Terminal Punto de Venta">
                             <i class="fa-solid fa-cart-shopping"></i>
                             <span><?php echo L('menu_tpv'); ?></span>
                         </button>
                     </form>
+                    <?php endif; ?>
 
                     <form method="post" action="index.php">
                         <button type="submit" name="irMiPerfil" class="topbar-btn" title="Mi Perfil">
@@ -449,16 +469,17 @@
                         <span class="label"><?php echo L('tpv_payment_method'); ?></span> <span id="tkMetodo">—</span>
                     </div>
 
+
                     <div id="tkLineas" class="ticket-items mt-16 mb-16"></div>
 
                     <div class="ticket-totals pt-16 border-top">
                         <div class="ticket-total-row label text-muted" id="tkSubtotalRow">
                             <span><?php echo L('tpv_subtotal'); ?></span><span id="tkSubtotal">—</span>
                         </div>
+                        <div id="tkIvaDesglose"></div>
                         <div id="tkDescRow" class="ticket-total-row d-none text-green">
                             <span id="tkDescLabel"><?php echo L('tpv_discount'); ?></span><span id="tkDescAmt">—</span>
                         </div>
-                        <div id="tkIvaDesglose"></div>
                         <div id="tkPuntosRow" class="ticket-total-row d-none text-green"></div>
                         <div id="tkValesRow" class="ticket-total-row d-none text-accent">
                             <span><?php echo L('ticket_label_voucher_paid'); ?></span><span id="tkValesAmt">—</span>
@@ -669,7 +690,7 @@
                 </div>
             </div>
 
-            <div class="form-group mb-0">
+            <div class="form-group mb-0" id="refundMethodSection">
                 <label class="form-label fw-600 mb-12 fs-13 text-muted tt-uppercase ls-1"><?php echo L('return_label_method'); ?>:</label>
                 <div class="d-flex flex-column gap-12" id="refundMethods">
                     <label class="method-option border br-12 p-16 d-flex ai-center gap-16 cp transition hover-bg-surface2" id="optCash">
@@ -762,7 +783,36 @@
             </div>
 
 
-            <div class="form-group mb-0">
+            <!-- BLOQUE: TIPO DE GESTIÓN FISCAL -->
+            <div class="form-group mb-20 border-bottom pb-20">
+                <label class="form-label fw-600 mb-12 fs-13 text-muted tt-uppercase ls-1">Tipo de Gestión Fiscal:</label>
+                <div class="d-grid grid-2 gap-12">
+                    <label class="method-option border br-12 p-16 d-flex ai-center gap-12 cp transition hover-bg-surface2" id="fiscalRectification">
+                        <div class="radio-custom d-flex ai-center jc-center">
+                            <input type="radio" name="tipoGestionFiscal" value="rectificacion" checked>
+                            <div class="radio-dot"></div>
+                        </div>
+                        <i class="fa-solid fa-file-invoice fs-20 text-green"></i>
+                        <div class="flex-1">
+                            <div class="fs-13 fw-700">Rectificación</div>
+                            <div class="fs-11 text-muted">Original y Abono válidos (Verde)</div>
+                        </div>
+                    </label>
+                    <label class="method-option border br-12 p-16 d-flex ai-center gap-12 cp transition hover-bg-surface2" id="fiscalAnulacion">
+                        <div class="radio-custom d-flex ai-center jc-center">
+                            <input type="radio" name="tipoGestionFiscal" value="anulacion">
+                            <div class="radio-dot"></div>
+                        </div>
+                        <i class="fa-solid fa-file-circle-xmark fs-20 text-red"></i>
+                        <div class="flex-1">
+                            <div class="fs-13 fw-700">Anulación</div>
+                            <div class="fs-11 text-muted">Invalida original (Amarillo)</div>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group mb-12">
                 <label class="form-label fw-600 mb-8"><?php echo L('client_label_notes'); ?>:</label>
 
                 <!-- Motivo libre -->
@@ -773,10 +823,7 @@
                     <option value="Otro motivo">Otro motivo</option>
                 </select>
 
-                <div class="d-flex ai-center gap-8 mb-12 p-8 br-8 bg-surface2 border-1" style="border-style: dashed;">
-                    <input type="checkbox" id="returnReponerStock" checked style="width: 18px; height: 18px; cursor: pointer;">
-                    <label for="returnReponerStock" class="fs-12 fw-600 cp"><?php echo L('return_label_reponer_stock'); ?></label>
-                </div>
+
 
                 <textarea id="returnNote" class="form-input fs-12" placeholder="<?php echo L('client_comments_placeholder', true); ?>" rows="2"></textarea>
             </div>
@@ -953,11 +1000,14 @@
             border-color: var(--red);
         }
     </style>
+    <link rel="stylesheet" href="./webroot/css/app.css?v=47" />
+    <!-- Generación de PDF en cliente -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="./webroot/js/validaciones.js?v=2"></script>
     <script src="./webroot/js/utils_global.js?v=16"></script>
     <?php if (isset($_SESSION['usuarioActualTPV']) && ($_SESSION['paginaEnCurso'] ?? '') !== 'Login'): ?>
         <script src="./webroot/js/main.js?v=46"></script>
-        <script src="./webroot/js/app.js?v=44" type="module"></script>
+        <script src="./webroot/js/app.js?v=46" type="module"></script>
     <?php endif; ?>
     <!-- SISTEMA DE MODALES GLOBALES (ALERTAS Y CONFIRMACIONES) -->
     <div class="modal-overlay" id="globalAlertModal" style="z-index: 15000;">
@@ -1048,6 +1098,21 @@
 
         function cerrarAlert() {
             document.getElementById('globalAlertModal').classList.remove('visible');
+        }
+
+        function showNotification(html, type = 'info') {
+            let notif = document.getElementById('ie-notif');
+            if (!notif) {
+                notif = document.createElement('div');
+                notif.id = 'ie-notif';
+                document.body.appendChild(notif);
+            }
+            const colors = { info: '#1a2fbf', success: '#0f8060', error: '#c0392b' };
+            notif.style.cssText = `position:fixed;bottom:24px;right:24px;background:${colors[type] || colors.info};color:white;padding:14px 20px;border-radius:12px;font-size:13px;font-weight:600;z-index:99999;box-shadow:0 4px 20px rgba(0,0,0,0.2);transition:opacity 0.3s;max-width:400px;line-height:1.4;`;
+            notif.innerHTML = html;
+            notif.style.opacity = '1';
+            clearTimeout(notif._timeout);
+            notif._timeout = setTimeout(() => { notif.style.opacity = '0'; }, 3500);
         }
 
         /**
@@ -1156,9 +1221,7 @@
             }
         }
     </script>
-    <?php if (isset($_SESSION['paginaEnCurso']) && strtolower($_SESSION['paginaEnCurso']) === 'inicioprivado'): ?>
-        <script type="module" src="./webroot/js/app.js?v=33"></script>
-    <?php endif; ?>
+    <?php /* app.js is already loaded on line 1010 via the authenticated-user check. Loading it again here with a different ?v= creates a second isolated ES module instance, breaking shared state. */ ?>
 </body>
 
 </html>

@@ -202,12 +202,12 @@
 
 <!-- MODAL ALTA/EDICIÓN CLIENTE -->
 <div class="modal-overlay" id="clienteAdminModal" role="dialog" aria-modal="true" aria-labelledby="client_modal_title">
-    <div class="modal modal-content gap-16 ai-stretch w-modal-md" style="max-width: 800px; border-radius: 20px; overflow: hidden; border: 1px solid var(--border); box-shadow: var(--shadow-lg);">
+    <div class="modal modal-content gap-16 ai-stretch w-modal-md" style="max-width: 800px; border-radius: 20px; border: 1px solid var(--border); box-shadow: var(--shadow-lg);">
         <div class="modal-header mb-0">
             <h2 class="m-0 fs-18" id="client_modal_title"><?php echo L('client_modal_new_title'); ?></h2>
             <button onclick="cerrarAdminModalCliente()" class="btn-close-modal" aria-label="<?php echo L('modal_cancel'); ?>">&times;</button>
         </div>
-        <form id="clienteForm" class="modal-body p-20">
+        <form id="clienteForm" class="modal-body p-20" style="overflow-y: auto; max-height: calc(80vh - 130px);">
             <input type="hidden" id="clienteId">
             <div class="form-group">
                 <label class="form-label"><?php echo L('client_label_type'); ?></label>
@@ -226,7 +226,18 @@
             </div>
             <div class="form-group mb-0 mt-10">
                 <label class="form-label"><?php echo L('client_th_nif'); ?></label>
-                <input type="text" id="clienteNif" class="form-input font-mono">
+                <div class="d-flex gap-8">
+                    <select id="clienteIdType" class="form-input" style="width: 130px;" title="Tipo de identificación">
+                        <option value="01">01 - NIF Español</option>
+                        <option value="02">02 - NIF-IVA (VIES)</option>
+                        <option value="03">03 - Pasaporte</option>
+                        <option value="04">04 - ID Oficial País</option>
+                        <option value="05">05 - Certificado</option>
+                        <option value="06">06 - Otro Documento</option>
+                    </select>
+                    <input type="text" id="clienteNif" class="form-input font-mono flex-1" placeholder="Documento">
+                    <input type="text" id="clientePais" class="form-input font-mono" style="width: 60px;" placeholder="ES" maxlength="2" title="Código de País (ISO)">
+                </div>
             </div>
             <div class="form-group mb-0 mt-10">
                 <label class="form-label"><?php echo L('user_label_email'); ?></label>
@@ -242,7 +253,10 @@
             </div>
             <div class="form-group mb-0 mt-10">
                     <span><?php echo L('client_label_rol'); ?></span>
-                    <button type="button" class="btn-text fs-12 text-blue p-0" style="background:none; border:none; cursor:pointer;" onclick="crearNuevoRol()"><?php echo L('client_btn_new_rol'); ?></button>
+                    <span style="display:inline-flex;gap:8px;">
+                        <button type="button" class="btn-text fs-12 text-blue p-0" style="background:none;border:none;cursor:pointer;" onclick="crearNuevoRol()"><?php echo L('client_btn_new_rol'); ?></button>
+                        <button type="button" class="btn-text fs-12 text-red p-0" style="background:none;border:none;cursor:pointer;" onclick="eliminarRolSeleccionado()"><?php echo L('client_btn_delete_rol'); ?></button>
+                    </span>
                 </label>
                 <select id="clienteRol" class="form-input">
                     <?php if (!empty($avClientes['roles'])): ?>
@@ -362,9 +376,11 @@
             telefono: document.getElementById('clienteTelefono').value.trim(),
             notas: document.getElementById('clienteNotas').value.trim(),
             rol: document.getElementById('clienteRol').value,
+            aeat_id_type: document.getElementById('clienteIdType').value,
+            aeat_codigo_pais: document.getElementById('clientePais').value.trim() || 'ES',
         };
 
-        if (!validarDocumento(payload.nif)) {
+        if (payload.aeat_id_type === '01' && !validarDocumento(payload.nif)) {
             showCustomAlert("<?php echo L('client_js_invalid_doc'); ?>", "<?php echo L('client_js_invalid_doc_body'); ?>", 'warning');
             return;
         }
@@ -404,7 +420,9 @@
         document.getElementById('clienteTelefono').value = '';
         document.getElementById('clienteNotas').value = '';
         document.getElementById('clienteRol').value = 'general';
-        document.getElementById('client_modal_new_title').innerText = "<?php echo L('client_modal_new_title'); ?>";
+        document.getElementById('clienteIdType').value = '01';
+        document.getElementById('clientePais').value = 'ES';
+        document.getElementById('client_modal_title').innerText = "<?php echo L('client_modal_new_title'); ?>";
         document.getElementById('clienteAdminModal').classList.add('visible');
     }
 
@@ -418,8 +436,9 @@
         document.getElementById('clienteTelefono').value = c.telefono || '';
         document.getElementById('clienteNotas').value = c.notas || '';
         document.getElementById('clienteRol').value = c.rol || 'general';
-        document.getElementById('client_modal_new_title').innerText = "<?php echo L('client_modal_edit_title'); ?>";
-
+        document.getElementById('clienteIdType').value = c.aeat_id_type || '01';
+        document.getElementById('clientePais').value = c.aeat_codigo_pais || 'ES';
+        document.getElementById('client_modal_title').innerText = "<?php echo L('client_modal_edit_title'); ?>";
         document.getElementById('clienteAdminModal').classList.add('visible');
     }
 
@@ -449,7 +468,7 @@
                             showCustomAlert("<?php echo L('prod_js_error'); ?>", data.error || "<?php echo L('prod_js_error'); ?>", 'error');
                             return;
                         }
-                        location.reload();
+                        loadClients(paginationData.actual);
                     } catch (e) {
                         console.error(e);
                         showCustomAlert("<?php echo L('error'); ?>", "<?php echo L('prod_js_error'); ?>", 'error');
@@ -511,14 +530,27 @@
                         timeStyle: 'short'
                     });
 
-                    let badgeClass = 'status-active';
-                    if (v.estado === 'pendiente_pago') badgeClass = 'status-pending';
-                    else if (['devuelta', 'anulada'].includes(v.estado)) badgeClass = 'status-cancelled';
+                    const esAbono = v.tipo_documento === 'abono' || (parseFloat(v.total) < 0);
+                    let statusHtml = '';
+
+                    if (esAbono) {
+                        statusHtml = `<span class="status-pill" style="background:var(--red-light);color:var(--red);border-color:var(--red);padding:2px 8px;font-size:10px;" title="Abono"><i class="fa-solid fa-file-circle-minus"></i> ${I18N.statusAbono}</span>`;
+                    } else if (v.estado === 'anulada') {
+                        statusHtml = `<span class="status-pill" style="background:var(--red-light);color:var(--red);border-color:var(--red);padding:2px 8px;font-size:10px;" title="Anulada"><i class="fa-solid fa-rectangle-xmark"></i> ${I18N.statusAnnulled}</span>`;
+                    } else if (v.estado === 'completada') {
+                        statusHtml = `<span class="status-pill status-active" title="${I18N.statusCompleted}"><i class="fa-solid fa-check"></i></span>`;
+                    } else if (['devuelta', 'parcialmente_devuelta'].includes(v.estado)) {
+                        statusHtml = `<span class="status-pill" style="background:#fff3e0;color:#e65100;border-color:#e65100;padding:2px 8px;font-size:10px;" title="Rectificada"><i class="fa-solid fa-triangle-exclamation"></i> ${I18N.statusRectified}</span>`;
+                    } else if (v.estado === 'pendiente_pago') {
+                        statusHtml = `<span class="status-pill status-pending" style="padding:2px 8px;font-size:10px;" title="Pendiente"><i class="fa-solid fa-clock"></i> ${I18N.pending}</span>`;
+                    } else {
+                        statusHtml = `<span class="status-pill" style="padding: 2px 8px; font-size: 10px; text-transform: uppercase;">${v.estado.replace('_', ' ')}</span>`;
+                    }
 
                     htmlV += `<tr>
                         <td>${fechaStr}</td>
                         <td class="font-mono">#${v.numero_ticket}</td>
-                        <td><span class="status-pill ${badgeClass}" style="padding: 2px 8px; font-size: 10px; text-transform: uppercase;">${v.estado.replace('_', ' ')}</span></td>
+                        <td>${statusHtml}</td>
                         <td class="text-right font-mono">${total.toFixed(2)}€</td>
                         <td class="text-right font-mono">${v.estado === 'pendiente_pago' ? pagado.toFixed(2) + '€' : '-'}</td>
                         <td class="text-right font-mono fw-bold ${pendiente > 0 ? 'text-danger' : 'text-success'}">${pendiente.toFixed(2)}€</td>
@@ -597,6 +629,41 @@
                 },
                 '',
                 'Ej: VIP, VIP+, etc.'
+        );
+    }
+
+    async function eliminarRolSeleccionado() {
+        const sel = document.getElementById('clienteRol');
+        const nombre = sel ? sel.value : '';
+        if (!nombre || nombre === 'general') {
+            showCustomAlert(<?php echo json_encode(L('prod_js_error')); ?>, <?php echo json_encode(L('client_js_delete_rol_protected')); ?>, 'error');
+            return;
+        }
+        const label = sel.options[sel.selectedIndex]?.text || nombre;
+        showCustomConfirm(
+            <?php echo json_encode(L('client_js_delete_rol_title')); ?>,
+            <?php echo json_encode(L('client_js_delete_rol_msg')); ?>.replace('{rol}', label),
+            async () => {
+                try {
+                    const resp = await fetch('api/gestionRolCliente.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ accion: 'eliminar', nombre }),
+                    });
+                    const data = await resp.json();
+                    if (!data.ok) {
+                        showCustomAlert(<?php echo json_encode(L('prod_js_error')); ?>, data.error || <?php echo json_encode(L('prod_js_error')); ?>, 'error');
+                        return;
+                    }
+                    showNotification('<i class="fa-solid fa-circle-check"></i> ' + <?php echo json_encode(L('client_js_rol_deleted')); ?>, 'success');
+                    setTimeout(() => location.reload(), 800);
+                } catch (e) {
+                    console.error(e);
+                    showCustomAlert(<?php echo json_encode(L('prod_js_error')); ?>, <?php echo json_encode(L('prod_js_error')); ?>, 'error');
+                }
+            },
+            <?php echo json_encode(L('modal_btn_accept')); ?>,
+            'danger'
         );
     }
 
@@ -767,8 +834,8 @@
 
     // Inicializar contador al cargar
     document.addEventListener('DOMContentLoaded', () => {
-        // El primer render ya viene del PHP, pero configuramos los eventos
         const inputBusqueda = document.getElementById('filtroNombre');
         inputBusqueda.addEventListener('input', filtrarClientes);
+        loadClients(1);
     });
 </script>

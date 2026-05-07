@@ -1,47 +1,20 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <style>
-    /* CSS para Skeleton Loaders y Estética Premium */
-    .skeleton-text {
-        height: 1.5rem;
-        background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-        background-size: 200% 100%;
-        animation: skeleton-loading 1.5s infinite;
-        border-radius: 4px;
-        width: 100%;
-    }
-    .skeleton-kpi { height: 2.5rem; width: 80%; margin: 4px 0; }
-    .skeleton-chart { height: 300px; width: 100%; }
-    .skeleton-table-row { height: 40px; width: 100%; margin: 8px 0; }
-    
-    @keyframes skeleton-loading {
-        0% { background-position: 200% 0; }
-        100% { background-position: -200% 0; }
-    }
-    
-    .card-section { 
-        transition: all 0.3s ease; 
-        border-radius: 20px;
-        overflow: hidden;
-        border: 1px solid var(--border) !important;
-        box-shadow: 0px 4px 16px rgba(0, 0, 0, 0.05) !important;
-        background: var(--bg-surface);
-    }
-    .card-section:hover { transform: translateY(-2px); box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1) !important; }
-    
+    /* Analytics-specific micro-animations */
     .fade-in { animation: fadeIn 0.5s ease-out forwards; opacity: 0; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-    .analitica-table { width: 100%; border-collapse: collapse; }
-    .analitica-table thead th { 
-        padding: 12px 16px; font-size: 11px; font-weight: 700; text-transform: uppercase; 
-        color: #64748b; background: #f8fafc; border-bottom: 2px solid #e2e8f0; text-align: left;
+    .kpi-icon {
+        width: 42px; height: 42px; border-radius: 12px;
+        display: flex; ai-center jc-center;
+        transition: all 0.3s ease;
     }
-    .analitica-table td { padding: 12px 16px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
-    .analitica-table tr:last-child td { border-bottom: none; }
-    .analitica-table tr:hover { background: #f8fafc; }
+    .card-section:hover .kpi-icon { transform: scale(1.1) rotate(5deg); }
     
     .opacity-50 { opacity: 0.5; }
+    .vr { width: 1px; background: var(--border); }
 </style>
+
 
 <div class="main-full p-24">
     <!-- CABECERA -->
@@ -82,12 +55,12 @@
 
     <!-- FILTROS -->
     <div class="filters-panel container-wider mb-32">
-        <form id="formFiltros" method="get" action="index.php" class="filters-form" style="display: flex; gap: 20px; align-items: flex-end; flex-wrap: wrap; background: var(--bg-surface); padding: 20px; border-radius: 16px; border: 1px solid var(--border);">
+        <form id="formFiltros" method="get" action="index.php" class="filter-toolbar">
             <input type="hidden" name="menu" value="Analitica">
             
             <div class="filter-group">
-                <label class="fs-11 font-bold mb-6 d-block text-muted tt-uppercase"><?php echo L('history_filter_period'); ?></label>
-                <select name="periodo" id="filterPeriodo" class="filter-input form-input" style="height: 44px; min-width: 140px;">
+                <label class="filter-label"><?php echo L('history_filter_period'); ?></label>
+                <select name="periodo" id="filterPeriodo" class="input-filter" style="min-width: 140px;">
                     <option value="hoy" <?php echo $avAnalitica['filtros']['periodo'] === 'hoy' ? 'selected' : ''; ?>><?php echo L('history_period_today'); ?></option>
                     <option value="semana" <?php echo $avAnalitica['filtros']['periodo'] === 'semana' ? 'selected' : ''; ?>><?php echo L('history_period_week'); ?></option>
                     <option value="mes" <?php echo $avAnalitica['filtros']['periodo'] === 'mes' ? 'selected' : ''; ?>><?php echo L('history_period_month'); ?></option>
@@ -98,30 +71,31 @@
 
             <div id="customDates" class="d-flex gap-20" style="<?php echo $avAnalitica['filtros']['periodo'] !== 'personalizado' ? 'display:none !important' : 'display:flex !important'; ?>">
                 <div class="filter-group">
-                    <label class="fs-11 font-bold mb-6 d-block text-muted tt-uppercase"><?php echo L('history_filter_since'); ?></label>
-                    <input type="date" name="fechaDesde" value="<?php echo $avAnalitica['filtros']['desde']; ?>" class="filter-input form-input" style="height: 44px;">
+                    <label class="filter-label"><?php echo L('history_filter_since'); ?></label>
+                    <input type="date" name="fechaDesde" value="<?php echo $avAnalitica['filtros']['desde']; ?>" class="input-filter">
                 </div>
                 <div class="filter-group">
-                    <label class="fs-11 font-bold mb-6 d-block text-muted tt-uppercase"><?php echo L('history_filter_until'); ?></label>
-                    <input type="date" name="fechaHasta" value="<?php echo $avAnalitica['filtros']['hasta']; ?>" class="filter-input form-input" style="height: 44px;">
+                    <label class="filter-label"><?php echo L('history_filter_until'); ?></label>
+                    <input type="date" name="fechaHasta" value="<?php echo $avAnalitica['filtros']['hasta']; ?>" class="input-filter">
                 </div>
             </div>
 
             <div class="filter-group">
-                <button type="submit" class="btn-filter h-44 px-28 d-flex ai-center gap-8">
+                <button type="submit" class="btn-filter" style="height: 36px; padding: 0 16px; border-radius: 8px;">
                     <i class="fa-solid fa-arrows-rotate"></i> <?php echo L('analytics_btn_filter'); ?>
                 </button>
             </div>
         </form>
     </div>
 
+
     <!-- KPI CARDS -->
     <div class="container-wider" style="margin-bottom: 25px;">
-        <div class="d-grid gap-24" style="grid-template-columns: repeat(4, 1fr);">
+        <div class="grid-4 gap-24">
             <div class="card-section p-24 d-flex flex-column gap-12" id="kpiSalesContainer">
                 <div class="d-flex ai-center jc-between">
                     <span class="fs-11 text-muted tt-uppercase font-bold"><?php echo L('analytics_kpis_sales'); ?></span>
-                    <i class="fa-solid fa-cart-shopping text-blue fs-16" style="margin-left: 12px;"></i>
+                    <div class="kpi-icon bg-blue-soft"><i class="fa-solid fa-cart-shopping fs-18"></i></div>
                 </div>
                 <div id="val_kpiSales" class="fs-30 font-mono font-bold"><div class="skeleton-text skeleton-kpi"></div></div>
                 <div id="sub_kpiSales" class="fs-12 text-muted"><div class="skeleton-text" style="width:60%"></div></div>
@@ -129,7 +103,7 @@
             <div class="card-section p-24 d-flex flex-column gap-12" id="kpiProfitContainer">
                 <div class="d-flex ai-center jc-between">
                     <span class="fs-11 text-muted tt-uppercase font-bold"><?php echo L('analytics_kpis_profit'); ?></span>
-                    <i class="fa-solid fa-sack-dollar text-green fs-16" style="margin-left: 12px;"></i>
+                    <div class="kpi-icon bg-green-soft"><i class="fa-solid fa-sack-dollar fs-18"></i></div>
                 </div>
                 <div id="val_kpiProfit" class="fs-30 font-mono font-bold"><div class="skeleton-text skeleton-kpi"></div></div>
                 <div id="sub_kpiProfit" class="fs-12 text-muted"><div class="skeleton-text" style="width:60%"></div></div>
@@ -137,7 +111,7 @@
             <div class="card-section p-24 d-flex flex-column gap-12" id="kpiOpsContainer">
                 <div class="d-flex ai-center jc-between">
                     <span class="fs-11 text-muted tt-uppercase font-bold"><?php echo L('analytics_kpis_ops'); ?></span>
-                    <i class="fa-solid fa-ticket text-orange fs-16" style="margin-left: 12px;"></i>
+                    <div class="kpi-icon bg-orange-soft"><i class="fa-solid fa-ticket fs-18"></i></div>
                 </div>
                 <div id="val_kpiOps" class="fs-30 font-mono font-bold"><div class="skeleton-text skeleton-kpi"></div></div>
                 <div id="sub_kpiOps" class="fs-12 text-muted"><div class="skeleton-text" style="width:60%"></div></div>
@@ -145,7 +119,7 @@
             <div class="card-section p-24 d-flex flex-column gap-12" id="kpiAverageContainer">
                 <div class="d-flex ai-center jc-between">
                     <span class="fs-11 text-muted tt-uppercase font-bold"><?php echo L('analytics_kpis_average_ticket'); ?></span>
-                    <i class="fa-solid fa-chart-simple text-accent fs-16" style="margin-left: 12px;"></i>
+                    <div class="kpi-icon bg-purple-soft"><i class="fa-solid fa-chart-simple fs-18"></i></div>
                 </div>
                 <div id="val_kpiAverage" class="fs-30 font-mono font-bold"><div class="skeleton-text skeleton-kpi"></div></div>
                 <div id="sub_kpiAverage" class="fs-12 text-muted"><div class="skeleton-text" style="width:60%"></div></div>
@@ -153,12 +127,13 @@
         </div>
     </div>
 
+
     <!-- MAIN CONTENT -->
     <div class="container-wider d-flex flex-column gap-24">
         <!-- TOP + CATEGORIAS -->
-        <div class="d-grid gap-24" style="grid-template-columns: 2fr 1fr;">
+        <div class="grid-2 gap-24">
             <div class="card-section">
-                <div class="p-20 border-bottom d-flex ai-center gap-10" style="background: #fffbeb;">
+                <div class="p-20 border-bottom d-flex ai-center gap-10 bg-surface2">
                     <i class="fa-solid fa-crown text-orange"></i>
                     <h3 class="m-0 fs-15 font-bold"><?php echo L('analytics_top_products_title_simple'); ?></h3>
                 </div>
@@ -171,7 +146,7 @@
                 </div>
             </div>
             <div class="card-section">
-                <div class="p-20 border-bottom d-flex ai-center gap-10" style="background: #f0f9ff;">
+                <div class="p-20 border-bottom d-flex ai-center gap-10 bg-surface2">
                     <i class="fa-solid fa-chart-pie text-blue"></i>
                     <h3 class="m-0 fs-15 font-bold"><?php echo L('analytics_cat_sales_title'); ?></h3>
                 </div>
@@ -182,9 +157,9 @@
         </div>
 
         <!-- IVA + EVOLUCION -->
-        <div class="d-grid gap-24" style="grid-template-columns: 1fr 2fr;">
+        <div class="grid-2 gap-24">
             <div class="card-section">
-                <div class="p-20 border-bottom d-flex ai-center gap-10" style="background: #fdf4ff;">
+                <div class="p-20 border-bottom d-flex ai-center gap-10 bg-surface2">
                     <i class="fa-solid fa-percent text-purple"></i>
                     <h3 class="m-0 fs-15 font-bold"><?php echo L('analytics_iva_title'); ?></h3>
                 </div>
@@ -196,7 +171,7 @@
                 </div>
             </div>
             <div class="card-section">
-                <div class="p-20 border-bottom d-flex ai-center gap-10" style="background: #f0fdf4;">
+                <div class="p-20 border-bottom d-flex ai-center gap-10 bg-surface2">
                     <i class="fa-solid fa-chart-line text-green"></i>
                     <h3 class="m-0 fs-15 font-bold"><?php echo L('analytics_evo_title'); ?></h3>
                 </div>
@@ -206,9 +181,11 @@
             </div>
         </div>
 
+
         <!-- RANKING COMPLETO -->
         <div class="card-section">
-            <div class="p-20 border-bottom d-flex jc-between ai-center gap-20" style="background: #f8fafc;">
+            <div class="p-20 border-bottom d-flex jc-between ai-center gap-20 bg-surface2">
+
                 <div class="d-flex ai-center gap-10">
                     <i class="fa-solid fa-list-ol text-accent"></i>
                     <h3 class="m-0 fs-15 font-bold"><?php echo L('analytics_ranking_title'); ?></h3>
@@ -234,10 +211,11 @@
                 </table>
             </div>
             <div class="p-16 border-top d-flex jc-center" id="loadMoreRankingContainer" style="display: none;">
-                <button type="button" id="btnLoadMoreRanking" onclick="loadMoreRanking()" class="btn-filter" style="background: #f8fafc; color: #64748b; border: 1px solid #e2e8f0; padding: 8px 24px;">
+                <button type="button" id="btnLoadMoreRanking" onclick="loadMoreRanking()" class="btn-prominent-back compact" style="height: 44px; padding: 0 32px;">
                     <i class="fa-solid fa-plus-circle mr-8"></i> <?php echo L('analytics_ranking_load_more'); ?>
                 </button>
             </div>
+
         </div>
     </div>
 </div>
@@ -278,14 +256,17 @@
             await fetch(`index.php?menu=Analitica&ajax=runOptimization&step=step3`, { headers: commonHeaders }).then(r => r.json());
 
             document.getElementById('optimizerBanner').innerHTML = `
-                <div class="card-section p-20 d-flex ai-center gap-16" style="background: #f0fdf4; border-color: #22c55e !important;">
-                    <i class="fa-solid fa-circle-check text-green fs-24"></i>
-                    <div>
-                        <h3 class="m-0 fs-16 text-green">¡Optimización completada!</h3>
-                        <p class="m-0 fs-13 text-muted">La base de datos ya está lista. El historial completo cargará mucho más rápido.</p>
+                <div class="alert-premium premium-info ai-center fade-in" style="border-color: var(--green) !important;">
+                    <div class="alert-icon-wrap" style="background: var(--green) !important;">
+                        <i class="fa-solid fa-circle-check"></i>
+                    </div>
+                    <div class="alert-content">
+                        <h3 class="alert-title" style="color: var(--green) !important;">¡Optimización completada!</h3>
+                        <p class="alert-desc">La base de datos ya está lista. El historial completo cargará mucho más rápido.</p>
                     </div>
                 </div>
             `;
+
             setTimeout(() => {
                 document.getElementById('optimizerBanner').style.display = 'none';
                 window.location.reload(); 
@@ -293,7 +274,7 @@
         } catch (e) {
             btn.disabled = false;
             btn.innerHTML = oldHtml;
-            alert("Error al optimizar. Es posible que el servidor haya cortado la conexión por el tamaño de la tabla. Por favor, vuelve a intentarlo; el proceso continuará donde se quedó.");
+            showCustomAlert("Error de optimización", "Error al optimizar. Es posible que el servidor haya cortado la conexión por el tamaño de la tabla. Por favor, vuelve a intentarlo; el proceso continuará donde se quedó.", "error");
         }
     }
 
@@ -374,9 +355,12 @@
 
             const formatted = num.toLocaleString(activeLocale, { minimumFractionDigits: 2 });
             valEl.innerHTML = `<span class="fade-in">${formatted}${suffix ? ' ' + suffix : ''}</span>`;
-            if (colorize) valEl.style.color = num >= 0 ? '#16a34a' : '#dc2626';
+            if (colorize) {
+                valEl.style.color = num >= 0 ? 'var(--green)' : 'var(--red)';
+            }
             if (subEl) subEl.innerHTML = `<span class="fade-in"><?php echo L('analytics_kpis_on_sales'); ?></span>`;
         }
+
 
         function renderTopProductsTable(data) {
             const container = document.getElementById('topProductsTableContainer');
@@ -486,17 +470,27 @@
             container.innerHTML = '';
             container.appendChild(canvas);
             
+            const accentColor = getComputedStyle(document.body).getPropertyValue('--accent').trim() || '#3b82f6';
+            
             new Chart(canvas, {
                 type: 'doughnut',
                 data: {
                     labels: data.map(c => c.categoria || 'Sin categoría'),
                     datasets: [{
                         data: data.map(c => parseFloat(c.total)),
-                        backgroundColor: ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#64748b']
+                        backgroundColor: [accentColor, '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#64748b']
                     }]
                 },
-                options: { responsive: true, maintainAspectRatio: false, cutout: '70%', plugins: { legend: { position: 'bottom' } } }
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false, 
+                    cutout: '75%', 
+                    plugins: { 
+                        legend: { position: 'bottom', labels: { usePointStyle: true, padding: 20, font: { size: 11 } } } 
+                    } 
+                }
             });
+
         }
 
         function renderEvolutionChart(data, agrupacion = 'dia') {
@@ -515,6 +509,9 @@
                 return date.toLocaleDateString(activeLocale, { day: '2-digit', month: '2-digit' });
             });
 
+            const accentColor = getComputedStyle(document.body).getPropertyValue('--accent').trim() || '#3b82f6';
+            const greenColor = getComputedStyle(document.body).getPropertyValue('--green').trim() || '#10b981';
+
             new Chart(canvas, {
                 type: 'line',
                 data: {
@@ -523,18 +520,22 @@
                         { 
                             label: '<?php echo L('analytics_chart_income'); ?>', 
                             data: data.map(d => d.ingresos), 
-                            borderColor: '#3b82f6', 
-                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            borderColor: accentColor, 
+                            backgroundColor: accentColor + '1A', // 10% opacity
                             fill: true,
-                            tension: 0.4 
+                            tension: 0.4,
+                            pointRadius: 4,
+                            pointHoverRadius: 6
                         },
                         { 
                             label: '<?php echo L('analytics_chart_profit'); ?>', 
                             data: data.map(d => d.beneficio), 
-                            borderColor: '#10b981', 
-                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            borderColor: greenColor, 
+                            backgroundColor: greenColor + '1A',
                             fill: true,
-                            tension: 0.4 
+                            tension: 0.4,
+                            pointRadius: 4,
+                            pointHoverRadius: 6
                         }
                     ]
                 },
@@ -543,14 +544,15 @@
                     maintainAspectRatio: false, 
                     interaction: { intersect: false, mode: 'index' },
                     scales: { 
-                        y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } },
+                        y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } },
                         x: { grid: { display: false } }
                     },
                     plugins: {
-                        legend: { position: 'top', align: 'end' }
+                        legend: { position: 'top', align: 'end', labels: { usePointStyle: true } }
                     }
                 }
             });
+
         }
 
         window.exportRanking = function() {

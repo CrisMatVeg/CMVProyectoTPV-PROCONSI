@@ -79,15 +79,18 @@ export const AppState = {
   set esFactura(val) { window.esFactura = val; },
 
   ticketNum: 1001,
-  activeCat: "all",
-  activeAttr: null,
-  activeTag: null,
   // Reactivity & Legacy Bridge
   get searchTerm() { return window.searchTerm || ""; },
   set searchTerm(val) { window.searchTerm = val; },
 
   get activeCat() { return window.activeCat || "all"; },
   set activeCat(val) { window.activeCat = val; },
+
+  get activeTag() { return window.activeTag || null; },
+  set activeTag(val) { window.activeTag = val; },
+
+  get activeAttr() { return window.activeAttr || null; },
+  set activeAttr(val) { window.activeAttr = val; },
 
   get minPrice() { return window.minPrice || 0; },
   set minPrice(val) { window.minPrice = val; },

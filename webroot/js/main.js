@@ -114,24 +114,44 @@ function getEffectivePrice(p, socio = null) {
     // 3. Segmentación Cliente
     if (t.es_solo_socios && (!socio || parseInt(socio.es_socio) !== 1))
       return false;
-    if (
-      t.id_cliente &&
-      (!socio || parseInt(socio.id) !== parseInt(t.id_cliente))
-    )
-      return false;
-    if (t.tipo_cliente !== "todos") {
-      if (!socio || socio.tipo !== t.tipo_cliente) {
-        // Caso especial mayorista (es un flag, no un tipo ENUM en la DB original, pero lo mapeamos)
-        if (
-          t.tipo_cliente === "mayorista" &&
-          (!socio || parseInt(socio.es_mayorista) !== 1)
-        )
+
+    // 3.1. Cliente Específico (id_cliente o cliente_ids)
+    let isSpecificMatch = false;
+    if (t.id_cliente && socio && parseInt(socio.id) === parseInt(t.id_cliente)) {
+      isSpecificMatch = true;
+    }
+    if (!isSpecificMatch && t.cliente_ids && socio) {
+      try {
+        const ids = JSON.parse(t.cliente_ids);
+        if (Array.isArray(ids) && ids.includes(parseInt(socio.id))) {
+          isSpecificMatch = true;
+        }
+      } catch (e) {}
+    }
+
+    // Si la tarifa especifica clientes y este no lo es, fuera.
+    if ((t.id_cliente || t.cliente_ids) && !isSpecificMatch) return false;
+
+    // 3.2. Roles / Segmentos (Solo si no es match específico)
+    if (!isSpecificMatch) {
+      const rolCliente = socio && socio.rol ? socio.rol.toLowerCase() : "general";
+
+      // Comprobar roles_segmento (nuevo formato)
+      if (t.roles_segmento) {
+        const segmentos = t.roles_segmento
+          .toLowerCase()
+          .split(",")
+          .map((s) => s.trim());
+        if (!segmentos.includes(rolCliente)) return false;
+      }
+      // Comprobar tipo_cliente (legacy)
+      else if (t.tipo_cliente && t.tipo_cliente !== "todos") {
+        const tipoReq = t.tipo_cliente.toLowerCase();
+        if (tipoReq === "mayorista") {
+          if (rolCliente !== "mayorista" && (!socio || parseInt(socio.es_mayorista) !== 1)) return false;
+        } else if (tipoReq !== rolCliente) {
           return false;
-        if (
-          t.tipo_cliente !== "mayorista" &&
-          (!socio || socio.tipo !== t.tipo_cliente)
-        )
-          return false;
+        }
       }
     }
 
@@ -261,16 +281,34 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   // Atributos filters: Gestionados por app.selectTag() en vInicioPrivado.php
+  
+  // Bloquear letra 'e', '+', '-' en inputs numéricos (solicitud usuario)
+  document.addEventListener("keydown", function(e) {
+      if (e.target.tagName === "INPUT" && e.target.type === "number") {
+          if (["e", "E", "+", "-"].includes(e.key)) {
+              e.preventDefault();
+          }
+      }
+  });
 });
 
 // ── Formato monetario ──────────────────────────────────────────────────────────
 function fmt(n) {
   const val = typeof n === "number" ? n : parseFloat(n) || 0;
-  // Si el nmero tiene ms de 2 decimales, los mostramos todos (hasta 10)
-  // para respetar la configuración de alta precisión.
+  
+  // Solo mostrar más de 2 decimales si ALGÚN producto en el carrito tiene más de 2 decimales
+  let requiereAltaPrecision = false;
+  if (typeof cart !== 'undefined') {
+    requiereAltaPrecision = Object.values(cart).some(item => {
+      const precio = parseFloat(item.price || 0);
+      return (Math.round(precio * 100) / 100) !== precio;
+    });
+  }
+
   const str = val.toString();
   const parts = str.split('.');
-  if (parts.length > 1 && parts[1].length > 2) {
+  
+  if (requiereAltaPrecision && parts.length > 1 && parts[1].length > 2) {
     return val.toString().replace(".", ",") + " €";
   }
   return val.toFixed(2).replace(".", ",") + " €";
@@ -873,7 +911,7 @@ async function guardarNuevoSocio() {
   const nif = document.getElementById("newSocioNif").value.trim();
 
   if (!nombre || !nif) {
-    alert(I18N.nameNifRequired);
+    showCustomAlert("Error", I18N.nameNifRequired, "error");
     return;
   }
 
@@ -903,11 +941,11 @@ async function guardarNuevoSocio() {
       document.getElementById("btnAddSocio").classList.add("d-none");
       renderCart();
     } else {
-      alert("Error al registrar: " + r.error);
+      showCustomAlert("Error", "Error al registrar: " + r.error, "error");
     }
   } catch (e) {
     console.error(e);
-    alert("Error de conexión");
+    showCustomAlert("Error", "Error de conexión", "error");
   }
 }
 
@@ -1032,7 +1070,12 @@ function seleccionarClienteGuardado(idx) {
  */
 function calculateFinalTotal() {
   const items = Object.values(cart);
-  let subtotal = items.reduce((s, i) => s + i.price * i.qty, 0);
+  let subtotal = 0;
+  items.forEach((item) => {
+    const p = parseFloat(item.price || 0);
+    const q = parseInt(item.qty || 0);
+    subtotal += p * q;
+  });
 
   // Bundle discounts
   let bundleDiscountTotal = 0;
@@ -1233,7 +1276,7 @@ function mostrarTicket(v, isFromTPV = true) {
   if (btnAnular) {
     const isAbono = (v.tipo_documento || 'venta') === 'abono';
     btnAnular.style.display =
-      !isFromTPV && v.estado === "completada" && !isAbono ? "" : "none";
+      !isFromTPV && (v.estado === "completada" || v.estado === "parcialmente_devuelta") && !isAbono ? "" : "none";
     btnAnular.onclick = () =>
       abrirModalAnulacionTicket(v.numero_ticket, v.fecha, v.id_cliente);
   }
@@ -1381,6 +1424,7 @@ function mostrarTicket(v, isFromTPV = true) {
         gDate.setMonth(gDate.getMonth() + months);
         const isExpired = gDate < new Date();
         const gStr = gDate.toLocaleDateString("es-ES");
+        const cantDisponible = l.cantidad - (l.cantidad_devuelta || 0);
 
         return `
           <div style="display:flex; justify-content:space-between; padding: 10px 0; border-bottom: 1px solid var(--surface2); ${l.devuelta ? "opacity:0.6; background:rgba(192,57,43,0.05);" : ""}">
@@ -1389,6 +1433,16 @@ function mostrarTicket(v, isFromTPV = true) {
                 <div>
                   <span style="font-weight:600; ${l.devuelta ? "text-decoration:line-through;" : ""}">${l.nombre_producto}</span>
                   <span style="color:var(--text-muted); font-size:11px; margin-left:6px;">${l.codigo_producto}</span>
+                  <div style="display:flex; gap:4px; margin-top:2px;">
+                    ${(l.descuentos || []).filter(d => d.tipo_descuento === 'tarifa').map(t => {
+                      const tName = t.nombre || t.nombre_descuento || 'Tarifa';
+                      return `
+                        <span class="fs-9 px-6 py-2 br-4 bg-accent-soft text-accent fw-800 tt-uppercase d-inline-flex ai-center gap-4" style="border: 1px solid rgba(var(--accent-rgb), 0.1);">
+                          <i class="fa-solid fa-tag fs-8 opacity-70"></i> ${tName}
+                        </span>
+                      `;
+                    }).join("")}
+                  </div>
                 </div>
                 <span style="font-family:'DM Mono',monospace; font-weight:600;">${fmt(l.total_linea)}</span>
               </div>
@@ -1403,9 +1457,9 @@ function mostrarTicket(v, isFromTPV = true) {
               ${l.devuelta && l.motivo_devolucion ? `<div style="margin-top:4px; font-size:11px; color:var(--red); font-style:italic;"><i class="fa-solid fa-circle-info"></i> Motivo: ${l.motivo_devolucion}</div>` : ""}
             </div>
             ${
-              !isFromTPV && !l.devuelta && v.estado === "completada"
+              !isFromTPV && !l.devuelta && (v.estado === "completada" || v.estado === "parcialmente_devuelta")
                 ? `<div style="padding-left:12px; display:flex; align-items:center;">
-                  <button onclick="abrirModalDevolucion(${l.id}, ${v.numero_ticket}, '${v.fecha}', ${v.id_cliente || "null"}, ${l.meses_garantia || 24}, '${l.nombre_producto.replace(/'/g, "\\'")}')" title="Devolver este producto" class="btn-icon text-red">
+                  <button onclick="abrirModalDevolucion(${l.id}, ${v.numero_ticket}, '${v.fecha}', ${v.id_cliente || "null"}, ${l.meses_garantia || 24}, '${l.nombre_producto.replace(/'/g, "\\'")}', ${l.cantidad})" title="Devolver este producto" class="btn-icon text-red">
                     <i class="fa-solid fa-arrow-rotate-left"></i>
                   </button>
                 </div>`
@@ -1628,7 +1682,12 @@ function mostrarTicket(v, isFromTPV = true) {
   if (descRow) {
     const discountAmt = parseFloat(v.descuento_amt || 0);
     const discountPctVal = parseFloat(v.descuento_pct || 0);
-    if (discountAmt > 0 || discountPctVal > 0) {
+    const puntosAmt = parseFloat(v.puntos_descuento_amt || 0);
+    const totalV = parseFloat(v.total || 0);
+    const subtV = parseFloat(v.subtotal || 0);
+    const diff = Math.max(0, subtV - totalV);
+
+    if (discountAmt > 0 || discountPctVal > 0 || puntosAmt > 0 || diff > 0.01) {
       descRow.classList.remove("d-none");
       const el_tkDescLabel = document.getElementById("tkDescLabel");
       const el_tkDescAmt = document.getElementById("tkDescAmt");
@@ -1642,13 +1701,8 @@ function mostrarTicket(v, isFromTPV = true) {
         }
       }
       if (el_tkDescAmt) {
-        el_tkDescAmt.textContent =
-          "−" +
-          fmt(
-            discountAmt > 0
-              ? discountAmt
-              : (parseFloat(v.subtotal) * discountPctVal) / 100,
-          );
+        const totalToDisplay = diff > 0.01 ? diff : (discountAmt + puntosAmt + (subtV * discountPctVal / 100));
+        el_tkDescAmt.textContent = "−" + fmt(totalToDisplay);
       }
     } else {
       descRow.classList.add("d-none");
@@ -1819,8 +1873,8 @@ function closeModal() {
   nuevaVenta();
 }
 
-async function devolverLinea(idLinea, numTicket) {
-  abrirModalDevolucion(idLinea, numTicket);
+async function devolverLinea(idLinea, numTicket, fechaVenta, idCliente, mesesGarantia, nombreProd, maxQty) {
+  abrirModalDevolucion(idLinea, numTicket, fechaVenta, idCliente, mesesGarantia, nombreProd, maxQty);
 }
 
 async function devolverTicket(numTicket, fechaVenta, idCliente) {
@@ -1836,7 +1890,8 @@ async function confirmarAnulacionTicket(numTicket) {
   const motivo = nota ? `${motivoBase}: ${nota}` : motivoBase;
 
   try {
-    const reponerStock = document.getElementById("returnReponerStock")?.checked ?? true;
+
+    const esAnulacion = document.querySelector('input[name="tipoGestionFiscal"]:checked')?.value === 'anulacion';
     const resp = await fetch("api/gestionDevolucion.php", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1844,17 +1899,24 @@ async function confirmarAnulacionTicket(numTicket) {
         accion: "devolverTicket",
         numTicket,
         motivo,
-        metodoReembolso,
-        reponerStock,
+        metodoReembolso: esAnulacion ? "anulacion" : metodoReembolso,
+        reponerStock: true,
+        esAnulacion
       }),
     });
     const r = await resp.json();
     if (r.ok) {
       document.getElementById("returnModal").classList.remove("visible");
-      const numAbono = r.numTicketAbono;
-      showToast(
-        `<i class='fa-solid fa-check'></i> Abono <strong>A-${numAbono}</strong> generado correctamente`,
-      );
+      
+      if (r.anulacionCompleta) {
+          showToast("<i class='fa-solid fa-check'></i> Venta anulada correctamente (Anulación Fiscal)");
+      } else {
+          const numAbono = r.numTicketAbono;
+          showToast(
+            `<i class='fa-solid fa-check'></i> Abono <strong>A-${numAbono}</strong> generado correctamente`,
+          );
+      }
+
       const v = await cargarVenta(numTicket);
       mostrarTicket(v, false);
       if (typeof updateVentaStatusUI === "function")
@@ -2332,7 +2394,8 @@ function abrirModalDevolucion(
   fechaVenta,
   idCliente,
   mesesGarantia,
-  nombreProducto
+  nombreProducto,
+  maxQty = 1
 ) {
   const modal = document.getElementById("returnModal");
   if (!modal) return;
@@ -2426,14 +2489,42 @@ function abrirModalDevolucion(
     optExchange.querySelector("input").disabled = true;
   }
 
-  // Ya no restringimos "Vale / Cupón" a clientes registrados
-  // La validación anterior ha sido eliminada.
+  // Resetear gestión fiscal a Rectificación por defecto y OCULTAR Anulación para líneas sueltas
+  const rectOption = document.querySelector('input[name="tipoGestionFiscal"][value="rectificacion"]');
+  if (rectOption) rectOption.checked = true;
+  toggleRefundMethodVisibility();
+  const fiscalAnulBlock = document.getElementById("fiscalAnulacion");
+  if (fiscalAnulBlock) fiscalAnulBlock.style.display = "none";
+  const fiscalRectBlock = document.getElementById("fiscalRectification");
+  if (fiscalRectBlock) {
+      fiscalRectBlock.style.display = "flex";
+      fiscalRectBlock.classList.remove("grid-col-span-2");
+  }
 
-  // Auto-seleccionar primera opción válida
-  const availableInput = modal.querySelector(
-    'input[name="metodoReembolso"]:not(:disabled)',
-  );
-  if (availableInput) availableInput.checked = true;
+  // Gestión de cantidades
+  const qtyRow = document.getElementById("qtyReturnRow");
+  const qtyInput = document.getElementById("qtyReturnInput");
+  const qtyMaxBody = document.getElementById("qtyReturnMaxLabelBody");
+
+  if (qtyRow && qtyInput && qtyMaxBody) {
+    if (maxQty > 1) {
+      qtyRow.classList.remove("d-none");
+      qtyInput.value = maxQty;
+      qtyInput.max = maxQty;
+      qtyMaxBody.innerText = maxQty;
+    } else {
+      qtyRow.classList.add("d-none");
+      qtyInput.value = 1;
+      qtyInput.max = 1;
+      qtyMaxBody.innerText = 1;
+    }
+    
+    // Prevenir que se pueda escribir más del máximo
+    qtyInput.oninput = function() {
+      if (parseInt(this.value) > maxQty) this.value = maxQty;
+      if (parseInt(this.value) < 1) this.value = 1;
+    };
+  }
 
   subtitle.innerText = `Venta del ${dateVenta.toLocaleDateString()}`;
 
@@ -2446,6 +2537,13 @@ function abrirModalAnulacionTicket(numTicket, fechaVenta, idCliente) {
   if (!modal) return;
 
   modal.classList.add("visible");
+
+  // Default a anulación y ocultar reembolso
+  const radioAnulacion = document.querySelector('input[name="tipoGestionFiscal"][value="anulacion"]');
+  if (radioAnulacion) {
+      radioAnulacion.checked = true;
+      toggleRefundMethodVisibility();
+  }
 
   // 1. Resetear UI (usamos la misma lógica que en líneas individuales pero adaptada)
   const subtitle = document.getElementById("returnModalSubtitle");
@@ -2506,6 +2604,17 @@ function abrirModalAnulacionTicket(numTicket, fechaVenta, idCliente) {
   );
   if (availableInput) availableInput.checked = true;
 
+  // Resetear gestión fiscal a Rectificación por defecto y MOSTRAR Anulación para tickets completos
+  const rectOptionAnul = document.querySelector('input[name="tipoGestionFiscal"][value="rectificacion"]');
+  if (rectOptionAnul) rectOptionAnul.checked = true;
+  const fiscalAnulBlock = document.getElementById("fiscalAnulacion");
+  if (fiscalAnulBlock) fiscalAnulBlock.style.display = "flex";
+  const fiscalRectBlock = document.getElementById("fiscalRectification");
+  if (fiscalRectBlock) {
+      fiscalRectBlock.style.display = "flex";
+      fiscalRectBlock.classList.remove("grid-col-span-2");
+  }
+
   subtitle.innerText = `Anulación Ticket #${String(numTicket).padStart(4, "0")}`;
 
   document.getElementById("confirmReturnBtn").onclick = () =>
@@ -2518,12 +2627,12 @@ async function confirmarDevolucion(idLinea, numTicket) {
   const metodoReembolso =
     document.querySelector('input[name="metodoReembolso"]:checked')?.value ||
     "efectivo";
-  const cantidadEl = document.getElementById("returnQty");
+  const cantidadEl = document.getElementById("qtyReturnInput");
   const cantidad = cantidadEl ? parseInt(cantidadEl.value) || null : null;
   const finalMotivo = nota ? `${motivo}: ${nota}` : motivo;
 
   try {
-    const reponerStock = document.getElementById("returnReponerStock")?.checked ?? true;
+    const esAnulacion = document.querySelector('input[name="tipoGestionFiscal"]:checked')?.value === 'anulacion';
     const resp = await fetch("./api/gestionDevolucion.php", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -2533,25 +2642,30 @@ async function confirmarDevolucion(idLinea, numTicket) {
         cantidad,
         motivo: finalMotivo,
         metodoReembolso,
-        reponerStock,
+        reponerStock: true,
+        esAnulacion
       }),
     });
     const data = await resp.json();
-    if (!data.ok)
-      throw new Error(data.error || "No se pudo realizar la devolución");
+    if (data.ok) {
+      document.getElementById("returnModal").classList.remove("visible");
+      
+      if (data.anulacionCompleta) {
+          showToast("<i class='fa-solid fa-check'></i> Venta anulada correctamente (Anulación Fiscal)");
+      } else {
+          const numAbono = data.numTicketAbono;
+          showToast(
+            `<i class='fa-solid fa-check'></i> Abono <strong>A-${numAbono}</strong> generado correctamente`,
+          );
+      }
 
-    document.getElementById("returnModal").classList.remove("visible");
-    const numAbono = data.numTicketAbono;
-    showToast(
-      `<i class='fa-solid fa-check'></i> Abono <strong>A-${numAbono}</strong> generado correctamente`,
-    );
-    const ventaActualizada = await cargarVenta(numAbono);
-    mostrarTicket(ventaActualizada, false);
-    if (typeof updateVentaStatusUI === "function")
-      updateVentaStatusUI(
-        numTicket,
-        ventaActualizada.status || ventaActualizada.estado,
-      );
+      const v = await cargarVenta(numTicket);
+      mostrarTicket(v, false);
+      if (typeof updateVentaStatusUI === "function")
+        updateVentaStatusUI(numTicket, v.status || v.estado);
+    } else {
+      throw new Error(data.error || "No se pudo realizar la devolución");
+    }
   } catch (err) {
     showToast("<i class='fa-solid fa-circle-xmark'></i> " + err.message);
   }
@@ -2706,13 +2820,7 @@ function applyAdvancedFilters() {
   renderProducts();
 }
 
-// ── Reloj ──────────────────────────────────────────────────────────────────────
-function fmt(n) {
-  return new Intl.NumberFormat("es-ES", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(n) + " €";
-}
+
 
 // Variables globales para fidelización (Portadas de PaymentManager)
 var puntosCanjeados = 0;
@@ -2778,17 +2886,6 @@ if (productsGrid) {
 
   renderProducts();
 
-  // Atributos (Tags) Navigation
-  const attrTabs = document.getElementById("attrTabs");
-  if (attrTabs) {
-    attrTabs.addEventListener("click", (e) => {
-      const tag = e.target.closest(".attr-tab-btn");
-      if (!tag) return;
-      tag.classList.toggle("active");
-      applyAdvancedFilters(); // Llamamos a la lógica de filtros locales
-    });
-  }
-
   productsGrid.addEventListener("scroll", () => {
     if (productsGrid.scrollTop + productsGrid.clientHeight >= productsGrid.scrollHeight - 20) {
       loadMoreProducts();
@@ -2800,3 +2897,18 @@ if (productsGrid) {
 
 // [REMOVED] Comodín logic moved to modular architecture (CartManager.js / app.js)
 
+function toggleRefundMethodVisibility() {
+    const fiscalType = document.querySelector('input[name="tipoGestionFiscal"]:checked')?.value;
+    const refundSection = document.getElementById("refundMethodSection");
+    if (!refundSection) return;
+    if (fiscalType === "anulacion") {
+        refundSection.style.display = "none";
+    } else {
+        refundSection.style.display = "block";
+    }
+}
+document.addEventListener("change", (e) => {
+    if (e.target.name === "tipoGestionFiscal") {
+        toggleRefundMethodVisibility();
+    }
+});

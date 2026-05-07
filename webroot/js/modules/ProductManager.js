@@ -185,7 +185,8 @@ export const ProductManager = {
                 limit: AppState.limit,
                 offset: AppState.offset,
                 term: AppState.searchTerm,
-                cat: AppState.activeCat
+                cat: AppState.activeCat,
+                tag: AppState.activeTag || ''
             });
 
             if (data.ok) {
@@ -194,6 +195,7 @@ export const ProductManager = {
                     name: p.nombre,
                     codigo: p.referencia,
                     price: p.precio_venta, // Keeping as string/value from server
+                    iva: parseFloat(p.iva || 21),
                     icono: p.icono || '📦',
                     cat: p.categoria,
                     stock: parseInt(p.stock),

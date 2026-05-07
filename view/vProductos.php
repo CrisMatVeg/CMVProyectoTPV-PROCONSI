@@ -141,6 +141,19 @@
                 <option value="bajo_stock"><?php echo L('prod_status_low_stock'); ?></option>
             </select>
         </div>
+
+        <div class="filter-item">
+            <span class="filter-label"><?php echo L('tpv_sort_by'); ?></span>
+            <select id="filterSort" class="filter-control" onchange="filtrarProductos()" style="min-width: 180px;">
+                <option value=""><?php echo L('prod_sort_recent'); ?></option>
+                <option value="name_asc"><?php echo L('tpv_sort_name_asc'); ?></option>
+                <option value="name_desc"><?php echo L('tpv_sort_name_desc'); ?></option>
+                <option value="price_asc"><?php echo L('tpv_sort_price_asc'); ?></option>
+                <option value="price_desc"><?php echo L('tpv_sort_price_desc'); ?></option>
+                <option value="stock_asc"><?php echo L('tpv_sort_stock_asc'); ?></option>
+                <option value="stock_desc"><?php echo L('tpv_sort_stock_desc'); ?></option>
+            </select>
+        </div>
     </div>
 
     <!-- TABLA DE PRODUCTOS (PESTAÑA 1) -->
@@ -172,7 +185,12 @@
                                 <span class="fs-24"><?php echo $icono; ?></span>
                             <?php endif; ?>
                         </td>
-                        <td class="font-bold"><?php echo htmlspecialchars($p['nombre']); ?></td>
+                        <td class="font-bold">
+                            <?php echo htmlspecialchars($p['nombre']); ?>
+                            <?php if ($p['es_pack']): ?>
+                                <span class="ml-8 px-6 py-2 br-4 fs-10 bg-accent-soft text-accent border border-accent"><?php echo L('prod_pill_pack'); ?></span>
+                            <?php endif; ?>
+                        </td>
                         <td class="text-muted"><?php echo htmlspecialchars($p['referencia']); ?></td>
                         <td>
                             <span class="cat-pill">
@@ -308,7 +326,7 @@
                 </tr>
             </thead>
             <tbody id="packsTableBody">
-                <?php foreach ($avProductos['productos'] as $p): if (!$p['es_pack']) continue; ?>
+                <?php foreach ($avProductos['packs'] as $p): ?>
                     <tr class="product-row row-tipo-pack"
                         data-nombre="<?php echo strtolower(htmlspecialchars($p['nombre'])); ?>"
                         data-codigo="<?php echo strtolower(htmlspecialchars($p['referencia'])); ?>"
@@ -1248,7 +1266,9 @@
         term: '',
         cat: '',
         minPrice: '',
-        maxPrice: ''
+        maxPrice: '',
+        estado: 'all',
+        sortBy: ''
     };
 
     function debounce(func, timeout = 300) {
@@ -1279,6 +1299,8 @@
                     estado: currentFilters.estado,
                     minPrice: currentFilters.minPrice,
                     maxPrice: currentFilters.maxPrice,
+                    sort_by: currentFilters.sortBy,
+                    excluir_packs: true,
                     limit: limit,
                     offset: offset
                 })
@@ -1310,14 +1332,14 @@
 
         let html = '';
         lista.forEach(p => {
-            if (p.es_pack) return; // En esta pestaña no mostramos packs
-
             const stock = parseInt(p.stock || 0);
             const stockMin = parseInt(p.stock_minimo || 0);
             const esCritico = (stockMin > 0 && stock <= stockMin);
             const statusClass = p.activo ? 'status-active' : 'status-inactive';
             const statusIcon = p.activo ? 'fa-circle-check' : 'fa-circle-xmark';
             const statusText = p.activo ? "<?php echo L('prod_pill_active'); ?>" : "<?php echo L('prod_pill_inactive'); ?>";
+
+            const packBadge = p.es_pack ? '<span class="ml-8 px-6 py-2 br-4 fs-10 bg-accent-soft text-accent border border-accent"><?php echo L('prod_pill_pack'); ?></span>' : '';
 
             let iconHtml = '';
             if (p.icono && p.icono.startsWith('data:image')) {
@@ -1394,7 +1416,8 @@
         currentFilters.minPrice = document.getElementById('filterPriceMin') ? document.getElementById('filterPriceMin').value : '';
         currentFilters.maxPrice = document.getElementById('filterPriceMax') ? document.getElementById('filterPriceMax').value : '';
         currentFilters.estado = document.getElementById('filterEstado') ? document.getElementById('filterEstado').value : 'all';
-        
+        currentFilters.sortBy = document.getElementById('filterSort') ? document.getElementById('filterSort').value : '';
+
         loadProducts(1);
     }, 400);
 
@@ -1465,10 +1488,12 @@
     function calcularPrecioDesdeMargen() {
         const coste = parseFloat(document.getElementById('prodPrecioCoste').value) || 0;
         const margen = parseFloat(document.getElementById('prodMargen').value) || 0;
+        const { iva } = getDatoIVA();
         const inputVenta = document.getElementById('prodPrecioVenta');
 
         if (coste >= 0) {
-            const precioVenta = coste * (1 + (margen / 100));
+            // PVP = coste × (1 + margen%) × (1 + IVA%)
+            const precioVenta = coste * (1 + (margen / 100)) * (1 + (iva / 100));
             const keepPrecision = document.getElementById('prodMantenerPrecision')?.checked;
             inputVenta.value = keepPrecision ? precioVenta.toString() : precioVenta.toFixed(2);
         }
@@ -1477,10 +1502,13 @@
     function calcularMargenDesdePrecio() {
         const coste = parseFloat(document.getElementById('prodPrecioCoste').value) || 0;
         const venta = parseFloat(document.getElementById('prodPrecioVenta').value.replace(',', '.')) || 0;
+        const { iva } = getDatoIVA();
         const inputMargen = document.getElementById('prodMargen');
 
         if (coste > 0) {
-            const margen = ((venta / coste) - 1) * 100;
+            // Margen = (PVP_sin_IVA / coste - 1) × 100
+            const ventaSinIva = venta / (1 + (iva / 100));
+            const margen = ((ventaSinIva / coste) - 1) * 100;
             inputMargen.value = margen.toFixed(2);
         } else {
             inputMargen.value = '0.00';
@@ -1733,7 +1761,7 @@
         // Debounce para no saturar la API
         if (timerPreviewMargen) clearTimeout(timerPreviewMargen);
         timerPreviewMargen = setTimeout(async () => {
-            const motivo = document.getElementById('massMargenMotivo').value.trim(); if (!motivo) { showCustomAlert(<?php echo json_encode(L('prod_js_error', true)); ?>, <?php echo json_encode(L('prod_js_reason_req', true)); ?>, 'error'); btn.disabled = false; btn.innerHTML = oldHtml; return; } const categoria = document.getElementById('massCategoriaSelect').value;
+            const categoria = document.getElementById('massCategoriaSelect').value;
             try {
                 const resp = await fetch('api/aplicarMargenMasivo.php', {
                     method: 'POST',
@@ -2139,33 +2167,35 @@
     }
 
     async function excluirDeRegla(idProducto, idRegla, tipo) {
-        if (!confirm(<?php echo json_encode(L('prod_js_confirm_exclude_title', true)); ?>.replace('{tipo}', (tipo === 'tarifa' ? <?php echo json_encode(L('prod_modal_pill_tariff', true)); ?>.toLowerCase() : <?php echo json_encode(L('prod_modal_pill_promo', true)); ?>.toLowerCase())))) return;
-
-        try {
-            const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-            const resp = await fetch('api/gestionExclusiones.php', {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'x-csrf-token': token 
-                },
-                body: JSON.stringify({
-                    accion: 'excluir',
-                    id_producto: idProducto,
-                    id_regla: idRegla,
-                    tipo: tipo
-                })
-            });
-            const data = await resp.json();
-            if (data.ok) {
-                if (typeof showToast === 'function') showToast(<?php echo json_encode(L('prod_js_excluded_success', true)); ?>);
-                cargarTarifasProducto(idProducto);
-            } else {
-                showCustomAlert(<?php echo json_encode(L('prod_js_error', true)); ?>, data.error, 'error');
+        const msg = <?php echo json_encode(L('prod_js_confirm_exclude_title', true)); ?>.replace('{tipo}', (tipo === 'tarifa' ? <?php echo json_encode(L('prod_modal_pill_tariff', true)); ?>.toLowerCase() : <?php echo json_encode(L('prod_modal_pill_promo', true)); ?>.toLowerCase()));
+        
+        showCustomConfirm(<?php echo json_encode(L('modal_confirm_title', true)); ?>, msg, async () => {
+            try {
+                const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+                const resp = await fetch('api/gestionExclusiones.php', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'x-csrf-token': token 
+                    },
+                    body: JSON.stringify({
+                        accion: 'excluir',
+                        id_producto: idProducto,
+                        id_regla: idRegla,
+                        tipo: tipo
+                    })
+                });
+                const data = await resp.json();
+                if (data.ok) {
+                    if (typeof showToast === 'function') showToast(<?php echo json_encode(L('prod_js_excluded_success', true)); ?>);
+                    cargarTarifasProducto(idProducto);
+                } else {
+                    showCustomAlert(<?php echo json_encode(L('prod_js_error', true)); ?>, data.error, 'error');
+                }
+            } catch (e) {
+                showCustomAlert(<?php echo json_encode(L('prod_js_error', true)); ?>, <?php echo json_encode(L('prod_js_connection', true)); ?> + ": " + e.message, 'error');
             }
-        } catch (e) {
-            showCustomAlert(<?php echo json_encode(L('prod_js_error', true)); ?>, <?php echo json_encode(L('prod_js_connection', true)); ?> + ": " + e.message, 'error');
-        }
+        }, <?php echo json_encode(L('modal_btn_confirm', true)); ?>, 'danger');
     }
 
     function cerrarModalProducto() {
@@ -2525,8 +2555,8 @@
                         });
                         const r = await resp.json();
                         if (r.ok) {
-                            const targetRow = document.querySelector(`.product-row[data-id="${id}"]`) ||
-                                Array.from(document.querySelectorAll('.product-row')).find(row => row.innerHTML.includes(`eliminarProducto(${id},`));
+                            const targetRow = document.querySelector(`#tbodyProductos tr[data-id="${id}"]`) ||
+                                document.querySelector(`#tbodyPacks tr[data-id="${id}"]`);
 
                             if (targetRow) {
                                 targetRow.style.transition = 'opacity 0.3s, transform 0.3s';
@@ -2648,7 +2678,7 @@
                 document.getElementById('nuevoNS').value = '';
                 cargarNS(idProd);
             } else {
-                alert(<?php echo json_encode(L('prod_js_error', true)); ?> + ": " + (r.error || <?php echo json_encode(L('error_unknown', true)); ?>));
+                showCustomAlert(<?php echo json_encode(L('error', true)); ?>, <?php echo json_encode(L('prod_js_error', true)); ?> + ": " + (r.error || <?php echo json_encode(L('error_unknown', true)); ?>), "error");
             }
         } catch (err) {
             console.error(err);
@@ -2702,29 +2732,37 @@
         const filtersPrecios = document.getElementById('filtersPrecios');
 
         if (tabId === 'productos') {
-            btnProd.classList.add('active');
-            btnPacks.classList.remove('active');
+            if (btnProd) btnProd.classList.add('active');
+            if (btnPacks) btnPacks.classList.remove('active');
 
-            contentProd.classList.add('active');
-            contentProd.classList.remove('d-none');
-            contentPacks.classList.add('d-none');
-            contentPacks.classList.remove('active');
+            if (contentProd) {
+                contentProd.classList.add('active');
+                contentProd.classList.remove('d-none');
+            }
+            if (contentPacks) {
+                contentPacks.classList.add('d-none');
+                contentPacks.classList.remove('active');
+            }
 
-            btnNuevoProd.classList.remove('d-none');
-            btnNuevoPack.classList.add('d-none');
-            filtersPrecios.classList.remove('d-none');
+            if (btnNuevoProd) btnNuevoProd.classList.remove('d-none');
+            if (btnNuevoPack) btnNuevoPack.classList.add('d-none');
+            if (filtersPrecios) filtersPrecios.classList.remove('d-none');
         } else {
-            btnPacks.classList.add('active');
-            btnProd.classList.remove('active');
+            if (btnPacks) btnPacks.classList.add('active');
+            if (btnProd) btnProd.classList.remove('active');
 
-            contentPacks.classList.add('active');
-            contentPacks.classList.remove('d-none');
-            contentProd.classList.add('d-none');
-            contentProd.classList.remove('active');
+            if (contentPacks) {
+                contentPacks.classList.add('active');
+                contentPacks.classList.remove('d-none');
+            }
+            if (contentProd) {
+                contentProd.classList.add('d-none');
+                contentProd.classList.remove('active');
+            }
 
-            btnNuevoPack.classList.remove('d-none');
-            btnNuevoProd.classList.add('d-none');
-            filtersPrecios.classList.add('d-none');
+            if (btnNuevoPack) btnNuevoPack.classList.remove('d-none');
+            if (btnNuevoProd) btnNuevoProd.classList.add('d-none');
+            if (filtersPrecios) filtersPrecios.classList.add('d-none');
         }
     }
 
@@ -2745,51 +2783,64 @@
     }
 
 
+    let _packSearchTimer = null;
+
     function buscarProductoParaPack(query) {
         const resCont = document.getElementById('packSearchResults');
-        query = query.trim().toLowerCase();
+        query = query.trim();
         if (query.length < 2) {
             resCont.style.display = 'none';
             return;
         }
 
-        const idEnEdicion = parseInt(document.getElementById('packId').value) || 0;
-        const yaAñadidos = componentesPackActivos.map(c => parseInt(c.id_producto || c.id));
+        clearTimeout(_packSearchTimer);
+        _packSearchTimer = setTimeout(async () => {
+            const idEnEdicion = parseInt(document.getElementById('packId').value) || 0;
+            const yaAñadidos = componentesPackActivos.map(c => parseInt(c.id_producto || c.id));
 
-        const filtrados = TODOS_LOS_PRODUCTOS.filter(p => {
-            if (p.id === idEnEdicion) return false; // Not itself
-            if (p.es_pack) return false; // Pack of packs not supported yet
-            if (yaAñadidos.includes(p.id)) return false; // Already added
+            try {
+                const resp = await fetch('api/gestionProducto.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ accion: 'listar', term: query, excluir_packs: true, limit: 10, offset: 0 })
+                });
+                const r = await resp.json();
+                if (!r.ok) return;
 
-            return p.nombre.toLowerCase().includes(query) || (p.referencia && p.referencia.toLowerCase().includes(query));
-        }).slice(0, 8); // top 8
+                const filtrados = r.productos
+                    .filter(p => parseInt(p.id) !== idEnEdicion && !yaAñadidos.includes(parseInt(p.id)))
+                    .slice(0, 8);
 
-        resCont.innerHTML = '';
-        if (filtrados.length === 0) {
-            resCont.innerHTML = '<div class="p-16 text-muted fs-12 text-center"><i class="fa-solid fa-circle-info mr-8"></i> ' + <?php echo json_encode(L('prod_js_no_results', true)); ?> + '</div>';
-        } else {
-            filtrados.forEach(p => {
-                const div = document.createElement('div');
-                div.className = 'search-result-item';
-                div.innerHTML = `
-                    <div class="d-flex ai-center gap-12 full-width">
-                        <div class="result-icon"><i class="fa-solid fa-box fs-14"></i></div>
-                        <div class="flex-1 overflow-hidden">
-                            <div class="result-title text-ellipsis">${p.nombre}</div>
-                            <div class="result-meta font-mono">${p.referencia || 'S/R'}</div>
-                        </div>
-                        <div class="result-price">${(parseFloat(p.precio_venta)).toFixed(2)}€</div>
-                    </div>
-                `;
-                div.onclick = () => {
-                    añadirComponente(p);
-                    document.getElementById('packSearchInput').value = '';
-                    resCont.style.display = 'none';
-                };
-                resCont.appendChild(div);
-            });
-        }
-        resCont.style.display = 'block';
+                resCont.innerHTML = '';
+                if (filtrados.length === 0) {
+                    resCont.innerHTML = '<div class="p-16 text-muted fs-12 text-center"><i class="fa-solid fa-circle-info mr-8"></i> ' + <?php echo json_encode(L('prod_js_no_results', true)); ?> + '</div>';
+                } else {
+                    filtrados.forEach(p => {
+                        const div = document.createElement('div');
+                        div.className = 'search-result-item';
+                        div.innerHTML = `
+                            <div class="d-flex ai-center gap-12 full-width">
+                                <div class="result-icon"><i class="fa-solid fa-box fs-14"></i></div>
+                                <div class="flex-1 overflow-hidden">
+                                    <div class="result-title text-ellipsis">${p.nombre}</div>
+                                    <div class="result-meta font-mono">${p.referencia || 'S/R'}</div>
+                                </div>
+                                <div class="result-price">${(parseFloat(p.precio_venta || 0)).toFixed(2)}€</div>
+                            </div>
+                        `;
+                        div.onclick = () => {
+                            añadirComponente(p);
+                            document.getElementById('packSearchInput').value = '';
+                            resCont.style.display = 'none';
+                        };
+                        resCont.appendChild(div);
+                    });
+                }
+                resCont.style.display = 'block';
+            } catch (e) {
+                // silencioso — el dropdown simplemente no se muestra
+            }
+        }, 300);
     }
 
     // Hide search results when click outside
@@ -2805,7 +2856,7 @@
             id_producto: prod.id,
             id: prod.id, // For compatibility
             nombre: prod.nombre,
-            referencia: prod.codigo,
+            referencia: prod.referencia || prod.codigo || '',
             cantidad: 1
         });
         renderComponentesPack();
@@ -2866,7 +2917,7 @@
         e.preventDefault();
 
         if (componentesPackActivos.length === 0) {
-            alert(<?php echo json_encode(L('prod_js_pack_min_components', true)); ?>);
+            showCustomAlert(<?php echo json_encode(L('modal_alert_title', true)); ?>, <?php echo json_encode(L('prod_js_pack_min_components', true)); ?>, "warning");
             return;
         }
 
@@ -2875,6 +2926,7 @@
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + <?php echo json_encode(L('prod_js_saving', true)); ?>;
 
         const id = document.getElementById('packId').value || null;
+        const pvpSanitizado = document.getElementById('packPrecioVenta').value.replace(',', '.');
         const codIva = document.getElementById('packIvaTipo').value;
         const listaIvas = Array.isArray(TIPOS_IVA) ? TIPOS_IVA : Object.values(TIPOS_IVA);
         const tipoIva = listaIvas.find(t => t.codigo === codIva);
@@ -2888,7 +2940,7 @@
             icono: document.getElementById('packIcono').value || '',
             categoria: document.getElementById('packCat').value,
             precio_coste: 0,
-            precio_venta: document.getElementById('packPrecioVenta').value,
+            precio_venta: pvpSanitizado,
             iva: ivaPerc,
             codigo_iva: codIva,
             stock_actual: 0,
@@ -2921,10 +2973,10 @@
                         .join('\n');
                     if (errorList) msg += '\n\nDetalles:\n' + errorList;
                 }
-                alert(<?php echo json_encode(L('prod_js_error_save', true)); ?> + ":\n" + msg);
+                showCustomAlert(<?php echo json_encode(L('prod_js_error_save', true)); ?>, msg, "error");
             }
         } catch (err) {
-            alert(<?php echo json_encode(L('prod_js_connection', true)); ?>);
+            showCustomAlert(<?php echo json_encode(L('prod_js_error', true)); ?>, <?php echo json_encode(L('prod_js_connection', true)); ?>, "error");
         } finally {
             btn.disabled = false;
             btn.innerHTML = <?php echo json_encode(L('prod_modal_btn_save_pack', true)); ?>;
@@ -2996,26 +3048,6 @@
     });
 
     // Mini-toast local para esta página (puede no tener el global de main.js)
-    function showNotification(html, type = 'info') {
-        let notif = document.getElementById('ie-notif');
-        if (!notif) {
-            notif = document.createElement('div');
-            notif.id = 'ie-notif';
-            document.body.appendChild(notif);
-        }
-        const colors = {
-            info: '#1a2fbf',
-            success: '#0f8060',
-            error: '#c0392b'
-        };
-        notif.style.cssText = `position:fixed;bottom:24px;right:24px;background:${colors[type]};color:white;padding:14px 20px;border-radius:12px;font-size:13px;font-weight:600;z-index:99999;box-shadow:0 4px 20px rgba(0,0,0,0.2);transition:opacity 0.3s;max-width:400px;line-height:1.4;`;
-        notif.innerHTML = html;
-        notif.style.opacity = '1';
-        clearTimeout(notif._timeout);
-        notif._timeout = setTimeout(() => {
-            notif.style.opacity = '0';
-        }, 3500);
-    }
 
     // --- GESTIÓN DE CATEGORÍAS ---
     

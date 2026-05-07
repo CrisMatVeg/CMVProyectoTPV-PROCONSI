@@ -116,39 +116,78 @@
         }
 
         togglePromoFields();
-        // Reset a la primera pestaña
+        // Reset cache
+        _cachedPromoProdRows = [];
+        _cachedPromoCatRows = [];
+        
         const firstTab = document.querySelector('#promoModal .tab-btn[data-tab="general"]');
         if (firstTab) switchTabPromo(firstTab, 'tab-promo-general');
 
         modal.classList.add('visible');
     };
 
-    window.filtrarProductosPromo = function() {
-        const input = document.getElementById('promoBusquedaProd');
-        if (!input) return;
-        const val = input.value.toLowerCase().trim();
-        const rows = document.querySelectorAll('.promo-product-row');
-        
-        rows.forEach(row => {
-            const name = (row.dataset.name || '').toLowerCase();
-            const ref = (row.dataset.ref || '').toLowerCase();
-            const matches = name.includes(val) || ref.includes(val);
-            row.classList.toggle('hidden-filter-row', !matches);
-        });
+    let _cachedPromoProdRows = [];
+    let _cachedPromoCatRows = [];
+
+    // Build cache when modal opens or when tab changes to filters
+    window.buildPromoFiltersCache = function() {
+        _cachedPromoProdRows = Array.from(document.querySelectorAll('.promo-product-row'));
+        _cachedPromoCatRows = Array.from(document.querySelectorAll('.promo-category-row'));
     };
 
+    let _searchPromoTimer;
+    window.filtrarProductosPromo = function() {
+        clearTimeout(_searchPromoTimer);
+        _searchPromoTimer = setTimeout(() => {
+            const input = document.getElementById('promoBusquedaProd');
+            if (!input) return;
+            const val = input.value.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, "");
+            
+            // Optimization: Cache rows if not already cached
+            if (_cachedPromoProdRows.length === 0) buildPromoFiltersCache();
+
+            // Use a fast loop and direct style manipulation
+            const len = _cachedPromoProdRows.length;
+            const container = document.getElementById('listadoProductosPromo');
+            
+            // Minimize reflows by hiding container during heavy work
+            if (container) container.style.display = 'none';
+
+            for (let i = 0; i < len; i++) {
+                const row = _cachedPromoProdRows[i];
+                const name = (row.getAttribute('data-name') || '').normalize('NFD').replace(/[\u0300-\u036f]/g, "");
+                const ref = (row.getAttribute('data-ref') || '').normalize('NFD').replace(/[\u0300-\u036f]/g, "");
+                const matches = !val || name.includes(val) || ref.includes(val);
+                
+                row.style.display = matches ? '' : 'none';
+                row.classList.toggle('hidden-filter-row', !matches);
+            }
+
+            if (container) container.style.display = '';
+        }, 100);
+    };
+
+    let _searchCatPromoTimer;
     window.filtrarCategoriasPromo = function() {
-        const input = document.getElementById('promoBusquedaCat');
-        if (!input) return;
-        const val = input.value.toLowerCase().trim();
-        const rows = document.querySelectorAll('.promo-category-row');
-        
-        rows.forEach(row => {
-            const name = (row.dataset.name || '').toLowerCase();
-            const code = (row.dataset.code || '').toLowerCase();
-            const matches = name.includes(val) || code.includes(val);
-            row.classList.toggle('hidden-filter-row', !matches);
-        });
+        clearTimeout(_searchCatPromoTimer);
+        _searchCatPromoTimer = setTimeout(() => {
+            const input = document.getElementById('promoBusquedaCat');
+            if (!input) return;
+            const val = input.value.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, "");
+            
+            if (_cachedPromoCatRows.length === 0) buildPromoFiltersCache();
+
+            const len = _cachedPromoCatRows.length;
+            for (let i = 0; i < len; i++) {
+                const row = _cachedPromoCatRows[i];
+                const name = (row.getAttribute('data-name') || '').normalize('NFD').replace(/[\u0300-\u036f]/g, "");
+                const code = (row.getAttribute('data-code') || '').normalize('NFD').replace(/[\u0300-\u036f]/g, "");
+                const matches = !val || name.includes(val) || code.includes(val);
+                
+                row.style.display = matches ? '' : 'none';
+                row.classList.toggle('hidden-filter-row', !matches);
+            }
+        }, 100);
     };
 
     window.updateProdCountPromo = function() {
@@ -166,10 +205,22 @@
     };
 
     window.switchTabPromo = function(btn, tabId) {
-        document.querySelectorAll('#promoModal .tab-btn').forEach(b => b.classList.remove('active'));
+        const modal = document.getElementById('promoModal');
+        if (!modal) return;
+
+        modal.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        document.querySelectorAll('#promoModal .tab-pane').forEach(p => p.classList.remove('active'));
-        document.getElementById(tabId).classList.add('active');
+
+        // Build cache if switching to filters for the first time or if empty
+        if (tabId === 'tab-promo-filtros') {
+            buildPromoFiltersCache();
+        }
+
+        requestAnimationFrame(() => {
+            modal.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+            const target = document.getElementById(tabId);
+            if (target) target.classList.add('active');
+        });
     };
 
     window.cerrarModalPromo = function() {
@@ -356,6 +407,12 @@
 
     .tab-pane.active {
         display: block;
+        animation: fadeIn 0.2s ease-out;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(4px); }
+        to { opacity: 1; transform: translateY(0); }
     }
 
     /* Special rule for Filters Tab: internally scrollable lists, not the container */
@@ -396,6 +453,21 @@
     .promo-product-row:has(input:checked) {
         background: var(--blue-light);
         border-color: var(--accent);
+    }
+
+    .promo-product-row, .promo-category-row, .checkbox-item {
+        user-select: none;
+        -webkit-user-select: none;
+    }
+
+    /* Optimization for large lists */
+    #listadoProductosPromo {
+        contain: content;
+        min-height: 200px;
+    }
+
+    .hidden-filter-row {
+        display: none !important;
     }
 
     /* Modal Spacing & Components */
@@ -699,6 +771,7 @@
                     <div class="form-group mb-0">
                         <label class="form-label fs-11" id="labelValor"><?php echo L('promos_label_value'); ?></label>
                         <input type="number" id="promoValor" class="form-input text-right font-mono" step="0.01" min="0">
+                        <span class="form-error" id="err-valor"></span>
                     </div>
                     <div class="form-group mb-0">
                         <label class="form-label fs-11"><?php echo L('promos_label_min'); ?></label>

@@ -179,6 +179,12 @@ export const UiController = {
     const sidebar = document.querySelector(".order-panel");
     if (!resizer || !sidebar) return;
 
+    // Cargar ancho guardado
+    const savedWidth = localStorage.getItem("tpv-sidebar-width");
+    if (savedWidth) {
+        sidebar.style.width = savedWidth + "px";
+    }
+
     let isResizing = false;
     resizer.addEventListener("mousedown", (e) => {
         isResizing = true;
@@ -190,6 +196,7 @@ export const UiController = {
         const width = window.innerWidth - e.clientX;
         if (width >= 350 && width <= 600) {
             sidebar.style.width = width + "px";
+            localStorage.setItem("tpv-sidebar-width", width);
         }
     });
 
@@ -209,11 +216,18 @@ export const UiController = {
     // We render the PRODUCTS array which is managed by ProductManager
     // but we can still apply secondary local filters (like tags or price ranges)
     let filtered = AppConfig.products.filter((p) => {
-      // Category filter (mostly server-side, but good to keep for consistency)
-      let matchesCat = (AppState.activeCat === "all") || 
-                       (AppState.activeCat === "baja" && p.inactive) || 
-                       (!p.inactive && p.cat == AppState.activeCat);
-      if (!matchesCat) return false;
+      // Packs category: show only packs; all other categories: exclude packs
+      if (AppState.activeCat === "packs") {
+        if (!p.es_pack) return false;
+        // Apply search/price/stock filters but skip category matching
+      } else {
+        if (p.es_pack) return false;
+        // Category filter (mostly server-side, but good to keep for consistency)
+        let matchesCat = (AppState.activeCat === "all") ||
+                         (AppState.activeCat === "baja" && p.inactive) ||
+                         (!p.inactive && p.cat == AppState.activeCat);
+        if (!matchesCat) return false;
+      }
 
       // Local search refinement (if any)
       const matchesSearch = (p.name || "").toLowerCase().includes(AppState.searchTerm.toLowerCase()) || 
@@ -231,12 +245,23 @@ export const UiController = {
       // Tag/Attribute Filter
       if (AppState.activeTag) {
         if (!p.atributos) return false;
+        let attrs = [];
         try {
-          const attrs = JSON.parse(p.atributos);
-          if (!Array.isArray(attrs) || !attrs.includes(AppState.activeTag)) return false;
+          attrs = typeof p.atributos === 'string' ? JSON.parse(p.atributos) : p.atributos;
         } catch (e) {
-          return false;
+          // Fallback for simple comma-separated strings
+          if (typeof p.atributos === 'string') {
+            attrs = p.atributos.split(',').map(s => s.trim());
+          }
         }
+        
+        if (!Array.isArray(attrs)) return false;
+
+        // Flatten in case of nested arrays and normalize to uppercase for comparison
+        const flatAttrs = attrs.flat(2).map(a => String(a).toUpperCase());
+        const searchTag = String(AppState.activeTag).toUpperCase();
+        
+        if (!flatAttrs.includes(searchTag)) return false;
       }
 
       return true;
@@ -297,7 +322,7 @@ export const UiController = {
   },
 
   updateTotalsUI(totals) {
-    document.getElementById("subtotal").textContent = Utils.fmt2(totals.totalBase);
+    document.getElementById("subtotal").textContent = Utils.fmt2(totals.subtotal);
     document.getElementById("totalAmt").textContent = Utils.fmt2(totals.total);
     document.getElementById("chargeTotal").textContent = Utils.fmt2(totals.total);
     document.getElementById("discountAmt").textContent = "-" + Utils.fmt2(totals.totalDiscount);
@@ -369,9 +394,15 @@ export const UiController = {
         let tagsHtml = '';
         if (p.atributos) {
           try {
-            const attrs = typeof p.atributos === 'string' ? JSON.parse(p.atributos) : p.atributos;
-            if (Array.isArray(attrs) && attrs.length > 0) {
-              tagsHtml = `<div class="product-tags">${attrs.map(t => `<span class="product-badge">${t}</span>`).join("")}</div>`;
+            let attrs = typeof p.atributos === 'string' ? JSON.parse(p.atributos) : p.atributos;
+            if (Array.isArray(attrs)) {
+              // Flatten and deduplicate
+              const flatAttrs = [...new Set(attrs.flat(2))];
+              let badgeHtml = '';
+              flatAttrs.forEach(a => {
+                badgeHtml += `<span class="product-badge">${a}</span>`;
+              });
+              tagsHtml = `<div class="product-tags">${badgeHtml}</div>`;
             }
           } catch (e) {
             console.error("Error parsing tags for card:", e);
@@ -421,6 +452,9 @@ export const UiController = {
               <button class="qty-btn" onclick="app.changeQty('${item.cartKey}', +1)" aria-label="${window.I18N?.increaseQty || "Aumentar cantidad"}"><i class="fa-solid fa-plus" aria-hidden="true"></i></button>
             </div>
             <div class="order-item-total">${Utils.fmt2(item.price * item.qty)}</div>
+            <button class="btn-remove-item" onclick="app.removeFromCart('${item.cartKey}')" title="Quitar todo" aria-label="Quitar todo">
+              <i class="fa-solid fa-trash"></i>
+            </button>
           </div>`;
     },
     emptyCart() {

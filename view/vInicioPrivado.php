@@ -1,7 +1,230 @@
-<div class="main">
-    <!-- CATALOG PANEL -->
-    <div class="catalog-panel">
+    <!-- NOTIFICACIONES VERIFACTU -->
+    <?php
+    require_once __DIR__ . '/../model/AeatQueueService.php';
+    $resumenAEAT = (new AeatQueueService())->obtenerResumenEstado();
+    if ($resumenAEAT['criticos'] > 0 || $resumenAEAT['pendientes_24h'] > 0 || $resumenAEAT['subsanaciones'] > 0): ?>
+        <div class="verifactu-alert-banner">
+            <div class="d-flex ai-center gap-12">
+                <div class="alert-icon">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                </div>
+                <div class="alert-content">
+                    <div class="alert-title">Atención: Incidencias VeriFactu</div>
+                    <div class="alert-msg">
+                        <?php if ($resumenAEAT['criticos'] > 0): ?>
+                            <span class="mr-12"><i class="fa-solid fa-circle-xmark text-red mr-4"></i> <strong><?php echo $resumenAEAT['criticos']; ?></strong> rechazos críticos</span>
+                        <?php endif; ?>
+                        <?php if ($resumenAEAT['pendientes_24h'] > 0): ?>
+                            <span class="mr-12"><i class="fa-solid fa-clock text-amber mr-4"></i> Sin conexión hace >24h</span>
+                        <?php endif; ?>
+                        <?php if ($resumenAEAT['subsanaciones'] > 0): ?>
+                            <span><i class="fa-solid fa-wrench text-orange mr-4"></i> <strong><?php echo $resumenAEAT['subsanaciones']; ?></strong> correcciones pendientes</span>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <a href="index.php?irHistorial&soloIncidencias=1&periodo=todo" class="btn-alert-action">Gestionar Incidencias</a>
+            </div>
+        </div>
+        <style>
+            .verifactu-alert-banner {
+                background: linear-gradient(90deg, #fff5f5 0%, #fff 100%);
+                border-left: 5px solid var(--red);
+                padding: 12px 24px;
+                margin: 10px 20px 0 20px;
+                border-radius: 12px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+                border: 1px solid rgba(231, 76, 60, 0.1);
+                border-left-width: 5px;
+            }
+            .alert-icon { font-size: 24px; color: var(--red); }
+            .alert-title { font-weight: 800; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: #2c3e50; }
+            .alert-msg { font-size: 12px; color: #5f6c7b; margin-top: 2px; }
+            .btn-alert-action {
+                margin-left: auto;
+                padding: 6px 16px;
+                background: var(--red);
+                color: white;
+                border-radius: 8px;
+                font-size: 11px;
+                font-weight: 700;
+                text-decoration: none;
+                transition: all 0.2s;
+            }
+            .btn-alert-action:hover { transform: translateY(-1px); box-shadow: 0 4px 8px rgba(231, 76, 60, 0.3); }
+        </style>
+    <?php endif; ?>
+
+    <div class="main">
+        <!-- CATALOG PANEL -->
+        <div class="catalog-panel">
         <div class="search-bar">
+            <!-- SEMÁFORO VERIFACTU -->
+            <?php
+            $colorSemaforo = 'text-green';
+            $iconSemaforo = 'fa-circle-check';
+            $tituloSemaforo = 'VeriFactu: Sistema Operativo';
+            $msgSemaforo = 'Todos los registros han sido enviados y aceptados.';
+
+            if ($resumenAEAT['criticos'] > 0 || $resumenAEAT['subsanaciones'] > 0) {
+                $colorSemaforo = 'text-red animate-pulse';
+                $iconSemaforo = 'fa-circle-xmark';
+                $tituloSemaforo = 'VeriFactu: ATENCIÓN REQUERIDA';
+                $msgSemaforo = "Existen {$resumenAEAT['criticos']} rechazos y {$resumenAEAT['subsanaciones']} subsanaciones pendientes.";
+            } elseif ($resumenAEAT['pendientes_total'] > 0) {
+                $colorSemaforo = 'text-amber';
+                $iconSemaforo = 'fa-circle-dot';
+                $tituloSemaforo = 'VeriFactu: Envíos Pendientes';
+                $msgSemaforo = "Hay {$resumenAEAT['pendientes_total']} registros en cola esperando conexión.";
+            }
+            ?>
+            <div class="verifactu-status-lite <?php echo $colorSemaforo; ?>" title="<?php echo $tituloSemaforo; ?>&#10;<?php echo $msgSemaforo; ?>" onclick="location.href='index.php?irHistorial&soloIncidencias=1&periodo=todo'">
+                <i class="fa-solid <?php echo $iconSemaforo; ?>"></i>
+                <span class="fs-9 fw-900 ml-4">AEAT</span>
+            </div>
+            <div class="verifactu-queue-timer" title="Próximo reintento de la cola VeriFactu">
+                <i class="fa-solid fa-clock-rotate-left fs-10"></i>
+                <span class="queue-countdown fs-10 fw-700" style="font-variant-numeric: tabular-nums; min-width: 22px; display: inline-block;">--</span>
+            </div>
+            <style>
+                .verifactu-queue-timer {
+                    display: flex; align-items: center; gap: 4px;
+                    padding: 6px 9px; margin-right: 8px;
+                    background: var(--surface); border: 1.5px solid var(--border);
+                    border-radius: 8px; color: var(--text-muted); cursor: default;
+                    font-size: 10px;
+                }
+            </style>
+            <script>
+                (function () {
+                    // Datos iniciales desde el servidor
+                    let nextTs = 0;
+                    let isBlocked = false;
+                    let lastResumen = null;
+
+                    function updateDisplay(resumen) {
+                        lastResumen = resumen;
+                        isBlocked = (parseInt(resumen.criticos) > 0 || parseInt(resumen.subsanaciones) > 0);
+                        const rawDelivery = resumen.proximo_envio;
+                        // Normalizar a ISO 8601 (reemplazar espacio por T si MySQL lo devuelve así)
+                        const nextDelivery = rawDelivery ? rawDelivery.replace(' ', 'T') : null;
+                        nextTs = nextDelivery ? Math.floor(new Date(nextDelivery).getTime() / 1000) : 0;
+
+                        // Actualizar semáforo (opcional pero recomendado)
+                        const semaforo = document.querySelector('.verifactu-status-lite');
+                        if (semaforo) {
+                            if (isBlocked) {
+                                semaforo.className = 'verifactu-status-lite text-red animate-pulse';
+                                semaforo.querySelector('i').className = 'fa-solid fa-circle-xmark';
+                            } else if (parseInt(resumen.pendientes_total) > 0) {
+                                semaforo.className = 'verifactu-status-lite text-amber';
+                                semaforo.querySelector('i').className = 'fa-solid fa-circle-dot';
+                            } else {
+                                semaforo.className = 'verifactu-status-lite text-green';
+                                semaforo.querySelector('i').className = 'fa-solid fa-circle-check';
+                            }
+                        }
+                    }
+
+                    let heartbeatInFlight = false;
+                    let _pollTimer = null;
+
+                    // Reprograma el próximo fetch: 3 s si hay actividad, 30 s en reposo
+                    // (el reposo de 30 s evita parar por completo: detecta ventas nuevas)
+                    function schedulePoll() {
+                        clearTimeout(_pollTimer);
+                        const isActive = isBlocked
+                            || nextTs > 0
+                            || parseInt(lastResumen?.pendientes_total || 0) > 0;
+                        _pollTimer = setTimeout(fetchStatus, isActive ? 3000 : 30000);
+                    }
+
+                    function fetchStatus() {
+                        const now = Math.floor(Date.now() / 1000);
+                        const hasPending = parseInt(lastResumen?.pendientes_total || 0) > 0;
+                        const timerExpired = (nextTs > 0 && now >= nextTs) || (hasPending && nextTs === 0);
+
+                        // Si el timer ya expiró y hay pendientes, disparar el heartbeat
+                        if (timerExpired && !heartbeatInFlight && !isBlocked) {
+                            heartbeatInFlight = true;
+                            fetch('api/verifactu_stats.php?accion=heartbeat')
+                                .then(r => r.json())
+                                .then(data => {
+                                    if (data.ok && data.resumen) updateDisplay(data.resumen);
+                                })
+                                .catch(e => console.error("Error heartbeat VF:", e))
+                                .finally(() => { heartbeatInFlight = false; schedulePoll(); });
+                            return; // No hace falta la llamada extra de resumen
+                        }
+
+                        // Si no ha expirado, solo actualizamos los stats
+                        fetch('api/verifactu_stats.php?accion=resumen&_t=' + Date.now())
+                            .then(r => r.json())
+                            .then(data => {
+                                if (data.ok) {
+                                    lastResumen = data.resumen;
+                                    updateDisplay(data.resumen);
+                                }
+                            })
+                            .catch(e => console.error("Error polling VF:", e))
+                            .finally(() => schedulePoll());
+                    }
+
+                    function tickCountdown() {
+                        let text = '--';
+                        let color = 'var(--text-muted)';
+
+                        if (isBlocked) {
+                            text = 'STOP';
+                            color = '#ef4444';
+                        } else if (nextTs > 0) {
+                            const secs = Math.max(0, nextTs - Math.floor(Date.now() / 1000));
+                            text = secs + 's';
+                            color = (secs > 0 && secs <= 10) ? '#f57c00' : 'var(--text)';
+                        }
+
+                        const hasCriticos = parseInt(lastResumen?.criticos || 0) > 0;
+                        const titleBlocked = hasCriticos
+                            ? "Cola detenida — rechazos críticos pendientes"
+                            : "Cola detenida — subsanaciones pendientes";
+
+                        document.querySelectorAll('.queue-countdown').forEach(function(el) {
+                            el.textContent = text;
+                            el.style.color = color;
+                            if (isBlocked) {
+                                el.classList.add('animate-pulse');
+                                el.title = titleBlocked;
+                            } else {
+                                el.classList.remove('animate-pulse');
+                                el.title = nextTs > 0 ? "Próximo envío en " + text : "Sin envíos pendientes";
+                            }
+                        });
+                    }
+
+                    // Carga inicial
+                    updateDisplay(<?php echo json_encode($resumenAEAT); ?>);
+                    
+                    tickCountdown();
+                    setInterval(tickCountdown, 1000); // Tick visual cada segundo (siempre)
+                    schedulePoll();                   // Inicia el bucle de polling adaptativo
+                })();
+            </script>
+            <style>
+                .verifactu-status-lite {
+                    display: flex;
+                    align-items: center;
+                    padding: 8px 12px;
+                    background: var(--surface);
+                    border: 2px solid currentColor;
+                    border-radius: 10px;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    margin-right: 8px;
+                }
+                .verifactu-status-lite:hover { transform: scale(1.05); filter: brightness(1.1); }
+                .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+                @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+            </style>
+
             <div class="search-input-fancy">
                 <i class="fa-solid fa-magnifying-glass"></i>
                 <input
@@ -76,6 +299,8 @@
                                 <button class="attr-tab attr-tab-btn d-inline-flex ai-center gap-6"
                                     data-attr="<?php echo htmlspecialchars($attr); ?>"
                                     onclick="app.selectTag('<?php echo htmlspecialchars($attr); ?>')"
+                                    ondblclick="event.preventDefault(); event.stopPropagation();"
+                                    draggable="false"
                                     style="font-size: 11px; padding: 6px 14px;">
                                     <i class="fa-solid fa-tag" style="opacity: 0.5;"></i> <?php echo htmlspecialchars($attr); ?>
                                 </button>
@@ -87,27 +312,33 @@
         </div>
 
 
-        <div class="cat-tabs-container">
-            
-            <div class="cat-tabs" id="catTabs">
-                <button class="cat-tab active" data-cat="all" onclick="app.selectCategory('all')">
-                    <i class="fa-solid fa-border-all"></i>
-                    <span><?php echo L('tpv_cat_all'); ?></span>
-                </button>
-                <?php if (isset($avInicioPrivado) && is_array($avInicioPrivado) && isset($avInicioPrivado['categorias']) && is_array($avInicioPrivado['categorias'])): ?>
-                    <?php foreach ($avInicioPrivado['categorias'] as $c): ?>
-                        <button class="cat-tab" data-cat="<?php echo htmlspecialchars($c['codigo']); ?>" onclick="app.selectCategory('<?php echo htmlspecialchars($c['codigo']); ?>')">
-                            <i class="fa-solid fa-layer-group"></i>
-                            <span><?php echo htmlspecialchars($c['nombre']); ?></span>
-                        </button>
-                    <?php endforeach; ?>
-                <?php endif; ?>
-                <button class="cat-tab" data-cat="baja" style="color: var(--red); border-color: rgba(192, 57, 43, 0.2);" onclick="app.selectCategory('baja')">
-                    <i class="fa-solid fa-arrow-trend-down"></i>
-                    <span><?php echo L('tpv_cat_discontinued'); ?></span>
-                </button>
+        <div class="cat-tabs-wrapper">
+            <div class="scroll-shadow shadow-left" id="shadowLeft"></div>
+            <div class="cat-tabs-container">
+                <div class="cat-tabs" id="catTabs">
+                    <button class="cat-tab active" data-cat="all" onclick="app.selectCategory('all')">
+                        <i class="fa-solid fa-border-all"></i>
+                        <span><?php echo L('tpv_cat_all'); ?></span>
+                    </button>
+                    <?php if (isset($avInicioPrivado) && is_array($avInicioPrivado) && isset($avInicioPrivado['categorias']) && is_array($avInicioPrivado['categorias'])): ?>
+                        <?php foreach ($avInicioPrivado['categorias'] as $c): ?>
+                            <button class="cat-tab" data-cat="<?php echo htmlspecialchars($c['codigo']); ?>" onclick="app.selectCategory('<?php echo htmlspecialchars($c['codigo']); ?>')">
+                                <i class="fa-solid fa-layer-group"></i>
+                                <span><?php echo htmlspecialchars($c['nombre']); ?></span>
+                            </button>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                    <button class="cat-tab" data-cat="packs" style="color: var(--accent);" onclick="app.selectCategory('packs')">
+                        <i class="fa-solid fa-cubes"></i>
+                        <span>Packs</span>
+                    </button>
+                    <button class="cat-tab" data-cat="baja" style="color: var(--red); border-color: rgba(192, 57, 43, 0.2);" onclick="app.selectCategory('baja')">
+                        <i class="fa-solid fa-arrow-trend-down"></i>
+                        <span><?php echo L('tpv_cat_discontinued'); ?></span>
+                    </button>
+                </div>
             </div>
-
+            <div class="scroll-shadow shadow-right" id="shadowRight"></div>
         </div>
 
 
@@ -122,6 +353,32 @@
         window.TPV_LANG = {
             'insufficient_cash': '<?php echo L('tpv_error_insufficient_cash'); ?>'
         };
+
+        // Gestión de sombras en el scroll de categorías
+        document.addEventListener('DOMContentLoaded', () => {
+            const tabs = document.getElementById('catTabs');
+            const shadowL = document.getElementById('shadowLeft');
+            const shadowR = document.getElementById('shadowRight');
+            
+            if (tabs && shadowL && shadowR) {
+                const updateShadows = () => {
+                    const scrollLeft = tabs.scrollLeft;
+                    const maxScroll = tabs.scrollWidth - tabs.clientWidth;
+                    
+                    shadowL.style.opacity = scrollLeft > 10 ? '1' : '0';
+                    shadowR.style.opacity = scrollLeft < maxScroll - 10 ? '1' : '0';
+                };
+                
+                tabs.addEventListener('scroll', updateShadows);
+                window.addEventListener('resize', updateShadows);
+                // Pequeño delay para que el renderizado se complete
+                setTimeout(updateShadows, 500);
+                
+                // Observador por si cambian las categorías dinámicamente
+                const observer = new MutationObserver(updateShadows);
+                observer.observe(tabs, { childList: true });
+            }
+        });
     </script>
 
     <!-- ORDER PANEL -->
@@ -152,14 +409,14 @@
                 <span><?php echo L('tpv_subtotal'); ?></span>
                 <span id="subtotal">0,00 €</span>
             </div>
+            <div id="ivaBreakdown" class="iva-breakdown">
+                <!-- Dinámico -->
+            </div>
             <div
                 class="total-row d-none text-green"
                 id="discountRow">
                 <span><?php echo L('tpv_discount'); ?></span>
                 <span id="discountAmt">-0,00 €</span>
-            </div>
-            <div id="ivaBreakdown" class="iva-breakdown">
-                <!-- Dinámico -->
             </div>
             <div class="total-row main">
                 <span><?php echo L('tpv_total'); ?></span>
@@ -196,14 +453,6 @@
                 <!-- Botón Vale eliminado y movido dentro del modal de cliente -->
                 <button
                     class="pay-btn"
-                    data-method="a_cuenta"
-                    id="btnACuenta"
-                    onclick="selectSidebarPayment(this)">
-                    <i class="fa-solid fa-file-invoice-dollar"></i>
-                    <?php echo L('tpv_method_account'); ?>
-                </button>
-                <button
-                    class="pay-btn"
                     data-method="mixto"
                     id="btnMixtoSidebar"
                     onclick="selectSidebarPayment(this)">
@@ -218,7 +467,7 @@
                     type="text"
                     id="discountCode"
                     placeholder="<?php echo L('tpv_discount_placeholder'); ?>" />
-                <button class="discount-apply" onclick="applyDiscount()">
+                <button class="discount-apply" onclick="app.applyDiscount()">
                     <?php echo L('tpv_apply'); ?>
                 </button>
             </div>
@@ -420,13 +669,13 @@
             <?php else: ?>
                 <?php if (isset($_SESSION['mensajeErrorCaja'])): ?>
                     <div class="bg-red-light text-red p-12 br-8 fs-12 mb-10 border font-bold">
-                        <?= $_SESSION['mensajeErrorCaja']; unset($_SESSION['mensajeErrorCaja']); ?>
+                        <?= htmlspecialchars($_SESSION['mensajeErrorCaja']); unset($_SESSION['mensajeErrorCaja']); ?>
                     </div>
                 <?php endif; ?>
 
                 <div class="form-group">
                     <label class="form-label fs-13"><?php echo L('cash_open_label_initial'); ?></label>
-                    <input type="number" step="0.01" min="0.01" name="fondoInicial" class="form-input font-mono fs-16 text-right" placeholder="0.00" value="<?= number_format($avInicioPrivado['fondoSugerido'], 2, '.', '') ?>" required autofocus>
+                    <input type="number" step="0.01" min="0.01" name="fondoInicial" class="form-input font-mono fs-16 text-right" placeholder="0.00" value="<?= htmlspecialchars(number_format($avInicioPrivado['fondoSugerido'], 2, '.', '')) ?>" required autofocus>
                 </div>
                 <div class="modal-footer full-width mt-10">
                     <button type="submit" name="abrirCaja" class="btn-save w-full h-48 fs-15 font-bold br-12 shadow-md">
@@ -488,7 +737,18 @@
                 <div id="clienteRegistro" class="d-none flex-column gap-8 p-12 bg-surface2 br-8 border-2">
                     <div id="clienteRegistroTitulo" class="form-label fs-12 font-bold"><?php echo L('client_new_title'); ?></div>
                     <input id="newClienteNombre" class="form-input fs-12" placeholder="<?php echo L('client_placeholder_name'); ?>" />
-                    <input id="newClienteNif" class="form-input fs-12 font-mono" placeholder="NIF / CIF" />
+                    <div class="d-flex gap-4">
+                        <select id="newClienteIdType" class="form-input fs-11 p-2-4" style="width: 100px;">
+                            <option value="01">01 - NIF ES</option>
+                            <option value="02">02 - NIF IVA</option>
+                            <option value="03">03 - PASAP.</option>
+                            <option value="04">04 - ID OFIC.</option>
+                            <option value="05">05 - CERTIF.</option>
+                            <option value="06">06 - OTRO</option>
+                        </select>
+                        <input id="newClienteNif" class="form-input fs-12 font-mono flex-1" placeholder="Documento" />
+                        <input id="newClientePais" class="form-input fs-12 font-mono" style="width: 45px;" placeholder="ES" maxlength="2" />
+                    </div>
                     <div class="d-flex gap-8">
                         <button onclick="app.cancelarRegistroCliente()" class="btn-cancel fs-11 p-4"><?php echo L('modal_cancel'); ?></button>
                         <button onclick="app.guardarNuevoCliente()" class="btn-save fs-11 p-4"><?php echo L('client_btn_save_use'); ?></button>
@@ -509,7 +769,18 @@
                 <div id="socioRegistro" class="d-none flex-column gap-8 p-12 bg-surface2 br-8 border-2">
                     <div class="form-label fs-12 font-bold"><?php echo L('client_new_socio_title'); ?></div>
                     <input id="newSocioNombre" class="form-input fs-12" placeholder="Nombre completo" />
-                    <input id="newSocioNif" class="form-input fs-12 font-mono" placeholder="DNI / NIE" />
+                    <div class="d-flex gap-4">
+                        <select id="newSocioIdType" class="form-input fs-11 p-2-4" style="width: 100px;">
+                            <option value="01">01 - NIF ES</option>
+                            <option value="02">02 - NIF IVA</option>
+                            <option value="03">03 - PASAP.</option>
+                            <option value="04">04 - ID OFIC.</option>
+                            <option value="05">05 - CERTIF.</option>
+                            <option value="06">06 - OTRO</option>
+                        </select>
+                        <input id="newSocioNif" class="form-input fs-12 font-mono flex-1" placeholder="Documento" />
+                        <input id="newSocioPais" class="form-input fs-12 font-mono" style="width: 45px;" placeholder="ES" maxlength="2" />
+                    </div>
                     <div class="d-flex gap-8">
                         <button onclick="app.cancelarRegistroSocio()" class="btn-cancel fs-11 p-4"><?php echo L('modal_cancel'); ?></button>
                         <button onclick="app.guardarNuevoSocio()" class="btn-save fs-11 p-4"><?php echo L('client_btn_save_use'); ?></button>
@@ -525,7 +796,18 @@
                     </div>
                     <div class="form-group">
                         <label class="form-label" id="labelEmpresaNif"><?php echo L('client_label_nif'); ?></label>
-                        <input id="empresaNif" class="form-input font-mono" placeholder="B12345678" />
+                        <div class="d-flex gap-4">
+                            <select id="empresaIdType" class="form-input fs-11 p-2-4" style="width: 100px;">
+                                <option value="01">01 - NIF ES</option>
+                                <option value="02">02 - NIF IVA</option>
+                                <option value="03">03 - PASAP.</option>
+                                <option value="04">04 - ID OFIC.</option>
+                                <option value="05">05 - CERTIF.</option>
+                                <option value="06">06 - OTRO</option>
+                            </select>
+                            <input id="empresaNif" class="form-input font-mono flex-1" placeholder="Documento" />
+                            <input id="empresaPais" class="form-input font-mono" style="width: 45px;" placeholder="ES" maxlength="2" />
+                        </div>
                         <span class="form-error" id="err-empresaNif"></span>
                     </div>
                 </div>
@@ -579,6 +861,13 @@
                         <span class="fs-13 font-bold"><?php echo L('tpv_total_sale'); ?></span>
                         <span id="mixTotalVenta" class="font-bold font-mono fs-20 text-accent">0,00 €</span>
                     </div>
+                    <div id="tariffNotice" class="d-none mt-4 p-8 br-8 bg-accent-soft text-accent fs-11 fw-700 animate-fade-in">
+                        <i class="fa-solid fa-tag mr-6 opacity-70"></i> <span id="tariffNoticeText">Tarifa aplicada</span>
+                    </div>
+
+                    <div id="promoNoticeSummary" class="d-none mt-4 p-8 br-8 bg-green-light text-green fs-11 fw-700 animate-fade-in">
+                        <i class="fa-solid fa-percent mr-6 opacity-70"></i> <span id="promoNoticeText">Promo aplicada</span>
+                    </div>
                     <div id="mixListaPagos" class="d-flex flex-column gap-4 mt-8 pb-8 border-bottom border-dashed">
                         <div class="text-center opacity-50 fs-11 italic"><?php echo L('tpv_no_payments'); ?></div>
                     </div>
@@ -609,10 +898,6 @@
                             <i class="fa-solid fa-mobile-screen fs-16"></i>
                             <span class="fs-11 font-bold"><?php echo L('tpv_method_bizum'); ?></span>
                         </button>
-                        <button id="btnAcuenta" onclick="app.selectModalPayment(this)" class="btn-tpv-method flex-1 py-10 px-8 br-8 border-2 transition d-flex flex-column ai-center gap-4 bg-surface" style="min-width:70px;">
-                            <i class="fa-solid fa-file-invoice-dollar fs-16"></i>
-                            <span class="fs-11 font-bold"><?php echo L('tpv_method_account'); ?></span>
-                        </button>
                     </div>
 
                     <div id="pagoMontoArea" class="d-none animate-fade-in">
@@ -626,18 +911,14 @@
                                 <!-- Dinámico vía JS -->
                             </div>
                         </div>
-                        <div id="extraEfectivo" class="d-none mt-12 p-12 br-8 bg-surface1 border-1 d-flex jc-space-between ai-center">
-                             <span class="fs-13 font-bold opacity-70"><?php echo L('tpv_change_to_return'); ?>:</span>
-                             <span id="efectivoCambio" class="fs-22 font-mono font-bold text-green">0,00 €</span>
-                        </div>
-                        <!-- A cuenta fecha -->
-                        <div id="extraAcuenta" class="d-none mt-8 p-8 br-8 bg-surface1 border-1 border-dashed mb-8">
-                            <div class="form-group">
-                                <label class="fs-11 opacity-70 mb-2 d-block"><?php echo L('tpv_payment_deadline'); ?></label>
-                                <input id="aCuentaFechaLimite" type="date" class="form-input fs-12 p-4-8 bg-transparent" style="border:0; border-bottom:1px solid var(--border-color);" />
+                        <div id="extraEfectivo" class="d-none mt-12 p-12 br-8 bg-surface1 border-1 d-flex flex-column gap-8">
+                            <div class="d-flex jc-space-between ai-center">
+                                <span class="fs-13 font-bold opacity-70"><?php echo L('tpv_change_to_return'); ?>:</span>
+                                <span id="efectivoCambio" class="fs-22 font-mono font-bold text-green">0,00 €</span>
                             </div>
-                            <div id="aCuentaAlertaCliente" class="d-none mt-4 p-4 bg-red-light br-4 text-red font-bold fs-10 text-center">
-                                <?php echo L('tpv_select_client_to_owe'); ?>
+                            <div class="d-flex jc-space-between ai-center opacity-60 fs-11 border-top pt-6">
+                                <span><i class="fa-solid fa-vault"></i> Efectivo en caja (según sistema):</span>
+                                <span id="cajaEfectivoLabel" class="font-mono font-bold">—</span>
                             </div>
                         </div>
                     </div>
@@ -674,7 +955,7 @@ require_once __DIR__ . '/../model/TipoIVAPDO.php';
 $ivasVigentes = TipoIVAPDO::listarVigentesActuales();
 ?>
 <div id="modalComodin" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modalComodinTitle">
-    <div class="modal modal-content glass-effect ai-stretch w-450 p-32">
+    <div class="modal modal-content glass-effect ai-stretch w-380 p-24">
         <div class="d-flex ai-center gap-16 pb-16 border-bottom">
             <div class="modal-icon text-accent bg-accent-light m-0">
                 <i class="fa-solid fa-box-open"></i>
@@ -686,7 +967,7 @@ $ivasVigentes = TipoIVAPDO::listarVigentesActuales();
             <button onclick="app.cerrarModalComodin()" class="btn-close-modal" style="margin-left: auto;" aria-label="<?php echo L('modal_cancel'); ?>">&times;</button>
         </div>
 
-        <div class="modal-body p-0 mt-24 grid gap-32">
+        <div class="modal-body p-0 mt-24 grid gap-20">
             <div class="form-group mb-0">
                 <label class="form-label fw-600 mb-4 fs-13 text-muted tt-uppercase ls-1"><?php echo L('tpv_custom_desc'); ?></label>
                 <input id="comodinDesc" type="text" class="form-input" placeholder="<?php echo L('tpv_custom_desc_placeholder'); ?>" autocomplete="off" />

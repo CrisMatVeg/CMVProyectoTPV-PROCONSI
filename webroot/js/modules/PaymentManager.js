@@ -3,7 +3,7 @@
  * Handles checkout process, payment methods, and client/socio selection.
  */
 
-import { AppState } from './AppConfig.js';
+import { AppConfig, AppState } from './AppConfig.js';
 import { ApiService } from './ApiService.js';
 import { Utils } from './Utils.js';
 import { CartManager } from './CartManager.js';
@@ -46,13 +46,18 @@ export const PaymentManager = {
     // Resetear estado de comprobación de efectivo
     window.cajaEfectivoActual = null;
     try {
-      const resp = await ApiService.request("./api/getCajaEstadoActual.php");
+      const resp = await ApiService.request("./api/cajaEstadoActual.php");
       if (resp.ok) {
-        window.cajaEfectivoActual = resp.efectivoActual;
+        window.cajaEfectivoActual = parseFloat(resp.efectivoActual);
+        console.log('[Caja] Efectivo en turno calculado por API:', window.cajaEfectivoActual, '€');
+        const lbl = document.getElementById('cajaEfectivoLabel');
+        if (lbl) lbl.textContent = Utils.formatCurrency(window.cajaEfectivoActual);
       }
     } catch (e) {
       console.error("Error al obtener estado de caja:", e);
     }
+
+    await this.syncCartPricesWithServer();
 
     const totals = CartManager.calculateTotals();
     this.totalVentaActual = totals ? totals.total : 0;
@@ -81,7 +86,7 @@ export const PaymentManager = {
        }
     }
 
-    const totalPagadoVales = window.currentPayments.reduce((acc, p) => acc + p.importe, 0);
+    const totalPagadoVales = window.currentPayments.reduce((acc, p) => acc + (p.metodo === 'vale' ? p.importe : 0), 0);
     const pendiente = Math.max(0, this.totalVentaActual - totalPagadoVales);
 
     // Pre-añadir el método seleccionado en el sidebar (Efectivo por defecto)
@@ -89,17 +94,14 @@ export const PaymentManager = {
       const existing = window.currentPayments.find(p => p.metodo === AppState.selectedPayment);
       if (existing) {
         existing.importe = pendiente;
-        existing.recibido = AppState.selectedPayment === 'efectivo' ? 0 : pendiente;
+        existing.recibido = AppState.selectedPayment === 'efectivo' ? pendiente : pendiente;
       } else {
-        const tieneCliente = !!(AppState.clienteSeleccionado || AppState.socioActual);
-        if (AppState.selectedPayment !== 'a_cuenta' || tieneCliente) {
-          window.currentPayments.push({
+        window.currentPayments.push({
             metodo: AppState.selectedPayment,
             importe: pendiente,
-            recibido: AppState.selectedPayment === 'efectivo' ? 0 : pendiente,
+            recibido: pendiente,
             label: AppState.selectedPayment.charAt(0).toUpperCase() + AppState.selectedPayment.slice(1).replace('_', ' ')
           });
-        }
       }
     }
 
@@ -114,7 +116,7 @@ export const PaymentManager = {
 
     document.querySelectorAll(".form-error").forEach((el) => (el.innerText = ""));
     
-    this.quitarValeAplicado();
+    // this.quitarValeAplicado(); // [ELIMINADO] No quitar el vale aquí, dejar que se gestione en el flujo de pagos
     const valeContainer = document.getElementById("clienteValesContainer");
     if (valeContainer) valeContainer.classList.add("d-none");
 
@@ -134,9 +136,12 @@ export const PaymentManager = {
     if (btnS) btnS.classList.toggle("selected-type", AppState.tipoClienteActual === "socio");
   },
 
-  seleccionarTipoCliente(tipo) {
+  async seleccionarTipoCliente(tipo) {
     AppState.tipoClienteActual = tipo;
     this.updateTypeButtons();
+
+    await this.syncCartPricesWithServer();
+    this.updateMixSummary();
 
     const empD = document.getElementById("empresaDatos");
     if (empD) empD.classList.add("d-none");
@@ -171,6 +176,7 @@ export const PaymentManager = {
       if (gen) gen.classList.remove("d-none");
     }
 
+    CartManager.recalculateCartPrices();
     const totals = CartManager.calculateTotals();
     UiController.renderCart(totals);
   },
@@ -193,10 +199,21 @@ export const PaymentManager = {
         AppState.socioActual = r.cliente;
         AppState.tipoClienteActual = "socio";
         this.updateTypeButtons();
-        info.innerHTML = `<i class="fa-solid fa-check-circle text-green"></i> ${r.cliente.nombre} (${r.cliente.nif})`;
+        info.innerHTML = `
+          <div class="d-flex ai-center jc-space-between bg-surface2 p-8 br-8 border-1">
+            <span class="fs-13 fw-600"><i class="fa-solid fa-check-circle text-green mr-8"></i> ${r.cliente.nombre} (${r.cliente.nif})</span>
+            <button type="button" class="btn-tpv-icon sm text-red" onclick="app.deseleccionarCliente()" title="Deseleccionar">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+        `;
         Utils.showToast("Socio identificado");
         this.cargarValesCliente(r.cliente.id);
         this.mostrarPuntosCliente(r.cliente);
+        
+        await this.syncCartPricesWithServer();
+        
+        CartManager.recalculateCartPrices();
         const totals = CartManager.calculateTotals();
         UiController.renderCart(totals);
       } else {
@@ -209,6 +226,46 @@ export const PaymentManager = {
       AppState.socioActual = null;
       Utils.showToast(e.message, "error");
     }
+  },
+
+  deseleccionarCliente() {
+    AppState.socioActual = null;
+    AppState.clienteSeleccionado = null;
+    AppState.tipoClienteActual = "particular";
+    
+    // Limpiar UI de resultados
+    const resEl = document.getElementById("clienteResultados");
+    if (resEl) resEl.innerHTML = "";
+    
+    const socioInfo = document.getElementById("socioInfo");
+    if (socioInfo) socioInfo.innerHTML = "";
+    
+    const socioSearch = document.getElementById("socioSearch");
+    if (socioSearch) socioSearch.value = "";
+    
+    const clienteSearch = document.getElementById("clienteSearch");
+    if (clienteSearch) clienteSearch.value = "";
+
+    // Resetear botones de tipo
+    this.updateTypeButtons();
+    
+    // Ocultar paneles de vales y puntos
+    const valeContainer = document.getElementById("clienteValesContainer");
+    if (valeContainer) valeContainer.classList.add("d-none");
+    
+    const puntosContainer = document.getElementById("clientePuntosContainer");
+    if (puntosContainer) puntosContainer.classList.add("d-none");
+    
+    this.quitarValeAplicado();
+    this.quitarPuntosCanjeados();
+    
+    // Recalcular precios (quitar tarifas de socio si las hubiera)
+    CartManager.recalculateCartPrices();
+    const totals = CartManager.calculateTotals();
+    UiController.renderCart(totals);
+    
+    this.updateMixSummary();
+    Utils.showToast("Cliente deseleccionado");
   },
 
   async cargarValesCliente(idCliente) {
@@ -250,34 +307,45 @@ export const PaymentManager = {
 
   aplicarVale(vale) {
     AppState.valeAplicado = vale;
+    
+    // [NUEVO] Añadir el vale directamente a la lista de pagos actual para que se refleje en el total pendiente
+    const existing = window.currentPayments.find(p => p.metodo === "vale");
+    if (!existing) {
+        const totals = CartManager.calculateTotals();
+        window.currentPayments.push({
+            metodo: "vale",
+            importe: Math.min(totals.total, parseFloat(vale.importe_restante)),
+            label: `Vale: ${vale.codigo}`
+        });
+    }
+
     const resumen = document.getElementById("valeAplicadoResumen");
     const totalLabel = document.getElementById("valeAplicadoTotal");
-    const pendienteLabel = document.getElementById("valePendienteCobro");
     const listado = document.getElementById("listadoValesCliente");
     
-    const totals = CartManager.calculateTotals();
-    const totalTPV = totals.total;
-
     if (resumen && totalLabel) {
       resumen.classList.remove("d-none");
       totalLabel.textContent = Utils.formatCurrency(parseFloat(vale.importe_restante));
-      if (pendienteLabel) {
-        const rest = Math.max(0, totalTPV - parseFloat(vale.importe_restante));
-        pendienteLabel.textContent = Utils.formatCurrency(rest);
-      }
     }
     if (listado) listado.classList.add("d-none");
     
+    this.updateMixSummary(); // Forzar actualización de sumas en el modal
     Utils.showToast(`<i class="fa-solid fa-ticket"></i> Vale ${vale.codigo} aplicado`);
   },
 
   quitarValeAplicado() {
     AppState.valeAplicado = null;
+    
+    // [NUEVO] Quitar de la lista de pagos
+    window.currentPayments = window.currentPayments.filter(p => p.metodo !== "vale");
+    
     const resumen = document.getElementById("valeAplicadoResumen");
     const listado = document.getElementById("listadoValesCliente");
     
     if (resumen) resumen.classList.add("d-none");
     if (listado) listado.classList.remove("d-none");
+
+    this.updateMixSummary();
   },
 
 
@@ -317,13 +385,15 @@ export const PaymentManager = {
   async guardarNuevoSocio() {
     const nombre = document.getElementById("newSocioNombre").value.trim();
     const nif = document.getElementById("newSocioNif").value.trim();
+    const idType = document.getElementById("newSocioIdType").value;
+    const pais = document.getElementById("newSocioPais").value.trim() || "ES";
 
     if (!nombre || !nif) {
       Utils.showToast("Nombre y NIF son obligatorios", "error");
       return;
     }
 
-    if (typeof window.validarDocumento === "function" && !window.validarDocumento(nif)) {
+    if (idType === "01" && typeof window.validarDocumento === "function" && !window.validarDocumento(nif)) {
       Utils.showToast("El DNI/NIE de socio no es válido", "warning");
       return;
     }
@@ -331,17 +401,20 @@ export const PaymentManager = {
     try {
       const r = await ApiService.request("api/gestionCliente.php", {
         method: "POST",
-        body: JSON.stringify({ accion: "registrar", nombre, nif, es_socio: 1 })
+        body: JSON.stringify({ accion: "registrar", nombre, nif, es_socio: 1, aeat_id_type: idType, aeat_codigo_pais: pais })
       });
       if (r.ok) {
         Utils.showToast("Socio registrado y seleccionado", "success");
-        AppState.socioActual = { id: r.id, nombre, nif, es_socio: true };
+        AppState.socioActual = { id: r.id, nombre, nif, es_socio: true, aeat_id_type: idType, aeat_codigo_pais: pais };
         AppState.tipoClienteActual = "socio";
         this.updateTypeButtons();
         this.cancelarRegistroSocio();
         document.getElementById("socioInfo").innerHTML = `<i class="fa-solid fa-check-circle text-green"></i> ${nombre} (NUEVO)`;
         this.cargarValesCliente(r.id);
         
+        await this.syncCartPricesWithServer();
+        
+        CartManager.recalculateCartPrices();
         const totals = CartManager.calculateTotals();
         if (totals) UiController.renderCart(totals);
       } else {
@@ -379,8 +452,12 @@ export const PaymentManager = {
   async guardarNuevoCliente() {
     const nombreInput = document.getElementById("newClienteNombre");
     const nifInput = document.getElementById("newClienteNif");
+    const idTypeInput = document.getElementById("newClienteIdType");
+    const paisInput = document.getElementById("newClientePais");
     const nombre = nombreInput?.value.trim() || "";
     const nif = nifInput?.value.trim() || "";
+    const idType = idTypeInput?.value || "01";
+    const pais = paisInput?.value.trim() || "ES";
     const tipo = AppState.tipoClienteActual;
 
     if (!nombre) {
@@ -388,7 +465,7 @@ export const PaymentManager = {
       return;
     }
 
-    if (nif && typeof window.validarDocumento === "function" && !window.validarDocumento(nif)) {
+    if (idType === "01" && nif && typeof window.validarDocumento === "function" && !window.validarDocumento(nif)) {
       Utils.showToast("El NIF/CIF del cliente no es válido", "warning");
       return;
     }
@@ -402,6 +479,8 @@ export const PaymentManager = {
           nif,
           tipo,
           es_socio: 0,
+          aeat_id_type: idType,
+          aeat_codigo_pais: pais,
         })
       });
 
@@ -413,6 +492,8 @@ export const PaymentManager = {
           nif,
           tipo,
           es_socio: false,
+          aeat_id_type: idType,
+          aeat_codigo_pais: pais,
         };
         AppState.clienteSeleccionado = clientObj;
 
@@ -421,6 +502,10 @@ export const PaymentManager = {
           const empNif = document.getElementById("empresaNif");
           if (empNom) empNom.value = nombre;
           if (empNif) empNif.value = nif;
+          const empIdT = document.getElementById("empresaIdType");
+          const empP = document.getElementById("empresaPais");
+          if (empIdT) empIdT.value = idType;
+          if (empP) empP.value = pais;
         }
 
         const resEl = document.getElementById("clienteResultados");
@@ -429,6 +514,10 @@ export const PaymentManager = {
         }
 
         this.cancelarRegistroCliente();
+        
+        await this.syncCartPricesWithServer();
+        
+        CartManager.recalculateCartPrices();
         const totals = CartManager.calculateTotals();
         if (totals) UiController.renderCart(totals);
       } else {
@@ -485,28 +574,46 @@ export const PaymentManager = {
     }
   },
 
-  seleccionarClienteGuardado(idx) {
+  async seleccionarClienteGuardado(idx) {
     const c = this.ultimosClientesBuscados[idx];
     if (!c) return;
     AppState.clienteSeleccionado = c;
     AppState.tipoClienteActual = c.tipo || "particular";
+    AppState.socioActual = null;
+    
+    await this.syncCartPricesWithServer();
+
     this.updateTypeButtons();
 
     if (AppState.tipoClienteActual === "empresa") {
         document.getElementById("empresaNombre").value = `${c.nombre} ${c.apellidos || ""}`.trim();
         document.getElementById("empresaNif").value = c.nif || "";
+        const empIdT = document.getElementById("empresaIdType");
+        const empP = document.getElementById("empresaPais");
+        if (empIdT) empIdT.value = c.aeat_id_type || '01';
+        if (empP) empP.value = c.aeat_codigo_pais || 'ES';
     }
 
     const resEl = document.getElementById("clienteResultados");
     if (resEl) {
-        resEl.innerHTML = `<i class="fa-solid fa-check-circle text-success"></i> ${c.nombre} (${c.nif || ""})`;
+        resEl.innerHTML = `
+          <div class="d-flex ai-center jc-space-between bg-surface2 p-8 br-8 border-1 full-width">
+            <span class="fs-13 fw-600"><i class="fa-solid fa-check-circle text-success mr-8"></i> ${c.nombre} (${c.nif || ""})</span>
+            <button type="button" class="btn-tpv-icon sm text-red" onclick="app.deseleccionarCliente()" title="Deseleccionar">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+        `;
         this.cargarValesCliente(c.id);
     }
 
-    Utils.showToast("Cliente seleccionado");
+    Utils.showToast("Cliente seleccionado: " + c.nombre);
     this.mostrarPuntosCliente(c);
+    
+    CartManager.recalculateCartPrices();
     const totals = CartManager.calculateTotals();
     UiController.renderCart(totals);
+    this.updateMixSummary();
   },
 
   mostrarPuntosCliente(cliente) {
@@ -607,6 +714,43 @@ export const PaymentManager = {
     document.querySelectorAll(".form-error").forEach((el) => (el.innerText = ""));
   },
 
+  async syncCartPricesWithServer() {
+    try {
+      const idCliente = AppState.socioActual?.id ?? AppState.clienteSeleccionado?.id ?? null;
+      const cartLines = Object.values(AppState.cart).map(it => ({ id: it.id, qty: it.qty }));
+      
+      const recalcResp = await ApiService.request('./api/recalcularPreciosCarrito.php', {
+        method: 'POST',
+        body: JSON.stringify({
+          lineas: cartLines,
+          id_cliente: idCliente,
+          codigoCupon: AppState.currentPromo?.codigo ?? null
+        })
+      });
+
+      if (recalcResp.ok && recalcResp.lineas) {
+        const cart = AppState.cart;
+        recalcResp.lineas.forEach(serverLine => {
+          if (serverLine.comodin) return;
+          const key = Object.keys(cart).find(k => String(cart[k].id) === String(serverLine.id));
+          if (key) {
+            cart[key].price            = serverLine.precio_final;
+            cart[key].basePriceSnapshot = serverLine.precio_base;
+            cart[key].appliedTariffs   = serverLine.appliedTariffs;
+            cart[key]._tariffApplied   = true;
+          }
+        });
+        AppState.cart = cart;
+        
+        // Actualizar el total local tras sincronizar
+        const totals = CartManager.calculateTotals();
+        this.totalVentaActual = totals ? totals.total : this.totalVentaActual;
+      }
+    } catch (e) {
+      console.error('[Tariff recalc] Error al recalcular precios de tarifa:', e);
+    }
+  },
+
   // --- RECOVERED SPLIT PAYMENTS LOGIC ---
 
   updateMixSummary() {
@@ -619,8 +763,12 @@ export const PaymentManager = {
 
     const inputMonto = document.getElementById("mixPagoMonto");
     if (inputMonto && this.checkoutContext !== 'mixto') {
-        if (AppState.selectedPayment === 'a_cuenta' || AppState.selectedPayment === 'efectivo') {
-            inputMonto.value = displayTotal.toFixed(2);
+        if (AppState.selectedPayment === 'efectivo') {
+            const totalPagadoOtros = window.currentPayments
+                .filter(p => p.metodo !== AppState.selectedPayment)
+                .reduce((acc, p) => acc + p.importe, 0);
+            const faltaReal = Math.max(0, this.totalVentaActual - totalPagadoOtros);
+            inputMonto.value = faltaReal.toFixed(2);
         }
     }
 
@@ -637,6 +785,81 @@ export const PaymentManager = {
       el_Pendiente.parentElement.classList.toggle("text-green", pendiente <= 0.01);
     }
 
+    // [NUEVO] Aviso de tarifa aplicada
+    const el_TariffNotice = document.getElementById("tariffNotice");
+    const el_TariffText = document.getElementById("tariffNoticeText");
+    if (el_TariffNotice) {
+      const itemsWithTariffs = Object.values(AppState.cart).filter(it => it.appliedTariffs && it.appliedTariffs.length > 0);
+      if (itemsWithTariffs.length > 0) {
+        // Obtenemos los nombres únicos de las tarifas aplicadas (excluyendo cupones/promos que se muestran aparte)
+        const tariffNames = [...new Set(itemsWithTariffs.flatMap(it => 
+          it.appliedTariffs
+            .filter(t => t.tipo_descuento !== 'cupon' && t.tipo_descuento !== 'promocion')
+            .map(t => t.nombre || t.nombre_descuento || 'Tarifa')
+        ))].filter(name => !!name);
+        
+        if (tariffNames.length > 0) {
+            el_TariffText.textContent = "Tarifa" + (tariffNames.length > 1 ? "s" : "") + ": " + tariffNames.join(", ");
+            el_TariffNotice.classList.remove("d-none");
+            el_TariffNotice.classList.add("d-flex");
+        } else {
+            el_TariffNotice.classList.add("d-none");
+            el_TariffNotice.classList.remove("d-flex");
+        }
+      } else {
+        el_TariffNotice.classList.add("d-none");
+        el_TariffNotice.classList.remove("d-flex");
+      }
+    }
+
+    // [NUEVO] Aviso de Promo/Cupón aplicado
+    const el_PromoNotice = document.getElementById("promoNoticeSummary");
+    const el_PromoText = document.getElementById("promoNoticeText");
+    if (el_PromoNotice) {
+      if (AppState.currentPromo) {
+        let descText = AppState.currentPromo.nombre || AppState.currentPromo.codigo;
+        if (AppState.currentPromo.tipo === "percent") descText += ` (-${AppState.currentPromo.valor}%)`;
+        else if (AppState.currentPromo.tipo === "amount") descText += ` (-${Utils.formatCurrency(AppState.currentPromo.valor)})`;
+        
+        el_PromoText.textContent = "Promo: " + descText;
+        el_PromoNotice.classList.remove("d-none");
+        el_PromoNotice.classList.add("d-flex");
+      } else {
+        el_PromoNotice.classList.add("d-none");
+        el_PromoNotice.classList.remove("d-flex");
+      }
+    }
+
+    // [NUEVO] Sincronizar el importe del vale si el total ha cambiado
+    if (AppState.valeAplicado) {
+        const pVale = window.currentPayments.find(p => p.metodo === "vale");
+        if (pVale) {
+            const maxCubrible = parseFloat(AppState.valeAplicado.importe_restante);
+            // El vale debe cubrir lo que pueda del total, pero no más de lo que vale
+            pVale.importe = Math.min(this.totalVentaActual, maxCubrible);
+        }
+    }
+
+    // [NUEVO] Si no es mixto, asegurar que el pago principal cubra lo que falta
+    if (this.checkoutContext !== 'mixto' && AppState.selectedPayment) {
+        const pMain = window.currentPayments.find(p => p.metodo === AppState.selectedPayment);
+        if (pMain) {
+            const totalPagadoOtros = window.currentPayments
+                .filter(p => p !== pMain)
+                .reduce((acc, p) => acc + p.importe, 0);
+            const pendienteReal = Math.max(0, this.totalVentaActual - totalPagadoOtros);
+            
+            const oldImporte = pMain.importe;
+            pMain.importe = pendienteReal;
+            
+            if (pMain.metodo === 'efectivo') {
+                if (Math.abs(pMain.recibido - oldImporte) < 0.01 || pMain.recibido < 0.01) {
+                    pMain.recibido = pMain.importe;
+                }
+            }
+        }
+    }
+
     this.calcularCambioMix();
 
     const el_Lista = document.getElementById("mixListaPagos");
@@ -650,7 +873,7 @@ export const PaymentManager = {
         
         // [NUEVO] El contenedor de gestión solo se muestra si hay algo que gestionar
         const el_gestion = document.getElementById("cobroMixtoGestion");
-        const requiereMonto = (AppState.selectedPayment === 'efectivo' || AppState.selectedPayment === 'a_cuenta');
+        const requiereMonto = (AppState.selectedPayment === 'efectivo');
         
         if (el_gestion) {
             el_gestion.classList.toggle("d-none", !requiereMonto);
@@ -689,21 +912,30 @@ export const PaymentManager = {
         if (el_gestion) el_gestion.classList.remove("d-none");
         if (el_selector) el_selector.style.display = "";
         if (labelAdd) labelAdd.classList.remove("d-none");
+
+        // Mostrar el área de importe siempre que haya un método seleccionado en modo mixto
+        const area = document.getElementById("pagoMontoArea");
+        if (area) {
+            if (AppState.selectedPayment) {
+                area.classList.remove("d-none");
+                area.style.display = "block";
+            } else {
+                area.classList.add("d-none");
+                area.style.display = "none";
+            }
+        }
     }
 
-    // [NUEVO] Sincronizar visibilidad de campos extra y botones de método
+    // Sincronizar visibilidad del bloque de cambio en efectivo
     const el_extraEfectivo = document.getElementById("extraEfectivo");
-    const el_extraAcuenta = document.getElementById("extraAcuenta");
     if (el_extraEfectivo) el_extraEfectivo.classList.toggle("d-none", AppState.selectedPayment !== "efectivo");
-    if (el_extraAcuenta) el_extraAcuenta.classList.toggle("d-none", AppState.selectedPayment !== "a_cuenta");
 
     // Resaltar el botón correspondiente en el selector del modal
     document.querySelectorAll(".btn-tpv-method").forEach((b) => {
         b.classList.remove("border-accent", "bg-accent-soft");
         b.style.borderColor = "";
         const m = b.id.replace("btn", "").toLowerCase();
-        const currentM = AppState.selectedPayment === 'a_cuenta' ? 'acuenta' : AppState.selectedPayment;
-        if (m === currentM) {
+        if (m === AppState.selectedPayment) {
             b.classList.add("border-accent", "bg-accent-soft");
             b.style.borderColor = "var(--accent)";
         }
@@ -711,8 +943,7 @@ export const PaymentManager = {
 
     const btnFinal = document.getElementById("confirmarClienteBtn");
     if (btnFinal) {
-      const esAcuenta = (this.checkoutContext === 'a_cuenta' || (AppState.selectedPayment === 'a_cuenta' && this.checkoutContext !== 'mixto'));
-      btnFinal.disabled = esAcuenta ? false : (pendiente > 0.01);
+      btnFinal.disabled = (pendiente > 0.01);
     }
 
     this.renderPaymentsList();
@@ -731,7 +962,6 @@ export const PaymentManager = {
       efectivo: "fa-money-bill-1",
       tarjeta: "fa-credit-card",
       bizum: "fa-mobile-screen",
-      a_cuenta: "fa-file-invoice-dollar",
       vale: "fa-ticket",
       puntos: "fa-star"
     };
@@ -759,7 +989,7 @@ export const PaymentManager = {
 
   selectModalPayment(btn) {
     const metodo = btn.id.replace("btn", "").toLowerCase();
-    AppState.selectedPayment = (metodo === "acuenta" || metodo === "a_cuenta") ? "a_cuenta" : metodo;
+    AppState.selectedPayment = metodo;
     
     this.updateMixSummary();
 
@@ -774,7 +1004,7 @@ export const PaymentManager = {
     const inputMonto = document.getElementById("mixPagoMonto");
     const importeIngresado = parseFloat(inputMonto.value) || 0;
 
-    const metodosValidos = ['efectivo', 'tarjeta', 'bizum', 'a_cuenta'];
+    const metodosValidos = ['efectivo', 'tarjeta', 'bizum'];
     if (!AppState.selectedPayment || !metodosValidos.includes(AppState.selectedPayment)) {
       Utils.showToast("Selecciona un método de pago", 'warning');
       return;
@@ -793,11 +1023,22 @@ export const PaymentManager = {
     const importeAplicado = Math.min(importeIngresado, pendiente);
     const recibidoReal = esEfectivo ? importeIngresado : importeAplicado;
 
+    // [NUEVO] Validar que hay cambio suficiente ANTES de añadir el pago
+    if (esEfectivo) {
+        const cambioNecesario = Math.max(0, recibidoReal - importeAplicado);
+        if (cambioNecesario > 0.01) {
+            const disponible = parseFloat(window.cajaEfectivoActual) || 0;
+            if (cambioNecesario > (disponible + 0.01)) {
+                Utils.showToast(`No puedes añadir este pago: El cambio (${Utils.formatCurrency(cambioNecesario)}) es mayor que el efectivo disponible (${Utils.formatCurrency(disponible)})`, "error");
+                return;
+            }
+        }
+    }
+
     window.currentPayments.push({
       metodo: AppState.selectedPayment,
       importe: importeAplicado,
       recibido: recibidoReal,
-      fecha_limite: AppState.selectedPayment === "a_cuenta" ? document.getElementById("aCuentaFechaLimite")?.value : null,
     });
 
     inputMonto.value = "";
@@ -813,32 +1054,72 @@ export const PaymentManager = {
     const inputMonto = document.getElementById("mixPagoMonto");
     const montoIngresado = parseFloat(inputMonto?.value) || 0;
     
-    // Si NO es mixto, el "pendiente" sobre el que calculamos el cambio es el TOTAL de la venta
-    // Si ES mixto, es lo que falta por pagar de la venta
-    const totalPagadoConfirmado = (this.checkoutContext === 'mixto') 
+    // En modo mixto, todos los pagos ya añadidos están comprometidos → el pendiente
+    // es total menos TODOS los existentes. En modo simple, excluimos los del mismo método
+    // para que el campo de efectivo muestre cuánto falta cubrir con ese método.
+    const totalPagadoOtros = (this.checkoutContext === 'mixto')
         ? window.currentPayments.reduce((acc, p) => acc + p.importe, 0)
-        : 0;
-    const pendienteReal = Math.max(0, this.totalVentaActual - totalPagadoConfirmado);
+        : window.currentPayments
+            .filter(p => p.metodo !== AppState.selectedPayment)
+            .reduce((acc, p) => acc + p.importe, 0);
+    const pendienteReal = Math.max(0, this.totalVentaActual - totalPagadoOtros);
 
     const cambioEl = document.getElementById("efectivoCambio");
     const feedbackEl = document.getElementById("mixPagoStatusFeedback");
     if (!cambioEl) return;
 
     if (AppState.selectedPayment === "efectivo") {
-        const falta  = pendienteReal - montoIngresado;
+        const falta = pendienteReal - montoIngresado;
         const cambio = Math.max(0, montoIngresado - pendienteReal);
-        if (feedbackEl) {
-            if (falta > 0.005) {
-                feedbackEl.className = "mt-8 p-10 br-8 text-center font-bold fs-13 bg-red-soft text-red";
-                feedbackEl.innerHTML = `<i class="fa-solid fa-hourglass-half"></i> Faltan: ${Utils.formatCurrency(falta)}`;
-                feedbackEl.classList.remove("d-none");
-            } else {
-                // Si hay cambio o es exacto, ocultamos el feedback secundario para no duplicar con el área de Cambio
-                feedbackEl.innerHTML = "";
-                feedbackEl.classList.add("d-none");
+        const disponible = parseFloat(window.cajaEfectivoActual) || 0;
+        const btnConf = document.getElementById("confirmarClienteBtn");
+        console.log('[Cambio] montoIngresado:', montoIngresado, '| pendiente:', pendienteReal, '| cambio:', cambio, '| disponible en caja:', disponible);
+
+        if (falta > 0.01) {
+            feedbackEl.className = "mt-8 p-10 br-8 text-center font-bold fs-13 bg-red-light text-red";
+            feedbackEl.classList.remove("d-none");
+            feedbackEl.innerHTML = `<i class="fa-solid fa-circle-exclamation"></i> Faltan: ${Utils.formatCurrency(falta)}`;
+            // El botón ya está deshabilitado por pendiente > 0 en updateMixSummary
+        } else if (cambio > 0.01) {
+            const esExcesivo = (cambio > disponible + 0.01);
+            feedbackEl.style.cssText = "";
+            feedbackEl.className = esExcesivo
+                ? "mt-8 p-12 br-8 text-center font-bold fs-13 bg-red-light text-red border border-red"
+                : "mt-8 p-10 br-8 text-center font-bold fs-13 bg-green-light text-green";
+            feedbackEl.classList.remove("d-none");
+            const icono = esExcesivo ? "fa-triangle-exclamation" : "fa-hand-holding-dollar";
+            const txtLabel = esExcesivo ? "CAMBIO EXCESIVO — NO SE PUEDE CONFIRMAR" : "Cambio a devolver";
+            const txtExtra = esExcesivo
+                ? `<div class="fs-11 mt-4" style="opacity:0.92;">Efectivo disponible en caja: ${Utils.formatCurrency(disponible)}</div>`
+                : "";
+            feedbackEl.innerHTML = `<i class="fa-solid ${icono}"></i> ${txtLabel}: <strong>${Utils.formatCurrency(cambio)}</strong>${txtExtra}`;
+
+            // Bloquear/desbloquear el botón según disponibilidad
+            if (btnConf) {
+                btnConf.disabled = esExcesivo;
+                btnConf.style.opacity = esExcesivo ? "0.5" : "";
+                btnConf.style.cursor  = esExcesivo ? "not-allowed" : "";
+                btnConf.title = esExcesivo
+                    ? `Sin efectivo suficiente. Necesitas ${Utils.formatCurrency(cambio)}, hay ${Utils.formatCurrency(disponible)}`
+                    : "";
+            }
+        } else {
+            feedbackEl.innerHTML = "";
+            feedbackEl.classList.add("d-none");
+            if (btnConf) {
+                btnConf.disabled = false;
+                btnConf.style.opacity = "";
+                btnConf.style.cursor  = "";
+                btnConf.title = "";
             }
         }
-        cambioEl.textContent = Utils.formatCurrency(Math.max(0, montoIngresado - pendienteReal));
+
+        if (this.checkoutContext !== "mixto") {
+            const pEfectivo = window.currentPayments.find(p => p.metodo === "efectivo");
+            if (pEfectivo) pEfectivo.recibido = isNaN(montoIngresado) ? pendienteReal : montoIngresado;
+        }
+
+        cambioEl.textContent = Utils.formatCurrency(cambio);
     } else {
         if (feedbackEl) {
             feedbackEl.innerHTML = "";
@@ -855,11 +1136,10 @@ export const PaymentManager = {
             el_Pendiente.parentElement.classList.toggle("text-red", pnd > 0.01);
         }
 
-        // [NUEVO] Sincronizar el importe recibido para el registro de la venta si es un pago único de efectivo
         if (AppState.selectedPayment === "efectivo" && this.checkoutContext !== 'mixto') {
             const efectivoPago = window.currentPayments.find(p => p.metodo === 'efectivo');
             if (efectivoPago) {
-                efectivoPago.recibido = montoIngresado;
+                efectivoPago.recibido = isNaN(montoIngresado) ? pendienteReal : montoIngresado;
             }
         }
     }
@@ -876,20 +1156,33 @@ export const PaymentManager = {
       btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> PROCESANDO...';
     }
 
-    // 1. Validar "A cuenta" si aplica
-    const esAcuentaIndividual = (this.checkoutContext === 'a_cuenta' || (AppState.selectedPayment === 'a_cuenta' && this.checkoutContext !== 'mixto'));
-    const tieneAcuentaEnMixto = window.currentPayments.some(p => p.metodo === "a_cuenta");
-    
-    if (esAcuentaIndividual || tieneAcuentaEnMixto) {
-        const clienteId = AppState.socioActual ? AppState.socioActual.id : (AppState.clienteSeleccionado ? AppState.clienteSeleccionado.id : null);
-        if (!clienteId) {
-            Utils.showToast("Debes seleccionar un cliente para fiar la compra.", "error");
-            if (btn) { btn.disabled = false; btn.textContent = "Confirmar Cobro"; }
+    // [MEJORADO] Sumar todo el cambio de pagos en efectivo (por si hay varios en mixto)
+    const totalCambioEfectivo = window.currentPayments.reduce((acc, p) => {
+        if (p.metodo === 'efectivo') return acc + Math.max(0, p.recibido - p.importe);
+        return acc;
+    }, 0);
+
+    if (totalCambioEfectivo > 0.009) {
+        // [CRÍTICO] Forzar refresco de efectivo disponible justo antes de validar
+        try {
+            const resp = await ApiService.request("./api/cajaEstadoActual.php");
+            if (resp.ok) window.cajaEfectivoActual = parseFloat(resp.efectivoActual);
+        } catch (e) {
+            console.error("No se pudo refrescar el estado de la caja", e);
+        }
+
+        const disponible = parseFloat(window.cajaEfectivoActual) || 0;
+        if (totalCambioEfectivo > (disponible + 0.01)) {
+            Utils.showToast(`BLOQUEADO: No hay efectivo suficiente en el cajón para devolver el cambio (${Utils.formatCurrency(totalCambioEfectivo)}). Disponible: ${Utils.formatCurrency(disponible)}`, "error");
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = "Confirmar Cobro";
+            }
             return;
         }
     }
 
-    // 2. Validar Factura: si está activada, el cliente debe estar identificado (Nombre y NIF)
+    // 1. Validar Factura: si está activada, el cliente debe estar identificado (Nombre y NIF)
     if (AppState.esFactura) {
       const tieneSocio = !!AppState.socioActual;
       const tieneEmpresa = !!(document.getElementById("empresaNombre")?.value && document.getElementById("empresaNif")?.value);
@@ -903,12 +1196,31 @@ export const PaymentManager = {
       }
     }
 
+    // [NUEVO] Capturar metadatos AEAT de identificación si es empresa manual
+    let manualAeatIdType = null;
+    let manualAeatPais = null;
+    if (AppState.tipoClienteActual === 'empresa') {
+        manualAeatIdType = document.getElementById("empresaIdType")?.value;
+        manualAeatPais = document.getElementById("empresaPais")?.value.trim() || 'ES';
+    }
+
     // 3. Preparar payload
     const totals = CartManager.calculateTotals();
+
+    // Derivar metodoPago desde el contexto de cobro, no del último botón pulsado en el modal.
+    // En modo mixto AppState.selectedPayment cambia con cada método que se selecciona dentro del modal,
+    // por lo que usamos checkoutContext como fuente autoritativa.
+    const metodosUsados = [...new Set(window.currentPayments.map(p => p.metodo))];
+    const derivedMetodoPago = (this.checkoutContext === 'mixto' || metodosUsados.length > 1)
+        ? 'mixto'
+        : (window.currentPayments[0]?.metodo || AppState.selectedPayment || 'efectivo');
+
     const payload = {
       cliente: AppState.clienteSeleccionado,
       socio: AppState.socioActual,
       tipoCliente: AppState.tipoClienteActual,
+      aeatIdType: manualAeatIdType,
+      aeatCodigoPais: manualAeatPais,
       lineas: Object.values(window.cart).map(it => ({
         id: it.id,
         name: it.name,
@@ -918,10 +1230,11 @@ export const PaymentManager = {
         iva: it.iva,
         variant: it.variant,
         basePriceSnapshot: it.basePriceSnapshot,
+        descuentos: it.appliedTariffs,
         appliedTariffs: it.appliedTariffs
       })),
       pagos: window.currentPayments,
-      metodoPago: AppState.selectedPayment || 'efectivo',
+      metodoPago: derivedMetodoPago,
       efectivoRecibido: window.currentPayments.find(p => p.metodo === 'efectivo')?.recibido || 0,
       total: totals.total,
       subtotal: totals.subtotal,
@@ -941,12 +1254,26 @@ export const PaymentManager = {
       
       if (data.ok) {
         Utils.showToast("Venta guardada con éxito", "success");
+        
+        // [NUEVO] Actualizar stock localmente para refrescar la UI de inmediato
+        const itemsVendidos = Object.values(AppState.cart);
+        itemsVendidos.forEach(item => {
+            if (item.id === -1) return; // Comodines
+            const p = AppConfig.products.find(x => String(x.id) === String(item.id));
+            if (p) {
+                p.stock = Math.max(0, (p.stock || 0) - item.qty);
+            }
+        });
+        // Refrescar el catálogo para mostrar productos agotados
+        UiController.renderProducts();
+
         if (typeof window.clearCart === "function") {
           window.clearCart();
         } else {
           CartManager.clearCart();
         }
         window.currentPayments = [];
+        AppState.valeAplicado = null; // Limpiar vale tras éxito
         TicketManager.showTicket(data.venta, true);
         this.cerrarModalCliente();
       } else {

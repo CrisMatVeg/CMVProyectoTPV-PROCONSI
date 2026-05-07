@@ -14,8 +14,8 @@
             <p class="fs-14 m-0 text-muted"><?php echo L('dashboard_subtitle'); ?> · <span class="text-green font-bold"><?php echo L('dashboard_status_active'); ?></span></p>
         </div>
 
-        <?php if ($_SESSION['usuarioActualTPV']->getRol() === 'admin' && $avDashboard['kpis']): ?>
-            <!-- KPI CARDS (Only for Admin) -->
+        <?php if ($_SESSION['usuarioActualTPV']->tienePermiso('ver_analitica') && isset($avDashboard['kpis']) && $avDashboard['kpis']): ?>
+            <!-- KPI CARDS (Only for authorized users) -->
             <div class="d-grid gap-16 mb-32" style="grid-template-columns: repeat(5, 1fr);">
                 <div class="kpi-card p-20 bg-blue-light br-20 border-2 border-blue d-flex flex-column shadow-sm hover-translate-y">
                     <div class="fs-12 text-muted tt-uppercase font-bold mb-8"><?php echo L('dashboard_kpi_total_sales'); ?></div>
@@ -45,8 +45,6 @@
             </div>
             <script>
                 function irAProductosBajoStock() {
-                    // Redirigir a productos con un parámetro para filtrar por bajo stock? 
-                    // Por ahora solo redirigimos, y el usuario puede usar el filtro manual que añadí.
                     const form = document.createElement('form');
                     form.method = 'POST';
                     form.action = 'index.php';
@@ -64,6 +62,7 @@
         <div class="d-grid grid-1-360 gap-16">
             <div class="dashboard-grid no-border p-0">
                 <!-- Acceso al TPV -->
+                <?php if ($_SESSION['usuarioActualTPV']->tienePermiso('acceso_tpv')): ?>
                 <form method="post">
                     <?php if (isset($avDashboard['cajaAbierta']) && $avDashboard['cajaAbierta']): ?>
                         <button type="submit" name="irTPV" class="dashboard-btn">
@@ -79,9 +78,10 @@
                         </button>
                     <?php endif; ?>
                 </form>
+                <?php endif; ?>
 
                 <!-- Gestión de Personal -->
-                <?php if ($_SESSION['usuarioActualTPV']->getRol() === 'admin'): ?>
+                <?php if ($_SESSION['usuarioActualTPV']->tienePermiso('gestionar_usuarios')): ?>
                     <form method="post">
                         <button type="submit" name="irUsuarios" class="dashboard-btn">
                             <i class="fa-solid fa-users-gear"></i>
@@ -89,8 +89,10 @@
                             <span class="btn-desc"><?php echo L('dashboard_btn_users_sub'); ?></span>
                         </button>
                     </form>
+                <?php endif; ?>
 
-                    <!-- Gestión de Clientes/Socios -->
+                <!-- Gestión de Clientes/Socios -->
+                <?php if ($_SESSION['usuarioActualTPV']->tienePermiso('gestionar_clientes')): ?>
                     <form method="post">
                         <button type="submit" name="irClientes" class="dashboard-btn">
                             <i class="fa-solid fa-user-group"></i>
@@ -98,8 +100,10 @@
                             <span class="btn-desc"><?php echo L('dashboard_btn_clients_sub'); ?></span>
                         </button>
                     </form>
+                <?php endif; ?>
 
-                    <!-- Gestión de Productos -->
+                <!-- Gestión de Productos -->
+                <?php if ($_SESSION['usuarioActualTPV']->tienePermiso('gestionar_productos')): ?>
                     <form method="post">
                         <button type="submit" name="irProductos" class="dashboard-btn">
                             <i class="fa-solid fa-box-archive"></i>
@@ -107,26 +111,10 @@
                             <span class="btn-desc"><?php echo L('dashboard_btn_products_sub'); ?></span>
                         </button>
                     </form>
+                <?php endif; ?>
 
-                    <!-- Compras / Entradas -->
-                    <form method="post">
-                        <button type="submit" name="irCompras" class="dashboard-btn">
-                            <i class="fa-solid fa-hand-holding-dollar"></i>
-                            <span class="btn-title"><?php echo L('dashboard_btn_purchases'); ?></span>
-                            <span class="btn-desc"><?php echo L('dashboard_btn_purchases_sub'); ?></span>
-                        </button>
-                    </form>
-
-                    <!-- Proveedores -->
-                    <form method="post">
-                        <button type="submit" name="irProveedores" class="dashboard-btn">
-                            <i class="fa-solid fa-truck-field"></i>
-                            <span class="btn-title"><?php echo L('dashboard_btn_providers'); ?></span>
-                            <span class="btn-desc"><?php echo L('dashboard_btn_providers_sub'); ?></span>
-                        </button>
-                    </form>
-
-                    <!-- Gestión de IVAs -->
+                <!-- Gestión de IVAs -->
+                <?php if ($_SESSION['usuarioActualTPV']->tienePermiso('gestionar_iva')): ?>
                     <form method="post">
                         <button type="submit" name="irTiposIVA" class="dashboard-btn">
                             <i class="fa-solid fa-percent"></i>
@@ -134,8 +122,10 @@
                             <span class="btn-desc"><?php echo L('dashboard_btn_iva_sub'); ?></span>
                         </button>
                     </form>
+                <?php endif; ?>
 
-                    <!-- Tarifas de precios -->
+                <!-- Tarifas de precios -->
+                <?php if ($_SESSION['usuarioActualTPV']->tienePermiso('gestionar_tarifas')): ?>
                     <form method="post">
                         <button type="submit" name="irTarifas" class="dashboard-btn">
                             <i class="fa-solid fa-arrow-up-wide-short"></i>
@@ -143,8 +133,10 @@
                             <span class="btn-desc"><?php echo L('dashboard_btn_tariffs_sub'); ?></span>
                         </button>
                     </form>
+                <?php endif; ?>
 
-                    <!-- Gestión de Descuentos -->
+                <!-- Gestión de Descuentos -->
+                <?php if ($_SESSION['usuarioActualTPV']->tienePermiso('gestionar_promociones')): ?>
                     <form method="post">
                         <button type="submit" name="irPromociones" class="dashboard-btn">
                             <i class="fa-solid fa-ticket-simple"></i>
@@ -152,8 +144,32 @@
                             <span class="btn-desc"><?php echo L('dashboard_btn_discounts_sub'); ?></span>
                         </button>
                     </form>
+                <?php endif; ?>
 
-                    <!-- Historial de Ventas -->
+                <!-- Compras / Entradas -->
+                <?php if ($_SESSION['usuarioActualTPV']->tienePermiso('gestionar_inventario')): ?>
+                    <form method="post">
+                        <button type="submit" name="irCompras" class="dashboard-btn">
+                            <i class="fa-solid fa-hand-holding-dollar"></i>
+                            <span class="btn-title"><?php echo L('dashboard_btn_purchases'); ?></span>
+                            <span class="btn-desc"><?php echo L('dashboard_btn_purchases_sub'); ?></span>
+                        </button>
+                    </form>
+                <?php endif; ?>
+
+                <!-- Proveedores -->
+                <?php if ($_SESSION['usuarioActualTPV']->tienePermiso('gestionar_proveedores')): ?>
+                    <form method="post">
+                        <button type="submit" name="irProveedores" class="dashboard-btn">
+                            <i class="fa-solid fa-truck-field"></i>
+                            <span class="btn-title"><?php echo L('dashboard_btn_providers'); ?></span>
+                            <span class="btn-desc"><?php echo L('dashboard_btn_providers_sub'); ?></span>
+                        </button>
+                    </form>
+                <?php endif; ?>
+
+                <!-- Historial de Ventas -->
+                <?php if ($_SESSION['usuarioActualTPV']->tienePermiso('ver_historial')): ?>
                     <form method="post">
                         <button type="submit" name="irHistorial" class="dashboard-btn">
                             <i class="fa-solid fa-clock-rotate-left"></i>
@@ -161,7 +177,10 @@
                             <span class="btn-desc"><?php echo L('dashboard_btn_history_sub'); ?></span>
                         </button>
                     </form>
+                <?php endif; ?>
 
+                <!-- Ajustes del Sistema -->
+                <?php if ($_SESSION['usuarioActualTPV']->tienePermiso('gestionar_configuracion')): ?>
                     <!-- Auditoría VeriFactu -->
                     <a href="verifactu_log.php" target="_blank" class="dashboard-btn" style="text-decoration: none;">
                         <i class="fa-solid fa-microchip text-accent"></i>
@@ -169,7 +188,6 @@
                         <span class="btn-desc"><?php echo L('dashboard_fiscal_audit_sub'); ?></span>
                     </a>
 
-                    <!-- Ajustes del Sistema -->
                     <form method="post">
                         <button type="submit" name="irConfiguracion" class="dashboard-btn">
                             <i class="fa-solid fa-gears"></i>
@@ -177,8 +195,10 @@
                             <span class="btn-desc"><?php echo L('dashboard_btn_settings_sub'); ?></span>
                         </button>
                     </form>
+                <?php endif; ?>
 
-                    <!-- Analítica -->
+                <!-- Analítica -->
+                <?php if ($_SESSION['usuarioActualTPV']->tienePermiso('ver_analitica')): ?>
                     <form method="post">
                         <button type="submit" name="irAnalitica" class="dashboard-btn">
                             <i class="fa-solid fa-chart-line text-accent"></i>
@@ -186,16 +206,10 @@
                             <span class="btn-desc"><?php echo L('dashboard_btn_analytics_sub'); ?></span>
                         </button>
                     </form>
-                <?php else: ?>
-                    <div class="dashboard-btn-locked">
-                        <i class="fa-solid fa-lock"></i>
-                        <span class="btn-title"><?php echo L('dashboard_btn_admin_locked'); ?></span>
-                        <span class="btn-desc"><?php echo L('dashboard_btn_admin_locked_sub'); ?></span>
-                    </div>
                 <?php endif; ?>
             </div>
 
-            <?php if ($_SESSION['usuarioActualTPV']->getRol() === 'admin' && !empty($avDashboard['metodos'])): ?>
+            <?php if ($_SESSION['usuarioActualTPV']->tienePermiso('ver_analitica') && !empty($avDashboard['metodos'])): ?>
                 <!-- STATS PANEL (Right side on large screens) -->
                 <div class="stats-panel bg-surface p-24 br-20 border-2 shadow-sm">
                     <div class="fs-13 font-bold tt-uppercase mb-16 pb-8 border-bottom"><?php echo L('dashboard_stats_payments'); ?></div>

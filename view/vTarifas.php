@@ -348,7 +348,7 @@
                             <div class="clients-selection-container border br-12 overflow-hidden bg-white mt-4">
                                 <div class="d-flex ai-center jc-between p-12-24 border-bottom bg-surface1">
                                     <span class="fs-12 tt-uppercase fw-800 text-accent ls-1" id="countSelectedClients">0 <?php echo L('rates_selected'); ?></span>
-                                    <button type="button" class="btn-clean-tarifa px-16 py-8 fs-13 fw-600 transition" onclick="if(window.unselectAllClientsTarifa) unselectAllClientsTarifa(); else alert('Error: JS not loaded');">
+                                    <button type="button" class="btn-clean-tarifa px-16 py-8 fs-13 fw-600 transition" onclick="if(window.unselectAllClientsTarifa) unselectAllClientsTarifa(); else showCustomAlert('Error', 'JS not loaded', 'error');">
                                         <i class="fa-solid fa-eraser mr-4"></i> <?php echo L('rates_btn_clean'); ?>
                                     </button>
                                 </div>
@@ -406,7 +406,7 @@
                     <div class="products-selection-container border br-12 overflow-hidden bg-white">
                         <div class="d-flex ai-center jc-between p-16-24 border-bottom bg-surface1 gap-12">
                             <span class="fs-12 tt-uppercase fw-800 text-accent ls-1" id="countSelectedProd">0 <?php echo L('rates_selected'); ?></span>
-                            <button type="button" class="btn-clean-tarifa px-16 py-8 fs-13 fw-600 transition" onclick="if(window.unselectAllProductsTarifa) unselectAllProductsTarifa(); else alert('Error: JS not loaded');">
+                             <button type="button" class="btn-clean-tarifa px-16 py-8 fs-13 fw-600 transition" onclick="if(window.unselectAllProductsTarifa) unselectAllProductsTarifa(); else showCustomAlert('Error', 'JS not loaded', 'error');">
                                 <i class="fa-solid fa-eraser mr-4"></i> <?php echo L('rates_btn_clean'); ?>
                             </button>
                         </div>
@@ -434,9 +434,102 @@
 </div>
 
 <script>
+    // Essential UI functions defined early to prevent ReferenceErrors
+    function abrirModalTarifa(t = null) {
+        limpiarErroresTarifa();
+        if (t) {
+            if (document.getElementById('tarifaId')) document.getElementById('tarifaId').value = t.id;
+            if (document.getElementById('tarifaNombre')) document.getElementById('tarifaNombre').value = t.nombre;
+            if (document.getElementById('tarifaTipo')) document.getElementById('tarifaTipo').value = t.tipo;
+            if (document.getElementById('tarifaValor')) document.getElementById('tarifaValor').value = t.valor;
+            if (document.getElementById('tarifaPrioridad')) document.getElementById('tarifaPrioridad').value = t.prioridad || 0;
+            if (document.getElementById('tarifaFecha')) document.getElementById('tarifaFecha').value = t.fecha_aplicacion;
+            if (document.getElementById('tarifaFechaFin')) document.getElementById('tarifaFechaFin').value = t.fecha_fin || '';
+            if (document.getElementById('tarifaHoraInicio')) document.getElementById('tarifaHoraInicio').value = t.hora_inicio || '';
+            if (document.getElementById('tarifaHoraFin')) document.getElementById('tarifaHoraFin').value = t.hora_fin || '';
+
+            // Días de la semana
+            const diasRule = t.dias_semana ? t.dias_semana.split(',').map(Number) : [];
+            document.querySelectorAll('.tarifa-dia-checkbox').forEach(cb => {
+                cb.checked = diasRule.includes(parseInt(cb.value));
+            });
+            document.querySelectorAll('.tarifa-cliente-checkbox').forEach(cb => {
+                cb.checked = false;
+                if (t.cliente_ids) {
+                    try {
+                        const ids = JSON.parse(t.cliente_ids);
+                        if (Array.isArray(ids) && ids.includes(parseInt(cb.value))) {
+                            cb.checked = true;
+                        }
+                    } catch (e) {}
+                }
+            });
+
+            // Roles Segmento
+            const roles = t.roles_segmento ? t.roles_segmento.split(',') : [];
+            document.querySelectorAll('.tarifa-rol-checkbox').forEach(cb => {
+                cb.checked = roles.includes(cb.value);
+            });
+
+            if (document.getElementById('tarifaScope')) document.getElementById('tarifaScope').value = t.scope || 'todos';
+            if (document.getElementById('tarifaCategoria')) document.getElementById('tarifaCategoria').value = t.categoria || '';
+
+            // Checkboxes de productos
+            document.querySelectorAll('.tarifa-prod-checkbox').forEach(cb => {
+                cb.checked = false;
+                if (t.producto_ids) {
+                    try {
+                        const ids = JSON.parse(t.producto_ids);
+                        if (Array.isArray(ids) && ids.includes(parseInt(cb.value))) {
+                            cb.checked = true;
+                        }
+                    } catch (e) {}
+                }
+            });
+            const modalTitle = document.querySelector('.modal-header h2');
+            if (modalTitle) modalTitle.innerText = "<?php echo L('rates_edit_rule'); ?>";
+        } else {
+            if (document.getElementById('tarifaId')) document.getElementById('tarifaId').value = '';
+            if (document.getElementById('tarifaNombre')) document.getElementById('tarifaNombre').value = '';
+            if (document.getElementById('tarifaTipo')) document.getElementById('tarifaTipo').value = 'percent';
+            if (document.getElementById('tarifaValor')) document.getElementById('tarifaValor').value = '';
+            if (document.getElementById('tarifaPrioridad')) document.getElementById('tarifaPrioridad').value = '0';
+            if (document.getElementById('tarifaFecha')) document.getElementById('tarifaFecha').value = '';
+            if (document.getElementById('tarifaFechaFin')) document.getElementById('tarifaFechaFin').value = '';
+            if (document.getElementById('tarifaHoraInicio')) document.getElementById('tarifaHoraInicio').value = '';
+            if (document.getElementById('tarifaHoraFin')) document.getElementById('tarifaHoraFin').value = '';
+            document.querySelectorAll('.tarifa-dia-checkbox').forEach(cb => cb.checked = false);
+            document.querySelectorAll('.tarifa-cliente-checkbox').forEach(cb => cb.checked = false);
+            if (document.getElementById('tarifaScope')) document.getElementById('tarifaScope').value = 'todos';
+            if (document.getElementById('tarifaCategoria')) document.getElementById('tarifaCategoria').value = '';
+            document.querySelectorAll('.tarifa-rol-checkbox').forEach(cb => cb.checked = false);
+            document.querySelectorAll('.tarifa-prod-checkbox').forEach(cb => cb.checked = false);
+            const modalTitle = document.querySelector('.modal-header h2');
+            if (modalTitle) modalTitle.innerText = "<?php echo L('rates_new_rule'); ?>";
+        }
+
+        onScopeChangeTarifa();
+        updateProdCount();
+        updateClientCount();
+
+        // Resetear a la primera pestaña
+        const firstTabBtn = document.querySelector('.tab-btn[data-tab="general"]');
+        if (firstTabBtn) switchTabTarifa(firstTabBtn, 'tab-general');
+
+        const modal = document.getElementById('tarifaModal');
+        if (modal) modal.classList.add('visible');
+    }
+
+    function cerrarModalTarifa() {
+        const modal = document.getElementById('tarifaModal');
+        if (modal) modal.classList.remove('visible');
+        limpiarErroresTarifa();
+    }
+
     function limpiarErroresTarifa() {
         document.querySelectorAll('#tarifaModal .form-error').forEach(el => el.innerText = '');
     }
+
 
     function onScopeChangeTarifa() {
         const scope = document.getElementById('tarifaScope').value;
@@ -462,24 +555,16 @@
     function filtrarProductosTarifa() {
         const busqueda = document.getElementById('tarifaBusquedaProd').value.toLowerCase();
         const rows = document.querySelectorAll('#listadoProductosTarifa .product-row');
-
         rows.forEach(row => {
-            const nombre = row.dataset.name;
-            if (nombre.includes(busqueda)) {
-                row.style.display = 'flex';
-            } else {
-                row.style.display = 'none';
-            }
+            row.classList.toggle('d-none', !row.dataset.name.includes(busqueda));
         });
     }
 
     function filtrarClientesTarifa() {
         const busqueda = document.getElementById('tarifaBusquedaIndiv').value.toLowerCase();
         const rows = document.querySelectorAll('#listadoClientesTarifa .client-row');
-
         rows.forEach(row => {
-            const nombre = row.dataset.name;
-            row.style.display = nombre.includes(busqueda) ? 'flex' : 'none';
+            row.classList.toggle('d-none', !row.dataset.name.includes(busqueda));
         });
     }
 
@@ -563,92 +648,7 @@
     }
     */
 
-    function abrirModalTarifa(t = null) {
-        limpiarErroresTarifa();
-        if (t) {
-            document.getElementById('tarifaId').value = t.id;
-            document.getElementById('tarifaNombre').value = t.nombre;
-            document.getElementById('tarifaTipo').value = t.tipo;
-            document.getElementById('tarifaValor').value = t.valor;
-            document.getElementById('tarifaPrioridad').value = t.prioridad || 0;
-            document.getElementById('tarifaFecha').value = t.fecha_aplicacion;
-            document.getElementById('tarifaFechaFin').value = t.fecha_fin || '';
-            document.getElementById('tarifaHoraInicio').value = t.hora_inicio || '';
-            document.getElementById('tarifaHoraFin').value = t.hora_fin || '';
 
-            // Días de la semana
-            const diasRule = t.dias_semana ? t.dias_semana.split(',').map(Number) : [];
-            document.querySelectorAll('.tarifa-dia-checkbox').forEach(cb => {
-                cb.checked = diasRule.includes(parseInt(cb.value));
-            });
-            document.querySelectorAll('.tarifa-cliente-checkbox').forEach(cb => {
-                cb.checked = false;
-                if (t.cliente_ids) {
-                    try {
-                        const ids = JSON.parse(t.cliente_ids);
-                        if (Array.isArray(ids) && ids.includes(parseInt(cb.value))) {
-                            cb.checked = true;
-                        }
-                    } catch (e) {}
-                }
-            });
-
-            // Roles Segmento
-            const roles = t.roles_segmento ? t.roles_segmento.split(',') : [];
-            document.querySelectorAll('.tarifa-rol-checkbox').forEach(cb => {
-                cb.checked = roles.includes(cb.value);
-            });
-
-            document.getElementById('tarifaScope').value = t.scope || 'todos';
-            document.getElementById('tarifaCategoria').value = t.categoria || '';
-
-            // Checkboxes de productos
-            document.querySelectorAll('.tarifa-prod-checkbox').forEach(cb => {
-                cb.checked = false;
-                if (t.producto_ids) {
-                    try {
-                        const ids = JSON.parse(t.producto_ids);
-                        if (Array.isArray(ids) && ids.includes(parseInt(cb.value))) {
-                            cb.checked = true;
-                        }
-                    } catch (e) {}
-                }
-            });
-            document.querySelector('.modal-header h2').innerText = "<?php echo L('rates_edit_rule'); ?>";
-        } else {
-            document.getElementById('tarifaId').value = '';
-            document.getElementById('tarifaNombre').value = '';
-            document.getElementById('tarifaTipo').value = 'percent';
-            document.getElementById('tarifaValor').value = '';
-            document.getElementById('tarifaPrioridad').value = '0';
-            document.getElementById('tarifaFecha').value = '';
-            document.getElementById('tarifaFechaFin').value = '';
-            document.getElementById('tarifaHoraInicio').value = '';
-            document.getElementById('tarifaHoraFin').value = '';
-            document.querySelectorAll('.tarifa-dia-checkbox').forEach(cb => cb.checked = false);
-            document.querySelectorAll('.tarifa-cliente-checkbox').forEach(cb => cb.checked = false);
-            document.getElementById('tarifaScope').value = 'todos';
-            document.getElementById('tarifaCategoria').value = '';
-            document.querySelectorAll('.tarifa-rol-checkbox').forEach(cb => cb.checked = false);
-            document.querySelectorAll('.tarifa-prod-checkbox').forEach(cb => cb.checked = false);
-            document.querySelector('.modal-header h2').innerText = "<?php echo L('rates_new_rule'); ?>";
-        }
-
-        onScopeChangeTarifa();
-        updateProdCount();
-        updateClientCount();
-
-        // Resetear a la primera pestaña
-        const firstTabBtn = document.querySelector('.tab-btn[data-tab="general"]');
-        if (firstTabBtn) switchTabTarifa(firstTabBtn, 'tab-general');
-
-        document.getElementById('tarifaModal').classList.add('visible');
-    }
-
-    function cerrarModalTarifa() {
-        document.getElementById('tarifaModal').classList.remove('visible');
-        limpiarErroresTarifa();
-    }
 
     async function guardarTarifa() {
         limpiarErroresTarifa();
@@ -663,11 +663,12 @@
         const fechaFin = document.getElementById('tarifaFechaFin').value;
         const horaIni = document.getElementById('tarifaHoraInicio').value;
         const horaFin = document.getElementById('tarifaHoraFin').value;
-        const roles = Array.from(document.querySelectorAll('.tarifa-rol-checkbox:checked')).map(cb => cb.value);
-        const clientes = Array.from(document.querySelectorAll('.tarifa-cliente-checkbox:checked')).map(cb => cb.value);
-        const dias = Array.from(document.querySelectorAll('.tarifa-dia-checkbox:checked')).map(cb => cb.value);
+        const selectedProds = Array.from(document.querySelectorAll('.tarifa-prod-checkbox:checked')).map(cb => parseInt(cb.value));
+        const rolesSegmento = Array.from(document.querySelectorAll('.tarifa-rol-checkbox:checked')).map(cb => cb.value);
+        const clienteIds = Array.from(document.querySelectorAll('.tarifa-cliente-checkbox:checked')).map(cb => parseInt(cb.value));
+        const dias = Array.from(document.querySelectorAll('.tarifa-dia-checkbox:checked')).map(cb => parseInt(cb.value));
 
-        const hasFilter = (fechaIni || fechaFin || horaIni || horaFin || roles.length > 0 || clientes.length > 0 || dias.length > 0);
+        const hasFilter = (fechaIni || fechaFin || horaIni || horaFin || rolesSegmento.length > 0 || clienteIds.length > 0 || dias.length > 0);
 
         if (!nombre) {
             document.getElementById('err-nombre').innerText = 'El nombre es obligatorio';
@@ -685,7 +686,6 @@
 
         const scope = document.getElementById('tarifaScope').value;
         const categoria = document.getElementById('tarifaCategoria').value;
-        const selectedProds = Array.from(document.querySelectorAll('.tarifa-prod-checkbox:checked')).map(cb => cb.value);
 
         const payload = {
             accion: id ? 'editar' : 'añadir',
@@ -694,9 +694,9 @@
             scope,
             categoria,
             producto_ids: selectedProds,
-            tipo_cliente: roles.join(','),
-            roles_segmento: clientes.join(','),
-            dias_semana: dias.join(','),
+            roles_segmento: rolesSegmento.join(','),
+            cliente_ids: clienteIds,
+            dias_semana: dias,
             hora_inicio: horaIni,
             hora_fin: horaFin,
             fecha_aplicacion: fechaIni,
@@ -712,6 +712,11 @@
             const r = await resp.json();
             if (r.ok) {
                 location.reload();
+            } else if (r.aErrores) {
+                for (const [field, msg] of Object.entries(r.aErrores)) {
+                    const el = document.getElementById('err-' + field);
+                    if (el) el.innerText = msg;
+                }
             } else {
                 showCustomAlert('Error', r.error || 'No se pudo guardar la tarifa', 'error');
             }
@@ -738,10 +743,10 @@
             });
             const r = await resp.json();
             if (r.ok) location.reload();
-            else alert("<?php echo L('error'); ?>: " + (r.error || "<?php echo L('modal_error_change_status'); ?>"));
+            else showCustomAlert("<?php echo L('error'); ?>", r.error || "<?php echo L('modal_error_change_status'); ?>", "error");
         } catch (e) {
             console.error(e);
-            alert("<?php echo L('error_server_connection'); ?>");
+            showCustomAlert("<?php echo L('error'); ?>", "<?php echo L('error_server_connection'); ?>", "error");
         }
     }
 
@@ -776,7 +781,8 @@
     }
 
     // --- LÓGICA TARIFARIO GLOBAL ---
-    const PRODUCTOS_DATA = <?php echo json_encode($avTarifas['productos']); ?>;
+    // Limiting product data to avoid browser crashes if catalog is too large (20k+)
+    const PRODUCTOS_DATA = <?php echo count($avTarifas['productos']) < 2000 ? json_encode($avTarifas['productos']) : '[]'; ?>;
     const TARIFAS_DATA = <?php echo json_encode($avTarifas['lista']); ?>;
 
     let tarifarioCurrentPage = 1;
@@ -974,12 +980,12 @@
                     });
                     const r = await resp.json();
                     if (!r.ok) {
-                        alert("<?php echo L('rates_error_save_order'); ?>: " + (r.error || "<?php echo L('rates_unknown_error'); ?>"));
+                        showCustomAlert("<?php echo L('error'); ?>", (r.error || "<?php echo L('rates_unknown_error'); ?>"), "error");
                         location.reload();
                     }
                 } catch (e) {
                     console.error(e);
-                    alert("<?php echo L('rates_error_reorder_connection'); ?>");
+                    showCustomAlert("<?php echo L('error'); ?>", "<?php echo L('rates_error_reorder_connection'); ?>", "error");
                     location.reload();
                 }
             }

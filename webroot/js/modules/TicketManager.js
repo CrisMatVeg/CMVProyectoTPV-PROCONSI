@@ -61,6 +61,28 @@ export const TicketManager = {
                 const isExpired = gDate < new Date();
                 const gStr = gDate.toLocaleDateString("es-ES");
 
+                const appliedDiscounts = l.descuentos || [];
+                const discountBadges = appliedDiscounts
+                  .filter(d => {
+                    // No mostrar si es un cupón (ya sale en el total general)
+                    if (d.tipo_descuento === 'cupon') return false;
+                    // No mostrar si el nombre coincide exactamente con el descuento general del ticket
+                    if (v.descuento_label && (d.nombre === v.descuento_label || d.nombre_descuento === v.descuento_label)) return false;
+                    return true;
+                  })
+                  .map(d => {
+                    const dName = d.nombre || d.nombre_descuento || 'Desc.';
+                    const isTarifa = d.tipo_descuento === 'tarifa';
+                    const bgColor = isTarifa ? 'bg-accent-soft' : 'bg-green-light';
+                    const textColor = isTarifa ? 'text-accent' : 'text-green';
+                    const icon = isTarifa ? 'fa-tag' : 'fa-percent';
+                    return `
+                      <span class="fs-9 px-6 py-2 br-4 ${bgColor} ${textColor} fw-800 tt-uppercase d-inline-flex ai-center gap-4" style="border: 1px solid rgba(var(--${isTarifa ? 'accent' : 'green'}-rgb), 0.1);">
+                        <i class="fa-solid ${icon} fs-8 opacity-70"></i> ${dName}
+                      </span>
+                    `;
+                  }).join("");
+
                 return `
           <div style="display:flex; justify-content:space-between; padding: 10px 0; border-bottom: 1px solid var(--surface2); ${l.devuelta ? "opacity:0.6; background:rgba(192,57,43,0.05);" : ""}">
             <div style="flex:1">
@@ -68,6 +90,7 @@ export const TicketManager = {
                 <div>
                   <span style="font-weight:600; ${l.devuelta ? "text-decoration:line-through;" : ""}">${l.nombre_producto}</span>
                   <span style="color:var(--text-muted); font-size:11px; margin-left:6px;">${l.codigo_producto}</span>
+                  <div style="display:flex; gap:4px; margin-top:2px;">${discountBadges}</div>
                 </div>
                 <span style="font-family:'DM Mono',monospace; font-weight:600;">${fmt2(l.total_linea)}</span>
               </div>
@@ -92,6 +115,7 @@ export const TicketManager = {
         const vSubtotal = parseFloat(v.subtotal) || 0;
         const vDescAmt = parseFloat(v.descuento_amt) || 0;
         const vPuntosAmt = parseFloat(v.puntos_descuento_amt) || 0;
+        const vDescPct = parseFloat(v.descuento_pct || 0);
         
         const ivaGrupos = {};
         v.lineas.forEach((l) => {
@@ -111,7 +135,12 @@ export const TicketManager = {
         let displayTotal = Object.values(ivaGrupos).reduce((acc, g) => acc + g.base + g.tax, 0);
 
         if (el_tkTotal) el_tkTotal.textContent = fmt2(vTotal);
-        if (el_tkSubtotalRow) el_tkSubtotalRow.style.display = "none";
+        
+        if (el_tkSubtotalRow) {
+            el_tkSubtotalRow.style.display = "flex";
+            const el_tkSubtotalVal = document.getElementById("tkSubtotal");
+            if (el_tkSubtotalVal) el_tkSubtotalVal.textContent = fmt2(vSubtotal);
+        }
 
         if (el_tkIvaDesglose) {
             el_tkIvaDesglose.innerHTML = Object.entries(ivaGrupos)
@@ -126,6 +155,35 @@ export const TicketManager = {
                 `).join("");
         }
 
+        const el_tkDescRow = document.getElementById("tkDescRow");
+        if (el_tkDescRow) {
+            const diff = Math.max(0, vSubtotal - vTotal);
+            // Si hay un descuento explícito o una diferencia entre subtotal y total
+            if (vDescAmt > 0 || diff > 0.01) {
+                el_tkDescRow.classList.remove("d-none");
+                el_tkDescRow.style.display = "flex";
+                const el_tkDescLabel = document.getElementById("tkDescLabel");
+                const el_tkDescAmt = document.getElementById("tkDescAmt");
+                
+                if (el_tkDescLabel) {
+                    if (v.descuento_label) {
+                        el_tkDescLabel.textContent = `Descuento (${v.descuento_label})`;
+                    } else if (vDescPct > 0) {
+                        el_tkDescLabel.textContent = `Descuento (${vDescPct}%)`;
+                    } else {
+                        el_tkDescLabel.textContent = "Descuento";
+                    }
+                }
+                if (el_tkDescAmt) {
+                    const amt = diff > 0.01 ? diff : vDescAmt;
+                    el_tkDescAmt.textContent = "−" + fmt2(amt);
+                }
+            } else {
+                el_tkDescRow.classList.add("d-none");
+                el_tkDescRow.style.display = "none";
+            }
+        }
+
         const el_tkPuntosRow = document.getElementById("tkPuntosRow");
         if (el_tkPuntosRow) {
             if (vPuntosAmt > 0) {
@@ -135,6 +193,8 @@ export const TicketManager = {
                 el_tkPuntosRow.classList.add("d-none");
             }
         }
+
+
 
         // Reset tabs
         if (typeof window.switchTicketTab === 'function') {
@@ -238,7 +298,7 @@ export const TicketManager = {
         if (btnAnular) {
             const isAbono = (v.tipo_documento || 'venta') === 'abono';
             // Mostrar botón anular si es historial, completada y no es un abono
-            btnAnular.style.display = (!isFromTPV && v.estado === "completada" && !isAbono) ? "flex" : "none";
+            btnAnular.style.display = (!isFromTPV && (v.estado === "completada" || v.estado === "parcialmente_devuelta") && !isAbono) ? "flex" : "none";
             btnAnular.onclick = () => {
                 if (typeof window.abrirModalAnulacionTicket === 'function') {
                     window.abrirModalAnulacionTicket(v.numero_ticket, v.fecha, v.id_cliente);

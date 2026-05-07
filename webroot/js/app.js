@@ -3,14 +3,14 @@
  * Main entry point and orchestration layer.
  */
 
-import { AppConfig, AppState } from './modules/AppConfig.js?v=32';
-import { ApiService } from './modules/ApiService.js?v=32';
-import { Utils } from './modules/Utils.js?v=32';
-import { TicketManager } from './modules/TicketManager.js?v=32';
-import { ProductManager } from './modules/ProductManager.js?v=32';
-import { CartManager } from './modules/CartManager.js?v=32';
-import { UiController } from './modules/UiController.js?v=32';
-import { PaymentManager } from './modules/PaymentManager.js?v=32';
+import { AppConfig, AppState } from './modules/AppConfig.js';
+import { ApiService } from './modules/ApiService.js';
+import { Utils } from './modules/Utils.js';
+import { TicketManager } from './modules/TicketManager.js';
+import { ProductManager } from './modules/ProductManager.js';
+import { CartManager } from './modules/CartManager.js';
+import { UiController } from './modules/UiController.js';
+import { PaymentManager } from './modules/PaymentManager.js';
 
 const TpvApp = {
   /**
@@ -49,8 +49,8 @@ const TpvApp = {
     PaymentManager.ejecutarCobroFinal();
   },
 
-  seleccionarTipoCliente(tipo) {
-    PaymentManager.seleccionarTipoCliente(tipo);
+  async seleccionarTipoCliente(tipo) {
+    await PaymentManager.seleccionarTipoCliente(tipo);
   },
 
   aplicarVale(vale) {
@@ -81,8 +81,8 @@ const TpvApp = {
     PaymentManager.buscarClienteGuardado();
   },
 
-  seleccionarClienteGuardado(idx) {
-    PaymentManager.seleccionarClienteGuardado(idx);
+  async seleccionarClienteGuardado(idx) {
+    await PaymentManager.seleccionarClienteGuardado(idx);
   },
 
   mostrarRegistroCliente() {
@@ -101,6 +101,10 @@ const TpvApp = {
     PaymentManager.cerrarModalCliente();
   },
 
+  deseleccionarCliente() {
+    PaymentManager.deseleccionarCliente();
+  },
+
   canjearPuntos() {
     PaymentManager.canjearPuntos();
   },
@@ -117,16 +121,19 @@ const TpvApp = {
     PaymentManager.updateMixSummary();
   },
 
-  removePagoMixto(index) {
-    PaymentManager.removePagoMixto(index);
-  },
-
   handleFacturaToggle(val) {
     AppState.esFactura = val;
   },
 
   applyDiscount() {
-    CartManager.applyDiscountCode(document.getElementById("discountCode").value);
+    const input = document.getElementById("discountCode");
+    const res = CartManager.applyDiscountCode(input.value);
+    if (res.ok) {
+        Utils.showToast(`Cupón "${res.promo.codigo}" aplicado`, "success");
+        input.value = "";
+    } else {
+        Utils.showToast(res.error, "error");
+    }
     this.refreshUI();
   },
 
@@ -203,7 +210,7 @@ const TpvApp = {
     if (this._searchTimeout) clearTimeout(this._searchTimeout);
     this._searchTimeout = setTimeout(() => {
         ProductManager.loadProducts(true).then(() => this.refreshUI());
-    }, 400);
+    }, 200);
   },
 
   toggleAdvancedFilters() {
@@ -231,6 +238,10 @@ const TpvApp = {
   },
 
   selectTag(tag) {
+    // Disable all tag buttons to prevent double-click race condition
+    const tagBtns = document.querySelectorAll('.attr-tab-btn');
+    tagBtns.forEach(b => { b.disabled = true; b.style.pointerEvents = 'none'; });
+
     if (AppState.activeTag === tag) {
         AppState.activeTag = null;
     } else {
@@ -238,13 +249,16 @@ const TpvApp = {
     }
 
     // Actualizar UI de botones de etiquetas
-    document.querySelectorAll(".attr-tab-btn").forEach(b => {
+    tagBtns.forEach(b => {
         const isSelected = (b.dataset.attr === AppState.activeTag);
-        b.classList.toggle("active", isSelected);
+        b.classList.toggle('active', isSelected);
     });
 
-    // Refresh UI (UiController handles local tag filtering on the current PRODUCTS set)
-    this.refreshUI();
+    // Refresh from server, re-enable buttons after load
+    ProductManager.loadProducts(true).then(() => {
+        this.refreshUI();
+        tagBtns.forEach(b => { b.disabled = false; b.style.pointerEvents = ''; });
+    });
   },
 
   abrirModalComodin() {
@@ -323,11 +337,17 @@ const TpvApp = {
    * Cart Actions
    */
   clearCart() {
-    if (confirm("¿Estás seguro de que quieres vaciar el carrito?")) {
-        AppState.cart = {};
-        AppState.saveCart();
-        this.refreshUI();
-    }
+    window.showCustomConfirm(
+        "Vaciar pedido", 
+        "¿Estás seguro de que quieres eliminar todos los productos del pedido actual?", 
+        () => {
+            AppState.cart = {};
+            AppState.saveCart();
+            this.refreshUI();
+        },
+        "Vaciar",
+        "danger"
+    );
   },
 
   changeQty(id, delta) {
@@ -341,6 +361,19 @@ const TpvApp = {
   setQty(id, val) {
     CartManager.setQty(id, val);
     this.refreshUI();
+  },
+
+  removeFromCart(id) {
+    window.showCustomConfirm(
+        "Eliminar producto", 
+        "¿Quitar este producto del pedido?", 
+        () => {
+            CartManager.removeFromCart(id);
+            this.refreshUI();
+        },
+        "Eliminar",
+        "danger"
+    );
   },
 
   /**

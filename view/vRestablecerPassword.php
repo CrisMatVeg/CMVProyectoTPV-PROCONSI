@@ -1,6 +1,6 @@
 </header>
 <div class="main container-full d-flex ai-center jc-center min-h-80vh">
-    <div class="modal modal-content auth-card w-400 p-40">
+    <div class="modal modal-content auth-card w-480 p-40">
         <div class="topbar-brand-dot mb-24"></div>
         <div class="modal-title text-center fs-24 font-bold text-accent"><?php echo L('login_reset_title'); ?></div>
         <div class="modal-sub mb-32 text-center text-muted fs-14">
@@ -16,7 +16,7 @@
                 <a href="index.php?menu=RecuperarPassword" class="btn-save w-full p-14 text-decoration-none d-inline-block"><?php echo L('login_reset_btn_new_link'); ?></a>
             </div>
         <?php else: ?>
-            <form method="post" action="index.php?menu=RecuperarPassword&token=<?php echo htmlspecialchars($_GET['token']); ?>" class="form-grid d-flex flex-column gap-24">
+            <form method="post" action="index.php?menu=RestablecerPassword&token=<?php echo htmlspecialchars($_GET['token']); ?>" class="form-grid d-flex flex-column gap-24">
                 
                 <?php if (isset($aErrores['general'])): ?>
                     <div class="p-12 bg-red-light text-red br-8 fs-13 italic">
@@ -46,16 +46,17 @@
                     <?php endif; ?>
                 </div>
 
-                <div class="mt-8 d-flex flex-column gap-12">
-                    <button type="submit" name="cambiarPassword" class="btn-save p-14 fs-14 fw-700 shadow-lg hover-translate-y">
-                        <i class="fa-solid fa-rotate mr-10"></i> <?php echo L('login_btn_update_pass'); ?>
-                    </button>
-                    
-                    <a href="index.php?menu=Login" class="btn-cancel border-none bg-none text-muted p-12 cursor-pointer text-center text-decoration-none fs-13 hover-text-accent transition-all">
+                <div class="grid-2 gap-12 mt-8">
+                    <a href="index.php?menu=Login" class="btn-cancel w-full p-14 fs-14 text-decoration-none transition-all d-flex ai-center jc-center" style="height: 48px;">
                         <?php echo L('modal_cancel'); ?>
                     </a>
+                    <button type="submit" name="cambiarPassword" class="btn-save w-full p-14 fs-14 fw-700 shadow-lg hover-translate-y d-flex ai-center jc-center" style="height: 48px;">
+                        <i class="fa-solid fa-rotate mr-10"></i> <?php echo L('login_btn_update_pass'); ?>
+                    </button>
                 </div>
             </form>
         <?php endif; ?>
     </div>
 </div>
+
+</content>
