@@ -39,6 +39,8 @@ try {
                     'id'       => (int)$cli['id'],
                     'nombre'   => $cli['nombre'],
                     'nif'      => $cli['nif'],
+                    'aeat_id_type'     => $cli['aeat_id_type'] ?? '01',
+                    'aeat_codigo_pais' => $cli['aeat_codigo_pais'] ?? 'ES',
                     'rol'      => $cli['rol'] ?? 'general',
                     'puntos'   => $cli['puntos'] ?? 0,
                 ],
@@ -53,13 +55,14 @@ try {
         $nombre = trim($input['nombre'] ?? '');
         $nif    = trim($input['nif'] ?? '');
         $tipo   = $input['tipo'] ?? 'particular';
-        $rol    = $input['rol'] ?? 'general';
+        $aeat_id_type = $input['aeat_id_type'] ?? '01';
+        $aeat_codigo_pais = $input['aeat_codigo_pais'] ?? 'ES';
 
         if ($nombre === '' || $nif === '') {
             throw new Exception('Nombre y NIF son obligatorios para registrar un cliente');
         }
 
-        if (!Validador::validarDocumento($nif)) {
+        if ($aeat_id_type === '01' && !Validador::validarDocumento($nif)) {
             throw new Exception('El NIF/CIF proporcionado no tiene un formato válido.');
         }
 
@@ -68,6 +71,8 @@ try {
             $cli['nombre']   = $nombre;
             $cli['tipo']     = $tipo;
             $cli['rol']      = $rol;
+            $cli['aeat_id_type'] = $aeat_id_type;
+            $cli['aeat_codigo_pais'] = $aeat_codigo_pais;
             ClientePDO::actualizar((int)$cli['id'], $cli);
             $nuevoId = (int)$cli['id'];
         } else {
@@ -77,6 +82,8 @@ try {
                 'nombre'    => $nombre,
                 'apellidos' => '',
                 'nif'       => $nif,
+                'aeat_id_type'   => $aeat_id_type,
+                'aeat_codigo_pais' => $aeat_codigo_pais,
                 'email'     => null,
                 'telefono'  => null,
             ]);
@@ -120,7 +127,7 @@ try {
         $total = (int)$qCount->fetchColumn();
 
         // Obtener datos paginados
-        $dataSql = "SELECT id, tipo, rol, nombre, apellidos, nif, email, telefono, puntos, fecha_alta " . $baseSql . " ORDER BY id ASC LIMIT :limit OFFSET :offset";
+        $dataSql = "SELECT id, tipo, rol, nombre, apellidos, nif, aeat_id_type, aeat_codigo_pais, email, telefono, puntos, fecha_alta " . $baseSql . " ORDER BY id ASC LIMIT :limit OFFSET :offset";
         $dataSql = str_replace([':limit', ':offset'], [(int)$limit, (int)$offset], $dataSql);
 
         $q = DBPDO::ejecutarConsulta($dataSql, $params);
@@ -180,8 +187,11 @@ try {
         throw new Exception('El nombre es obligatorio');
     }
 
+    $aeat_id_type = $input['aeat_id_type'] ?? '01';
+    $aeat_codigo_pais = $input['aeat_codigo_pais'] ?? 'ES';
+
     $nifInput = trim($input['nif'] ?? '');
-    if ($nifInput !== '' && !Validador::validarDocumento($nifInput)) {
+    if ($aeat_id_type === '01' && $nifInput !== '' && !Validador::validarDocumento($nifInput)) {
         throw new Exception('El NIF/CIF proporcionado no tiene un formato válido.');
     }
 
@@ -196,6 +206,8 @@ try {
         'nombre'    => $nombre,
         'apellidos' => $input['apellidos'] ?? '',
         'nif'       => $nifInput ?: null,
+        'aeat_id_type'     => $input['aeat_id_type'] ?? '01',
+        'aeat_codigo_pais' => $input['aeat_codigo_pais'] ?? 'ES',
         'email'     => $input['email'] ?? null,
         'telefono'  => $telefonoInput ?: null,
         'direccion' => $input['direccion'] ?? null,

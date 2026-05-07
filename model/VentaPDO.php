@@ -125,6 +125,8 @@ class VentaPDO
         $nifCliente       = isset($datos['nifCliente']) ? mb_substr(trim($datos['nifCliente']), 0, 20) : null;
         $metodoPago       = in_array($datos['metodoPago'] ?? '', ['efectivo', 'tarjeta', 'bizum', 'a_cuenta', 'mixto', 'puntos']) ? $datos['metodoPago'] : 'efectivo';
         $idCliente        = isset($datos['idCliente']) ? (int)$datos['idCliente'] : null;
+        $idTypeAEAT       = $datos['aeatIdType'] ?? null;
+        $codigoPaisAEAT   = $datos['aeatCodigoPais'] ?? null;
         $efectivoRecibido = round((float)($datos['efectivo']['recibido'] ?? $datos['efectivoRecibido'] ?? 0), 2);
 
         // [FallBack] Si no viene arriba, buscar en el desglose de pagos (útil para TPV modular)
@@ -191,11 +193,11 @@ class VentaPDO
         $descuentoLabel = isset($datos['descuentoLabel']) ? mb_substr(trim($datos['descuentoLabel']), 0, 100) : null;
 
         $sqlVenta = "INSERT INTO ventas 
-         (numero_ticket, fecha, id_usuario, id_cliente, tipo_cliente, nombre_cliente, nif_cliente, metodo_pago,
+         (numero_ticket, fecha, id_usuario, id_cliente, tipo_cliente, nombre_cliente, nif_cliente, aeat_id_type, aeat_codigo_pais, metodo_pago,
           subtotal, descuento_pct, descuento_amt, descuento_label, base_imponible, iva_amt, total, efectivo_recibido,
           estado, pagado_a_cuenta, fecha_limite_pago, es_factura, comentarios, id_turno,
           puntos_ganados, puntos_canjeados, puntos_descuento_amt)
-        VALUES (:ticket, NOW(), :usuario, :cliente, :tipo, :nombre, :nif, :metodo,
+        VALUES (:ticket, NOW(), :usuario, :cliente, :tipo, :nombre, :nif, :aeatIdType, :aeatCodigoPais, :metodo,
           :subtotal, :descPct, :descAmt, :descLabel, :base, :ivaAmt, :total, :efectivo,
           :estado, :pagadoACuenta, :fechaLimite, :esFactura, :comentarios, :idTurno,
           :puntosGanados, :puntosCanjeados, :puntosDescuentoAmt)";
@@ -207,8 +209,10 @@ class VentaPDO
             ':tipo'          => $tipoCliente,
             ':nombre'        => $nombreCliente,
             ':nif'           => $nifCliente,
+            ':aeatIdType'    => $idTypeAEAT,
+            ':aeatCodigoPais' => $codigoPaisAEAT,
             ':metodo'        => $metodoPago,
-            ':subtotal'      => $subtotal,
+            ':subtotal'      => $totalReal,
             ':descPct'       => $descPct,
             ':descAmt'       => $descAmt,
             ':descLabel'     => $descuentoLabel,

@@ -63,5 +63,33 @@ class Validador {
         $tel = preg_replace('/\s+/', '', $tel);
         return preg_match('/^(\+34|0034|34)?[6789]\d{8}$|^(\+[1-9]\d{6,14})$/', $tel);
     }
+
+    /**
+     * Valida el formato del NIF-IVA (VIES) para operadores intracomunitarios.
+     * Debe comenzar por el código ISO del país y tener una longitud razonable.
+     */
+    public static function validarNifIva($nif, $pais) {
+        $nif = strtoupper(trim($nif));
+        $pais = strtoupper(trim($pais));
+        if (empty($nif) || empty($pais)) return false;
+
+        // Regla básica VeriFactu: El ID debe comenzar por el código de país
+        if (!str_starts_with($nif, $pais)) return false;
+
+        $longitudes = [
+            'AT' => 11, 'BE' => 12, 'BG' => 11, 'CY' => 11, 'CZ' => 12, 'DE' => 11, 'DK' => 10,
+            'EE' => 11, 'EL' => 11, 'ES' => 11, 'FI' => 10, 'FR' => 13, 'HR' => 13, 'HU' => 10,
+            'IE' => 10, 'IT' => 13, 'LT' => 14, 'LU' => 10, 'LV' => 13, 'MT' => 10, 'NL' => 14,
+            'PL' => 12, 'PT' => 11, 'RO' => 12, 'SE' => 14, 'SI' => 10, 'SK' => 12
+        ];
+
+        $len = strlen($nif);
+        if (isset($longitudes[$pais])) {
+            // Permitimos un margen de +-1 por si incluyen caracteres extra o formatos antiguos
+            return ($len >= $longitudes[$pais] - 1 && $len <= $longitudes[$pais] + 1);
+        }
+
+        return ($len >= 5 && $len <= 20);
+    }
 }
 ?>

@@ -78,6 +78,8 @@ try {
     $nombre_cliente = $datos['nombreCliente'] ?? ($datos['cliente']['nombre'] ?? ($datos['socio']['nombre'] ?? null));
     $nif_cliente    = strtoupper(trim($datos['nifCliente'] ?? ($datos['cliente']['nif'] ?? ($datos['socio']['nif'] ?? ''))));
     $id_cliente     = $datos['idCliente'] ?? ($datos['cliente']['id'] ?? ($datos['socio']['id'] ?? null));
+    $aeat_id_type   = $datos['aeatIdType'] ?? ($datos['cliente']['aeat_id_type'] ?? '01');
+    $aeat_codigo_pais = $datos['aeatCodigoPais'] ?? ($datos['cliente']['aeat_codigo_pais'] ?? 'ES');
     $esFactura      = (!empty($datos['esFactura']) || $total >= 3000) ? 1 : 0;
 
     // Validación obligatoria para Empresas o Facturas nominativas
@@ -87,8 +89,17 @@ try {
 
         if (empty($nif_cliente)) {
             $aErrores['empresaNif'] = 'El NIF/CIF es obligatorio para empresas o facturas.';
-        } elseif (!Validador::validarDocumento($nif_cliente)) {
-            $aErrores['empresaNif'] = 'El CIF/NIF no tiene un formato válido (ej: B12345678, 12345678A, X1234567A).';
+        } else {
+            // Validación específica según tipo
+            if ($aeat_id_type === '01' || empty($aeat_id_type)) {
+                if (!Validador::validarDocumento($nif_cliente)) {
+                    $aErrores['empresaNif'] = 'El CIF/NIF no tiene un formato válido (ej: B12345678, 12345678A, X1234567A).';
+                }
+            } elseif ($aeat_id_type === '02') {
+                if (!Validador::validarNifIva($nif_cliente, $aeat_codigo_pais)) {
+                    $aErrores['empresaNif'] = "El NIF-IVA no es válido para el país $aeat_codigo_pais. Debe empezar por el prefijo del país.";
+                }
+            }
         }
     }
 
@@ -106,6 +117,8 @@ try {
     $datos['nombreCliente'] = $nombre_cliente;
     $datos['nifCliente']    = $nif_cliente;
     $datos['idCliente']     = $id_cliente;
+    $datos['aeatIdType']    = $aeat_id_type;
+    $datos['aeatCodigoPais'] = $aeat_codigo_pais;
     $datos['esFactura']     = $esFactura;
 
     // Resolver / crear cliente en tabla clientes
@@ -131,6 +144,8 @@ try {
                     'nombre'    => $nombreEmpresa,
                     'apellidos' => '',
                     'nif'       => $nifEmpresa,
+                    'aeat_id_type'   => $aeat_id_type,
+                    'aeat_codigo_pais' => $aeat_codigo_pais,
                     'email'     => null,
                     'telefono'  => null,
                     'es_socio'  => 0,
