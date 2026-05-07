@@ -246,7 +246,7 @@ CREATE TABLE IF NOT EXISTS ventas (
     tipo_cliente ENUM('particular','empresa') NOT NULL DEFAULT 'particular',
     nombre_cliente VARCHAR(100) NULL,
     nif_cliente VARCHAR(20) NULL,
-    metodo_pago ENUM('efectivo', 'tarjeta', 'bizum', 'a_cuenta') NOT NULL,
+    metodo_pago ENUM('efectivo', 'tarjeta', 'bizum', 'a_cuenta', 'mixto') NOT NULL,
     subtotal DECIMAL(10,2) NOT NULL,
     descuento_pct DECIMAL(5,2) DEFAULT 0,
     descuento_amt DECIMAL(10,2) DEFAULT 0,
@@ -267,7 +267,7 @@ CREATE TABLE IF NOT EXISTS ventas (
     hash_actual VARCHAR(64) DEFAULT NULL,
     hash_anterior VARCHAR(64) DEFAULT NULL,
     firma_digital LONGTEXT DEFAULT NULL,
-    estado_envio_aeat ENUM('pendiente', 'enviado', 'error') NOT NULL DEFAULT 'pendiente',
+    estado_envio_aeat ENUM('pendiente', 'enviado', 'error_critico', 'subsanacion_pendiente', 'bloqueado', 'anulado_pendiente') NOT NULL DEFAULT 'pendiente',
     codigo_qr TEXT DEFAULT NULL,
     CONSTRAINT fk_ventas_usr FOREIGN KEY (id_usuario) REFERENCES usuarios(id) ON DELETE SET NULL,
     CONSTRAINT fk_ventas_clie FOREIGN KEY (id_cliente) REFERENCES clientes(id) ON DELETE SET NULL,
@@ -479,6 +479,7 @@ DELIMITER //
 CREATE TRIGGER tg_ventas_prevent_update BEFORE UPDATE ON ventas
 FOR EACH ROW
 BEGIN
+    -- Si la factura ya tiene huella (fue emitida fiscalmente), bloqueamos cambios en campos críticos
     IF OLD.hash_actual IS NOT NULL THEN
         IF NEW.total <> OLD.total OR 
            NEW.base_imponible <> OLD.base_imponible OR 
@@ -486,9 +487,9 @@ BEGIN
            NEW.subtotal <> OLD.subtotal OR
            NEW.fecha <> OLD.fecha OR
            NEW.numero_ticket <> OLD.numero_ticket OR
-           NEW.nif_cliente <> OLD.nif_cliente THEN
+           NEW.es_factura <> OLD.es_factura THEN
            
-            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'VeriFactu: Inalterabilidad violada. No se permite modificar campos fiscales de una factura ya emitida.';
+            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'VeriFactu: Inalterabilidad violada. No se permite modificar campos que afecten a la huella fiscal.';
         END IF;
     END IF;
 END //

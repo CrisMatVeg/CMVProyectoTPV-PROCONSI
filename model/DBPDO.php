@@ -48,10 +48,11 @@ class DBPDO
      * @param array|null $parametros Parámetros para consultas preparadas
      * @return PDOStatement Objeto PDOStatement ya ejecutado
      */
-    public static function ejecutarConsulta($sentenciaSQL, $parametros = null)
+    public static function ejecutarConsulta($sentenciaSQL, $parametros = null, ?PDO $db = null)
     {
         try {
-            $consulta = self::getPDO()->prepare($sentenciaSQL);
+            $conn = $db ?? self::getPDO();
+            $consulta = $conn->prepare($sentenciaSQL);
             $consulta->execute($parametros);
             return $consulta;
         } catch (PDOException $e) {

@@ -7,10 +7,10 @@ USE `dbelectrobazar-tpv`;
 CREATE TABLE IF NOT EXISTS cola_envios (
     id INT AUTO_INCREMENT PRIMARY KEY,
     id_venta INT NOT NULL,
-    xml_path VARCHAR(255) NOT NULL,
+    xml_path VARCHAR(255) NULL,
     intentos INT DEFAULT 0,
     ultimo_error TEXT NULL,
-    estado ENUM('pendiente', 'enviado', 'error_critico') DEFAULT 'pendiente',
+    estado ENUM('pendiente', 'enviado', 'error_critico', 'bloqueado') DEFAULT 'pendiente',
     fecha_proximo_intento DATETIME DEFAULT CURRENT_TIMESTAMP,
     creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     actualizado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
