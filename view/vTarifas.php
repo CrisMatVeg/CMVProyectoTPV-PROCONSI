@@ -41,6 +41,7 @@
                     <th><?php echo L('rates_th_name'); ?></th>
                     <th><?php echo L('rates_th_type'); ?></th>
                     <th class="text-right"><?php echo L('rates_th_value'); ?></th>
+                    <th><?php echo L('rates_th_date'); ?></th>
                     <th><?php echo L('rates_th_scope'); ?></th>
                     <th class="text-center"><?php echo L('rates_th_status'); ?></th>
                     <th class="text-center pr-20"><?php echo L('rates_th_actions'); ?></th>
@@ -782,8 +783,17 @@
 
     // --- LÓGICA TARIFARIO GLOBAL ---
     // Limiting product data to avoid browser crashes if catalog is too large (20k+)
-    const PRODUCTOS_DATA = <?php echo count($avTarifas['productos']) < 2000 ? json_encode($avTarifas['productos']) : '[]'; ?>;
-    const TARIFAS_DATA = <?php echo json_encode($avTarifas['lista']); ?>;
+    const PRODUCTOS_DATA = <?php
+        $flags = JSON_HEX_TAG | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE;
+        $slim = array_map(fn($p) => [
+            'id'           => $p->getId(),
+            'nombre'       => $p->getNombre(),
+            'categoria'    => $p->getCategoria() ?? '',
+            'precio_venta' => $p->getPrecioVenta(),
+        ], $avTarifas['productos']);
+        echo json_encode($slim, $flags) ?: '[]';
+    ?>;
+    const TARIFAS_DATA = <?php echo json_encode($avTarifas['lista'], JSON_HEX_TAG | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) ?: '[]'; ?>;
 
     let tarifarioCurrentPage = 1;
     let tarifarioItemsPerPage = 50;
@@ -994,6 +1004,13 @@
 </script>
 
 <style>
+    /* Fix: el table-container global usa display:flex; como flex item,
+       width:100% en la tabla no garantiza que thead ocupe el ancho completo.
+       Convertir a block soluciona el problema en ambas pestañas. */
+    #view-reglas .table-container {
+        display: block;
+    }
+
     .drag-handle {
         cursor: grab;
         color: var(--text-muted);
@@ -1178,6 +1195,7 @@
 
     /* --- TARIFARIO MATRIX STYLES --- */
     #view-tarifario .table-container {
+        display: block;
         overflow-x: auto;
         width: 100%;
     }
