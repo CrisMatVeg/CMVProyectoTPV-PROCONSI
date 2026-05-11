@@ -87,6 +87,20 @@ try {
             if ($id <= 0) {
                 throw new Exception('ID de tipo de IVA inválido');
             }
+            $tipoIva = TipoIVAPDO::obtenerPorId($id);
+            if (!$tipoIva) {
+                echo json_encode(['ok' => false, 'error' => 'Tipo de IVA no encontrado.']);
+                break;
+            }
+            if ($tipoIva['activo']) {
+                echo json_encode(['ok' => false, 'error' => 'No se puede eliminar un tipo de IVA activo. Desactívalo primero.']);
+                break;
+            }
+            $nProductos = TipoIVAPDO::contarProductos($id);
+            if ($nProductos > 0) {
+                echo json_encode(['ok' => false, 'error' => "No se puede eliminar: {$nProductos} producto(s) tienen asignado este tipo de IVA."]);
+                break;
+            }
             TipoIVAPDO::eliminar($id);
             echo json_encode(['ok' => true]);
             break;

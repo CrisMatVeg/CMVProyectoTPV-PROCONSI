@@ -186,6 +186,10 @@
 
     async function guardarIva() {
         limpiarErroresIva();
+        const btn = document.querySelector('#ivaModal .btn-save');
+        const oldHtml = btn ? btn.innerHTML : '';
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>'; }
+
         const id = document.getElementById('ivaId').value;
         const payload = {
             accion: id ? 'editar' : 'añadir',
@@ -198,11 +202,10 @@
             activo: document.getElementById('ivaActivo').checked ? 1 : 0,
         };
 
-        if (payload.fecha_inicio && payload.fecha_fin) {
-            if (!validarFechas(payload.fecha_inicio, payload.fecha_fin)) {
-                showCustomAlert("<?php echo L('rates_confirm_apply_title'); ?>", "<?php echo L('rates_confirm_apply_msg'); ?>", 'warning');
-                return;
-            }
+        if (payload.fecha_inicio && payload.fecha_fin && payload.fecha_fin < payload.fecha_inicio) {
+            document.getElementById('err-fecha_fin').innerText = 'La fecha de fin no puede ser anterior a la de inicio';
+            if (btn) { btn.disabled = false; btn.innerHTML = oldHtml; }
+            return;
         }
 
         try {
@@ -227,6 +230,8 @@
         } catch (e) {
             console.error(e);
             showCustomAlert('Error', 'Error de conexión con el servidor', 'error');
+        } finally {
+            if (btn) { btn.disabled = false; btn.innerHTML = oldHtml; }
         }
     }
 
