@@ -352,7 +352,7 @@ export const UiController = {
     if (discRow) discRow.style.display = totals.totalDiscount > 0 ? "flex" : "none";
     
     const chargeBtn = document.getElementById("chargeBtn");
-    if (chargeBtn) chargeBtn.disabled = totals.subtotal === 0;
+    if (chargeBtn) chargeBtn.disabled = Object.keys(AppState.cart).length === 0;
   },
 
   /**
@@ -437,6 +437,7 @@ export const UiController = {
           </div>`;
     },
     cartItem(item) {
+        const priceModified = item._customPrice && item.basePriceSnapshot != null && Math.abs(item.price - item.basePriceSnapshot) > 0.001;
         return `
           <div class="order-item">
             <span class="order-item-emoji">
@@ -444,7 +445,7 @@ export const UiController = {
             </span>
             <div class="order-item-info">
               <div class="order-item-name">${item.name}</div>
-              <div class="order-item-price">${Utils.fmt2(item.price)} × ${item.qty}</div>
+              <div class="order-item-price"><input type="number" class="price-input${priceModified ? ' price-modified' : ''}" value="${parseFloat(item.price).toFixed(2)}" min="0" step="0.01" onchange="app.setItemPrice('${item.cartKey}', this.value)" onfocus="this.select()" title="Editar precio (solo esta venta)">€ × ${item.qty}</div>
             </div>
             <div class="qty-ctrl">
               <button class="qty-btn" onclick="app.changeQty('${item.cartKey}', -1)" aria-label="${window.I18N?.reduceQty || "Reducir cantidad"}"><i class="fa-solid fa-minus" aria-hidden="true"></i></button>

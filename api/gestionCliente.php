@@ -43,6 +43,7 @@ try {
                     'aeat_codigo_pais' => $cli['aeat_codigo_pais'] ?? 'ES',
                     'rol'      => $cli['rol'] ?? 'general',
                     'puntos'   => $cli['puntos'] ?? 0,
+                    'telefono' => $cli['telefono'] ?? null,
                 ],
             ]);
         } else {
@@ -175,6 +176,19 @@ try {
         $id = isset($input['id']) ? (int)$input['id'] : null;
         if (!$id) throw new Exception('ID obligatorio para eliminar');
         ClientePDO::marcarBaja($id);
+        echo json_encode(['ok' => true]);
+        exit;
+    }
+
+    if ($accion === 'actualizarTelefono') {
+        $id  = isset($input['id']) ? (int)$input['id'] : null;
+        $tel = trim($input['telefono'] ?? '');
+        if (!$id) throw new Exception('ID obligatorio');
+        if ($tel === '') throw new Exception('El teléfono es obligatorio');
+        if (!Validador::validarTelefono($tel)) throw new Exception('El teléfono no tiene un formato válido.');
+        $db = DBPDO::getPDO();
+        $stmt = $db->prepare("UPDATE clientes SET telefono = :tel WHERE id = :id");
+        $stmt->execute([':tel' => $tel, ':id' => $id]);
         echo json_encode(['ok' => true]);
         exit;
     }

@@ -137,8 +137,8 @@ export const CartManager = {
       const item = cart[key];
       // Skip custom products (comodines)
       if (String(key).startsWith("comodin_") || item.id === -1) return;
-      // Skip items already validated by the server API in the active checkout session
-      if (item._tariffApplied) return;
+      // Skip items already validated by the server API or with manually edited price
+      if (item._tariffApplied || item._customPrice) return;
 
       const product = AppConfig.products.find((p) => String(p.id) === String(item.id));
       if (!product) return;
@@ -229,6 +229,16 @@ export const CartManager = {
       delete cart[id];
     }
     AppState.cart = cart; // Write back
+  },
+
+  setItemPrice(cartKey, newPrice) {
+    const cart = AppState.cart;
+    if (!cart[cartKey]) return;
+    const price = parseFloat(newPrice);
+    if (isNaN(price) || price < 0) return;
+    cart[cartKey].price = Math.round(price * 100) / 100;
+    cart[cartKey]._customPrice = true;
+    AppState.cart = cart;
   },
 
   setQty(id, value) {

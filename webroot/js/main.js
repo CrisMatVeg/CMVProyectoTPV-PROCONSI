@@ -2419,9 +2419,9 @@ function abrirModalDevolucion(
   const productStatus = document.getElementById("returnProductStatusBadge");
 
   // Limpiar clases previas
-  [stCommercial, stWarranty].forEach((el) =>
-    el.classList.remove("status-ok", "status-warn", "status-err"),
-  );
+  [stCommercial, stWarranty].forEach((el) => {
+    if (el) el.classList.remove("status-ok", "status-warn", "status-err");
+  });
   [optCash, optBalance, optCard, optExchange].forEach((el) => {
     if (el) {
         el.classList.remove("disabled");
@@ -2494,11 +2494,11 @@ function abrirModalDevolucion(
   if (rectOption) rectOption.checked = true;
   toggleRefundMethodVisibility();
   const fiscalAnulBlock = document.getElementById("fiscalAnulacion");
-  if (fiscalAnulBlock) fiscalAnulBlock.style.display = "none";
+  if (fiscalAnulBlock) { fiscalAnulBlock.classList.add("d-none"); fiscalAnulBlock.classList.remove("d-flex"); }
   const fiscalRectBlock = document.getElementById("fiscalRectification");
   if (fiscalRectBlock) {
-      fiscalRectBlock.style.display = "flex";
-      fiscalRectBlock.classList.remove("grid-col-span-2");
+      fiscalRectBlock.classList.remove("d-none");
+      fiscalRectBlock.classList.add("d-flex", "grid-col-span-2");
   }
 
   // Gestión de cantidades
@@ -2608,11 +2608,11 @@ function abrirModalAnulacionTicket(numTicket, fechaVenta, idCliente) {
   const rectOptionAnul = document.querySelector('input[name="tipoGestionFiscal"][value="rectificacion"]');
   if (rectOptionAnul) rectOptionAnul.checked = true;
   const fiscalAnulBlock = document.getElementById("fiscalAnulacion");
-  if (fiscalAnulBlock) fiscalAnulBlock.style.display = "flex";
+  if (fiscalAnulBlock) { fiscalAnulBlock.classList.remove("d-none"); fiscalAnulBlock.classList.add("d-flex"); }
   const fiscalRectBlock = document.getElementById("fiscalRectification");
   if (fiscalRectBlock) {
-      fiscalRectBlock.style.display = "flex";
-      fiscalRectBlock.classList.remove("grid-col-span-2");
+      fiscalRectBlock.classList.remove("d-none", "grid-col-span-2");
+      fiscalRectBlock.classList.add("d-flex");
   }
 
   subtitle.innerText = `Anulación Ticket #${String(numTicket).padStart(4, "0")}`;
@@ -2632,7 +2632,6 @@ async function confirmarDevolucion(idLinea, numTicket) {
   const finalMotivo = nota ? `${motivo}: ${nota}` : motivo;
 
   try {
-    const esAnulacion = document.querySelector('input[name="tipoGestionFiscal"]:checked')?.value === 'anulacion';
     const resp = await fetch("./api/gestionDevolucion.php", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -2643,7 +2642,7 @@ async function confirmarDevolucion(idLinea, numTicket) {
         motivo: finalMotivo,
         metodoReembolso,
         reponerStock: true,
-        esAnulacion
+        esAnulacion: false
       }),
     });
     const data = await resp.json();

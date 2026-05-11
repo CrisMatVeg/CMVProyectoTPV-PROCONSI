@@ -105,6 +105,14 @@ const TpvApp = {
     PaymentManager.deseleccionarCliente();
   },
 
+  cancelarTelefonoBizum() {
+    PaymentManager.cancelarTelefonoBizum();
+  },
+
+  async confirmarTelefonoBizum() {
+    await PaymentManager.confirmarTelefonoBizum();
+  },
+
   canjearPuntos() {
     PaymentManager.canjearPuntos();
   },
@@ -361,6 +369,12 @@ const TpvApp = {
   setQty(id, val) {
     CartManager.setQty(id, val);
     this.refreshUI();
+  },
+
+  setItemPrice(cartKey, newPrice) {
+    CartManager.setItemPrice(cartKey, newPrice);
+    const totals = CartManager.calculateTotals();
+    UiController.renderCart(totals);
   },
 
   removeFromCart(id) {

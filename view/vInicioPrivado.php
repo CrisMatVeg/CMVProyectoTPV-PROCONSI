@@ -949,6 +949,45 @@
 </div>
 
 
+<!-- MODAL TELÉFONO BIZUM -->
+<div id="bizumPhoneModal" class="modal-overlay" style="z-index: 20000 !important;" role="dialog" aria-modal="true" aria-labelledby="bizumPhoneModalTitle">
+    <div class="modal modal-content glass-effect ai-stretch w-420 p-24">
+        <div class="d-flex ai-center gap-16 pb-16 border-bottom">
+            <div class="modal-icon text-accent bg-accent-soft m-0">
+                <i class="fa-solid fa-mobile-screen"></i>
+            </div>
+            <div>
+                <div class="fs-18 fw-700" id="bizumPhoneModalTitle"><?php echo L('bizum_phone_required_title') ?></div>
+                <div class="fs-12 text-muted" id="bizumPhoneClientLabel"></div>
+            </div>
+            <button onclick="app.cancelarTelefonoBizum()" class="btn-close-modal" style="margin-left: auto;" aria-label="<?php echo L('modal_cancel') ?>">&times;</button>
+        </div>
+
+        <div class="d-flex flex-column gap-16 mt-20">
+            <div class="d-flex ai-start gap-10 p-12 br-8 fs-13" style="background: var(--orange-light); border: 1px solid var(--orange);">
+                <i class="fa-solid fa-circle-info mt-2" style="color: var(--orange); flex-shrink: 0;"></i>
+                <span><?php echo L('bizum_phone_required_warning') ?></span>
+            </div>
+            <div class="form-group mb-0">
+                <label class="form-label fw-600 mb-4 fs-13 text-muted tt-uppercase ls-1"><?php echo L('bizum_phone_label') ?></label>
+                <input type="tel" id="bizumPhoneInput"
+                       class="form-input font-mono fs-22 text-center"
+                       placeholder="600 000 000"
+                       maxlength="20"
+                       onkeydown="if(event.key==='Enter') app.confirmarTelefonoBizum()" />
+                <div id="bizumPhoneError" class="d-none text-red fs-12 font-bold mt-6"></div>
+            </div>
+        </div>
+
+        <div class="modal-footer full-width jc-end mt-20 pt-16 border-top">
+            <button onclick="app.cancelarTelefonoBizum()" class="btn-cancel"><?php echo L('modal_cancel') ?></button>
+            <button onclick="app.confirmarTelefonoBizum()" class="btn-save d-flex ai-center gap-8">
+                <i class="fa-solid fa-mobile-screen"></i> <?php echo L('bizum_phone_confirm') ?>
+            </button>
+        </div>
+    </div>
+</div>
+
 <!-- MODAL PRODUCTO COMODÍN -->
 <?php
 require_once __DIR__ . '/../model/TipoIVAPDO.php';

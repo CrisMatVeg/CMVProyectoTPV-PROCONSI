@@ -624,6 +624,46 @@ body {
   font-size: 11px;
   color: var(--text-muted);
   font-family: var(--font-main);
+  display: flex;
+  align-items: baseline;
+  gap: 1px;
+}
+.price-input {
+  width: 42px;
+  border: none;
+  border-bottom: 1px dashed transparent;
+  background: transparent;
+  text-align: right;
+  font-family: var(--font-main);
+  font-size: 11px;
+  font-weight: 500;
+  color: inherit;
+  padding: 0 1px;
+  line-height: 1.3;
+  cursor: text;
+  transition: border-color 0.15s, color 0.12s;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.price-input::-webkit-outer-spin-button,
+.price-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+}
+.order-item:hover .price-input:not(:focus):not(.price-modified) {
+  border-bottom-color: var(--text-muted);
+}
+.price-input:focus {
+  outline: none;
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  background: transparent;
+}
+.price-input.price-modified {
+  color: var(--accent);
+  font-weight: 700;
+  border-bottom-color: var(--accent);
 }
 
 .qty-ctrl {

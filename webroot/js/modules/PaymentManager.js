@@ -212,10 +212,11 @@ export const PaymentManager = {
         this.mostrarPuntosCliente(r.cliente);
         
         await this.syncCartPricesWithServer();
-        
+
         CartManager.recalculateCartPrices();
         const totals = CartManager.calculateTotals();
         UiController.renderCart(totals);
+        this.updateMixSummary();
       } else {
         throw new Error(r.error || "Socio no encontrado");
       }
@@ -734,6 +735,7 @@ export const PaymentManager = {
           if (serverLine.comodin) return;
           const key = Object.keys(cart).find(k => String(cart[k].id) === String(serverLine.id));
           if (key) {
+            if (cart[key]._customPrice) return; // Precio editado manualmente: no sobreescribir
             cart[key].price            = serverLine.precio_final;
             cart[key].basePriceSnapshot = serverLine.precio_base;
             cart[key].appliedTariffs   = serverLine.appliedTariffs;
@@ -943,7 +945,9 @@ export const PaymentManager = {
 
     const btnFinal = document.getElementById("confirmarClienteBtn");
     if (btnFinal) {
-      btnFinal.disabled = (pendiente > 0.01);
+      // Recalcular con los importes ya sincronizados (el bloque anterior puede haberlos modificado)
+      const totalPagadoFinal = window.currentPayments.reduce((acc, p) => acc + p.importe, 0);
+      btnFinal.disabled = (Math.max(0, displayTotal - totalPagadoFinal) > 0.01);
     }
 
     this.renderPaymentsList();
@@ -989,14 +993,100 @@ export const PaymentManager = {
 
   selectModalPayment(btn) {
     const metodo = btn.id.replace("btn", "").toLowerCase();
+
+    if (metodo === 'bizum') {
+      const cliente = AppState.socioActual || AppState.clienteSeleccionado;
+      if (!cliente) {
+        Utils.showToast(window.I18N?.bizum_no_client || "Selecciona un cliente antes de usar Bizum", 'warning');
+        return;
+      }
+      if (!cliente.telefono) {
+        this._bizumPendingBtn = btn;
+        this.abrirModalTelefonoBizum(cliente);
+        return;
+      }
+    }
+
     AppState.selectedPayment = metodo;
-    
+
+    // En modo no-mixto: sincronizar currentPayments con el método seleccionado
+    if (this.checkoutContext !== 'mixto') {
+      const metodosNormales = ['efectivo', 'tarjeta', 'bizum'];
+      const pagoExistente = window.currentPayments.find(p => metodosNormales.includes(p.metodo));
+      const yaExiste = window.currentPayments.find(p => p.metodo === metodo);
+      if (pagoExistente && !yaExiste) {
+        pagoExistente.metodo = metodo;
+        pagoExistente.recibido = pagoExistente.importe;
+      } else if (!pagoExistente) {
+        const totals = CartManager.calculateTotals();
+        const importe = totals ? totals.total : this.totalVentaActual;
+        window.currentPayments.push({ metodo, importe, recibido: importe });
+      }
+    }
+
     this.updateMixSummary();
 
     const inputMonto = document.getElementById("mixPagoMonto");
     if (inputMonto) {
       inputMonto.focus();
       inputMonto.select();
+    }
+  },
+
+  abrirModalTelefonoBizum(cliente) {
+    const modal = document.getElementById("bizumPhoneModal");
+    const label = document.getElementById("bizumPhoneClientLabel");
+    const input = document.getElementById("bizumPhoneInput");
+    const errorEl = document.getElementById("bizumPhoneError");
+    if (!modal) return;
+    if (label) label.textContent = cliente.nombre || '';
+    if (input) input.value = '';
+    if (errorEl) errorEl.classList.add("d-none");
+    modal.classList.add("visible");
+    setTimeout(() => input && input.focus(), 100);
+  },
+
+  cancelarTelefonoBizum() {
+    const modal = document.getElementById("bizumPhoneModal");
+    if (modal) modal.classList.remove("visible");
+    this._bizumPendingBtn = null;
+  },
+
+  async confirmarTelefonoBizum() {
+    const input = document.getElementById("bizumPhoneInput");
+    const errorEl = document.getElementById("bizumPhoneError");
+    const tel = (input?.value || '').trim();
+
+    const showError = (msg) => {
+      if (errorEl) { errorEl.textContent = msg; errorEl.classList.remove("d-none"); }
+    };
+
+    if (!tel) { showError("El teléfono es obligatorio"); return; }
+    if (!/^[+\d][\d\s\-().]{6,19}$/.test(tel)) { showError("Formato de teléfono no válido"); return; }
+
+    const cliente = AppState.socioActual || AppState.clienteSeleccionado;
+    if (!cliente?.id) { showError("No hay cliente seleccionado"); return; }
+
+    try {
+      const r = await ApiService.request("api/gestionCliente.php", {
+        method: "POST",
+        body: JSON.stringify({ accion: "actualizarTelefono", id: cliente.id, telefono: tel })
+      });
+      if (!r.ok) throw new Error(r.error || "Error al guardar teléfono");
+
+      cliente.telefono = tel;
+
+      const modal = document.getElementById("bizumPhoneModal");
+      if (modal) modal.classList.remove("visible");
+      this._bizumPendingBtn = null;
+
+      AppState.selectedPayment = 'bizum';
+      this.updateMixSummary();
+      const inputMonto = document.getElementById("mixPagoMonto");
+      if (inputMonto) { inputMonto.focus(); inputMonto.select(); }
+      Utils.showToast("Teléfono guardado. Bizum seleccionado.", "success");
+    } catch (e) {
+      showError(e.message);
     }
   },
 
@@ -1180,6 +1270,24 @@ export const PaymentManager = {
             }
             return;
         }
+    }
+
+    // Validar Bizum: requiere cliente seleccionado con teléfono
+    const tieneBizum = window.currentPayments.some(p => p.metodo === 'bizum')
+                       || AppState.selectedPayment === 'bizum';
+    if (tieneBizum) {
+      const clienteBizum = AppState.socioActual || AppState.clienteSeleccionado;
+      if (!clienteBizum) {
+        Utils.showToast(window.I18N?.bizum_no_client || "Selecciona un cliente antes de usar Bizum", "warning");
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-check"></i> Confirmar Cobro'; }
+        return;
+      }
+      if (!clienteBizum.telefono) {
+        this._bizumPendingBtn = null;
+        this.abrirModalTelefonoBizum(clienteBizum);
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-check"></i> Confirmar Cobro'; }
+        return;
+      }
     }
 
     // 1. Validar Factura: si está activada, el cliente debe estar identificado (Nombre y NIF)
