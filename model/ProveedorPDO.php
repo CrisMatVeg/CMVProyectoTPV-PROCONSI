@@ -28,8 +28,6 @@ class ProveedorPDO
                     (bool)$row['aplica_re'],
                     $row['notas'],
                     (bool)$row['activo'],
-                    $row['condiciones_pago'],
-                    $row['plazo_entrega'],
                     $row['vencimiento_dias'],
                     $row['fecha_alta']
                 );
@@ -57,8 +55,6 @@ class ProveedorPDO
                     (bool)$row['aplica_re'],
                     $row['notas'],
                     (bool)$row['activo'],
-                    $row['condiciones_pago'],
-                    $row['plazo_entrega'],
                     $row['vencimiento_dias'],
                     $row['fecha_alta']
                 );
@@ -70,13 +66,13 @@ class ProveedorPDO
         }
     }
 
-    public static function añadirProveedor($cif_nif, $nombre, $direccion, $telefono, $email, $aplica_re, $notas, $condiciones_pago = null, $plazo_entrega = null, $vencimiento_dias = 0)
+    public static function añadirProveedor($cif_nif, $nombre, $direccion, $telefono, $email, $aplica_re, $notas, $vencimiento_dias = 0)
     {
         try {
             $db = DBPDO::getPDO();
 
-            $sql = "INSERT INTO proveedores (cif_nif, nombre, direccion, telefono, email, aplica_re, notas, condiciones_pago, plazo_entrega, vencimiento_dias) 
-                    VALUES (:cif, :nombre, :direccion, :telefono, :email, :re, :notas, :cond_pago, :plazo, :venc)";
+            $sql = "INSERT INTO proveedores (cif_nif, nombre, direccion, telefono, email, aplica_re, notas, vencimiento_dias)
+                    VALUES (:cif, :nombre, :direccion, :telefono, :email, :re, :notas, :venc)";
 
             $stmt = $db->prepare($sql);
             $stmt->execute([
@@ -87,8 +83,6 @@ class ProveedorPDO
                 ':email' => $email,
                 ':re' => $aplica_re ? 1 : 0,
                 ':notas' => $notas,
-                ':cond_pago' => $condiciones_pago,
-                ':plazo' => $plazo_entrega,
                 ':venc' => $vencimiento_dias
             ]);
 
@@ -99,21 +93,19 @@ class ProveedorPDO
         }
     }
 
-    public static function editarProveedor($id, $cif_nif, $nombre, $direccion, $telefono, $email, $aplica_re, $notas, $activo, $condiciones_pago = null, $plazo_entrega = null, $vencimiento_dias = 0)
+    public static function editarProveedor($id, $cif_nif, $nombre, $direccion, $telefono, $email, $aplica_re, $notas, $activo, $vencimiento_dias = 0)
     {
         try {
 
-            $sql = "UPDATE proveedores SET 
-                    cif_nif = :cif, 
-                    nombre = :nombre, 
-                    direccion = :direccion, 
-                    telefono = :telefono, 
-                    email = :email, 
-                    aplica_re = :re, 
+            $sql = "UPDATE proveedores SET
+                    cif_nif = :cif,
+                    nombre = :nombre,
+                    direccion = :direccion,
+                    telefono = :telefono,
+                    email = :email,
+                    aplica_re = :re,
                     notas = :notas,
                     activo = :activo,
-                    condiciones_pago = :cond_pago,
-                    plazo_entrega = :plazo,
                     vencimiento_dias = :venc
                     WHERE id = :id";
 
@@ -127,8 +119,6 @@ class ProveedorPDO
                 ':re' => $aplica_re ? 1 : 0,
                 ':notas' => $notas,
                 ':activo' => $activo ? 1 : 0,
-                ':cond_pago' => $condiciones_pago,
-                ':plazo' => $plazo_entrega,
                 ':venc' => $vencimiento_dias
             ]);
             return $stmt->rowCount() > 0;

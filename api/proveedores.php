@@ -48,8 +48,6 @@ try {
                     'aplica_re' => $proveedor->getAplicaRe(),
                     'notas' => $proveedor->getNotas(),
                     'activo' => $proveedor->getActivo(),
-                    'condiciones_pago' => $proveedor->getCondicionesPago(),
-                    'plazo_entrega' => $proveedor->getPlazoEntrega(),
                     'vencimiento_dias' => $proveedor->getVencimientoDias()
                 ] : null]);
             } else {
@@ -65,8 +63,6 @@ try {
                         'email' => $p->getEmail(),
                         'aplica_re' => $p->getAplicaRe(),
                         'activo' => $p->getActivo(),
-                        'condiciones_pago' => $p->getCondicionesPago(),
-                        'plazo_entrega' => $p->getPlazoEntrega(),
                         'vencimiento_dias' => $p->getVencimientoDias()
                     ];
                 }
@@ -97,8 +93,6 @@ try {
                     $data['direccion'] ?? '', $data['telefono'] ?? '',
                     $data['email'] ?? '', $data['aplica_re'] ?? false,
                     $data['notas'] ?? '', $data['activo'] ?? true,
-                    $data['condiciones_pago'] ?? null,
-                    $data['plazo_entrega'] ?? null,
                     $data['vencimiento_dias'] ?? 0
                 );
                 echo json_encode(['ok' => true, 'success' => $success]);
@@ -107,8 +101,6 @@ try {
                     $data['cif_nif'], $data['nombre'], $data['direccion'] ?? '',
                     $data['telefono'] ?? '', $data['email'] ?? '',
                     $data['aplica_re'] ?? false, $data['notas'] ?? '',
-                    $data['condiciones_pago'] ?? null,
-                    $data['plazo_entrega'] ?? null,
                     $data['vencimiento_dias'] ?? 0
                 );
                 echo json_encode(['ok' => true, 'success' => (bool)$id, 'id' => $id]);

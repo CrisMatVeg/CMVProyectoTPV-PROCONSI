@@ -142,19 +142,9 @@
                         <input type="email" id="provEmail" class="form-input" placeholder="<?php echo L('prov_placeholder_email'); ?>">
                     </div>
 
-                    <div class="d-grid grid-3 gap-16">
-                        <div class="form-group">
-                            <label class="form-label"><?php echo L('prov_label_pay_cond'); ?></label>
-                            <input type="text" id="provCondicionesPago" class="form-input" placeholder="<?php echo L('prov_placeholder_pay_cond'); ?>">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label"><?php echo L('prov_label_delivery_term'); ?></label>
-                            <input type="text" id="provPlazoEntrega" class="form-input" placeholder="<?php echo L('prov_placeholder_delivery_term'); ?>">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label"><?php echo L('prov_label_due_days'); ?></label>
-                            <input type="number" id="provVencimientoDias" class="form-input" min="0" placeholder="<?php echo L('prov_placeholder_due_days'); ?>">
-                        </div>
+                    <div class="form-group">
+                        <label class="form-label"><?php echo L('prov_label_due_days'); ?></label>
+                        <input type="number" id="provVencimientoDias" class="form-input" min="0" placeholder="<?php echo L('prov_placeholder_due_days'); ?>">
                     </div>
  
                     <div class="form-group">
@@ -179,7 +169,7 @@
             <div id="tabProductos" class="tab-pane d-none">
                 <div class="d-grid grid-2 gap-24 ai-start">
                     <!-- PANEL IZQUIERDO: SELECCIÓN -->
-                    <div class="panel-selection">
+                    <div class="panel-selection" style="display: flex; flex-direction: column; max-height: 420px;">
                         <h3 class="fs-14 font-bold mb-12 d-flex ai-center gap-8 text-accent">
                             <i class="fa-solid fa-list-check"></i> <?php echo L('prov_label_catalog'); ?>
                         </h3>
@@ -188,12 +178,12 @@
                             <input type="text" class="form-input pl-36" id="searchProductosLibres" placeholder="<?php echo L('prod_search_placeholder'); ?>" onkeyup="buscarProductosAlEscribir(event)">
                         </div>
 
-                        <div id="checklistCont">
+                        <div id="checklistCont" style="flex: 1; overflow-y: auto; min-height: 0;">
                             <!-- Checklist de productos cargados aquí -->
                             <div class="p-40 text-center text-muted fs-13"><?php echo L('loading'); ?></div>
                         </div>
 
-                        <div class="d-flex ai-center jc-between mt-auto">
+                        <div class="d-flex ai-center jc-between pt-12 mt-auto" style="flex-shrink: 0;">
                             <span class="fs-12 text-muted"><?php echo L('selected'); ?>: <strong id="countSelectedSearch" class="text-accent">0</strong></span>
                             <button class="btn-vincular" onclick="vincularSeleccionados()">
                                 <i class="fa-solid fa-plus"></i> <?php echo L('prov_btn_link'); ?>
@@ -202,11 +192,11 @@
                     </div>
 
                     <!-- PANEL DERECHO: VINCULADOS -->
-                    <div class="panel-associated">
+                    <div class="panel-associated" style="display: flex; flex-direction: column; max-height: 420px;">
                         <h3 class="fs-14 font-bold mb-12 d-flex ai-center gap-8">
                             <i class="fa-solid fa-link"></i> <?php echo L('prov_label_linked'); ?>
                         </h3>
-                        <div class="table-container m-0 border br-12 overflow-auto bg-white flex-1">
+                        <div class="table-container m-0 border br-12 overflow-auto bg-white" style="flex: 1; min-height: 0;">
                             <table class="data-table">
                                 <thead class="pos-sticky top-0 z-10 bg-surface1">
                                     <tr>
@@ -271,16 +261,21 @@
     }
 
     let selectedForLinking = [];
+    let toVincularNuevo = [];   // objetos {id,nombre,referencia,stock_actual} para nuevo proveedor
+    let productLookup = {};     // id -> objeto producto (para recuperar datos al confirmar)
+    let esNuevoProveedor = false;
 
     function abrirModalProveedor() {
         document.getElementById('formProveedor').reset();
         document.getElementById('provId').value = '';
-        document.getElementById('provCondicionesPago').value = '';
-        document.getElementById('provPlazoEntrega').value = '';
         document.getElementById('provVencimientoDias').value = '0';
         document.getElementById('modalProveedorTitle').innerText = "<?php echo L('prov_modal_new_title'); ?>";
         document.getElementById('divProvActivo').style.display = 'none';
-        document.getElementById('tabBtnProductos').style.display = 'none';
+        document.getElementById('tabBtnProductos').style.display = 'flex';
+        esNuevoProveedor = true;
+        selectedForLinking = [];
+        toVincularNuevo = [];
+        productLookup = {};
         cambiarTab('general');
         document.getElementById('modalProveedor').style.display = 'flex';
     }
@@ -288,6 +283,9 @@
     function cerrarModalProveedor() {
         document.getElementById('modalProveedor').style.display = 'none';
         selectedForLinking = [];
+        toVincularNuevo = [];
+        productLookup = {};
+        esNuevoProveedor = false;
         document.getElementById('countSelectedSearch').innerText = '0';
         document.getElementById('searchProductosLibres').value = '';
     }
@@ -299,13 +297,15 @@
         document.getElementById('provTel').value = p.telefono;
         document.getElementById('provEmail').value = p.email;
         document.getElementById('provDireccion').value = p.direccion;
-        document.getElementById('provCondicionesPago').value = p.condiciones_pago || '';
-        document.getElementById('provPlazoEntrega').value = p.plazo_entrega || '';
         document.getElementById('provVencimientoDias').value = p.vencimiento_dias || 0;
         document.getElementById('provActivo').checked = p.activo == 1;
         document.getElementById('divProvActivo').style.display = 'flex';
         document.getElementById('modalProveedorTitle').innerText = "<?php echo L('prov_modal_edit_title'); ?>: " + p.nombre;
         document.getElementById('tabBtnProductos').style.display = 'flex';
+        esNuevoProveedor = false;
+        selectedForLinking = [];
+        toVincularNuevo = [];
+        productLookup = {};
         cambiarTab('general');
         document.getElementById('modalProveedor').style.display = 'flex';
     }
@@ -314,7 +314,7 @@
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         document.querySelectorAll('.tab-pane').forEach(p => {
             p.classList.add('d-none');
-            p.style.display = 'none'; // Ensure hidden completely
+            p.style.display = 'none';
         });
 
         if (tab === 'general') {
@@ -326,11 +326,15 @@
             document.getElementById('tabBtnProductos').classList.add('active');
             const pane = document.getElementById('tabProductos');
             pane.classList.remove('d-none');
-            pane.style.display = 'block'; // Or 'grid' if d-grid works fine
+            pane.style.display = 'block';
             selectedForLinking = [];
             document.getElementById('countSelectedSearch').innerText = '0';
-            lanzarBusquedaProductos(''); // Cargar todos al inicio
-            cargarProductosProveedor();
+            lanzarBusquedaProductos('');
+            if (esNuevoProveedor) {
+                renderizarProductosPendientes();
+            } else {
+                cargarProductosProveedor();
+            }
         }
     }
 
@@ -371,6 +375,31 @@
         }
     }
 
+    function renderizarProductosPendientes() {
+        const tbody = document.getElementById('tbodyProvProductos');
+        if (toVincularNuevo.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3" class="text-center p-40 text-muted"><?php echo L('prov_js_no_linked'); ?></td></tr>';
+            return;
+        }
+        tbody.innerHTML = '';
+        toVincularNuevo.forEach(p => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>
+                    <div class="font-bold fs-13">${p.nombre}</div>
+                    <div class="fs-11 text-muted font-mono">${p.referencia}</div>
+                </td>
+                <td class="text-right font-mono">${p.stock_actual}</td>
+                <td class="text-center">
+                    <button class="btn-icon text-red" onclick="desvincularProducto(${p.id})" title="<?php echo L('prov_js_unlink'); ?>">
+                        <i class="fa-solid fa-link-slash"></i>
+                    </button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
     let searchTimer;
 
     function buscarProductosAlEscribir(e) {
@@ -384,15 +413,24 @@
         const cont = document.getElementById('checklistCont');
 
         try {
-            const res = await fetch(`api/productos_proveedor.php?accion=buscar_libres&term=${term}&id_proveedor=${idProv}`);
+            const res = await fetch(`api/productos_proveedor.php?accion=buscar_libres&term=${encodeURIComponent(term)}&id_proveedor=${idProv}`);
             const data = await res.json();
             if (data.success) {
-                if (data.productos.length === 0) {
+                // En modo nuevo: excluir los ya comprometidos localmente
+                const vinculadosIds = toVincularNuevo.map(p => p.id);
+                const productos = esNuevoProveedor
+                    ? data.productos.filter(p => !vinculadosIds.includes(p.id))
+                    : data.productos;
+
+                // Guardar datos para recuperarlos al confirmar vinculación
+                productos.forEach(p => { productLookup[p.id] = p; });
+
+                if (productos.length === 0) {
                     cont.innerHTML = '<div class="p-40 text-center text-muted fs-13"><?php echo L('prod_no_results_short'); ?></div>';
                     return;
                 }
                 cont.innerHTML = '';
-                data.productos.forEach(p => {
+                productos.forEach(p => {
                     const isSelected = selectedForLinking.includes(p.id);
                     const div = document.createElement('div');
                     div.className = 'item-check' + (isSelected ? ' selected' : '');
@@ -424,21 +462,28 @@
     }
 
     async function vincularSeleccionados() {
-        const ids = selectedForLinking;
-        if (ids.length === 0) return showCustomAlert("<?php echo L('prod_th_status'); ?>", "<?php echo L('prov_js_select_vinc'); ?>", 'warning');
+        if (selectedForLinking.length === 0) return showCustomAlert("<?php echo L('prod_th_status'); ?>", "<?php echo L('prov_js_select_vinc'); ?>", 'warning');
+
+        if (esNuevoProveedor) {
+            // Mover seleccionados al panel derecho (aún sin ID de proveedor)
+            selectedForLinking.forEach(id => {
+                if (!toVincularNuevo.some(p => p.id === id) && productLookup[id]) {
+                    toVincularNuevo.push(productLookup[id]);
+                }
+            });
+            selectedForLinking = [];
+            document.getElementById('countSelectedSearch').innerText = '0';
+            renderizarProductosPendientes();
+            lanzarBusquedaProductos(document.getElementById('searchProductosLibres').value);
+            return;
+        }
 
         const idProv = document.getElementById('provId').value;
         try {
             const res = await fetch('api/productos_proveedor.php', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    accion: 'vincular',
-                    id_proveedor: idProv,
-                    ids: ids
-                })
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ accion: 'vincular', id_proveedor: idProv, ids: selectedForLinking })
             });
             const data = await res.json();
             if (data.success) {
@@ -453,6 +498,14 @@
     }
 
     async function desvincularProducto(id) {
+        if (esNuevoProveedor) {
+            // Quitar del panel derecho local sin tocar la BD
+            toVincularNuevo = toVincularNuevo.filter(p => p.id !== id);
+            renderizarProductosPendientes();
+            lanzarBusquedaProductos(document.getElementById('searchProductosLibres').value);
+            return;
+        }
+
         showCustomConfirm(
             "<?php echo L('prov_js_unlink'); ?>",
             "<?php echo L('prov_js_unlink_confirm'); ?>",
@@ -460,13 +513,8 @@
                 try {
                     const res = await fetch('api/productos_proveedor.php', {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            accion: 'desvincular',
-                            ids: [id]
-                        })
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ accion: 'desvincular', ids: [id] })
                     });
                     const data = await res.json();
                     if (data.success) {
@@ -491,10 +539,8 @@
             telefono: document.getElementById('provTel').value,
             email: document.getElementById('provEmail').value,
             direccion: document.getElementById('provDireccion').value,
-            condiciones_pago: document.getElementById('provCondicionesPago').value,
-            plazo_entrega: document.getElementById('provPlazoEntrega').value,
             vencimiento_dias: parseInt(document.getElementById('provVencimientoDias').value) || 0,
-            aplica_re: 1, // Siempre aplicado
+            aplica_re: 1,
             activo: document.getElementById('provActivo').checked ? 1 : 0
         };
 
@@ -511,14 +557,27 @@
         try {
             const res = await fetch('api/proveedores.php', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
             });
             const result = await res.json();
-            if (result.success) window.location.reload();
-            else showCustomAlert("<?php echo L('prod_js_error'); ?>", result.error || "<?php echo L('prod_js_error'); ?>", 'error');
+            if (result.success) {
+                // Si es nuevo proveedor y hay productos pendientes, vincularlos ahora
+                if (esNuevoProveedor && toVincularNuevo.length > 0 && result.id) {
+                    await fetch('api/productos_proveedor.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            accion: 'vincular',
+                            id_proveedor: result.id,
+                            ids: toVincularNuevo.map(p => p.id)
+                        })
+                    });
+                }
+                window.location.reload();
+            } else {
+                showCustomAlert("<?php echo L('prod_js_error'); ?>", result.error || "<?php echo L('prod_js_error'); ?>", 'error');
+            }
         } catch (err) {
             showCustomAlert("<?php echo L('prod_js_error'); ?>", "<?php echo L('prod_js_error'); ?>", 'error');
         }
