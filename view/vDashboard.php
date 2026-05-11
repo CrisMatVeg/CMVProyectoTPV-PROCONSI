@@ -181,13 +181,6 @@
 
                 <!-- Ajustes del Sistema -->
                 <?php if ($_SESSION['usuarioActualTPV']->tienePermiso('gestionar_configuracion')): ?>
-                    <!-- Auditoría VeriFactu -->
-                    <a href="verifactu_log.php" target="_blank" class="dashboard-btn" style="text-decoration: none;">
-                        <i class="fa-solid fa-microchip text-accent"></i>
-                        <span class="btn-title"><?php echo L('dashboard_fiscal_audit'); ?></span>
-                        <span class="btn-desc"><?php echo L('dashboard_fiscal_audit_sub'); ?></span>
-                    </a>
-
                     <form method="post">
                         <button type="submit" name="irConfiguracion" class="dashboard-btn">
                             <i class="fa-solid fa-gears"></i>

@@ -510,8 +510,28 @@ function parseAeatResponse($xmlString) {
             if (type === 'req') {
                 showModal('XML Solicitud', item.xml_content || 'No disponible');
             } else {
-                showModal('Respuesta AEAT', item.respuesta_aeat || 'No disponible');
+                const resp = item.respuesta_aeat || 'No hay respuesta registrada.';
+                const parsed = parseAeatResponseJS(resp);
+                showModal('Respuesta AEAT', resp, parsed);
             }
+        }
+
+        function parseAeatResponseJS(xmlStr) {
+            if (!xmlStr || !xmlStr.includes('<')) return null;
+            try {
+                const doc = new DOMParser().parseFromString(xmlStr, 'text/xml');
+                const fault = doc.querySelector('Fault faultstring');
+                if (fault) return { status: 'Error SOAP', message: fault.textContent, is_error: true };
+                const estado = doc.querySelector('EstadoRegistro')?.textContent || '';
+                const desc   = doc.querySelector('DescripcionErrorRegistro')?.textContent || '';
+                const code   = doc.querySelector('CodigoErrorRegistro')?.textContent || '';
+                if (!estado) return null;
+                return {
+                    status: estado,
+                    message: desc ? `(${code}) ${desc}` : 'Operación finalizada.',
+                    is_error: estado !== 'Correcto'
+                };
+            } catch (e) { return null; }
         }
 
         // Polling activo solo cuando hay ítems en cola; 3 s entre actualizaciones
@@ -688,6 +708,20 @@ function parseAeatResponse($xmlString) {
             <?php endif; ?>
             </tbody>
         </table>
+    </div>
+</div>
+
+<!-- MODAL XML / RESPUESTA AEAT -->
+<div id="modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="modalTitle" style="margin:0; font-size:18px; font-weight:700;"></h3>
+            <span class="close" onclick="closeModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div id="modalSummary" class="modal-summary" style="display:none;"></div>
+            <pre id="modalContent" class="code-block"></pre>
+        </div>
     </div>
 </div>
 

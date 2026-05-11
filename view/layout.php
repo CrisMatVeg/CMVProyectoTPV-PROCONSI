@@ -414,6 +414,13 @@
                         </form>
                     <?php endif; ?>
 
+                    <?php if ($_SESSION['usuarioActualTPV']->tienePermiso('gestionar_configuracion')): ?>
+                    <a href="verifactu_log.php" target="_blank" class="topbar-btn" title="<?php echo L('dashboard_fiscal_audit'); ?>">
+                        <i class="fa-solid fa-microchip"></i>
+                        <span><?php echo L('dashboard_fiscal_audit'); ?></span>
+                    </a>
+                    <?php endif; ?>
+
                     <form method="post" action="index.php">
                         <button type="submit" name="salir" class="topbar-btn btn-exit" title="Cerrar sesión">
                             <i class="fa-solid fa-power-off"></i>
@@ -798,7 +805,7 @@
                             <div class="fs-11 text-muted">Original y Abono válidos (Verde)</div>
                         </div>
                     </label>
-                    <label class="method-option border br-12 p-16 d-flex ai-center gap-12 cp transition hover-bg-surface2" id="fiscalAnulacion">
+                    <label class="method-option border br-12 p-16 d-none ai-center gap-12 cp transition hover-bg-surface2" id="fiscalAnulacion">
                         <div class="radio-custom d-flex ai-center jc-center">
                             <input type="radio" name="tipoGestionFiscal" value="anulacion">
                             <div class="radio-dot"></div>

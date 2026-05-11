@@ -426,25 +426,6 @@
                                 </div>
                             </div>
 
-                            <!-- Queue Table -->
-                            <div class="table-container border-1 br-16 overflow-hidden bg-surface shadow-sm mb-16">
-                                <table class="w-full border-collapse table-premium">
-                                    <thead class="bg-surface2">
-                                        <tr>
-                                            <th class="p-16 text-left"><?php echo L('config_vf_th_ticket'); ?></th>
-                                            <th class="p-16 text-left"><?php echo L('config_vf_th_state'); ?></th>
-                                            <th class="p-16 text-center"><?php echo L('config_vf_th_tries'); ?></th>
-                                            <th class="p-16 text-left"><?php echo L('config_vf_th_msg'); ?></th>
-                                            <th class="p-16 text-center"><?php echo L('config_vf_th_actions'); ?></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="vf-cola-body">
-                                        <tr>
-                                            <td colspan="5" class="p-32 text-center text-muted italic"><?php echo L('config_vf_loading'); ?></td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
                         </div>
                     </div>
                 </form>
@@ -621,96 +602,30 @@
      * Carga las estadísticas y cola de VeriFactu vía AJAX
      */
     function cargarStatsVerifactu() {
-        const tbody = document.getElementById('vf-cola-body');
-        
         fetch('api/verifactu_stats.php?accion=stats')
             .then(response => {
                 return response.json().then(data => {
-                    if (!response.ok) {
-                        throw new Error(data.error || 'Error HTTP ' + response.status);
-                    }
+                    if (!response.ok) throw new Error(data.error || 'Error HTTP ' + response.status);
                     return data;
                 }).catch(err => {
-                    // Si el parseo falla (no es JSON), lanzamos el error de estado
                     if (!response.ok) throw new Error('Error HTTP ' + response.status);
-                    throw err; // El parseo falló en un 200 OK? Raro
+                    throw err;
                 });
             })
             .then(data => {
-                // ... el resto de la lógica de éxito ...
                 if (data.ok) {
-                    // Actualizar contadores
                     document.getElementById('vf-stats-enviados').textContent = data.stats.enviados || 0;
                     document.getElementById('vf-stats-pendientes').textContent = data.stats.pendientes || 0;
                     document.getElementById('vf-stats-errores').textContent = data.stats.errores || 0;
-
-                    // Actualizar tabla
-                    if (data.items.length === 0) {
-                        tbody.innerHTML = '<tr><td colspan="5" class="p-32 text-center text-muted italic"><?php echo L('config_vf_no_records'); ?></td></tr>';
-                    } else {
-                        tbody.innerHTML = data.items.map(item => {
-                            let statusClass = 'bg-surface2 text-muted';
-                            let statusText = item.estado;
-                            if (item.estado === 'enviado') { statusClass = 'bg-green-light text-green'; statusText = '<?php echo L('verifactu_status_sent'); ?>'; }
-                            if (item.estado === 'pendiente') { statusClass = 'bg-amber-light text-amber'; statusText = '<?php echo L('verifactu_status_pending'); ?>'; }
-                            if (item.estado === 'error_critico') { statusClass = 'bg-red-light text-red'; statusText = '<?php echo L('verifactu_status_error'); ?>'; }
-
-                            return `
-                                <tr class="hover-bg-surface2 transition-all border-top">
-                                    <td class="p-16 font-bold text-accent">${item.numero_ticket}</td>
-                                    <td class="p-16">
-                                        <span class="badge-log ${statusClass} p-8 br-8 fs-11 tt-uppercase fw-bold">${statusText}</span>
-                                    </td>
-                                    <td class="p-16 text-center font-mono">${item.intentos}</td>
-                                    <td class="p-16 fs-12 lh-1-4" style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${item.ultimo_error || '<?php echo L('config_vf_none'); ?>'}">
-                                        ${item.ultimo_error || '<span class="text-muted italic"><?php echo L('config_vf_none'); ?></span>'}
-                                    </td>
-                                    <td class="p-16 text-center">
-                                        ${item.estado !== 'enviado' ? `
-                                            <button onclick="reintentarVerifactu(${item.id})" class="btn-action-icon text-accent" title="<?php echo L('config_vf_retry_now'); ?>">
-                                                <i class="fa-solid fa-rotate"></i>
-                                            </button>
-                                        ` : '<i class="fa-solid fa-check text-green fs-18"></i>'}
-                                    </td>
-                                </tr>
-                            `;
-                        }).join('');
-                    }
                 } else {
                     throw new Error(data.error || 'Error desconocido');
                 }
             })
             .catch(err => {
                 console.error('Error cargando VeriFactu:', err);
-                tbody.innerHTML = `<tr><td colspan="5" class="p-32 text-center text-red">
-                    <i class="fa-solid fa-circle-exclamation fs-24 mb-12 d-block"></i>
-                    <?php echo L('config_vf_api_error'); ?>: ${err.message}<br>
-                    <small class="text-muted"><?php echo L('config_vf_db_error'); ?></small>
-                </td></tr>`;
             });
     }
 
-    /**
-     * Fuerza el reintento de un envío específico
-     */
-    function reintentarVerifactu(id) {
-        const formData = new FormData();
-        formData.append('id', id);
-
-        fetch('api/verifactu_stats.php?accion=retry', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.ok) {
-                showCustomAlert("<?php echo L('config_vf_retry_success_title'); ?>", "<?php echo L('config_vf_retry_success_msg'); ?>", "success");
-                cargarStatsVerifactu();
-            } else {
-                showCustomAlert("<?php echo L('error'); ?>", data.error || "<?php echo L('config_vf_retry_error_msg'); ?>", "error");
-            }
-        });
-    }
 
     // Restaurar pestaña activa al cargar la página
     document.addEventListener('DOMContentLoaded', () => {

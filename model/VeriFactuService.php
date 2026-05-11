@@ -173,7 +173,7 @@ class VeriFactuService
      * @param array $rutasXmls Lista de rutas a archivos XML individuales.
      * @return string Contenido del XML de lote firmado.
      */
-    public function generarXmlLote(array $rutasXmls): string
+    public function generarXmlLote(array $rutasXmls, array $datos = []): string
     {
         if (empty($rutasXmls)) throw new Exception("No hay XMLs para procesar en el lote.");
 
