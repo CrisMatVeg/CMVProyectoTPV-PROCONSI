@@ -34,6 +34,7 @@ try {
     $esFactura = ($tipo === 'factura' || $venta['tipo_cliente'] === 'empresa' || (isset($venta['es_factura']) && $venta['es_factura'] == 1));
 
     $formattedNum = VentaPDO::formatTicketNumber($venta['numero_ticket'], $venta['fecha'], $esFactura);
+    $venta['numero_ticket_formato'] = $formattedNum;
 
     if ($esFactura) {
         $pdfBinary = PDFServiceV2::generarFacturaPDF($venta, $appConfig);

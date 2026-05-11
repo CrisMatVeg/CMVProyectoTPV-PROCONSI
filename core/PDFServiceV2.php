@@ -8,6 +8,40 @@ require_once __DIR__ . '/fpdf.php';
 class PDFServiceV2
 {
 
+    private static function embedQrCode(FPDF $pdf, array $venta, array $appConfig, float $x, float $y, float $size = 25.0): bool
+    {
+        if (empty($venta['hash_actual'])) return false;
+        $nif = $appConfig['empresa_nif'] ?? '';
+        if (empty($nif)) return false;
+
+        try {
+            require_once __DIR__ . '/../vendor/autoload.php';
+            require_once __DIR__ . '/../model/VeriFactuQrService.php';
+
+            $url = VeriFactuQrService::generarUrlAEAT($venta, $nif);
+
+            $qrCode = new \Endroid\QrCode\QrCode(
+                data: $url,
+                encoding: new \Endroid\QrCode\Encoding\Encoding('UTF-8'),
+                errorCorrectionLevel: \Endroid\QrCode\ErrorCorrectionLevel::Medium,
+                size: 200,
+                margin: 5,
+                roundBlockSizeMode: \Endroid\QrCode\RoundBlockSizeMode::Margin
+            );
+            $pngData = (new \Endroid\QrCode\Writer\PngWriter())->write($qrCode)->getString();
+
+            $tmpFile = tempnam(sys_get_temp_dir(), 'vfqr') . '.png';
+            file_put_contents($tmpFile, $pngData);
+
+            $pdf->Image($tmpFile, $x, $y, $size, $size, 'PNG');
+
+            @unlink($tmpFile);
+            return true;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
     private static function decode($txt)
     {
         if ($txt === null) return '';
@@ -226,6 +260,23 @@ class PDFServiceV2
         $pdf->SetFont('Courier', 'B', 7);
         $pdf->Cell(0, 4, self::decode($appConfig['ticket_pie_pagina'] ?? ''), 0, 1, 'C');
 
+        // QR VeriFactu (solo si la venta tiene hash registrado)
+        if (!empty($venta['hash_actual'])) {
+            $pdf->Ln(3);
+            $pdf->Cell(0, 0, '', 'T');
+            $pdf->Ln(2);
+            $pdf->SetFont('Courier', 'B', 6);
+            $pdf->Cell(0, 3, 'VERIFACTU', 0, 1, 'C');
+            $pdf->Ln(1);
+            $qrY = $pdf->GetY();
+            $qrX = (80 - 25) / 2; // centrado en página de 80mm
+            if (self::embedQrCode($pdf, $venta, $appConfig, $qrX, $qrY, 25)) {
+                $pdf->Ln(27);
+                $pdf->SetFont('Courier', '', 5);
+                $pdf->Cell(0, 3, self::decode('Escanea para verificar en AEAT'), 0, 1, 'C');
+            }
+        }
+
         return $pdf->Output('S');
     }
 
@@ -410,6 +461,22 @@ class PDFServiceV2
             $condiciones .= "\n\nOBSERVACIONES:\n" . $venta['comentarios'];
         }
         $pdf->MultiCell(85, 5, self::decode($condiciones), 0, 'L');
+
+        // QR VeriFactu (solo si la venta tiene hash registrado)
+        if (!empty($venta['hash_actual'])) {
+            $yQr = min($pdf->GetY() + 8, 242);
+            $pdf->SetXY(10, $yQr);
+            $pdf->SetFont('Arial', 'B', 7);
+            $pdf->SetTextColor(100);
+            $pdf->Cell(35, 4, self::decode('Verificación VeriFactu · AEAT'), 0, 1, 'L');
+            $qrY = $pdf->GetY();
+            if (self::embedQrCode($pdf, $venta, $appConfig, 10, $qrY, 28)) {
+                $pdf->SetXY(42, $qrY + 2);
+                $pdf->SetFont('Arial', '', 6);
+                $pdf->MultiCell(65, 3, self::decode("Escanee el código QR con la cámara de su dispositivo para comprobar la autenticidad de este documento en la sede electrónica de la AEAT (VeriFactu)."), 0, 'L');
+            }
+            $pdf->SetTextColor(0);
+        }
 
         $pdf->SetY(275);
         $pdf->SetFont('Arial', '', 8);
