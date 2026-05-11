@@ -779,38 +779,40 @@
                             <span class="cmp-badge"><i class="fa-solid fa-robot"></i> <?php echo L('prod_modal_badge_auto'); ?></span>
                             <span class="fs-11 text-muted"><?php echo L('prod_modal_badge_auto_desc'); ?></span>
                         </div>
-                        <div class="d-grid gap-16 mt-12" style="grid-template-columns: 1fr 1fr;">
-                            <div class="form-group mb-0">
-                                <div class="d-flex ai-center mb-4" style="height: 16px;">
-                                    <label class="form-label fs-10 tt-uppercase m-0" style="white-space: nowrap;">
-                                        <?php echo L('prod_modal_label_cost_base'); ?> <span class="opacity-50">(<?php echo L('optional'); ?>)</span>
-                                    </label>
-                                </div>
-                                <input type="text" id="prodPrecioProveedor" placeholder="<?php echo L('prod_placeholder_price'); ?>"
-                                    class="form-input text-right font-mono"
-                                    oninput="calcularTotalDesdeBase()"
-                                    title="<?php echo L('prod_modal_tip_cost_base'); ?>">
+
+                        <!-- CMP - campo principal ancho completo -->
+                        <div class="form-group mt-12 mb-0">
+                            <div class="d-flex ai-center jc-between mb-4 w-100" style="height: 16px;">
+                                <label class="form-label fs-10 tt-uppercase m-0" style="white-space: nowrap;"><?php echo L('prod_modal_label_cost_total'); ?> (€)</label>
+                                <button type="button" id="btnHistorialCostes" onclick="abrirModalHistorialCostes()" class="btn-icon p-0 fs-10 text-accent d-inline-flex ai-center ml-auto" title="<?php echo L('prod_modal_tip_cost_history'); ?>" style="display:none; width: auto; height: auto;">
+                                    <i class="fa-solid fa-clock-rotate-left mr-4"></i> <?php echo L('prod_modal_btn_history'); ?>
+                                </button>
                             </div>
-                            <div class="form-group mb-0">
-                                <div class="d-flex ai-center jc-between mb-4 w-100" style="height: 16px;">
-                                    <label class="form-label fs-10 tt-uppercase m-0" style="white-space: nowrap;"><?php echo L('prod_modal_label_cost_total'); ?></label>
-                                    <button type="button" id="btnHistorialCostes" onclick="abrirModalHistorialCostes()" class="btn-icon p-0 fs-10 text-accent d-inline-flex ai-center ml-auto" title="<?php echo L('prod_modal_tip_cost_history'); ?>" style="display:none; width: auto; height: auto;">
-                                        <i class="fa-solid fa-clock-rotate-left mr-4"></i> <?php echo L('prod_modal_btn_history'); ?>
-                                    </button>
-                                </div>
-                                <input type="text" id="prodPrecioCoste" placeholder="<?php echo L('prod_placeholder_price'); ?>"
-                                    class="form-input text-right font-mono"
-                                    oninput="calcularBaseDesdeTotal(); calcularPrecioDesdeMargen();"
-                                    title="<?php echo L('prod_modal_tip_cost_auto'); ?>">
-                                <span class="form-error" id="err-precio_coste"></span>
-                            </div>
+                            <input type="text" id="prodPrecioCoste" placeholder="<?php echo L('prod_placeholder_price'); ?>"
+                                class="form-input text-right font-mono"
+                                oninput="calcularBaseDesdeTotal(); calcularPrecioDesdeMargen();"
+                                title="<?php echo L('prod_modal_tip_cost_auto'); ?>">
+                            <!-- precio_proveedor oculto: calculado automáticamente a partir del CMP -->
+                            <input type="hidden" id="prodPrecioProveedor">
+                            <span class="form-error" id="err-precio_coste"></span>
                         </div>
-                        <div class="form-group mt-16">
-                            <label class="form-label fs-11 tt-uppercase mb-4"><?php echo L('prod_modal_label_margin'); ?></label>
+
+                        <!-- Margen -->
+                        <div class="form-group mt-16 mb-0">
+                            <label class="form-label fs-11 tt-uppercase mb-4"><?php echo L('prod_modal_label_margin'); ?> (%)</label>
                             <input type="number" id="prodMargen" placeholder="<?php echo L('prod_placeholder_margin'); ?>" step="0.01"
                                 class="form-input text-right font-mono"
                                 oninput="calcularPrecioDesdeMargen()"
                                 title="<?php echo L('prod_modal_tip_margin_calc'); ?>">
+                        </div>
+
+                        <!-- Precio neto venta sin IVA (informativo) -->
+                        <div id="precioNetoVentaBox" class="d-none mt-12 px-12 py-8 br-8 d-flex ai-center jc-between"
+                             style="background: var(--surface2); border: 1px solid var(--border);">
+                            <span class="fs-11 text-muted" style="letter-spacing: 0.3px;">
+                                <i class="fa-solid fa-arrow-right-long mr-6 opacity-40"></i><?php echo L('prod_modal_label_net_sale_price'); ?>
+                            </span>
+                            <span class="font-mono fw-700 fs-13" id="precioNetoVentaDisplay">—</span>
                         </div>
                     </div>
 
@@ -819,13 +821,19 @@
                         <div class="tab-section-title">
                             <?php echo L('prod_th_price'); ?>
                         </div>
+                        <!-- Desglose IVA (informativo) -->
+                        <div id="pvpBreakdownInfo" class="d-none px-10 py-6 br-6 d-flex ai-center gap-6 fs-11 text-muted"
+                             style="background: color-mix(in srgb, var(--accent) 6%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent); margin-bottom: 12px;">
+                            <i class="fa-solid fa-receipt opacity-60"></i>
+                            <span id="pvpBreakdownText"></span>
+                        </div>
                         <div class="form-group mb-0">
                             <label class="form-label fs-11 tt-uppercase mb-4"><?php echo L('prod_th_price'); ?> (€) <span class="opacity-50">(<?php echo L('optional'); ?>)</span></label>
                             <input type="text" id="prodPrecioVenta" placeholder="<?php echo L('prod_placeholder_price'); ?>"
                                 class="form-input text-right font-bold font-mono text-accent fs-18"
                                 oninput="calcularMargenDesdePrecio()"
                                 title="<?php echo L('prod_modal_tip_price_calc'); ?>">
-                            
+
                             <!-- Alta Precisión Checkbox -->
                             <div class="mt-8 d-flex ai-center gap-8 px-4 py-2 br-6 bg-surface2 border-1 transition-all hover-border-accent" style="width: fit-content;">
                                 <input type="checkbox" id="prodMantenerPrecision" class="form-checkbox cursor-pointer" onchange="togglePrecisionUI()">
@@ -833,7 +841,7 @@
                                     <i class="fa-solid fa-bullseye mr-4 opacity-50"></i> <?php echo L('prod_label_precision_price'); ?>
                                 </label>
                             </div>
-                            
+
                             <span class="form-error" id="err-precio_venta"></span>
                         </div>
                     </div>
@@ -1458,50 +1466,84 @@
         return opt.dataset.re == "1";
     }
 
+    // Recalcula CMP desde precio_proveedor (oculto) cuando cambia IVA o proveedor
     function calcularTotalDesdeBase() {
-        let base = document.getElementById('prodPrecioProveedor').value.replace(',', '.');
-        base = parseFloat(base) || 0;
-        
+        let base = parseFloat((document.getElementById('prodPrecioProveedor').value || '').replace(',', '.')) || 0;
+        if (base <= 0) return;
+
         const infoIVA = getDatoIVA();
         const aplicaRE = getAplicaRE();
         const pctRE = aplicaRE ? infoIVA.re : 0;
 
-        const total = base * (1 + (infoIVA.iva / 100) + (pctRE / 100));
-        document.getElementById('prodPrecioCoste').value = total.toFixed(4);
-        
-        // Al cambiar el coste, recalculamos PVP si hay margen
+        // CMP = precio_proveedor × (1 + RE/100) — sin IVA
+        const cmp = base * (1 + (pctRE / 100));
+        document.getElementById('prodPrecioCoste').value = cmp.toFixed(4);
+
         calcularPrecioDesdeMargen();
     }
 
+    // Actualiza precio_proveedor (oculto) cuando el usuario edita el CMP directamente
     function calcularBaseDesdeTotal() {
-        let total = document.getElementById('prodPrecioCoste').value.replace(',', '.');
-        total = parseFloat(total) || 0;
+        let cmp = parseFloat((document.getElementById('prodPrecioCoste').value || '').replace(',', '.')) || 0;
 
         const infoIVA = getDatoIVA();
         const aplicaRE = getAplicaRE();
         const pctRE = aplicaRE ? infoIVA.re : 0;
 
-        const base = total / (1 + (infoIVA.iva / 100) + (pctRE / 100));
-        document.getElementById('prodPrecioProveedor').value = base.toString();
+        // precio_proveedor = CMP / (1 + RE/100)
+        const base = pctRE > 0 ? cmp / (1 + (pctRE / 100)) : cmp;
+        document.getElementById('prodPrecioProveedor').value = base.toFixed(4);
+    }
+
+    function actualizarDesglosePVP(precioNeto, ivaPct, pvp) {
+        const box  = document.getElementById('pvpBreakdownInfo');
+        const text = document.getElementById('pvpBreakdownText');
+        if (!box || !text) return;
+        if (precioNeto > 0 && ivaPct >= 0) {
+            box.classList.remove('d-none');
+            const locale = '<?php echo L('locale'); ?>';
+            const fmtNeto = precioNeto.toLocaleString(locale, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            const fmtPvp  = pvp.toLocaleString(locale, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            text.innerHTML = `${fmtNeto}&nbsp;€ + ${ivaPct}% IVA = <strong>${fmtPvp}&nbsp;€</strong>`;
+        } else {
+            box.classList.add('d-none');
+        }
+    }
+
+    function actualizarNetoVentaBox(precioNeto) {
+        const box     = document.getElementById('precioNetoVentaBox');
+        const display = document.getElementById('precioNetoVentaDisplay');
+        if (!box || !display) return;
+        if (precioNeto > 0) {
+            box.classList.remove('d-none');
+            const locale = '<?php echo L('locale'); ?>';
+            display.textContent = precioNeto.toLocaleString(locale, {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' €';
+        } else {
+            box.classList.add('d-none');
+        }
     }
 
     function calcularPrecioDesdeMargen() {
-        const coste = parseFloat(document.getElementById('prodPrecioCoste').value) || 0;
+        const coste  = parseFloat(document.getElementById('prodPrecioCoste').value) || 0;
         const margen = parseFloat(document.getElementById('prodMargen').value) || 0;
         const { iva } = getDatoIVA();
         const inputVenta = document.getElementById('prodPrecioVenta');
 
         if (coste >= 0) {
             // PVP = coste × (1 + margen%) × (1 + IVA%)
-            const precioVenta = coste * (1 + (margen / 100)) * (1 + (iva / 100));
+            const precioNeto  = coste * (1 + (margen / 100));
+            const precioVenta = precioNeto * (1 + (iva / 100));
             const keepPrecision = document.getElementById('prodMantenerPrecision')?.checked;
             inputVenta.value = keepPrecision ? precioVenta.toString() : precioVenta.toFixed(2);
+
+            actualizarNetoVentaBox(coste > 0 ? precioNeto : 0);
+            actualizarDesglosePVP(coste > 0 ? precioNeto : 0, iva, precioVenta);
         }
     }
 
     function calcularMargenDesdePrecio() {
-        const coste = parseFloat(document.getElementById('prodPrecioCoste').value) || 0;
-        const venta = parseFloat(document.getElementById('prodPrecioVenta').value.replace(',', '.')) || 0;
+        const coste  = parseFloat(document.getElementById('prodPrecioCoste').value) || 0;
+        const venta  = parseFloat(document.getElementById('prodPrecioVenta').value.replace(',', '.')) || 0;
         const { iva } = getDatoIVA();
         const inputMargen = document.getElementById('prodMargen');
 
@@ -1510,6 +1552,9 @@
             const ventaSinIva = venta / (1 + (iva / 100));
             const margen = ((ventaSinIva / coste) - 1) * 100;
             inputMargen.value = margen.toFixed(2);
+
+            actualizarNetoVentaBox(ventaSinIva);
+            actualizarDesglosePVP(ventaSinIva, iva, venta);
         } else {
             inputMargen.value = '0.00';
         }
@@ -1598,7 +1643,11 @@
                 }
             }
 
-            if (parseFloat(producto.margen || 0) <= 0) calcularMargenDesdePrecio();
+            if (parseFloat(producto.margen || 0) <= 0) {
+                calcularMargenDesdePrecio();
+            } else {
+                calcularPrecioDesdeMargen(); // refresca cajas informativas de neto y PVP
+            }
 
             // Bloquear edición manual de stock y coste para productos existentes (solo permitimos si el usuario quiere forzar)
             inputStock.readOnly = true;
@@ -2071,6 +2120,8 @@
         document.getElementById('prodStockMin').value = '0';
         document.getElementById('prodMargen').value = '0.00';
         document.getElementById('prodPrecioProveedor').value = '0.0000';
+        document.getElementById('precioNetoVentaBox')?.classList.add('d-none');
+        document.getElementById('pvpBreakdownInfo')?.classList.add('d-none');
             
         const checkPrecision = document.getElementById('prodMantenerPrecision');
         if (checkPrecision) checkPrecision.checked = false;

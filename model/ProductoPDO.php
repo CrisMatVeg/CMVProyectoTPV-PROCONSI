@@ -524,30 +524,18 @@ class ProductoPDO
      */
     public static function recalcularPreciosCosteGlobal(): void
     {
-        $sql = "SELECT p.id, p.precio_proveedor, p.precio_coste,
-                       pv.aplica_re,
-                       COALESCE(t.recargo_equivalencia, 0) AS re_pct
-                FROM productos p
+        // Un solo UPDATE con JOIN en lugar de N queries individuales
+        // Protección: no tocar productos con precio_proveedor=0 que ya tengan coste manual
+        $sql = "UPDATE productos p
                 LEFT JOIN proveedores pv ON p.id_proveedor = pv.id
                 LEFT JOIN tipos_iva t ON p.id_tipo_iva = t.id
-                WHERE p.es_pack = 0";
-        $stmt = DBPDO::ejecutarConsulta($sql);
-        $productos = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-        foreach ($productos as $p) {
-            // Protección: No poner a 0 si ya hay un coste calculado y el proveedor está a 0
-            if ((float)$p['precio_proveedor'] <= 0 && (float)$p['precio_coste'] > 0) {
-                continue;
-            }
-
-            $reActual = ($p['aplica_re']) ? (float)$p['re_pct'] : 0.0;
-            $nuevoCoste = self::calcularPrecioCoste((float)$p['precio_proveedor'], $reActual);
-
-            DBPDO::ejecutarConsulta(
-                "UPDATE productos SET precio_coste = :coste WHERE id = :id",
-                [':coste' => $nuevoCoste, ':id' => $p['id']]
-            );
-        }
+                SET p.precio_coste = ROUND(
+                    p.precio_proveedor * (1 + COALESCE(IF(pv.aplica_re, t.recargo_equivalencia, 0), 0) / 100),
+                    4
+                )
+                WHERE p.es_pack = 0
+                AND NOT (p.precio_proveedor <= 0 AND p.precio_coste > 0)";
+        DBPDO::ejecutarConsulta($sql);
     }
 
     public static function sincronizarComponentesPack(int $id_pack, array $componentes): void
@@ -804,11 +792,11 @@ class ProductoPDO
      */
     public static function aplicarMargenMasivo(float $margen, ?string $categoria = null, array $excepciones = []): array
     {
-        $where = "es_pack = 0 AND activo = 1 AND precio_coste > 0";
+        $where = "p.es_pack = 0 AND p.activo = 1 AND p.precio_coste > 0";
         $params = [];
-        
+
         if ($categoria !== null && $categoria !== '') {
-            $where .= " AND categoria = ?";
+            $where .= " AND p.categoria = ?";
             $params[] = $categoria;
         }
 
@@ -822,11 +810,11 @@ class ProductoPDO
             $conds = [];
             if (!empty($ids)) {
                 $phs = implode(',', array_fill(0, count($ids), '?'));
-                $conds[] = "id IN ($phs)";
+                $conds[] = "p.id IN ($phs)";
             }
             if (!empty($refs)) {
                 $phs = implode(',', array_fill(0, count($refs), '?'));
-                $conds[] = "referencia IN ($phs)";
+                $conds[] = "p.referencia IN ($phs)";
             }
             if (!empty($conds)) {
                 $where .= " AND NOT (" . implode(" OR ", $conds) . ")";
