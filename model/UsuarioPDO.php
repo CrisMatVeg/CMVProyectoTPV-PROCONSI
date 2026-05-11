@@ -155,15 +155,14 @@ class UsuarioPDO
     /**
      * Cambia el estado Activo/Inactivo (Baja lógica).
      */
-    public static function toggleEstatus($id)
+    public static function toggleEstatus(int $id): bool
     {
-        $sql = "SELECT activo FROM usuarios WHERE id = :id";
-        $q = DBPDO::ejecutarConsulta($sql, [':id' => $id]);
+        $q = DBPDO::ejecutarConsulta("SELECT activo FROM usuarios WHERE id = :id", [':id' => $id]);
         $row = $q->fetch(PDO::FETCH_ASSOC);
         $nuevoEstado = $row['activo'] ? 0 : 1;
 
-        $sqlToggle = "UPDATE usuarios SET activo = :estado WHERE id = :id";
-        return DBPDO::ejecutarConsulta($sqlToggle, [':id' => $id, ':estado' => $nuevoEstado]);
+        DBPDO::ejecutarConsulta("UPDATE usuarios SET activo = :estado WHERE id = :id", [':id' => $id, ':estado' => $nuevoEstado]);
+        return (bool)$nuevoEstado;
     }
 
     /**

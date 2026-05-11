@@ -54,7 +54,7 @@
             </thead>
             <tbody id="usersTableBody">
                 <?php foreach ($listaUsuarios as $u): ?>
-                    <tr class="user-row" data-search="<?php echo htmlspecialchars(strtolower($u->getNombreCompleto() . ' ' . $u->getUsername() . ' ' . ($u->getEmail() ?? ''))); ?>">
+                    <tr class="user-row" data-id="<?php echo $u->getId(); ?>" data-search="<?php echo htmlspecialchars(strtolower($u->getNombreCompleto() . ' ' . $u->getUsername() . ' ' . ($u->getEmail() ?? ''))); ?>">
                         <td><?php echo $u->getNombreCompleto(); ?></td>
                         <td class="username-cell font-mono text-muted"><?php echo $u->getUsername(); ?></td>
                         <td class="email-cell fs-12 text-muted italic"><?php echo $u->getEmail() ?? '<span class="text-red-light">'.L('user_no_email', true).'</span>'; ?></td>
@@ -96,14 +96,11 @@
 
                                 <!-- Botón Dar Baja/Alta (Solo si no es el usuario actual) -->
                                 <?php if ($u->getId() !== $_SESSION['usuarioActualTPV']->getId()): ?>
-                                    <form method="post" class="d-inline">
-                                        <input type="hidden" name="idUsuario" value="<?php echo $u->getId(); ?>">
-                                        <button type="submit" name="toggleEstado"
-                                            class="status-pill <?php echo $u->getActivo() ? 'status-inactive' : 'status-active'; ?> border-none cursor-pointer gap-6 font-bold h-38 px-16">
-                                            <i class="fa-solid <?php echo $u->getActivo() ? 'fa-user-slash' : 'fa-user-check'; ?>"></i>
-                                            <?php echo $u->getActivo() ? L('user_btn_deactivate', true) : L('user_btn_activate', true); ?>
-                                        </button>
-                                    </form>
+                                    <button onclick="toggleEstadoUsuario(<?php echo $u->getId(); ?>)"
+                                        title="<?php echo $u->getActivo() ? L('user_btn_deactivate', true) : L('user_btn_activate', true); ?>"
+                                        class="btn-icon <?php echo $u->getActivo() ? 'text-red' : 'text-green'; ?>">
+                                        <i class="fa-solid fa-<?php echo $u->getActivo() ? 'arrow-down' : 'arrow-up'; ?>"></i>
+                                    </button>
                                 <?php else: ?>
                                     <span class="status-pill bg-blue-light text-accent border-none gap-6 font-bold h-38 px-16">
                                         <i class="fa-solid fa-user-check"></i>
@@ -232,6 +229,37 @@
             form.reset();
             // Limpiar errores si los hubiera (visualmente)
             form.querySelectorAll('.form-error').forEach(e => e.remove());
+        }
+    }
+
+    async function toggleEstadoUsuario(id) {
+        try {
+            const resp = await fetch('api/gestionUsuario.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ accion: 'toggle_estado', id })
+            });
+            const r = await resp.json();
+            if (!r.ok) return;
+
+            const activo = r.activo;
+            const btn = document.querySelector(`button[onclick="toggleEstadoUsuario(${id})"]`);
+            if (!btn) return;
+            const row = btn.closest('tr');
+
+            // Actualizar icono y color del botón toggle
+            btn.className = `btn-icon ${activo ? 'text-red' : 'text-green'}`;
+            btn.title = activo ? '<?php echo addslashes(L('user_btn_deactivate', true)); ?>' : '<?php echo addslashes(L('user_btn_activate', true)); ?>';
+            btn.querySelector('i').className = `fa-solid fa-${activo ? 'arrow-down' : 'arrow-up'}`;
+
+            // Actualizar pill de estado
+            const pill = row.querySelector('td:nth-child(5) .status-pill');
+            if (pill) {
+                pill.className = `status-pill ${activo ? 'status-active' : 'status-inactive'}`;
+                pill.textContent = activo ? '<?php echo addslashes(L('user_status_active', true)); ?>' : '<?php echo addslashes(L('user_status_inactive', true)); ?>';
+            }
+        } catch (e) {
+            console.error('Error al cambiar estado:', e);
         }
     }
 
