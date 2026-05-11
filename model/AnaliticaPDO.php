@@ -218,9 +218,13 @@ class AnaliticaPDO
 
     /**
      * Evolución desde tabla precalculada con agrupación opcional.
+     * Si el rango incluye hoy, añade los datos del día actual desde ventas en tiempo real.
      */
     public static function obtenerEvolucionRapida(string $desde, string $hasta, string $agrupacion = 'dia'): array
     {
+        $hoy = date('Y-m-d');
+        $hastaResumen = ($hasta >= $hoy) ? date('Y-m-d', strtotime('-1 day')) : $hasta;
+
         $selectFecha = "fecha";
         $groupBy = "fecha";
 
@@ -232,17 +236,61 @@ class AnaliticaPDO
             $groupBy = "YEAR(fecha)";
         }
 
-        return DBPDO::ejecutarConsulta("
-            SELECT 
-                $selectFecha,
-                SUM(total_ventas) as ingresos,
-                SUM(total_ventas - margen_estimado) as costes,
-                SUM(margen_estimado) as beneficio
-            FROM analitica_resumen_diario
-            WHERE fecha BETWEEN :d AND :h
-            GROUP BY $groupBy
-            ORDER BY fecha ASC
-        ", [':d' => $desde, ':h' => $hasta])->fetchAll(PDO::FETCH_ASSOC);
+        $rows = [];
+        if ($desde <= $hastaResumen) {
+            $rows = DBPDO::ejecutarConsulta("
+                SELECT
+                    $selectFecha,
+                    SUM(total_ventas) as ingresos,
+                    SUM(total_ventas - margen_estimado) as costes,
+                    SUM(margen_estimado) as beneficio
+                FROM analitica_resumen_diario
+                WHERE fecha BETWEEN :d AND :h
+                GROUP BY $groupBy
+                ORDER BY fecha ASC
+            ", [':d' => $desde, ':h' => $hastaResumen])->fetchAll(PDO::FETCH_ASSOC);
+        }
+
+        // Añadir datos de hoy en tiempo real si el rango lo incluye
+        if ($hasta >= $hoy) {
+            $hoyRow = DBPDO::ejecutarConsulta("
+                SELECT
+                    :fecha as fecha,
+                    COALESCE(SUM(lv.total_linea), 0) as ingresos,
+                    COALESCE(SUM(lv.precio_coste_unitario * lv.cantidad), 0) as costes,
+                    COALESCE(SUM(lv.total_linea - lv.precio_coste_unitario * lv.cantidad), 0) as beneficio
+                FROM lineas_venta lv
+                JOIN ventas v ON lv.id_venta = v.id
+                WHERE v.estado = 'completada' AND lv.devuelta = 0
+                  AND v.fecha >= :ini AND v.fecha <= :fin
+            ", [':fecha' => $hoy, ':ini' => $hoy . ' 00:00:00', ':fin' => $hoy . ' 23:59:59'])->fetch(PDO::FETCH_ASSOC);
+
+            if ($hoyRow) {
+                if ($agrupacion === 'dia') {
+                    $rows[] = $hoyRow;
+                } else {
+                    // Para mes/año: fusionar con la entrada existente del mismo período
+                    $clavePeriodo = $agrupacion === 'mes' ? date('Y-m-01') : date('Y-01-01');
+                    $encontrado = false;
+                    foreach ($rows as &$row) {
+                        if ($row['fecha'] === $clavePeriodo) {
+                            $row['ingresos']  = (float)$row['ingresos']  + (float)$hoyRow['ingresos'];
+                            $row['costes']    = (float)$row['costes']    + (float)$hoyRow['costes'];
+                            $row['beneficio'] = (float)$row['beneficio'] + (float)$hoyRow['beneficio'];
+                            $encontrado = true;
+                            break;
+                        }
+                    }
+                    unset($row);
+                    if (!$encontrado) {
+                        $hoyRow['fecha'] = $clavePeriodo;
+                        $rows[] = $hoyRow;
+                    }
+                }
+            }
+        }
+
+        return $rows;
     }
 
     /**
@@ -313,20 +361,59 @@ class AnaliticaPDO
 
     /**
      * Categorías desde tabla precalculada.
+     * Si el rango incluye hoy, fusiona con datos en tiempo real del día actual.
      */
     public static function obtenerCategoriasRapido(string $desde, string $hasta): array
     {
-        return DBPDO::ejecutarConsulta("
-            SELECT
-                MAX(categoria) as categoria,
-                SUM(total)     as total,
-                SUM(unidades)  as cantidad
-            FROM analitica_producto_diario
-            WHERE fecha BETWEEN :d AND :h
-              AND categoria IS NOT NULL
-            GROUP BY categoria
-            ORDER BY total DESC
-        ", [':d' => $desde, ':h' => $hasta])
-        ->fetchAll(PDO::FETCH_ASSOC);
+        $hoy = date('Y-m-d');
+        $hastaResumen = ($hasta >= $hoy) ? date('Y-m-d', strtotime('-1 day')) : $hasta;
+
+        $rows = [];
+        if ($desde <= $hastaResumen) {
+            $rows = DBPDO::ejecutarConsulta("
+                SELECT
+                    MAX(categoria) as categoria,
+                    SUM(total)     as total,
+                    SUM(unidades)  as cantidad
+                FROM analitica_producto_diario
+                WHERE fecha BETWEEN :d AND :h
+                  AND categoria IS NOT NULL
+                GROUP BY categoria
+                ORDER BY total DESC
+            ", [':d' => $desde, ':h' => $hastaResumen])->fetchAll(PDO::FETCH_ASSOC);
+        }
+
+        // Fusionar con datos de hoy en tiempo real
+        if ($hasta >= $hoy) {
+            $hoyRows = DBPDO::ejecutarConsulta("
+                SELECT
+                    COALESCE(p.categoria, 'Sin categoría') as categoria,
+                    SUM(lv.total_linea) as total,
+                    SUM(lv.cantidad) as cantidad
+                FROM lineas_venta lv
+                JOIN ventas v ON lv.id_venta = v.id
+                LEFT JOIN productos p ON lv.id_producto = p.id
+                WHERE v.estado = 'completada' AND lv.devuelta = 0
+                  AND v.fecha >= :ini AND v.fecha <= :fin
+                GROUP BY p.categoria
+            ", [':ini' => $hoy . ' 00:00:00', ':fin' => $hoy . ' 23:59:59'])->fetchAll(PDO::FETCH_ASSOC);
+
+            $catMap = [];
+            foreach ($rows as $i => $row) {
+                $catMap[$row['categoria']] = $i;
+            }
+            foreach ($hoyRows as $hoyRow) {
+                $cat = $hoyRow['categoria'];
+                if (isset($catMap[$cat])) {
+                    $rows[$catMap[$cat]]['total']    = (float)$rows[$catMap[$cat]]['total']    + (float)$hoyRow['total'];
+                    $rows[$catMap[$cat]]['cantidad']  = (float)$rows[$catMap[$cat]]['cantidad'] + (float)$hoyRow['cantidad'];
+                } else {
+                    $rows[] = $hoyRow;
+                }
+            }
+            usort($rows, fn($a, $b) => (float)$b['total'] <=> (float)$a['total']);
+        }
+
+        return $rows;
     }
 }

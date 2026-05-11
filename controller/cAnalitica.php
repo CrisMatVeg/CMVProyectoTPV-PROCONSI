@@ -126,28 +126,6 @@ if (isset($_GET['ajax'])) {
                 }
                 break;
 
-            case 'loadRanking':
-                // Validar que las fechas tengan formato coherente antes de procesar
-                if (!strtotime($desde) || !strtotime($hasta)) {
-                    echo json_encode([]);
-                    break;
-                }
-
-                $limit  = max(1, min(200, (int)($_GET['limit'] ?? 50)));
-                $offset = max(0, (int)($_GET['offset'] ?? 0));
-                
-                $diffDias = (strtotime($hasta) - strtotime($desde)) / 86400;
-                $results = [];
-
-                if ($diffDias > 30) {
-                    $results = AnaliticaPDO::obtenerRankingRapido($desde, $hasta, $limit, $offset);
-                } else {
-                    $results = VentaPDO::obtenerRankingCompletoProductos($desde, $hasta, $limit, $offset, $idUsuario, $tipoDocumento);
-                }
-                
-                echo json_encode($results ?: []);
-                break;
-
             case 'checkHealth':
                 echo json_encode(['optimized' => VentaPDO::estanIndicesListos()]);
                 break;

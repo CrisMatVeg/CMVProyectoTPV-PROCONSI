@@ -6,7 +6,8 @@
 
     .kpi-icon {
         width: 42px; height: 42px; border-radius: 12px;
-        display: flex; ai-center jc-center;
+        display: flex; align-items: center; justify-content: center;
+        flex-shrink: 0;
         transition: all 0.3s ease;
     }
     .card-section:hover .kpi-icon { transform: scale(1.1) rotate(5deg); }
@@ -18,7 +19,7 @@
 
 <div class="main-full p-24">
     <!-- CABECERA -->
-    <div class="section-header container-wider">
+    <div class="section-header container-wider mb-24">
         <div class="d-flex ai-center gap-16">
             <a href="index.php?irDashboard=1" class="btn-prominent-back compact" title="<?php echo L('login_back'); ?>">
                 <i class="fa-solid fa-chevron-left"></i>
@@ -47,14 +48,14 @@
                     <p class="m-0 fs-13 text-muted">Las consultas históricas pueden tardar. Aplica índices de rendimiento para cargar "Todo el historial" al instante.</p>
                 </div>
             </div>
-            <button id="btnOptimize" onclick="ejecutarOptimizacion()" class="btn-primary shadow-sm" style="background: var(--accent); border: none; padding: 10px 20px; border-radius: 10px; cursor: pointer; color: white; display: flex; ai-center gap-8;">
+            <button id="btnOptimize" onclick="ejecutarOptimizacion()" class="btn-primary shadow-sm" style="background: var(--accent); border: none; padding: 10px 20px; border-radius: 10px; cursor: pointer; color: white; display: flex; align-items: center; gap: 8px;">
                 <i class="fa-solid fa-wand-magic-sparkles"></i> Optimizar ahora
             </button>
         </div>
     </div>
 
     <!-- FILTROS -->
-    <div class="filters-panel container-wider mb-32">
+    <div class="filters-panel container-wider" style="margin-bottom: 24px;">
         <form id="formFiltros" method="get" action="index.php" class="filter-toolbar">
             <input type="hidden" name="menu" value="Analitica">
             
@@ -180,43 +181,6 @@
                 </div>
             </div>
         </div>
-
-
-        <!-- RANKING COMPLETO -->
-        <div class="card-section">
-            <div class="p-20 border-bottom d-flex jc-between ai-center gap-20 bg-surface2">
-
-                <div class="d-flex ai-center gap-10">
-                    <i class="fa-solid fa-list-ol text-accent"></i>
-                    <h3 class="m-0 fs-15 font-bold"><?php echo L('analytics_ranking_title'); ?></h3>
-                </div>
-                <button onclick="exportRanking()" class="btn-icon p-4-12 fs-12" style="background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; white-space: nowrap; flex-shrink: 0;">
-                    <i class="fa-solid fa-file-excel mr-4"></i> <?php echo L('analytics_btn_export'); ?>
-                </button>
-            </div>
-            <div style="max-height: 500px; overflow-y: auto;">
-                <table class="analitica-table" id="rankingTable">
-                    <thead style="position: sticky; top: 0; z-index: 5;">
-                        <tr>
-                            <th class="pl-20" style="width: 50px;"><?php echo L('analytics_th_pos'); ?></th>
-                            <th><?php echo L('analytics_th_product'); ?></th>
-                            <th class="text-right"><?php echo L('analytics_th_category'); ?></th>
-                            <th class="text-right"><?php echo L('analytics_th_units'); ?></th>
-                            <th class="text-right pr-20"><?php echo L('analytics_th_revenue'); ?></th>
-                        </tr>
-                    </thead>
-                    <tbody id="rankingTableBody">
-                        <tr><td colspan="5" class="p-40"><div class="skeleton-text skeleton-table-row"></div><div class="skeleton-text skeleton-table-row"></div></td></tr>
-                    </tbody>
-                </table>
-            </div>
-            <div class="p-16 border-top d-flex jc-center" id="loadMoreRankingContainer" style="display: none;">
-                <button type="button" id="btnLoadMoreRanking" onclick="loadMoreRanking()" class="btn-prominent-back compact" style="height: 44px; padding: 0 32px;">
-                    <i class="fa-solid fa-plus-circle mr-8"></i> <?php echo L('analytics_ranking_load_more'); ?>
-                </button>
-            </div>
-
-        </div>
     </div>
 </div>
 
@@ -304,18 +268,6 @@
                 });
         }
 
-        function fetchRanking(offset, callback, errorCallback) {
-            const params = new URLSearchParams({ menu: 'Analitica', ajax: 'loadRanking', limit: 50, offset: offset, ...searchParams });
-            fetch('index.php?' + params.toString(), {
-                headers: { 'X-Requested-With': 'XMLHttpRequest' }
-            })
-                .then(r => r.ok ? r.json() : Promise.reject('Error ' + r.status))
-                .then(callback)
-                .catch(err => {
-                    console.error('Error loading ranking:', err);
-                    if (errorCallback) errorCallback(err);
-                });
-        }
 
         // --- Cargas Paralelas ---
         
@@ -340,8 +292,6 @@
         // 3. IVA
         fetchAnalytics('loadIVA', data => {
             renderIVATable(data);
-            // 4. Ranking (Diferido para dar prioridad a los KPIs y Gráficos)
-            setTimeout(loadRankingInitial, 500);
         });
 
         // Helpers
@@ -349,11 +299,12 @@
             const valEl = document.getElementById('val_' + id);
             const subEl = document.getElementById('sub_' + id);
             if (!valEl) return;
-            
+
             let num = parseFloat(val);
             if (isNaN(num)) num = 0;
 
-            const formatted = num.toLocaleString(activeLocale, { minimumFractionDigits: 2 });
+            const decOpts = suffix ? { minimumFractionDigits: 2, maximumFractionDigits: 2 } : { maximumFractionDigits: 0 };
+            const formatted = num.toLocaleString(activeLocale, decOpts);
             valEl.innerHTML = `<span class="fade-in">${formatted}${suffix ? ' ' + suffix : ''}</span>`;
             if (colorize) {
                 valEl.style.color = num >= 0 ? 'var(--green)' : 'var(--red)';
@@ -387,80 +338,6 @@
                 html += `<tr class="fade-in"><td><span class="badge bg-green-light text-green">${iva.porcentaje}%</span></td><td class="text-right">${base.toLocaleString(activeLocale, {minimumFractionDigits:2})}€</td><td class="text-right font-bold text-purple">${parseFloat(iva.cuota).toLocaleString(activeLocale, {minimumFractionDigits:2})}€</td></tr>`;
             });
             container.innerHTML = html + `</tbody></table>`;
-        }
-
-        window.rankingOffset = 0;
-
-        function loadRankingInitial() {
-            loadMoreRanking(true);
-        }
-
-        window.loadMoreRanking = function(reset = false) {
-            const btn = document.getElementById('btnLoadMoreRanking');
-            const tbody = document.getElementById('rankingTableBody');
-            const container = document.getElementById('loadMoreRankingContainer');
-            
-            if (reset) {
-                window.rankingOffset = 0;
-                tbody.innerHTML = '';
-            }
-
-            if (btn) {
-                btn.disabled = true;
-                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-8"></i> ' + (reset ? 'Cargando...' : 'Buscando más...');
-            }
-
-            fetchRanking(window.rankingOffset, data => {
-                // Función auxiliar para resetear el botón
-                const resetBtn = () => {
-                    if (btn) {
-                        btn.disabled = false;
-                        btn.innerHTML = '<i class="fa-solid fa-plus-circle mr-8"></i> <?php echo L('analytics_ranking_load_more'); ?>';
-                    }
-                };
-
-                if (!data || data.length === 0) {
-                    if (reset) tbody.innerHTML = '<tr><td colspan="5" class="text-center p-40 text-muted italic"><?php echo L('analytics_no_data'); ?></td></tr>';
-                    if (container) container.style.display = 'none';
-                    resetBtn();
-                    return;
-                }
-
-                appendRankingRows(data);
-                window.rankingOffset += data.length;
-
-                resetBtn();
-                
-                // Si devolvemos menos del límite, es que ya no hay más
-                if (data.length < 50) {
-                    if (container) container.style.display = 'none';
-                } else {
-                    if (container) container.style.display = 'flex';
-                }
-            }, (err) => {
-                // Manejo de error en la llamada
-                if (btn) {
-                    btn.disabled = false;
-                    btn.className = 'btn btn-outline border-red text-red';
-                    btn.innerHTML = '<i class="fa-solid fa-triangle-exclamation mr-8"></i> Error al cargar. Reintentar';
-                }
-            });
-        };
-
-        function appendRankingRows(data) {
-            const tbody = document.getElementById('rankingTableBody');
-            data.forEach((p, i) => {
-                const tr = document.createElement('tr');
-                tr.className = 'fade-in ' + (p.unidades == 0 ? 'opacity-50' : '');
-                tr.innerHTML = `
-                    <td class="pl-20 font-mono text-muted">${window.rankingOffset + i + 1}</td>
-                    <td><div class="font-bold">${escapeHTML(p.nombre_producto_limpio)}</div><div class="fs-11 text-muted">${p.codigo_producto}</div></td>
-                    <td class="text-right"><span class="fs-10 px-6 py-2 br-4 bg-surface2 text-muted">${escapeHTML(p.categoria || 'N/A')}</span></td>
-                    <td class="text-right font-bold">${p.unidades}</td>
-                    <td class="text-right pr-20 text-accent font-bold">${parseFloat(p.total_recaudado).toLocaleString(activeLocale, {minimumFractionDigits:2})}€</td>
-                `;
-                tbody.appendChild(tr);
-            });
         }
 
         function renderCategoryChart(data) {
@@ -500,7 +377,8 @@
             container.appendChild(canvas);
             
             const labels = data.map(d => {
-                const date = new Date(d.fecha);
+                // T12:00:00 evita desfase UTC en timezones +X
+                const date = new Date(d.fecha + 'T12:00:00');
                 if (agrupacion === 'mes') {
                     return date.toLocaleDateString(activeLocale, { month: 'short', year: 'numeric' });
                 } else if (agrupacion === 'año') {
@@ -554,11 +432,6 @@
             });
 
         }
-
-        window.exportRanking = function() {
-            const params = new URLSearchParams({ ...searchParams });
-            window.location.href = 'api/exportarAnalitica.php?' + params.toString();
-        };
 
         function escapeHTML(str) {
             if (!str) return '';
