@@ -17,7 +17,7 @@ class CierreFiscalPDO
         // [NUEVO] El resumen ahora se basa en los pagos REALES realizados (pagos_venta)
         // para incluir abonos a cuenta y pagos parciales en el reporte del día.
         // Un pago se incluye en el cierre si su turno asociado todavía no tiene num_z.
-        $sql = "SELECT 
+        $sql = "SELECT
                 COALESCE(SUM(CASE WHEN p.metodo_pago = 'efectivo' THEN p.importe ELSE 0 END), 0) as total_efectivo,
                 COALESCE(SUM(CASE WHEN p.metodo_pago = 'tarjeta' THEN p.importe ELSE 0 END), 0) as total_tarjeta,
                 COALESCE(SUM(CASE WHEN p.metodo_pago = 'bizum' THEN p.importe ELSE 0 END), 0) as total_bizum,
@@ -25,7 +25,9 @@ class CierreFiscalPDO
                 COALESCE(SUM(p.importe), 0) as total_general
             FROM pagos_venta p
             JOIN caja_turnos t ON p.id_turno = t.id
-            WHERE t.num_z IS NULL";
+            JOIN ventas v ON v.id = p.id_venta
+            WHERE t.num_z IS NULL
+              AND v.estado NOT IN ('anulada')";
         $q = DBPDO::ejecutarConsulta($sql);
         return $q->fetch(PDO::FETCH_ASSOC);
     }
@@ -102,7 +104,7 @@ class CierreFiscalPDO
             ) AS sub
             JOIN cierres_fiscales cf ON cf.id = sub.id
             JOIN usuarios u ON cf.id_usuario = u.id
-            LEFT JOIN ventas v ON v.num_z = cf.id
+            LEFT JOIN ventas v ON v.num_z = cf.id AND v.estado NOT IN ('anulada')
             LEFT JOIN caja_deudas d ON d.id_cierre_fiscal = cf.id
             GROUP BY cf.id
             ORDER BY cf.$ordenPor $ordenDir";
@@ -147,7 +149,7 @@ class CierreFiscalPDO
                 COALESCE(SUM(CASE WHEN v.metodo_pago = 'a_cuenta' THEN v.total ELSE 0 END), 0) as total_a_cuenta
             FROM cierres_fiscales cf
             JOIN usuarios u ON cf.id_usuario = u.id
-            LEFT JOIN ventas v ON v.num_z = cf.id
+            LEFT JOIN ventas v ON v.num_z = cf.id AND v.estado NOT IN ('anulada')
             LEFT JOIN caja_deudas d ON d.id_cierre_fiscal = cf.id
             WHERE cf.id = :id
             GROUP BY cf.id";

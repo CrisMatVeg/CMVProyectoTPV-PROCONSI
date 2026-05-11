@@ -48,7 +48,7 @@ if (!function_exists('calcularResumenCaja')) {
     function calcularResumenCaja($ventas)
     {
         $r = [
-            'totalVentas'     => count($ventas),
+            'totalVentas'     => 0,
             'totalEfectivo'   => 0.0,
             'totalTarjeta'    => 0.0,
             'totalBizum'      => 0.0,
@@ -57,6 +57,8 @@ if (!function_exists('calcularResumenCaja')) {
         ];
 
         foreach ($ventas as $v) {
+            if (($v['estado'] ?? '') === 'anulada') continue;
+            $r['totalVentas']++;
             $r['totalBruto'] += (float)$v['total'];
             $r['totalIVA']   += (float)$v['iva_amt'];
             $m = $v['metodo_pago'];
