@@ -45,12 +45,10 @@ if (isset($_REQUEST['volver']) || isset($_REQUEST['irDashboard'])) {
     exit;
 }
 
-require_once 'model/ProductoPDO.php';
 require_once 'model/CategoriaPDO.php';
 
 $avPromos = [
-    'lista' => PromocionPDO::listarTodas(),
-    'productos' => ProductoPDO::listarProductos(false),
+    'lista'      => PromocionPDO::listarTodas(),
     'categorias' => CategoriaPDO::listarTodas(),
 ];
 

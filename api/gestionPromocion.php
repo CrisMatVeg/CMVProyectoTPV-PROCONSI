@@ -83,6 +83,22 @@ try {
             echo json_encode(['ok' => true]);
             break;
 
+        case 'buscarProductos':
+            require_once __DIR__ . '/../model/ProductoPDO.php';
+            $term = trim($input['term'] ?? '');
+            $productos = ProductoPDO::listarProductos(false, 100, 0, $term);
+            $result = [];
+            foreach ($productos as $p) {
+                $result[] = [
+                    'id'         => (int)$p->getId(),
+                    'nombre'     => $p->getNombre(),
+                    'referencia' => $p->getReferencia(),
+                    'precio'     => (float)$p->getPrecioVenta(),
+                ];
+            }
+            echo json_encode(['ok' => true, 'productos' => $result]);
+            break;
+
         default:
             throw new Exception('Acción no válida');
     }
