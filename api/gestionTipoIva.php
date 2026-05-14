@@ -43,7 +43,7 @@ try {
                 echo json_encode(['ok' => false, 'aErrores' => $errores]);
                 break;
             }
-            TipoIVAPDO::añadir($input);
+            TipoIVAPDO::agregar($input);
             echo json_encode(['ok' => true]);
             break;
 

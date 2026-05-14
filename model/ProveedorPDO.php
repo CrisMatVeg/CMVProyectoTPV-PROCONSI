@@ -66,7 +66,7 @@ class ProveedorPDO
         }
     }
 
-    public static function añadirProveedor($cif_nif, $nombre, $direccion, $telefono, $email, $aplica_re, $notas, $vencimiento_dias = 0)
+    public static function agregarProveedor($cif_nif, $nombre, $direccion, $telefono, $email, $aplica_re, $notas, $vencimiento_dias = 0)
     {
         try {
             $db = DBPDO::getPDO();

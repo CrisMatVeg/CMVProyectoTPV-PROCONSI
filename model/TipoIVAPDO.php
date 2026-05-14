@@ -62,7 +62,7 @@ class TipoIVAPDO
         return $row ?: null;
     }
 
-    public static function añadir(array $d): void
+    public static function agregar(array $d): void
     {
         $sql = "INSERT INTO tipos_iva
                 (codigo, nombre, porcentaje, recargo_equivalencia, fecha_inicio, fecha_fin, activo)

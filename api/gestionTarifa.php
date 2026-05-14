@@ -43,7 +43,7 @@ try {
                 echo json_encode(['ok' => false, 'error' => 'Las tarifas deben ser condicionales (filtros de cliente, fechas o días). Para cambios generales permanentes usa el Ajuste Masivo de Precios.']);
                 break;
             }
-            TarifaPrecioPDO::añadir($input, $_SESSION['usuarioActualTPV']->getId());
+            TarifaPrecioPDO::agregar($input, $_SESSION['usuarioActualTPV']->getId());
             echo json_encode(['ok' => true]);
             break;
 

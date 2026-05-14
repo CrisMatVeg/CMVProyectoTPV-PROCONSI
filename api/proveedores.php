@@ -97,7 +97,7 @@ try {
                 );
                 echo json_encode(['ok' => true, 'success' => $success]);
             } else {
-                $id = ProveedorPDO::añadirProveedor(
+                $id = ProveedorPDO::agregarProveedor(
                     $data['cif_nif'], $data['nombre'], $data['direccion'] ?? '',
                     $data['telefono'] ?? '', $data['email'] ?? '',
                     $data['aplica_re'] ?? false, $data['notas'] ?? '',

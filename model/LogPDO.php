@@ -25,7 +25,7 @@ class LogPDO {
                 $nombreUsuario = $_SESSION['usuarioActualTPV']->getNombre();
             }
 
-            $detallesJson = $detalles ? json_encode($detalles, JSON_UNESCAPED_UNICODE) : null;
+            $detallesJson = $detalles ? json_encode($detalles, JSON_UNESCAPED_UNICODE) : null; // columna nullable en BD
 
             $sql = "INSERT INTO logs_sistema (id_usuario, nombre_usuario, accion, descripcion, detalles_json) 
                     VALUES (:id_usuario, :nombre_usuario, :accion, :descripcion, :detalles_json)";

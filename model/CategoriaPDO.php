@@ -16,7 +16,7 @@ class CategoriaPDO
         return $q->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    public static function añadir(string $codigo, string $nombre): bool
+    public static function agregar(string $codigo, string $nombre): bool
     {
         $sql = "INSERT INTO categorias (codigo, nombre) VALUES (:codigo, :nombre)";
         try {

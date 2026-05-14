@@ -49,7 +49,7 @@ try {
             }
         }
 
-        $id = RolClientePDO::añadirRol($nombre);
+        $id = RolClientePDO::agregarRol($nombre);
         echo json_encode(['ok' => true, 'id' => $id, 'nombre' => strtolower($nombre)]);
         exit;
     }

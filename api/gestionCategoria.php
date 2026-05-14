@@ -35,7 +35,7 @@ try {
                 echo json_encode(['ok' => false, 'error' => 'Código y nombre son obligatorios']);
                 break;
             }
-            $res = CategoriaPDO::añadir($codigo, $nombre);
+            $res = CategoriaPDO::agregar($codigo, $nombre);
             echo json_encode(['ok' => $res]);
             break;
 

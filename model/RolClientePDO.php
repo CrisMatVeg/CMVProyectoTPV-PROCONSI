@@ -30,7 +30,7 @@ class RolClientePDO
     /**
      * Añade un nuevo rol de cliente.
      */
-    public static function añadirRol(string $nombre): int
+    public static function agregarRol(string $nombre): int
     {
         $nombre = strtolower(trim($nombre));
         $sql = "INSERT INTO roles_cliente (nombre) VALUES (:n)";

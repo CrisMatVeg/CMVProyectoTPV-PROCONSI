@@ -200,7 +200,7 @@ class AeatQueueService
     {
         $lotes = [];
         $loteActual = [];
-        $tamañoActual = 0;
+        $tamanoActual = 0;
         $maxRegistros = 1000;
         $maxBytes = 6 * 1024 * 1024; // 6MB
 
@@ -211,16 +211,16 @@ class AeatQueueService
             }
 
             // Si añadir este registro supera algún límite, cerramos el lote actual
-            if (count($loteActual) >= $maxRegistros || ($tamañoActual + $size) > $maxBytes) {
+            if (count($loteActual) >= $maxRegistros || ($tamanoActual + $size) > $maxBytes) {
                 if (!empty($loteActual)) {
                     $lotes[] = $loteActual;
                     $loteActual = [];
-                    $tamañoActual = 0;
+                    $tamanoActual = 0;
                 }
             }
 
             $loteActual[] = $reg;
-            $tamañoActual += $size;
+            $tamanoActual += $size;
         }
 
         if (!empty($loteActual)) {

@@ -81,7 +81,7 @@ class PromocionPDO
         return $row ?: null;
     }
 
-    public static function añadir(array $datos): void
+    public static function agregar(array $datos): void
     {
         $sql = "INSERT INTO promociones
                 (codigo, descripcion, tipo, valor, min_subtotal, bundle_buy_qty, bundle_pay_qty, id_producto, producto_ids, categoria_code, activo, solo_socios, roles_segmento, dias_semana, hora_inicio, hora_fin, fecha_inicio, fecha_fin, prioridad, excluidos)

@@ -155,7 +155,7 @@ try {
             break;
 
         case 'añadir':
-            $nuevo = ProductoPDO::añadirProducto($datos);
+            $nuevo = ProductoPDO::agregarProducto($datos);
             echo json_encode([
                 'ok'       => true,
                 'producto' => [

@@ -38,7 +38,7 @@ try {
                 echo json_encode(['ok' => false, 'aErrores' => $errores]);
                 break;
             }
-            PromocionPDO::añadir($input);
+            PromocionPDO::agregar($input);
             echo json_encode(['ok' => true]);
             break;
 

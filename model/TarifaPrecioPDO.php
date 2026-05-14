@@ -23,7 +23,7 @@ class TarifaPrecioPDO
         return $q->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
-    public static function añadir(array $d, int $idUsuario): void
+    public static function agregar(array $d, int $idUsuario): void
     {
         $sql = "INSERT INTO tarifas_precios
                 (nombre, tipo, valor, fecha_aplicacion, fecha_fin, dias_semana, hora_inicio, hora_fin, roles_segmento, tipo_cliente, es_solo_socios, id_cliente, cliente_ids, prioridad, scope, categoria, producto_ids, excluidos, creado_por)

@@ -104,7 +104,7 @@ class UsuarioPDO
     /**
      * Añade un nuevo usuario.
      */
-    public static function añadirUsuario($nombre, $login, $password, $rol, $idRol = null, $email = null)
+    public static function agregarUsuario($nombre, $login, $password, $rol, $idRol = null, $email = null)
     {
         $sql = "INSERT INTO usuarios (nombre, login, password, id_rol, email, idioma) 
                 VALUES (:nombre, :login, SHA2(:pass,256), :idrol, :email, 'es')";
