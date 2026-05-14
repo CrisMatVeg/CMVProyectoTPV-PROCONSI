@@ -9,8 +9,7 @@ if (!isset($_SESSION['usuarioActualTPV']) || !$_SESSION['usuarioActualTPV']->tie
     exit;
 }
 
-// Navegación Global
-if (isset($_REQUEST['volver']) || isset($_REQUEST['irDashboard'])) {
+if (isset($_REQUEST['volver'])) {
     $_SESSION['paginaEnCurso'] = 'Dashboard';
     header('Location: index.php');
     exit;

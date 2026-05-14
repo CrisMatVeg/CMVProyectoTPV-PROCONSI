@@ -25,7 +25,7 @@ if (isset($_REQUEST['irUsuarios'])) {
     header('Location: index.php');
     exit;
 }
-if (isset($_REQUEST['volver']) || isset($_REQUEST['irDashboard'])) {
+if (isset($_REQUEST['volver'])) {
     $_SESSION['paginaEnCurso'] = 'Dashboard';
     header('Location: index.php');
     exit;
@@ -49,7 +49,7 @@ if (isset($_REQUEST['accion'])) {
                 $sql = "UPDATE roles SET nombre = :nom, descripcion = :des WHERE id = :id";
                 DBPDO::ejecutarConsulta($sql, [':nom' => $nombre, ':des' => $desc, ':id' => $idRol]);
             } else {
-                $idRol = RolPDO::añadirRol($nombre, $desc);
+                $idRol = RolPDO::agregarRol($nombre, $desc);
             }
 
             error_log("GUARDANDO ROL ID: " . $idRol . " CON PERMISOS: " . print_r($permisosIds, true));

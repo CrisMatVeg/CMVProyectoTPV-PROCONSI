@@ -22,7 +22,7 @@ foreach ($proveedores as $p) {
 }
 
 $avInicioPrivado['productos'] = [];
-$productos = ProductoPDO::listarProductos(true);
+$productos = ProductoPDO::listarProductos(true, 500);
 foreach ($productos as $p) {
     $avInicioPrivado['productos'][] = [
         'id' => $p->getId(),

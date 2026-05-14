@@ -13,32 +13,13 @@ if (!isset($_SESSION['usuarioActualTPV']) || !$_SESSION['usuarioActualTPV']->tie
     exit;
 }
 
-// Navegación Global
-if (isset($_REQUEST['salir'])) {
-    session_destroy();
-    header('Location: index.php');
-    exit;
-}
-
-if (isset($_REQUEST['irTPV'])) {
-    $_SESSION['paginaEnCurso'] = 'inicioPrivado';
-    header('Location: index.php');
-    exit;
-}
-
 if (isset($_REQUEST['irCierreCaja'])) {
     $_SESSION['paginaEnCurso'] = 'cierreCaja';
     header('Location: index.php');
     exit;
 }
 
-if (isset($_REQUEST['irMiPerfil'])) {
-    $_SESSION['paginaEnCurso'] = 'MiPerfil';
-    header('Location: index.php');
-    exit;
-}
-
-if (isset($_REQUEST['volver']) || isset($_REQUEST['irDashboard'])) {
+if (isset($_REQUEST['volver'])) {
     $_SESSION['paginaEnCurso'] = 'Dashboard';
     header('Location: index.php');
     exit;
@@ -92,7 +73,7 @@ if (isset($_REQUEST['addUsuario'])) {
             }
         }
 
-        UsuarioPDO::añadirUsuario($nombre, $login, $pass, $nombreRol, $idRol, $email);
+        UsuarioPDO::agregarUsuario($nombre, $login, $pass, $nombreRol, $idRol, $email);
         header('Location: index.php?irUsuarios=1'); // Recargar para ver cambios
         exit;
     }

@@ -12,28 +12,8 @@ if (!isset($_SESSION['usuarioActualTPV'])) {
     exit;
 }
 
-// Volver al TPV
-// Navegación Global
-if (isset($_REQUEST['salir'])) {
-    session_destroy();
-    header('Location: index.php');
-    exit;
-}
-
-if (isset($_REQUEST['irTPV']) || isset($_REQUEST['irInicio'])) {
+if (isset($_REQUEST['irInicio'])) {
     $_SESSION['paginaEnCurso'] = 'inicioPrivado';
-    header('Location: index.php');
-    exit;
-}
-
-if (isset($_REQUEST['irDashboard'])) {
-    $_SESSION['paginaEnCurso'] = 'Dashboard';
-    header('Location: index.php');
-    exit;
-}
-
-if (isset($_REQUEST['irMiPerfil'])) {
-    $_SESSION['paginaEnCurso'] = 'MiPerfil';
     header('Location: index.php');
     exit;
 }
@@ -42,33 +22,7 @@ require_once 'model/CierreFiscalPDO.php';
 require_once 'model/CajaTurnoPDO.php';
 require_once 'model/CajaDeudaPDO.php';
 require_once 'model/VentaPDO.php';
-
-// 1. Definir funciones auxiliares
-if (!function_exists('calcularResumenCaja')) {
-    function calcularResumenCaja($ventas)
-    {
-        $r = [
-            'totalVentas'     => 0,
-            'totalEfectivo'   => 0.0,
-            'totalTarjeta'    => 0.0,
-            'totalBizum'      => 0.0,
-            'totalIVA'        => 0.0,
-            'totalBruto'      => 0.0,
-        ];
-
-        foreach ($ventas as $v) {
-            if (($v['estado'] ?? '') === 'anulada') continue;
-            $r['totalVentas']++;
-            $r['totalBruto'] += (float)$v['total'];
-            $r['totalIVA']   += (float)$v['iva_amt'];
-            $m = $v['metodo_pago'];
-            if ($m === 'efectivo') $r['totalEfectivo'] += (float)$v['total'];
-            elseif ($m === 'tarjeta') $r['totalTarjeta'] += (float)$v['total'];
-            elseif ($m === 'bizum') $r['totalBizum'] += (float)$v['total'];
-        }
-        return $r;
-    }
-}
+require_once 'model/CajaService.php';
 
 // 2. Obtener datos base
 $turnoActual = CajaTurnoPDO::obtenerTurnoAbierto();
@@ -88,7 +42,7 @@ if (isset($_POST['idTurnoPendiente']) && (int)$_POST['idTurnoPendiente'] > 0) {
 
 // (Data fetching moved below closure processing, but we need an initial fetch for intermediate calculations)
 $ventasIniciales = $turnoActual ? VentaPDO::obtenerVentasPorTurno((int)$turnoActual['id']) : [];
-$resumen = calcularResumenCaja($ventasIniciales);
+$resumen = CajaService::calcularResumenCaja($ventasIniciales);
 
 // [NUEVO] Sobrescribir totales de cobro con el registro REAL de pagos_venta (abonos incluidos)
 if ($turnoActual) {
@@ -278,7 +232,7 @@ if ($turnoAbiertoFinal) {
     $totalRetirado = 0;
     $totalIngresado = 0;
 }
-$resumen = calcularResumenCaja($ventasHoy);
+$resumen = CajaService::calcularResumenCaja($ventasHoy);
 
 // [NUEVO] Sobrescribir totales de cobro con el registro REAL de pagos_venta (abonos incluidos)
 if ($turnoAbiertoFinal) {

@@ -19,27 +19,14 @@ if (!$_SESSION['usuarioActualTPV']->tienePermiso('ver_analitica')) {
     exit;
 }
 
-// Navegación
-if (isset($_REQUEST['volver']) || isset($_REQUEST['irDashboard'])) {
-    $_SESSION['paginaEnCurso'] = 'Dashboard';
-    header('Location: index.php');
-    exit;
-}
-
-if (isset($_REQUEST['irTPV'])) {
-    $_SESSION['paginaEnCurso'] = 'inicioPrivado';
-    header('Location: index.php');
-    exit;
-}
-
-if (isset($_REQUEST['irMiPerfil'])) {
-    $_SESSION['paginaEnCurso'] = 'MiPerfil';
-    header('Location: index.php');
-    exit;
-}
-
 if (isset($_REQUEST['irCierreCaja'])) {
     $_SESSION['paginaEnCurso'] = 'cierreCaja';
+    header('Location: index.php');
+    exit;
+}
+
+if (isset($_REQUEST['volver'])) {
+    $_SESSION['paginaEnCurso'] = 'Dashboard';
     header('Location: index.php');
     exit;
 }
@@ -48,113 +35,87 @@ if (isset($_REQUEST['irCierreCaja'])) {
 require_once 'model/VentaPDO.php';
 require_once 'model/AnaliticaPDO.php';
 
-// AJAX: Cargar componentes de forma asíncrona para optimizar rendimiento
+// AJAX: un único endpoint loadAll evita session staircase y reduce queries
 if (isset($_GET['ajax'])) {
+    @ini_set('display_errors', '0');
+    session_write_close(); // Liberar lock de sesión; auth ya comprobado arriba
+    set_time_limit(180);
+
     $desde = $_GET['fechaDesde'] ?? date('Y-m-d', strtotime('-30 days'));
     $hasta = $_GET['fechaHasta'] ?? date('Y-m-d');
-    $idUsuario = null; 
-    $tipoDocumento = 'todos';
 
     try {
-        if (ob_get_length()) ob_clean();
-        header('Content-Type: application/json');
-
         switch ($_GET['ajax']) {
-            case 'loadKPIs':
-                $diffDias = (strtotime($hasta) - strtotime($desde)) / 86400;
-                if ($diffDias > 30) {
-                    echo json_encode(AnaliticaPDO::obtenerKPIsRapido($desde, $hasta));
-                } else {
-                    echo json_encode(VentaPDO::obtenerKPIs($desde, $hasta, $idUsuario, $tipoDocumento));
-                }
-                break;
-
-            case 'loadCharts':
-                $currentTs = strtotime($desde);
-                $endTs = strtotime($hasta);
-                $diffDays = ($endTs - $currentTs) / (60 * 60 * 24);
-
+            case 'loadAll':
+                $diffDays   = (strtotime($hasta) - strtotime($desde)) / 86400;
                 $agrupacion = 'dia';
-                if ($diffDays > 730) $agrupacion = 'año';
-                elseif ($diffDays > 90) $agrupacion = 'mes';
+                if ($diffDays > 730)     $agrupacion = 'año';
+                elseif ($diffDays > 90)  $agrupacion = 'mes';
 
-                // Usar pre-calculados para rangos largos (> 30 días)
+                // Caché de archivo para rangos > 30 días (los más lentos y menos volátiles).
+                // Primera carga computa y guarda; recargas dentro del TTL sirven el JSON directo.
+                $cacheFile = null;
                 if ($diffDays > 30) {
-                    $data = [
-                        'evolucion'    => AnaliticaPDO::obtenerEvolucionRapida($desde, $hasta, $agrupacion),
-                        'categorias'   => AnaliticaPDO::obtenerCategoriasRapido($desde, $hasta),
-                        'topProductos' => AnaliticaPDO::obtenerTopProductosRapido($desde, $hasta, 10),
-                        'agrupacion'   => $agrupacion
-                    ];
-                } else {
-                    $data = [
-                        'evolucion'    => VentaPDO::obtenerMargenesDetallados($desde, $hasta, $idUsuario, $tipoDocumento, $agrupacion),
-                        'categorias'   => VentaPDO::obtenerVentasPorCategoria($desde, $hasta, $idUsuario, $tipoDocumento),
-                        'topProductos' => VentaPDO::obtenerTopProductos($desde, $hasta, 10, $idUsuario, $tipoDocumento),
-                        'agrupacion'   => $agrupacion
-                    ];
-
-                    // Rellenar días vacíos para la evolución (Solo para rangos cortos <= 30 días con agrupación diaria)
-                    if ($agrupacion === 'dia') {
-                        $margenesPad = [];
-                        $margenesMap = [];
-                        foreach ($data['evolucion'] as $row) {
-                            $margenesMap[$row['fecha']] = $row;
-                        }
-                        while ($currentTs <= $endTs) {
-                            $dateYmd = date('Y-m-d', $currentTs);
-                            $margenesPad[] = $margenesMap[$dateYmd] ?? [
-                                'fecha' => $dateYmd,
-                                'ingresos' => 0,
-                                'costes' => 0,
-                                'beneficio' => 0
-                            ];
-                            $currentTs = strtotime('+1 day', $currentTs);
-                        }
-                        $data['evolucion'] = $margenesPad;
+                    $cacheDir  = dirname(__DIR__) . '/storage/analitica_cache/';
+                    @mkdir($cacheDir, 0755, true);
+                    $cacheFile = $cacheDir . md5("{$desde}:{$hasta}:{$agrupacion}") . '.json';
+                    $ttl       = $diffDays > 90 ? 600 : 300; // 10 min para >90 días, 5 min para el resto
+                    if (file_exists($cacheFile) && (time() - filemtime($cacheFile)) < $ttl) {
+                        while (ob_get_level() > 0) @ob_end_clean();
+                        header('Content-Type: application/json; charset=utf-8');
+                        readfile($cacheFile);
+                        break;
                     }
                 }
-                echo json_encode($data);
-                break;
 
-            case 'loadIVA':
-                $diffDias = (strtotime($hasta) - strtotime($desde)) / 86400;
-                if ($diffDias > 30) {
-                    echo json_encode(AnaliticaPDO::obtenerDesgloseIVARapido($desde, $hasta));
-                } else {
-                    echo json_encode(VentaPDO::obtenerDesgloseIVA($desde, $hasta, $idUsuario, $tipoDocumento));
+                VentaPDO::asegurarIndices();
+                $data = VentaPDO::obtenerTodoAnalitica($desde, $hasta, null, 'todos', $agrupacion);
+
+                // Rellenar días vacíos solo en agrupación diaria
+                if ($agrupacion === 'dia' && !empty($data['evolucion'])) {
+                    $curTs = strtotime($desde);
+                    $endTs = strtotime($hasta);
+                    $pad   = [];
+                    $mapa  = [];
+                    foreach ($data['evolucion'] as $row) {
+                        $mapa[$row['fecha']] = $row;
+                    }
+                    while ($curTs <= $endTs) {
+                        $ymd   = date('Y-m-d', $curTs);
+                        $pad[] = $mapa[$ymd] ?? ['fecha' => $ymd, 'ingresos' => 0, 'costes' => 0, 'beneficio' => 0];
+                        $curTs = strtotime('+1 day', $curTs);
+                    }
+                    $data['evolucion'] = $pad;
                 }
-                break;
 
-            case 'checkHealth':
-                echo json_encode(['optimized' => VentaPDO::estanIndicesListos()]);
+                while (ob_get_level() > 0) @ob_end_clean();
+                header('Content-Type: application/json; charset=utf-8');
+                $jsonOut = json_encode($data, JSON_PARTIAL_OUTPUT_ON_ERROR | JSON_UNESCAPED_UNICODE);
+                if ($cacheFile !== null) @file_put_contents($cacheFile, $jsonOut, LOCK_EX);
+                echo $jsonOut;
                 break;
 
             case 'runOptimization':
-                set_time_limit(300); 
-                $step = $_GET['step'] ?? 'all';
-                $success = false;
-                if ($step === 'step1') {
-                    try { DBPDO::ejecutarConsulta("ALTER TABLE ventas ADD INDEX idx_ventas_fecha (fecha)"); $success = true; } catch (Exception $e) { $success = true; }
-                } elseif ($step === 'step2') {
-                    try { DBPDO::ejecutarConsulta("ALTER TABLE ventas ADD INDEX idx_ventas_perf (estado, metodo_pago, fecha)"); $success = true; } catch (Exception $e) { $success = true; }
-                } elseif ($step === 'step3') {
-                    try { DBPDO::ejecutarConsulta("ALTER TABLE productos ADD INDEX idx_prod_cat_ref (categoria, referencia)"); $success = true; } catch (Exception $e) { $success = true; }
-                } else {
-                    $success = VentaPDO::optimizarIndices();
-                }
-                echo json_encode(['success' => $success]);
+                set_time_limit(300);
+                VentaPDO::asegurarIndices();
+                VentaPDO::actualizarEstadisticas();
+                while (ob_get_level() > 0) @ob_end_clean();
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['success' => true]);
                 break;
         }
     } catch (Throwable $e) {
-        if (ob_get_length()) ob_clean();
+        while (ob_get_level() > 0) @ob_end_clean();
         http_response_code(500);
-        echo json_encode([
-            'error' => true,
+        header('Content-Type: application/json; charset=utf-8');
+        $out = json_encode([
+            'error'   => true,
+            'class'   => get_class($e),
             'message' => $e->getMessage(),
-            'file' => basename($e->getFile()),
-            'line' => $e->getLine()
-        ]);
+            'file'    => basename($e->getFile()),
+            'line'    => $e->getLine()
+        ], JSON_PARTIAL_OUTPUT_ON_ERROR | JSON_UNESCAPED_UNICODE);
+        echo $out ?: '{"error":true,"message":"json_encode_failed"}';
     }
     exit;
 }

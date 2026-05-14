@@ -19,41 +19,20 @@ if (!$_SESSION['usuarioActualTPV']->tienePermiso('gestionar_productos')) {
     exit;
 }
 
-// Navegación Global
-if (isset($_REQUEST['salir'])) {
-    session_destroy();
-    header('Location: index.php');
-    exit;
-}
-
-if (isset($_REQUEST['irTPV'])) {
-    $_SESSION['paginaEnCurso'] = 'inicioPrivado';
-    header('Location: index.php');
-    exit;
-}
-
 if (isset($_REQUEST['irCierreCaja'])) {
     $_SESSION['paginaEnCurso'] = 'cierreCaja';
     header('Location: index.php');
     exit;
 }
 
-if (isset($_REQUEST['irMiPerfil'])) {
-    $_SESSION['paginaEnCurso'] = 'MiPerfil';
-    header('Location: index.php');
-    exit;
-}
-
-if (isset($_REQUEST['volver']) || isset($_REQUEST['irDashboard'])) {
+if (isset($_REQUEST['volver'])) {
     $_SESSION['paginaEnCurso'] = 'Dashboard';
     header('Location: index.php');
     exit;
 }
 
 // Paginación
-$pag = isset($_GET['p']) ? max(1, (int)$_GET['p']) : 1;
-$limit = 50;
-$offset = ($pag - 1) * $limit;
+['pag' => $pag, 'limit' => $limit, 'offset' => $offset] = obtenerPaginacion(50);
 
 $totalProductos = ProductoPDO::contarProductos(false, '', '', 'all', null, null, '', true);
 $totalPaginas = ceil($totalProductos / $limit);

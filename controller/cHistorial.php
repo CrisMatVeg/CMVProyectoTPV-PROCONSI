@@ -56,39 +56,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion'])) {
     }
 }
 
-// Navegación Global
-if (isset($_REQUEST['salir'])) {
-    session_destroy();
-    header('Location: index.php');
-    exit;
-}
-
-if (isset($_REQUEST['irTPV'])) {
-    $_SESSION['paginaEnCurso'] = 'inicioPrivado';
-    header('Location: index.php');
-    exit;
-}
-
 if (isset($_REQUEST['irCierreCaja'])) {
     $_SESSION['paginaEnCurso'] = 'cierreCaja';
     header('Location: index.php');
     exit;
 }
 
-if (isset($_REQUEST['irMiPerfil'])) {
-    $_SESSION['paginaEnCurso'] = 'MiPerfil';
-    header('Location: index.php');
-    exit;
-}
-
-if (isset($_REQUEST['volver']) || isset($_REQUEST['irDashboard'])) {
+if (isset($_REQUEST['volver'])) {
     $_SESSION['paginaEnCurso'] = 'Dashboard';
     header('Location: index.php');
     exit;
 }
 
 // Valores por defecto para los filtros
-$periodo       = $_REQUEST['periodo'] ?? 'hoy';
+$periodo       = $_REQUEST['periodo'] ?? 'todo';
 $idCajero      = isset($_REQUEST['idCajero']) && $_REQUEST['idCajero'] !== '' ? (int)$_REQUEST['idCajero'] : null;
 $numeroTicket  = isset($_REQUEST['numeroTicket']) && $_REQUEST['numeroTicket'] !== '' ? $_REQUEST['numeroTicket'] : null;
 $tipoDocumento = isset($_REQUEST['tipoDocumento']) && in_array($_REQUEST['tipoDocumento'], ['venta', 'abono', 'todos'])
@@ -132,9 +113,7 @@ $fechaDesde = $aErrores['fechaDesde'] ? date('Y-m-d') : $fechaDesdeRaw;
 $fechaHasta = $aErrores['fechaHasta'] ? date('Y-m-d') : $fechaHastaRaw;
 
 // Paginación
-$pag = isset($_GET['p']) ? max(1, (int)$_GET['p']) : 1;
-$limit = 50;
-$offset = ($pag - 1) * $limit;
+['pag' => $pag, 'limit' => $limit, 'offset' => $offset] = obtenerPaginacion(50);
 
 // Modo de visualización: Ventas o Cierres
 $verCierres = isset($_REQUEST['verCierres']) && $_REQUEST['verCierres'] == 1;

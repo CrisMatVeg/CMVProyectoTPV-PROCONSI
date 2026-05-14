@@ -5,13 +5,6 @@ if (isset($_REQUEST['atras'])) {
     exit;
 }
 
-/* if (isset($_REQUEST['registro'])) {
-    $_SESSION['paginaAnterior'] = $_SESSION['paginaEnCurso'];
-    $_SESSION['paginaEnCurso'] = 'Registro';
-    header('Location: index.php');
-    exit;
-} */
-
 $aErrores = [
     'username' => null,
     'password' => null
