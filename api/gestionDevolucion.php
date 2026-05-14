@@ -13,6 +13,7 @@ header('Content-Type: application/json; charset=utf-8');
 
 try {
     require_once __DIR__ . '/../config/confDBPDO.php';
+    require_once __DIR__ . '/../config/constantes.php';
     require_once __DIR__ . '/../model/DBPDO.php';
     require_once __DIR__ . '/../model/Usuario.php';
     require_once __DIR__ . '/../model/VentaPDO.php';
@@ -47,7 +48,7 @@ try {
             // Si el motivo es Error de Facturación/Rectificativa, el plazo es de 4 años (1460 días approx)
             // Para cualquier otro motivo de devolución comercial se mantiene en 30 días
             $esRectificativa = (strpos(strtolower($motivo), 'facturaci') !== false || strpos(strtolower($motivo), 'rectificativa') !== false);
-            $plazoMaximo = $esRectificativa ? 1460 : 30;
+            $plazoMaximo = $esRectificativa ? DIAS_GARANTIA_RECTIFICATIVA : DIAS_MAX_DEVOLUCION;
 
             if ($diasDiferencia > $plazoMaximo) {
                 if ($esRectificativa) {
