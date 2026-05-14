@@ -413,6 +413,46 @@
     </div>
 </div>
 
+<!-- MODAL PAGO FACTURA PENDIENTE -->
+<div id="modalPagarFactura" class="modal-overlay-bg">
+    <div class="modal-content" style="max-width: 440px; border-radius: 20px; overflow: hidden;">
+        <div class="modal-header">
+            <h2><?php echo L('purchase_btn_pay'); ?></h2>
+            <button class="btn-close-modal" onclick="cerrarModalPagarFactura()">&times;</button>
+        </div>
+        <div class="p-24">
+            <div class="mb-20">
+                <div class="fs-12 tt-uppercase opacity-60 mb-4"><?php echo L('purchase_total_to_pay'); ?></div>
+                <div class="fs-28 fw-700 font-mono text-accent" id="pagoFacTotal">0,00 €</div>
+            </div>
+            <div class="form-group mb-16">
+                <label class="form-label fs-11 tt-uppercase"><?php echo L('tpv_payment_method'); ?></label>
+                <select id="pagoFacMetodo" class="form-input" onchange="onCambioMetodoPagoFactura()">
+                    <option value="banco"><?php echo L('purchase_method_bank'); ?></option>
+                    <option value="caja"><?php echo L('purchase_method_cash'); ?></option>
+                    <option value="otro"><?php echo L('purchase_method_other'); ?></option>
+                </select>
+            </div>
+            <div id="pagoFacCajaInfo" class="bg-surface p-12 br-8 border-2 d-none">
+                <div class="d-flex jc-space-between ai-center">
+                    <span class="fs-12 opacity-60"><?php echo L('tpv_cash_in_drawer'); ?>:</span>
+                    <span class="fw-700 font-mono" id="pagoFacEfectivoDisp">...</span>
+                </div>
+                <div id="pagoFacAlerta" class="d-none mt-8 fs-12 fw-700" style="color: var(--danger);">
+                    &#9888; <?php echo L('purchase_js_insufficient_cash'); ?>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer pt-16 border-top p-24">
+            <button class="btn-cancel" onclick="cerrarModalPagarFactura()"><?php echo L('modal_cancel'); ?></button>
+            <div class="flex-1"></div>
+            <button id="btnConfirmarPagoFactura" class="btn-save w-auto px-32" onclick="confirmarPagoFactura()">
+                <i class="fa-solid fa-money-bill-transfer mr-8"></i> <?php echo L('purchase_btn_pay'); ?>
+            </button>
+        </div>
+    </div>
+</div>
+
 <!-- MODAL DETALLES -->
 <div id="modalDetalle" class="modal-overlay-bg">
     <div class="modal-content w-600" style="max-width: 600px; border-radius: 20px; overflow: hidden;">
@@ -900,7 +940,32 @@
         const num = document.getElementById('facNum').value;
         if (!num) return showCustomAlert(<?php echo json_encode(L('prod_th_status')); ?>, <?php echo json_encode(L('purchase_js_incomplete_fields')); ?>, 'warning');
         const btn = document.getElementById('btnGuardarFactura');
+        const metodo = document.getElementById('facPago').value;
+        const pagado = document.getElementById('facPagada').checked;
         btn.disabled = true;
+
+        if (metodo === 'caja' && pagado) {
+            try {
+                let totalFac = 0;
+                albaranesSeleccionados.forEach(id => {
+                    const a = albaranesPendientes.find(x => x.id === id);
+                    if (a) totalFac += parseFloat(a.total);
+                });
+                const rc = await fetch('api/cajaEstadoActual.php');
+                const resc = await rc.json();
+                const efectivo = resc.ok ? parseFloat(resc.efectivoActual) : 0;
+                if (efectivo < totalFac) {
+                    showCustomAlert('Error', <?php echo json_encode(L('purchase_js_insufficient_cash')); ?>, 'error');
+                    btn.disabled = false;
+                    return;
+                }
+            } catch (e) {
+                showCustomAlert('Error', <?php echo json_encode(L('tpv_js_conn_error')); ?>, 'error');
+                btn.disabled = false;
+                return;
+            }
+        }
+
         try {
             const r = await fetch('api/compras.php', {
                 method: 'POST',
@@ -909,8 +974,8 @@
                     proveedor_id: document.getElementById('facProveedor').value,
                     numero_factura: num,
                     fecha: document.getElementById('facFecha').value,
-                    metodo_pago: document.getElementById('facPago').value,
-                    pagado: document.getElementById('facPagada').checked,
+                    metodo_pago: metodo,
+                    pagado: pagado,
                     ids_albaranes: albaranesSeleccionados
                 })
             });
@@ -924,20 +989,87 @@
         }
     }
 
+    let _pagoFacturaId = null;
+    let _pagoFacturaTotal = 0;
+
     async function pagarFactura(id) {
-        showCustomConfirm(
-            <?php echo json_encode(L('purchase_btn_pay')); ?>,
-            <?php echo json_encode(L('purchase_js_pay_confirm')); ?>,
-            async () => {
-                // Si el usuario elige "Efectivo", pasamos 'caja'. Si no, por defecto 'banco'.
-                // Nota: showCustomConfirm es simple, así que por ahora forzamos 'caja' si acepta y luego 
-                // podríamos preguntar modo, pero para simplificar, usaremos un flujo de 'Caja' por defecto
-                // o añadiremos un selector.
-                ejecutarPagoFactura(id, 'caja');
-            },
-            <?php echo json_encode(L('purchase_method_cash')); ?>,
-            'success'
-        );
+        const r = await fetch('api/compras.php?type=factura&id=' + id);
+        const f = await r.json();
+        _pagoFacturaId = id;
+        _pagoFacturaTotal = parseFloat(f.total);
+
+        document.getElementById('pagoFacTotal').innerText =
+            _pagoFacturaTotal.toLocaleString(<?php echo json_encode(L('locale')); ?>, {minimumFractionDigits: 2}) + ' €';
+        document.getElementById('pagoFacMetodo').value = 'banco';
+        document.getElementById('pagoFacCajaInfo').classList.add('d-none');
+        document.getElementById('pagoFacAlerta').classList.add('d-none');
+        document.getElementById('btnConfirmarPagoFactura').disabled = false;
+        document.getElementById('modalPagarFactura').style.display = 'flex';
+    }
+
+    function cerrarModalPagarFactura() {
+        document.getElementById('modalPagarFactura').style.display = 'none';
+        _pagoFacturaId = null;
+        _pagoFacturaTotal = 0;
+    }
+
+    async function onCambioMetodoPagoFactura() {
+        const metodo = document.getElementById('pagoFacMetodo').value;
+        const cajaInfo = document.getElementById('pagoFacCajaInfo');
+        const alerta = document.getElementById('pagoFacAlerta');
+        const btn = document.getElementById('btnConfirmarPagoFactura');
+
+        if (metodo === 'caja') {
+            cajaInfo.classList.remove('d-none');
+            document.getElementById('pagoFacEfectivoDisp').innerText = '...';
+            try {
+                const rc = await fetch('api/cajaEstadoActual.php');
+                const resc = await rc.json();
+                const efectivo = resc.ok ? parseFloat(resc.efectivoActual) : 0;
+                document.getElementById('pagoFacEfectivoDisp').innerText =
+                    efectivo.toLocaleString(<?php echo json_encode(L('locale')); ?>, {minimumFractionDigits: 2}) + ' €';
+                if (efectivo < _pagoFacturaTotal) {
+                    alerta.classList.remove('d-none');
+                    btn.disabled = true;
+                } else {
+                    alerta.classList.add('d-none');
+                    btn.disabled = false;
+                }
+            } catch (e) {
+                alerta.classList.remove('d-none');
+                btn.disabled = true;
+            }
+        } else {
+            cajaInfo.classList.add('d-none');
+            alerta.classList.add('d-none');
+            btn.disabled = false;
+        }
+    }
+
+    async function confirmarPagoFactura() {
+        const metodo = document.getElementById('pagoFacMetodo').value;
+        const btn = document.getElementById('btnConfirmarPagoFactura');
+        btn.disabled = true;
+
+        if (metodo === 'caja') {
+            try {
+                const rc = await fetch('api/cajaEstadoActual.php');
+                const resc = await rc.json();
+                const efectivo = resc.ok ? parseFloat(resc.efectivoActual) : 0;
+                if (efectivo < _pagoFacturaTotal) {
+                    showCustomAlert('Error', <?php echo json_encode(L('purchase_js_insufficient_cash')); ?>, 'error');
+                    btn.disabled = false;
+                    return;
+                }
+            } catch (e) {
+                showCustomAlert('Error', <?php echo json_encode(L('tpv_js_conn_error')); ?>, 'error');
+                btn.disabled = false;
+                return;
+            }
+        }
+
+        await ejecutarPagoFactura(_pagoFacturaId, metodo);
+        cerrarModalPagarFactura();
     }
 
     async function ejecutarPagoFactura(id, metodo) {

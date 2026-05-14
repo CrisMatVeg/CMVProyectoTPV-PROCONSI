@@ -205,18 +205,26 @@ class CompraPDO
             $stmtUpdateAlb = $db->prepare($sqlUpdateAlb);
             $stmtUpdateAlb->execute(array_merge([$factura_id], $albaranes_ids));
 
-            // 3. Si se marca como pagada y el pago es por caja, registrar gasto
+            // 3. Si se marca como pagada y el pago es por caja, verificar efectivo y registrar gasto
             if ($pagada && $metodo_pago === 'caja') {
                 require_once __DIR__ . '/CajaTurnoPDO.php';
                 $turno = CajaTurnoPDO::obtenerTurnoAbierto();
-                if ($turno) {
-                    $concepto = "Pago Factura Compra $numero_factura";
-                    $db->prepare("INSERT INTO caja_movimientos (id_turno, tipo, importe, concepto) VALUES (?, 'retiro', ?, ?)")
-                        ->execute([$turno['id'], $total, $concepto]);
-
-                    $db->prepare("UPDATE caja_turnos SET total_retirado = total_retirado + ? WHERE id = ?")
-                        ->execute([$total, $turno['id']]);
+                if (!$turno) {
+                    throw new Exception("No hay un turno de caja abierto. Abre la caja antes de pagar en efectivo.");
                 }
+                $efectivoDisponible = CajaTurnoPDO::obtenerEfectivoActual();
+                if ($efectivoDisponible < $total) {
+                    throw new Exception(
+                        "Efectivo insuficiente en caja. Disponible: " . number_format($efectivoDisponible, 2, ',', '.') .
+                        " €, Necesario: " . number_format($total, 2, ',', '.') . " €"
+                    );
+                }
+                $concepto = "Pago Factura Compra $numero_factura";
+                $db->prepare("INSERT INTO caja_movimientos (id_turno, tipo, importe, concepto) VALUES (?, 'retiro', ?, ?)")
+                    ->execute([$turno['id'], $total, $concepto]);
+
+                $db->prepare("UPDATE caja_turnos SET total_retirado = total_retirado + ? WHERE id = ?")
+                    ->execute([$total, $turno['id']]);
             }
 
             $db->commit();
@@ -245,18 +253,26 @@ class CompraPDO
             $stmtUpdate = $db->prepare("UPDATE facturas_compra_prov SET pagado = 1, metodo_pago = ? WHERE id = ?");
             $stmtUpdate->execute([$metodo_pago, $id]);
 
-            // 2. Si es por caja, registrar gasto
+            // 2. Si es por caja, verificar efectivo disponible y registrar gasto
             if ($metodo_pago === 'caja') {
                 require_once __DIR__ . '/CajaTurnoPDO.php';
                 $turno = CajaTurnoPDO::obtenerTurnoAbierto();
-                if ($turno) {
-                    $concepto = "Pago Factura Compra " . $factura['numero_factura'];
-                    $db->prepare("INSERT INTO caja_movimientos (id_turno, tipo, importe, concepto) VALUES (?, 'retiro', ?, ?)")
-                        ->execute([$turno['id'], $factura['total'], $concepto]);
-
-                    $db->prepare("UPDATE caja_turnos SET total_retirado = total_retirado + ? WHERE id = ?")
-                        ->execute([$factura['total'], $turno['id']]);
+                if (!$turno) {
+                    throw new Exception("No hay un turno de caja abierto. Abre la caja antes de pagar en efectivo.");
                 }
+                $efectivoDisponible = CajaTurnoPDO::obtenerEfectivoActual();
+                if ($efectivoDisponible < $factura['total']) {
+                    throw new Exception(
+                        "Efectivo insuficiente en caja. Disponible: " . number_format($efectivoDisponible, 2, ',', '.') .
+                        " €, Necesario: " . number_format((float)$factura['total'], 2, ',', '.') . " €"
+                    );
+                }
+                $concepto = "Pago Factura Compra " . $factura['numero_factura'];
+                $db->prepare("INSERT INTO caja_movimientos (id_turno, tipo, importe, concepto) VALUES (?, 'retiro', ?, ?)")
+                    ->execute([$turno['id'], $factura['total'], $concepto]);
+
+                $db->prepare("UPDATE caja_turnos SET total_retirado = total_retirado + ? WHERE id = ?")
+                    ->execute([$factura['total'], $turno['id']]);
             }
 
             $db->commit();
