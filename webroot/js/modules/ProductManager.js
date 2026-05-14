@@ -186,7 +186,8 @@ export const ProductManager = {
                 offset: AppState.offset,
                 term: AppState.searchTerm,
                 cat: AppState.activeCat,
-                tag: AppState.activeTag || ''
+                tag: AppState.activeTag || '',
+                sort_by: (AppState.sortOrder || 'name-asc').replace(/-/g, '_')
             });
 
             if (data.ok) {

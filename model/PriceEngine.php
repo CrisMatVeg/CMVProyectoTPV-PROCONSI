@@ -342,7 +342,7 @@ class PriceEngine
         }
 
         // 5. Soporte Legacy "Solo Socios" - Solo si no es cliente específico
-        if (!$isSpecificClient && isset($item['solo_socios']) && $item['solo_socios'] == 1) {
+        if (!$isSpecificClient && !empty($item['es_solo_socios'])) {
             if (!$idCliente) return false;
             $c = DBPDO::ejecutarConsulta("SELECT rol FROM clientes WHERE id = :id", [':id' => $idCliente])->fetch();
             if (strtolower($c['rol'] ?? '') !== 'socio') return false;
