@@ -8,7 +8,15 @@ USE `dbelectrobazar-tpv`;
 -- Desactivar llaves foráneas para evitar errores de restricción
 SET FOREIGN_KEY_CHECKS = 0;
 
--- 1. OTROS
+-- 1. ANALÍTICA Y LOGS
+DROP TABLE IF EXISTS analitica_iva_diario;
+DROP TABLE IF EXISTS analitica_producto_diario;
+DROP TABLE IF EXISTS analitica_resumen_diario;
+DROP TABLE IF EXISTS log_ajustes_globales;
+DROP TABLE IF EXISTS cola_envios;
+DROP TABLE IF EXISTS correlativos;
+
+-- 2. OTROS
 DROP TABLE IF EXISTS pagos_venta;
 DROP TABLE IF EXISTS logs_sistema;
 DROP TABLE IF EXISTS vales;
