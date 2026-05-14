@@ -24,7 +24,7 @@ class AnaliticaPDO
                 COALESCE(SUM(CASE WHEN v.metodo_pago='a_cuenta' THEN v.total ELSE 0 END),0) as ac
             FROM ventas v
             WHERE v.estado = 'completada'
-              AND v.fecha >= :f_ini AND v.fecha < :f_fin
+              AND v.fecha >= :f_ini AND v.fecha <= :f_fin
               AND v.metodo_pago IN ('efectivo','tarjeta','bizum','a_cuenta','mixto')
         ", [':f_ini' => $fecha . ' 00:00:00', ':f_fin' => $fecha . ' 23:59:59'])->fetch(PDO::FETCH_ASSOC);
 
@@ -34,7 +34,8 @@ class AnaliticaPDO
             FROM lineas_venta lv
             JOIN ventas v ON lv.id_venta = v.id
             WHERE v.estado = 'completada'
-              AND v.fecha >= :f_ini AND v.fecha < :f_fin
+              AND v.metodo_pago != 'financiado'
+              AND v.fecha >= :f_ini AND v.fecha <= :f_fin
               AND lv.devuelta = 0
         ", [':f_ini' => $fecha . ' 00:00:00', ':f_fin' => $fecha . ' 23:59:59'])->fetchColumn();
 
@@ -89,7 +90,7 @@ class AnaliticaPDO
             JOIN ventas v ON lv.id_venta = v.id
             LEFT JOIN productos p ON lv.id_producto = p.id
             WHERE v.estado = 'completada'
-              AND v.fecha >= :f_ini AND v.fecha < :f_fin
+              AND v.fecha >= :f_ini AND v.fecha <= :f_fin
               AND lv.devuelta = 0
               AND lv.id_producto IS NOT NULL
             GROUP BY lv.id_producto
@@ -115,7 +116,7 @@ class AnaliticaPDO
             WHERE v.estado = 'completada'
               AND v.metodo_pago != 'financiado'
               AND lv.devuelta = 0
-              AND v.fecha >= :f_ini AND v.fecha < :f_fin
+              AND v.fecha >= :f_ini AND v.fecha <= :f_fin
             GROUP BY lv.iva_aplicado
         ", [
             ':f'     => $fecha,
@@ -187,7 +188,7 @@ class AnaliticaPDO
                     COALESCE(SUM(v.base_imponible), 0) as total_base
                 FROM ventas v
                 WHERE v.estado = 'completada'
-                  AND v.fecha >= :f_ini AND v.fecha < :f_fin
+                  AND v.fecha >= :f_ini AND v.fecha <= :f_fin
                   AND v.metodo_pago IN ('efectivo','tarjeta','bizum','a_cuenta','mixto')
             ", [
                 ':f_ini' => $hoy . ' 00:00:00',
@@ -203,7 +204,8 @@ class AnaliticaPDO
                 SELECT COALESCE(SUM((lv.precio_unitario - lv.precio_coste_unitario) * lv.cantidad), 0)
                 FROM lineas_venta lv JOIN ventas v ON lv.id_venta = v.id
                 WHERE v.estado = 'completada'
-                  AND v.fecha >= :ini AND v.fecha < :fin AND lv.devuelta = 0
+                  AND v.metodo_pago != 'financiado'
+                  AND v.fecha >= :ini AND v.fecha <= :fin AND lv.devuelta = 0
             ", [':ini' => $hoy . ' 00:00:00', ':fin' => $hoy . ' 23:59:59'])->fetchColumn();
             $resultado['beneficio_estimado'] += (float)($margenHoy ?? 0);
         }
@@ -295,41 +297,125 @@ class AnaliticaPDO
 
     /**
      * Top productos desde tabla precalculada.
+     * Si el rango incluye hoy, fusiona con datos en tiempo real del día actual.
      */
     public static function obtenerTopProductosRapido(string $desde, string $hasta, int $limite = 10): array
     {
-        return DBPDO::ejecutarConsulta("
-            SELECT 
-                id_producto,
-                MAX(nombre) as nombre_producto_limpio,
-                MAX(referencia) as codigo_producto,
-                MAX(categoria) as categoria,
-                SUM(unidades) as unidades,
-                SUM(total) as total_recaudado
-            FROM analitica_producto_diario
-            WHERE fecha BETWEEN :d AND :h
-            GROUP BY id_producto
-            ORDER BY unidades DESC
-            LIMIT $limite
-        ", [':d' => $desde, ':h' => $hasta])->fetchAll(PDO::FETCH_ASSOC);
+        $hoy = date('Y-m-d');
+        $hastaResumen = ($hasta >= $hoy) ? date('Y-m-d', strtotime('-1 day')) : $hasta;
+
+        $rows = [];
+        if ($desde <= $hastaResumen) {
+            $rows = DBPDO::ejecutarConsulta("
+                SELECT
+                    id_producto,
+                    MAX(nombre) as nombre_producto_limpio,
+                    MAX(referencia) as codigo_producto,
+                    MAX(categoria) as categoria,
+                    SUM(unidades) as unidades,
+                    SUM(total) as total_recaudado
+                FROM analitica_producto_diario
+                WHERE fecha BETWEEN :d AND :h
+                GROUP BY id_producto
+            ", [':d' => $desde, ':h' => $hastaResumen])->fetchAll(PDO::FETCH_ASSOC);
+        }
+
+        // Fusionar con datos de hoy en tiempo real
+        if ($hasta >= $hoy) {
+            $hoyRows = DBPDO::ejecutarConsulta("
+                SELECT
+                    lv.id_producto,
+                    TRIM(SUBSTRING_INDEX(COALESCE(NULLIF(TRIM(p.nombre),''), CONCAT('Producto ID ', lv.id_producto)), '(', 1)) as nombre_producto_limpio,
+                    COALESCE(NULLIF(TRIM(p.referencia),''), CONCAT('REF-', IFNULL(lv.id_producto,0))) as codigo_producto,
+                    p.categoria,
+                    SUM(lv.cantidad) as unidades,
+                    SUM(lv.total_linea) as total_recaudado
+                FROM lineas_venta lv
+                JOIN ventas v ON lv.id_venta = v.id
+                LEFT JOIN productos p ON lv.id_producto = p.id
+                WHERE v.estado = 'completada'
+                  AND v.metodo_pago != 'financiado'
+                  AND lv.devuelta = 0
+                  AND v.fecha >= :ini AND v.fecha <= :fin
+                  AND lv.id_producto IS NOT NULL
+                GROUP BY lv.id_producto
+            ", [':ini' => $hoy . ' 00:00:00', ':fin' => $hoy . ' 23:59:59'])->fetchAll(PDO::FETCH_ASSOC);
+
+            $idxMap = [];
+            foreach ($rows as $i => $row) {
+                $idxMap[(int)$row['id_producto']] = $i;
+            }
+            foreach ($hoyRows as $hoyRow) {
+                $id = (int)$hoyRow['id_producto'];
+                if (isset($idxMap[$id])) {
+                    $rows[$idxMap[$id]]['unidades']        = (int)$rows[$idxMap[$id]]['unidades'] + (int)$hoyRow['unidades'];
+                    $rows[$idxMap[$id]]['total_recaudado'] = (float)$rows[$idxMap[$id]]['total_recaudado'] + (float)$hoyRow['total_recaudado'];
+                } else {
+                    $rows[] = $hoyRow;
+                }
+            }
+            usort($rows, fn($a, $b) => (int)$b['unidades'] <=> (int)$a['unidades']);
+        }
+
+        return array_slice($rows, 0, $limite);
     }
 
     /**
      * Desglose de IVA desde tabla precalculada.
+     * Si el rango incluye hoy, fusiona con datos en tiempo real del día actual.
      */
     public static function obtenerDesgloseIVARapido(string $desde, string $hasta): array
     {
-        return DBPDO::ejecutarConsulta("
-            SELECT 
-                porcentaje,
-                SUM(cuota) as cuota,
-                SUM(total) as total
-            FROM analitica_iva_diario
-            WHERE fecha BETWEEN :d AND :h
-            GROUP BY porcentaje
-            ORDER BY porcentaje DESC
-        ", [':d' => $desde, ':h' => $hasta])
-        ->fetchAll(PDO::FETCH_ASSOC);
+        $hoy = date('Y-m-d');
+        $hastaResumen = ($hasta >= $hoy) ? date('Y-m-d', strtotime('-1 day')) : $hasta;
+
+        $rows = [];
+        if ($desde <= $hastaResumen) {
+            $rows = DBPDO::ejecutarConsulta("
+                SELECT
+                    porcentaje,
+                    SUM(cuota) as cuota,
+                    SUM(total) as total
+                FROM analitica_iva_diario
+                WHERE fecha BETWEEN :d AND :h
+                GROUP BY porcentaje
+                ORDER BY porcentaje DESC
+            ", [':d' => $desde, ':h' => $hastaResumen])->fetchAll(PDO::FETCH_ASSOC);
+        }
+
+        // Fusionar con datos de hoy en tiempo real
+        if ($hasta >= $hoy) {
+            $hoyRows = DBPDO::ejecutarConsulta("
+                SELECT
+                    lv.iva_aplicado as porcentaje,
+                    SUM(lv.total_linea * (lv.iva_aplicado / (100 + lv.iva_aplicado))) as cuota,
+                    SUM(lv.total_linea) as total
+                FROM lineas_venta lv
+                JOIN ventas v ON lv.id_venta = v.id
+                WHERE v.estado = 'completada'
+                  AND v.metodo_pago != 'financiado'
+                  AND lv.devuelta = 0
+                  AND v.fecha >= :ini AND v.fecha <= :fin
+                GROUP BY lv.iva_aplicado
+            ", [':ini' => $hoy . ' 00:00:00', ':fin' => $hoy . ' 23:59:59'])->fetchAll(PDO::FETCH_ASSOC);
+
+            $pctMap = [];
+            foreach ($rows as $i => $row) {
+                $pctMap[(string)$row['porcentaje']] = $i;
+            }
+            foreach ($hoyRows as $hoyRow) {
+                $pct = (string)$hoyRow['porcentaje'];
+                if (isset($pctMap[$pct])) {
+                    $rows[$pctMap[$pct]]['cuota'] = (float)$rows[$pctMap[$pct]]['cuota'] + (float)$hoyRow['cuota'];
+                    $rows[$pctMap[$pct]]['total'] = (float)$rows[$pctMap[$pct]]['total'] + (float)$hoyRow['total'];
+                } else {
+                    $rows[] = $hoyRow;
+                }
+            }
+            usort($rows, fn($a, $b) => (float)$b['porcentaje'] <=> (float)$a['porcentaje']);
+        }
+
+        return $rows;
     }
 
     /**

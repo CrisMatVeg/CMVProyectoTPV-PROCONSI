@@ -36,24 +36,6 @@
         </div>
     </div>
     
-    <!-- BANNER DE OPTIMIZACIÓN -->
-    <div id="optimizerBanner" class="container-wider mb-24 fade-in" style="display: none;">
-        <div class="card-section p-20 d-flex ai-center jc-space-between" style="background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border-color: #3b82f6 !important;">
-            <div class="d-flex ai-center gap-16">
-                <div class="bg-blue p-12 br-12 shadow-sm">
-                    <i class="fa-solid fa-gauge-high text-white fs-24"></i>
-                </div>
-                <div>
-                    <h3 class="m-0 fs-16 text-blue-dark">Base de datos no optimizada</h3>
-                    <p class="m-0 fs-13 text-muted">Las consultas históricas pueden tardar. Aplica índices de rendimiento para cargar "Todo el historial" al instante.</p>
-                </div>
-            </div>
-            <button id="btnOptimize" onclick="ejecutarOptimizacion()" class="btn-primary shadow-sm" style="background: var(--accent); border: none; padding: 10px 20px; border-radius: 10px; cursor: pointer; color: white; display: flex; align-items: center; gap: 8px;">
-                <i class="fa-solid fa-wand-magic-sparkles"></i> Optimizar ahora
-            </button>
-        </div>
-    </div>
-
     <!-- FILTROS -->
     <div class="filters-panel container-wider" style="margin-bottom: 24px;">
         <form id="formFiltros" method="get" action="index.php" class="filter-toolbar">
@@ -187,111 +169,54 @@
 <script>
     const activeLocale = '<?php echo $_SESSION['lang'] ?? 'es'; ?>';
 
-    async function checkDatabaseHealth() {
-        try {
-            const response = await fetch(`index.php?menu=Analitica&ajax=checkHealth`, {
-                headers: { 'X-Requested-With': 'XMLHttpRequest' }
-            });
-            const data = await response.json();
-            if (data.optimized === false) {
-                document.getElementById('optimizerBanner').style.display = 'block';
-            }
-        } catch (e) { console.error("Error checking health", e); }
-    }
-
-    async function ejecutarOptimizacion() {
-        const btn = document.getElementById('btnOptimize');
-        if (!btn) return;
-        const oldHtml = btn.innerHTML;
-        btn.disabled = true;
-        
-        try {
-            const commonHeaders = { 'X-Requested-With': 'XMLHttpRequest' };
-            // Paso 1
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Optimizando Fechas (1/3)...';
-            await fetch(`index.php?menu=Analitica&ajax=runOptimization&step=step1`, { headers: commonHeaders }).then(r => r.json());
-            
-            // Paso 2
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Optimizando Rendimiento (2/3)...';
-            await fetch(`index.php?menu=Analitica&ajax=runOptimization&step=step2`, { headers: commonHeaders }).then(r => r.json());
-            
-            // Paso 3
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Optimizando Catálogo (3/3)...';
-            await fetch(`index.php?menu=Analitica&ajax=runOptimization&step=step3`, { headers: commonHeaders }).then(r => r.json());
-
-            document.getElementById('optimizerBanner').innerHTML = `
-                <div class="alert-premium premium-info ai-center fade-in" style="border-color: var(--green) !important;">
-                    <div class="alert-icon-wrap" style="background: var(--green) !important;">
-                        <i class="fa-solid fa-circle-check"></i>
-                    </div>
-                    <div class="alert-content">
-                        <h3 class="alert-title" style="color: var(--green) !important;">¡Optimización completada!</h3>
-                        <p class="alert-desc">La base de datos ya está lista. El historial completo cargará mucho más rápido.</p>
-                    </div>
-                </div>
-            `;
-
-            setTimeout(() => {
-                document.getElementById('optimizerBanner').style.display = 'none';
-                window.location.reload(); 
-            }, 3000);
-        } catch (e) {
-            btn.disabled = false;
-            btn.innerHTML = oldHtml;
-            showCustomAlert("Error de optimización", "Error al optimizar. Es posible que el servidor haya cortado la conexión por el tamaño de la tabla. Por favor, vuelve a intentarlo; el proceso continuará donde se quedó.", "error");
-        }
-    }
-
     document.addEventListener('DOMContentLoaded', () => {
-        const activeLocale = '<?php echo $_SESSION['lang'] ?? 'es'; ?>';
-        const searchParams = {
-            fechaDesde: '<?php echo $avAnalitica['filtros']['desde']; ?>',
-            fechaHasta: '<?php echo $avAnalitica['filtros']['hasta']; ?>',
-            idCajero: '',
-            tipoDocumento: 'todos'
-        };
+        const fechaDesde = '<?php echo $avAnalitica['filtros']['desde']; ?>';
+        const fechaHasta = '<?php echo $avAnalitica['filtros']['hasta']; ?>';
 
-        // Router Auxiliar
-        function fetchAnalytics(action, callback) {
-            const params = new URLSearchParams({ menu: 'Analitica', ajax: action, ...searchParams });
-            fetch('index.php?' + params.toString(), {
-                headers: { 'X-Requested-With': 'XMLHttpRequest' }
-            })
-                .then(r => {
-                    if (!r.ok) return r.json().then(err => Promise.reject(err.message || 'Error ' + r.status));
-                    return r.json();
-                })
-                .then(callback)
-                .catch(err => {
-                    console.error(`Error loading ${action}:`, err);
-                    showErrorInContainer(action, err);
-                });
-        }
+        // Una sola petición AJAX con timeout de 90 segundos
+        const controller = new AbortController();
+        const timeoutId  = setTimeout(() => controller.abort(), 90000);
 
-
-        // --- Cargas Paralelas ---
-        
-        // Ejecutar al inicio
-    checkDatabaseHealth();
-
-    // 2. KPIs e IVA
-        fetchAnalytics('loadKPIs', (data) => {
-            updateKPI('kpiSales', data.total_ventas, '€');
-            updateKPI('kpiProfit', data.beneficio_estimado, '€', true);
-            updateKPI('kpiOps', data.total_operaciones, '');
-            updateKPI('kpiAverage', data.ticket_medio, '€');
+        const params = new URLSearchParams({
+            menu: 'Analitica',
+            ajax: 'loadAll',
+            fechaDesde,
+            fechaHasta
         });
 
-        // 2. Charts (Top y Categorias)
-        fetchAnalytics('loadCharts', (data) => {
-            renderTopProductsTable(data.topProductos);
-            renderCategoryChart(data.categorias);
-            renderEvolutionChart(data.evolucion, data.agrupacion);
-        });
+        fetch('index.php?' + params.toString(), {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            signal: controller.signal
+        })
+        .then(r => {
+            clearTimeout(timeoutId);
+            if (!r.ok) return r.json().then(err => Promise.reject(err.message || 'HTTP ' + r.status));
+            return r.json();
+        })
+        .then(data => {
+            if (data.error) throw new Error(data.message || 'Error del servidor');
 
-        // 3. IVA
-        fetchAnalytics('loadIVA', data => {
-            renderIVATable(data);
+            const kpis = data.kpis || {};
+            updateKPI('kpiSales',   kpis.total_ventas,       '€');
+            updateKPI('kpiProfit',  kpis.beneficio_estimado, '€', true);
+            updateKPI('kpiOps',     kpis.total_operaciones,  '');
+            updateKPI('kpiAverage', kpis.ticket_medio,       '€');
+
+            renderTopProductsTable(data.topProductos  || []);
+            renderCategoryChart(data.categorias        || []);
+            renderEvolutionChart(data.evolucion        || [], data.agrupacion || 'dia');
+            renderIVATable(data.iva                    || []);
+        })
+        .catch(err => {
+            clearTimeout(timeoutId);
+            const msg = err.name === 'AbortError' ? 'Tiempo de espera agotado (90s)' : String(err);
+            console.error('Error loadAll:', msg);
+            ['val_kpiSales','val_kpiProfit','val_kpiOps','val_kpiAverage',
+             'topProductsTableContainer','catChartContainer','evolutionChartContainer','ivaTableContainer'
+            ].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.innerHTML = `<div class="fs-12 text-red p-12"><i class="fa-solid fa-triangle-exclamation mr-4"></i> ${escapeHTML(msg)}</div>`;
+            });
         });
 
         // Helpers
@@ -438,20 +363,6 @@
             const p = document.createElement('p');
             p.textContent = str;
             return p.innerHTML;
-        }
-
-        function showErrorInContainer(action, errorMsg) {
-            const mappings = {
-                'loadKPIs': ['val_kpiSales', 'val_kpiProfit', 'val_kpiOps', 'val_kpiAverage'],
-                'loadCharts': ['topProductsTableContainer', 'catChartContainer', 'evolutionChartContainer'],
-                'loadIVA': ['ivaTableContainer']
-            };
-            
-            const targets = mappings[action] || [];
-            targets.forEach(id => {
-                const el = document.getElementById(id);
-                if (el) el.innerHTML = `<div class="fs-12 text-red py-10" title="${escapeHTML(errorMsg)}"><i class="fa-solid fa-triangle-exclamation mr-4"></i> Error</div>`;
-            });
         }
 
         // Toggle fechas
