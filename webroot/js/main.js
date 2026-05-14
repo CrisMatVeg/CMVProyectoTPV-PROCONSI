@@ -69,112 +69,6 @@ let ULTIMOS_CLIENTES_BUSCADOS = [];
   };
 })();
 
-// ── Motor de Precios Dinámicos ────────────────────────────────────────────────
-function getEffectivePrice(p, socio = null) {
-  let finalPrice = parseFloat(p.price);
-  const ahora = new Date();
-  const horaActual =
-    ahora.getHours().toString().padStart(2, "0") +
-    ":" +
-    ahora.getMinutes().toString().padStart(2, "0") +
-    ":" +
-    ahora.getSeconds().toString().padStart(2, "0");
-
-  // Filtrar tarifas validas
-  const activas = TARIFAS.filter((t) => {
-    // 0. Programación Temporal Avanzada
-    const fechaActual = ahora.toISOString().split("T")[0];
-    const diaActual = ahora.getDay(); // 0 (Dom) - 6 (Sáb)
-
-    // Check Start Date
-    if (t.fecha_aplicacion && fechaActual < t.fecha_aplicacion) return false;
-    // Check End Date
-    if (t.fecha_fin && fechaActual > t.fecha_fin) return false;
-    // Check Days of Week
-    if (t.dias_semana) {
-      const diasPermitidos = t.dias_semana.split(",").map(Number);
-      if (!diasPermitidos.includes(diaActual)) return false;
-    }
-
-    // 1. Scope de producto
-    if (t.scope === "categoria" && p.cat !== t.categoria) return false;
-    if (t.scope === "productos") {
-      try {
-        const ids = JSON.parse(t.producto_ids) || [];
-        if (!ids.includes(parseInt(p.id))) return false;
-      } catch (e) {
-        return false;
-      }
-    }
-
-    // 2. Horario
-    if (t.hora_inicio && horaActual < t.hora_inicio) return false;
-    if (t.hora_fin && horaActual > t.hora_fin) return false;
-
-    // 3. Segmentación Cliente
-    if (t.es_solo_socios && (!socio || parseInt(socio.es_socio) !== 1))
-      return false;
-
-    // 3.1. Cliente Específico (id_cliente o cliente_ids)
-    let isSpecificMatch = false;
-    if (t.id_cliente && socio && parseInt(socio.id) === parseInt(t.id_cliente)) {
-      isSpecificMatch = true;
-    }
-    if (!isSpecificMatch && t.cliente_ids && socio) {
-      try {
-        const ids = JSON.parse(t.cliente_ids);
-        if (Array.isArray(ids) && ids.includes(parseInt(socio.id))) {
-          isSpecificMatch = true;
-        }
-      } catch (e) {}
-    }
-
-    // Si la tarifa especifica clientes y este no lo es, fuera.
-    if ((t.id_cliente || t.cliente_ids) && !isSpecificMatch) return false;
-
-    // 3.2. Roles / Segmentos (Solo si no es match específico)
-    if (!isSpecificMatch) {
-      const rolCliente = socio && socio.rol ? socio.rol.toLowerCase() : "general";
-
-      // Comprobar roles_segmento (nuevo formato)
-      if (t.roles_segmento) {
-        const segmentos = t.roles_segmento
-          .toLowerCase()
-          .split(",")
-          .map((s) => s.trim());
-        if (!segmentos.includes(rolCliente)) return false;
-      }
-      // Comprobar tipo_cliente (legacy)
-      else if (t.tipo_cliente && t.tipo_cliente !== "todos") {
-        const tipoReq = t.tipo_cliente.toLowerCase();
-        if (tipoReq === "mayorista") {
-          if (rolCliente !== "mayorista" && (!socio || parseInt(socio.es_mayorista) !== 1)) return false;
-        } else if (tipoReq !== rolCliente) {
-          return false;
-        }
-      }
-    }
-
-    return true;
-  });
-
-  // Aplicar por prioridad
-  activas.sort((a, b) => b.prioridad - a.prioridad);
-
-  activas.forEach((t) => {
-    const val = parseFloat(t.valor);
-    let variation = 0;
-    if (t.tipo === "percent") {
-      variation = Math.round(finalPrice * (val / 100) * 100) / 100;
-    } else {
-      variation = val;
-    }
-    finalPrice += variation;
-  });
-
-  return Math.max(0, finalPrice);
-}
-
 // ── Estado de venta pospuesta ──────────────────────────────────────────────────
 // [MODERN] Postponed sales now handled in AppState/CartManager (localStorage)
 var currentPayments = []; // [NUEVO] Para pagos mixtos
@@ -283,8 +177,9 @@ document.addEventListener("DOMContentLoaded", function () {
   // Atributos filters: Gestionados por app.selectTag() en vInicioPrivado.php
   
   // Bloquear letra 'e', '+', '-' en inputs numéricos (solicitud usuario)
+  // Excepción: ajusteValorInput admite negativos para reducir precios
   document.addEventListener("keydown", function(e) {
-      if (e.target.tagName === "INPUT" && e.target.type === "number") {
+      if (e.target.tagName === "INPUT" && e.target.type === "number" && e.target.id !== "ajusteValorInput") {
           if (["e", "E", "+", "-"].includes(e.key)) {
               e.preventDefault();
           }
@@ -724,7 +619,12 @@ async function buscarSocio() {
     const r = await resp.json();
     if (r.ok) {
       socioActual = r.cliente;
-      info.innerHTML = `<i class="fa-solid fa-check-circle text-green"></i> ${r.cliente.nombre} (${r.cliente.nif})`;
+      // Construcción DOM segura: nombre y NIF son datos de usuario (anti-XSS)
+      info.innerHTML = '';
+      const iconSocio = document.createElement('i');
+      iconSocio.className = 'fa-solid fa-check-circle text-green';
+      info.appendChild(iconSocio);
+      info.appendChild(document.createTextNode(` ${r.cliente.nombre} (${r.cliente.nif})`));
       showToast(I18N.socioFound);
       cargarValesCliente(r.cliente.id);
       mostrarPuntosCliente(r.cliente);

@@ -4,6 +4,15 @@
  * Procesa la subsanación de un registro VeriFactu erróneo.
  */
 
+require_once __DIR__ . '/csrf_check.php';
+require_once __DIR__ . '/../model/Usuario.php';
+
+if (!isset($_SESSION['usuarioActualTPV'])) {
+    http_response_code(401);
+    echo json_encode(['ok' => false, 'msg' => 'No autorizado']);
+    exit;
+}
+
 header('Content-Type: application/json');
 require_once __DIR__ . '/../config/confDBPDO.php';
 require_once __DIR__ . '/../model/DBPDO.php';
@@ -30,9 +39,6 @@ if ($esFactura && ($nombre === '' || $nif === '')) {
 }
 
 try {
-    $idVenta = (int)$data['idVenta'];
-    $nombre = trim($data['nombre']);
-    $nif = trim($data['nif']);
     $rechazo = ($data['rechazoPrevio'] ?? 'N') === 'S';
 
     // subsanarVenta encola el registro y desbloquea los posteriores internamente
@@ -43,8 +49,9 @@ try {
     $qService = new AeatQueueService();
     $qService->procesarCola(true, 5);
 
-    echo json_encode(['ok' => true, 'msg' => 'Subsanación procesada y enviada a la AEAT.']);
+    echo json_encode(['ok' => true, 'mensaje' => 'Subsanación procesada y enviada a la AEAT.']);
 
 } catch (Exception $e) {
-    echo json_encode(['ok' => false, 'msg' => 'Error técnico: ' . $e->getMessage()]);
+    error_log('verifactuSubsanar: ' . $e->getMessage());
+    echo json_encode(['ok' => false, 'error' => 'Error al procesar la subsanación.']);
 }

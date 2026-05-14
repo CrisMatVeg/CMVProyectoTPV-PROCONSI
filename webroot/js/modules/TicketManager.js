@@ -222,10 +222,19 @@ export const TicketManager = {
         if (el_tkCommentsSection && el_tkCommentsText) {
             if (v.comentarios && v.comentarios.trim() !== "") {
                 el_tkCommentsSection.classList.remove("d-none");
-                el_tkCommentsText.innerHTML = `<strong>Observaciones:</strong><br>${v.comentarios.replace(/\n/g, '<br>')}`;
+                // Construcción DOM segura: evita XSS con datos de usuario
+                el_tkCommentsText.innerHTML = '';
+                const strong = document.createElement('strong');
+                strong.textContent = 'Observaciones:';
+                el_tkCommentsText.appendChild(strong);
+                el_tkCommentsText.appendChild(document.createElement('br'));
+                v.comentarios.split('\n').forEach((linea, i, arr) => {
+                    el_tkCommentsText.appendChild(document.createTextNode(linea));
+                    if (i < arr.length - 1) el_tkCommentsText.appendChild(document.createElement('br'));
+                });
             } else {
                 el_tkCommentsSection.classList.add("d-none");
-                el_tkCommentsText.innerHTML = "";
+                el_tkCommentsText.innerHTML = '';
             }
         }
 

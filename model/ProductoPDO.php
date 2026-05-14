@@ -85,6 +85,12 @@ class ProductoPDO
         ];
         $orderBy = $allowedSorts[$sortBy] ?? 'p.id DESC';
 
+        // LIMIT y OFFSET se insertan como enteros casteados (PDO no admite parámetros en LIMIT/OFFSET)
+        $limitInt  = (int)$limit;
+        $offsetInt = (int)$offset;
+        // La fecha se pasa como parámetro nombrado para evitar interpolación directa en SQL
+        $params[':hoy'] = $hoy;
+
         $sql = "SELECT p.id, p.referencia, p.nombre, p.descripcion, p.precio_coste, p.precio_venta,
                        p.stock_actual, p.stock_minimo, p.meses_garantia, p.icono, p.categoria,
                        p.atributos, p.activo, p.codigo_iva, p.es_pack, p.id_proveedor, p.margen, p.precio_proveedor, p.mantener_precision,
@@ -94,8 +100,8 @@ class ProductoPDO
                     SELECT id FROM tipos_iva t2
                     WHERE t2.codigo = p.codigo_iva
                       AND t2.activo = 1
-                      AND t2.fecha_inicio <= '$hoy'
-                      AND (t2.fecha_fin IS NULL OR t2.fecha_fin >= '$hoy')
+                      AND t2.fecha_inicio <= :hoy
+                      AND (t2.fecha_fin IS NULL OR t2.fecha_fin >= :hoy)
                     ORDER BY t2.fecha_inicio DESC
                     LIMIT 1
                 )
@@ -103,9 +109,8 @@ class ProductoPDO
                 $where
                 GROUP BY p.id
                 ORDER BY {$orderBy}
-                LIMIT :limit OFFSET :offset";
-        
-        $sql = str_replace([':limit', ':offset'], [(int)$limit, (int)$offset], $sql);
+                LIMIT {$limitInt} OFFSET {$offsetInt}";
+
         $consulta = DBPDO::ejecutarConsulta($sql, $params);
 
         $productos = [];
@@ -286,7 +291,7 @@ class ProductoPDO
     /**
      * Añade un nuevo producto a la base de datos.
      */
-    public static function añadirProducto(array $datos): array
+    public static function agregarProducto(array $datos): array
     {
         $iconoDato = $datos['icono'] ?? '';
         if (strpos($iconoDato, 'data:image') === 0) {
@@ -922,6 +927,7 @@ class ProductoPDO
             }
 
             if ($pvpNuevo === $pvpActual) continue;
+            if ($pvpNuevo <= 0) continue; // no dejar precio en 0 o negativo
 
             // Recalcular el nuevo margen si el coste es mayor a 0
             // Margen = (PVP_sin_IVA / coste - 1) × 100

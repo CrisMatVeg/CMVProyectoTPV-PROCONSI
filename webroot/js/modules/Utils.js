@@ -4,8 +4,25 @@
  */
 
 /**
- * Show a toast notification
- * @param {string} msg - The message to display (supports HTML)
+ * Escapa caracteres HTML para prevenir XSS al insertar texto de usuario en innerHTML.
+ * @param {string} str
+ * @returns {string}
+ */
+export function escapeHtml(str) {
+    if (str == null) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+/**
+ * Show a toast notification.
+ * msg puede contener HTML de confianza (iconos, negritas).
+ * Para datos de usuario usar escapeHtml() antes de concatenar.
+ * @param {string} msg
  * @param {string} type - 'success', 'error', 'info', etc.
  */
 export function showToast(msg, type = "info") {
@@ -79,6 +96,7 @@ export const fmt2 = formatCurrency;
 // Export as a single object for compatibility with legacy imports
 export const Utils = {
     showToast,
+    escapeHtml,
     formatCurrency,
     formatTicketNumber,
     fmt2: formatCurrency

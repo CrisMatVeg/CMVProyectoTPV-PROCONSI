@@ -56,6 +56,7 @@ try {
         $nombre = trim($input['nombre'] ?? '');
         $nif    = trim($input['nif'] ?? '');
         $tipo   = $input['tipo'] ?? 'particular';
+        $rol    = $input['rol'] ?? 'general';
         $aeat_id_type = $input['aeat_id_type'] ?? '01';
         $aeat_codigo_pais = $input['aeat_codigo_pais'] ?? 'ES';
 
@@ -127,9 +128,10 @@ try {
         $qCount = DBPDO::ejecutarConsulta($countSql, $params);
         $total = (int)$qCount->fetchColumn();
 
-        // Obtener datos paginados
-        $dataSql = "SELECT id, tipo, rol, nombre, apellidos, nif, aeat_id_type, aeat_codigo_pais, email, telefono, puntos, fecha_alta " . $baseSql . " ORDER BY id ASC LIMIT :limit OFFSET :offset";
-        $dataSql = str_replace([':limit', ':offset'], [(int)$limit, (int)$offset], $dataSql);
+        // Obtener datos paginados (LIMIT/OFFSET casteados a int, PDO no admite parámetros aquí)
+        $limitInt  = (int)$limit;
+        $offsetInt = (int)$offset;
+        $dataSql = "SELECT id, tipo, rol, nombre, apellidos, nif, aeat_id_type, aeat_codigo_pais, email, telefono, puntos, fecha_alta " . $baseSql . " ORDER BY id ASC LIMIT {$limitInt} OFFSET {$offsetInt}";
 
         $q = DBPDO::ejecutarConsulta($dataSql, $params);
         $lista = $q->fetchAll(PDO::FETCH_ASSOC);

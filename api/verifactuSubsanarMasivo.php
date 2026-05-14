@@ -97,9 +97,10 @@ try {
         'procesados' => $procesados,
         'errores' => $errores,
         'detalles_errores' => $detalles,
-        'msg' => "Se han preparado $procesados incidencias para su envío."
+        'mensaje' => "Se han preparado $procesados incidencias para su envío."
     ]);
 
 } catch (Exception $e) {
-    echo json_encode(['ok' => false, 'msg' => 'Error crítico: ' . $e->getMessage()]);
+    error_log('verifactuSubsanarMasivo: ' . $e->getMessage());
+    echo json_encode(['ok' => false, 'error' => 'Error crítico al procesar la subsanación masiva.']);
 }
