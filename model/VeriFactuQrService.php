@@ -24,7 +24,11 @@ class VeriFactuQrService
         $fecha = date('d-m-Y', strtotime($venta['fecha']));
         
         // El importe debe tener 2 decimales y "." como separador
-        $valImporte = isset($venta['total_aeat']) ? (float)$venta['total_aeat'] : (float)$venta['total'];
+        // total_aeat puede existir como columna con valor 0 (ventas normales no la rellenan),
+        // por eso no basta con isset(): solo usarla si es distinto de 0
+        $valImporte = ((float)($venta['total_aeat'] ?? 0) !== 0.0)
+            ? (float)$venta['total_aeat']
+            : (float)$venta['total'];
         $importe = number_format($valImporte, 2, '.', '');
         
         // Separamos el formato T-DDMMYYYY-NNNN en serie (T-DDMMYYYY) y número (NNNN)

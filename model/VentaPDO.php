@@ -42,7 +42,7 @@ class VentaPDO
      * Formatea el número de ticket/factura/abono según las reglas de negocio.
      * Ejemplo: T-2532026-1234 / F-2532026-1234 / A-2532026-1234
      */
-    public static function formatTicketNumber($numero, $fecha, $esFactura, string $tipoDocumento = 'venta'): string
+    public static function formatTicketNumber($numero, $fecha, $esFactura, ?string $tipoDocumento = 'venta'): string
     {
         if ($tipoDocumento === 'abono') {
             $prefix = 'A';
@@ -204,13 +204,13 @@ class VentaPDO
 
         $descuentoLabel = isset($datos['descuentoLabel']) ? mb_substr(trim($datos['descuentoLabel']), 0, 100) : null;
 
-        $sqlVenta = "INSERT INTO ventas 
+        $sqlVenta = "INSERT INTO ventas
          (numero_ticket, fecha, id_usuario, id_cliente, tipo_cliente, nombre_cliente, nif_cliente, aeat_id_type, aeat_codigo_pais, metodo_pago,
-          subtotal, descuento_pct, descuento_amt, descuento_label, base_imponible, iva_amt, total, efectivo_recibido,
+          subtotal, descuento_pct, descuento_amt, descuento_label, base_imponible, iva_amt, total, total_aeat, efectivo_recibido,
           estado, pagado_a_cuenta, fecha_limite_pago, es_factura, comentarios, id_turno,
           puntos_ganados, puntos_canjeados, puntos_descuento_amt)
         VALUES (:ticket, NOW(), :usuario, :cliente, :tipo, :nombre, :nif, :aeatIdType, :aeatCodigoPais, :metodo,
-          :subtotal, :descPct, :descAmt, :descLabel, :base, :ivaAmt, :total, :efectivo,
+          :subtotal, :descPct, :descAmt, :descLabel, :base, :ivaAmt, :total, :totalAeat, :efectivo,
           :estado, :pagadoACuenta, :fechaLimite, :esFactura, :comentarios, :idTurno,
           :puntosGanados, :puntosCanjeados, :puntosDescuentoAmt)";
 
@@ -231,6 +231,7 @@ class VentaPDO
             ':base'          => $base,
             ':ivaAmt'        => $ivaAmt,
             ':total'         => $total,
+            ':totalAeat'     => $total,
             ':efectivo'      => $efectivoRecibido,
             ':estado'        => $estado,
             ':pagadoACuenta' => $pagadoACuenta,
@@ -473,7 +474,6 @@ class VentaPDO
 
             $db->commit();
 
-            // Intento de envío — Respeta el Natural Batching (60s)
             try {
                 require_once __DIR__ . '/AeatQueueService.php';
                 (new AeatQueueService())->procesarCola();
@@ -888,8 +888,8 @@ class VentaPDO
                 $db
             );
 
-            $stmtLog = $db->prepare("INSERT INTO verifactu_logs (id_venta, tipo_registro, numero_serie, xml_path, hash_anterior, hash_actual, estado)
-                                     VALUES (:id, :tipo, :serie, :path, :ant, :act, 'pendiente')");
+            $stmtLog = $db->prepare("INSERT INTO verifactu_logs (id_venta, tipo_registro, numero_serie, xml_path, hash_anterior, hash_actual, estado, fecha_registro)
+                                     VALUES (:id, :tipo, :serie, :path, :ant, :act, 'pendiente', NOW())");
             $stmtLog->execute([
                 ':id'    => $idVenta,
                 ':tipo'  => ($esRechazo ? 'AltaPorRechazo' : 'AltaPorSubsanacion'),
@@ -912,6 +912,12 @@ class VentaPDO
 
             // Tras subsanar el registro bloqueante, regenerar y encolar los bloqueados posteriores
             $queueSvc->desbloquearRegistrosSiguientes($idVenta);
+
+            try {
+                $queueSvc->procesarCola();
+            } catch (\Exception $eVf) {
+                error_log("Error al disparar cola VeriFactu (Subsanación): " . $eVf->getMessage());
+            }
 
             return true;
         } catch (Exception $e) {
@@ -1122,54 +1128,50 @@ class VentaPDO
         $desdeFull = $desde . ' 00:00:00';
         $hastaFull = $hasta . ' 23:59:59';
 
-        $params = [
-            ':desde'     => $desdeFull,
-            ':hasta'     => $hastaFull
-        ];
-
-        $sql = "SELECT 
-                    COUNT(v.id) as total_operaciones,
-                    COALESCE(SUM(v.total), 0) as total_ventas,
-                    COALESCE(SUM(v.base_imponible), 0) as total_base,
-                    COALESCE(SUM(sub.margen_v), 0) as beneficio_estimado,
-                    COALESCE(SUM(v.total) / NULLIF(COUNT(v.id), 0), 0) as ticket_medio
-                FROM ventas v
-                LEFT JOIN (
-                    SELECT lv_sub.id_venta, SUM((lv_sub.precio_unitario - lv_sub.precio_coste_unitario) * lv_sub.cantidad) as margen_v
-                    FROM lineas_venta lv_sub
-                    INNER JOIN ventas v_sub ON lv_sub.id_venta = v_sub.id
-                    WHERE lv_sub.devuelta = 0 
-                      AND v_sub.fecha >= :desde AND v_sub.fecha <= :hasta
-                    GROUP BY lv_sub.id_venta
-                ) AS sub ON v.id = sub.id_venta
-                WHERE v.estado = 'completada' 
-                  AND v.metodo_pago IN ('efectivo', 'tarjeta', 'bizum', 'a_cuenta', 'mixto') ";
-
+        $filtroExtra = '';
+        $params = [':desde' => $desdeFull, ':hasta' => $hastaFull];
         if ($idUsuario) {
-            $sql .= " AND v.id_usuario = :idUsuario";
+            $filtroExtra .= ' AND v.id_usuario = :idUsuario';
             $params[':idUsuario'] = $idUsuario;
         }
         if ($tipoDocumento === 'venta' || $tipoDocumento === 'abono') {
-            $sql .= " AND v.tipo_documento = :tipoDoc";
+            $filtroExtra .= ' AND v.tipo_documento = :tipoDoc';
             $params[':tipoDoc'] = $tipoDocumento;
         }
 
-        $sql .= " AND v.fecha >= :desde AND v.fecha <= :hasta";
+        // Query 1: totales desde ventas (sin JOIN a lineas_venta)
+        $sqlV = "SELECT
+                    COUNT(id) as total_operaciones,
+                    COALESCE(SUM(total), 0) as total_ventas,
+                    COALESCE(SUM(base_imponible), 0) as total_base
+                FROM ventas v
+                WHERE v.estado = 'completada'
+                  AND v.metodo_pago IN ('efectivo','tarjeta','bizum','a_cuenta','mixto')
+                  AND v.fecha >= :desde AND v.fecha <= :hasta
+                  $filtroExtra";
+        $row = DBPDO::ejecutarConsulta($sqlV, $params)->fetch(PDO::FETCH_ASSOC);
 
-        $q = DBPDO::ejecutarConsulta($sql, $params);
-        $result = $q->fetch(PDO::FETCH_ASSOC);
+        // Query 2: margen desde lineas_venta (JOIN simple, sin subquery correlacionado)
+        $sqlM = "SELECT COALESCE(SUM((lv.precio_unitario - lv.precio_coste_unitario) * lv.cantidad), 0) as margen
+                 FROM lineas_venta lv
+                 JOIN ventas v ON lv.id_venta = v.id
+                 WHERE v.estado = 'completada'
+                   AND v.metodo_pago != 'financiado'
+                   AND lv.devuelta = 0
+                   AND v.fecha >= :desde AND v.fecha <= :hasta
+                   $filtroExtra";
+        $margen = (float)DBPDO::ejecutarConsulta($sqlM, $params)->fetchColumn();
 
-        if (!$result) {
-            return [
-                'total_operaciones' => 0,
-                'total_ventas' => 0,
-                'total_base' => 0,
-                'beneficio_estimado' => 0,
-                'ticket_medio' => 0
-            ];
-        }
+        $ops    = (int)($row['total_operaciones'] ?? 0);
+        $ventas = (float)($row['total_ventas'] ?? 0);
 
-        return $result;
+        return [
+            'total_operaciones'  => $ops,
+            'total_ventas'       => $ventas,
+            'total_base'         => (float)($row['total_base'] ?? 0),
+            'beneficio_estimado' => $margen,
+            'ticket_medio'       => $ops > 0 ? round($ventas / $ops, 2) : 0,
+        ];
     }
 
     /**
@@ -1779,12 +1781,11 @@ class VentaPDO
 
             $db->commit();
 
-            // [NUEVO] Envío VeriFactu FUERA de la transacción para evitar conflictos
             try {
                 require_once __DIR__ . '/AeatQueueService.php';
-                (new AeatQueueService())->procesarCola(); 
+                (new AeatQueueService())->procesarCola();
             } catch (\Exception $eVf) {
-                error_log("Error en envío inmediato VeriFactu (Abono): " . $eVf->getMessage());
+                error_log("Error al disparar cola VeriFactu (Abono): " . $eVf->getMessage());
             }
 
             return $numTicket;
@@ -1823,6 +1824,228 @@ class VentaPDO
     public static function optimizarIndices(): bool
     {
         return true;
+    }
+
+    /**
+     * Crea índices si no existen y actualiza estadísticas del optimizador.
+     * Idempotente: ignora "Duplicate key name" (error 1061).
+     * El índice cubriente idx_lv_analytics evita random I/O en lineas_venta con 2M+ filas.
+     */
+    public static function asegurarIndices(): void
+    {
+        // Consultar qué índices ya existen (1 query rápida vs 4 ALTER TABLE fallidos)
+        $existing = [];
+        try {
+            $rows = DBPDO::ejecutarConsulta("
+                SELECT TABLE_NAME, INDEX_NAME
+                FROM INFORMATION_SCHEMA.STATISTICS
+                WHERE TABLE_SCHEMA = DATABASE()
+                  AND TABLE_NAME   IN ('ventas','productos','lineas_venta')
+                  AND INDEX_NAME   IN ('idx_ventas_fecha','idx_ventas_perf','idx_prod_cat_ref','idx_lv_analytics')
+                GROUP BY TABLE_NAME, INDEX_NAME
+            ")->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($rows as $r) $existing[$r['TABLE_NAME']][$r['INDEX_NAME']] = true;
+        } catch (\Exception $e) {}
+
+        $sqls = [
+            ['ventas',        'idx_ventas_fecha',  "ALTER TABLE ventas ADD INDEX idx_ventas_fecha (fecha)"],
+            ['ventas',        'idx_ventas_perf',   "ALTER TABLE ventas ADD INDEX idx_ventas_perf (estado, metodo_pago, fecha)"],
+            ['productos',     'idx_prod_cat_ref',  "ALTER TABLE productos ADD INDEX idx_prod_cat_ref (categoria, referencia)"],
+            ['lineas_venta',  'idx_lv_analytics',  "ALTER TABLE lineas_venta ADD INDEX idx_lv_analytics (id_venta, devuelta, id_producto, iva_aplicado, total_linea, precio_coste_unitario, cantidad)"],
+        ];
+
+        $nuevoIndice = false;
+        foreach ($sqls as [$tabla, $indice, $sql]) {
+            if (isset($existing[$tabla][$indice])) continue;
+            try { DBPDO::ejecutarConsulta($sql); $nuevoIndice = true; } catch (\Exception $e) {}
+        }
+        if ($nuevoIndice) {
+            try { DBPDO::ejecutarConsulta("ANALYZE TABLE ventas, lineas_venta, productos"); } catch (\Exception $e) {}
+        }
+    }
+
+    /**
+     * Fuerza ANALYZE TABLE independientemente de si los índices ya existen.
+     * Llamar después de inserciones masivas para corregir estadísticas del optimizador.
+     */
+    public static function actualizarEstadisticas(): void
+    {
+        try {
+            DBPDO::ejecutarConsulta("ANALYZE TABLE ventas, lineas_venta, productos");
+        } catch (\Exception $e) {}
+    }
+
+    /**
+     * Retorna todos los datos de analítica en 6 queries simples:
+     * - Cada GROUP BY usa solo enteros/fechas (sin VARCHAR) → sort buffer mínimo
+     * - El índice cubriente idx_lv_analytics evita random I/O en filas reales
+     * - Las queries de categorías, IVA y top-productos retornan pocas filas
+     *   (a diferencia de una mega query que podía retornar millones de filas a PHP)
+     */
+    public static function obtenerTodoAnalitica(
+        string $desde,
+        string $hasta,
+        ?int   $idUsuario,
+        string $tipoDocumento,
+        string $agrupacion
+    ): array {
+        $desdeFull = $desde . ' 00:00:00';
+        $hastaFull = $hasta . ' 23:59:59';
+
+        $filtroExtra = '';
+        $params = [':desde' => $desdeFull, ':hasta' => $hastaFull];
+        if ($idUsuario) {
+            $filtroExtra .= ' AND v.id_usuario = :idUsuario';
+            $params[':idUsuario'] = $idUsuario;
+        }
+        if ($tipoDocumento === 'venta' || $tipoDocumento === 'abono') {
+            $filtroExtra .= ' AND v.tipo_documento = :tipoDoc';
+            $params[':tipoDoc'] = $tipoDocumento;
+        }
+
+        // WHERE común para todas las queries sobre lineas_venta JOIN ventas
+        $whereLines = "v.estado = 'completada' AND v.metodo_pago != 'financiado'
+                       AND lv.devuelta = 0
+                       AND v.fecha >= :desde AND v.fecha <= :hasta $filtroExtra";
+
+        // --- Q1: KPIs desde ventas únicamente (sin JOIN) ---
+        $sqlV = "SELECT COUNT(id) AS ops,
+                        COALESCE(SUM(total), 0) AS total_ventas,
+                        COALESCE(SUM(base_imponible), 0) AS total_base
+                 FROM ventas v
+                 WHERE v.estado = 'completada'
+                   AND v.metodo_pago IN ('efectivo','tarjeta','bizum','a_cuenta','mixto')
+                   AND v.fecha >= :desde AND v.fecha <= :hasta
+                   $filtroExtra";
+        $rowV = DBPDO::ejecutarConsulta($sqlV, $params)->fetch(PDO::FETCH_ASSOC);
+        if (!is_array($rowV)) $rowV = ['ops' => 0, 'total_ventas' => 0, 'total_base' => 0];
+
+        // --- Q2: UN SOLO JOIN agrupa por (periodo, producto, iva) ---
+        // Sustituye a las antiguas Q2 evolución + Q3 categorías + Q4 top prods + Q6 IVA:
+        // 4 scans de 2.28M×982K filas → 1 scan. MySQL lee el bloque enorme una sola vez.
+        $selectFecha = match ($agrupacion) {
+            'mes'  => "DATE_FORMAT(v.fecha, '%Y-%m-01')",
+            'año'  => "DATE_FORMAT(v.fecha, '%Y-01-01')",
+            default => "DATE(v.fecha)",
+        };
+        $sqlBase = "SELECT $selectFecha AS periodo,
+                           lv.id_producto,
+                           lv.iva_aplicado,
+                           SUM(lv.cantidad)                              AS unidades,
+                           SUM(lv.total_linea)                           AS ingresos,
+                           SUM(lv.precio_coste_unitario * lv.cantidad)   AS costes
+                    FROM lineas_venta lv
+                    JOIN ventas v ON lv.id_venta = v.id
+                    WHERE $whereLines
+                    GROUP BY 1, lv.id_producto, lv.iva_aplicado
+                    ORDER BY 1 ASC";
+        $baseRows = DBPDO::ejecutarConsulta($sqlBase, $params)->fetchAll(PDO::FETCH_ASSOC);
+
+        // --- Q3: info de todos los productos vendidos (PK lookup, instantáneo) ---
+        $seenPids = [];
+        foreach ($baseRows as $row) {
+            if ($row['id_producto'] !== null) $seenPids[(int)$row['id_producto']] = true;
+        }
+        $productMap = [];
+        if (!empty($seenPids)) {
+            $in   = implode(',', array_keys($seenPids));
+            $rows = DBPDO::ejecutarConsulta(
+                "SELECT id, nombre, referencia, categoria FROM productos WHERE id IN ($in)"
+            )->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($rows as $r) $productMap[(int)$r['id']] = $r;
+        }
+
+        // --- Agregación PHP: evolución, top10, IVA, categorías en un único bucle ---
+        $evolucionMap  = [];
+        $productTotals = [];
+        $ivaTotals     = [];
+        $catTotals     = [];
+
+        foreach ($baseRows as $row) {
+            $periodo  = $row['periodo'];
+            $pid      = $row['id_producto'] !== null ? (int)$row['id_producto'] : 0;
+            $ivaKey   = $row['iva_aplicado'];          // string decimal exacta desde PDO
+            $iva      = (float)$row['iva_aplicado'];
+            $ingresos = (float)$row['ingresos'];
+            $costes   = (float)$row['costes'];
+            $unidades = (float)$row['unidades'];
+
+            // Evolución temporal
+            if (!isset($evolucionMap[$periodo])) {
+                $evolucionMap[$periodo] = ['fecha' => $periodo, 'ingresos' => 0.0, 'costes' => 0.0, 'beneficio' => 0.0];
+            }
+            $evolucionMap[$periodo]['ingresos']  += $ingresos;
+            $evolucionMap[$periodo]['costes']    += $costes;
+            $evolucionMap[$periodo]['beneficio'] += $ingresos - $costes;
+
+            // Top productos
+            if ($pid > 0) {
+                if (!isset($productTotals[$pid])) $productTotals[$pid] = ['unidades' => 0.0, 'total_recaudado' => 0.0];
+                $productTotals[$pid]['unidades']       += $unidades;
+                $productTotals[$pid]['total_recaudado'] += $ingresos;
+            }
+
+            // Desglose IVA
+            if (!isset($ivaTotals[$ivaKey])) $ivaTotals[$ivaKey] = ['porcentaje' => $iva, 'cuota' => 0.0, 'total' => 0.0];
+            $ivaTotals[$ivaKey]['cuota'] += $iva > 0 ? $ingresos * ($iva / (100 + $iva)) : 0.0;
+            $ivaTotals[$ivaKey]['total'] += $ingresos;
+
+            // Categorías (derivadas del productMap, sin JOIN adicional)
+            $cat = ($pid > 0 && isset($productMap[$pid]) && !empty($productMap[$pid]['categoria']))
+                ? $productMap[$pid]['categoria']
+                : 'Sin categoría';
+            if (!isset($catTotals[$cat])) $catTotals[$cat] = 0.0;
+            $catTotals[$cat] += $ingresos;
+        }
+
+        // Evolución: ORDER BY 1 ASC en SQL garantiza orden; array_values preserva orden de inserción
+        $evolucion   = array_values($evolucionMap);
+        $margenTotal = (float)array_sum(array_column($evolucion, 'beneficio'));
+
+        // Categorías: ordenar por total desc
+        arsort($catTotals);
+        $categorias = [];
+        foreach ($catTotals as $cat => $total) $categorias[] = ['categoria' => $cat, 'total' => $total];
+
+        // Top 10 productos: ordenar por unidades desc, luego total_recaudado desc
+        uasort($productTotals, fn($a, $b) => $b['unidades'] != $a['unidades']
+            ? $b['unidades'] <=> $a['unidades']
+            : $b['total_recaudado'] <=> $a['total_recaudado']
+        );
+        $topProductos = [];
+        foreach (array_slice($productTotals, 0, 10, true) as $pid => $totals) {
+            $nombre = isset($productMap[$pid]) ? trim(explode('(', $productMap[$pid]['nombre'])[0]) : 'Producto ID ' . $pid;
+            $codigo = $productMap[$pid]['referencia'] ?? ('REF-' . $pid);
+            $topProductos[] = [
+                'id_producto'            => $pid,
+                'nombre_producto_limpio' => $nombre,
+                'codigo_producto'        => $codigo,
+                'unidades'               => $totals['unidades'],
+                'total_recaudado'        => $totals['total_recaudado'],
+            ];
+        }
+
+        // IVA: ordenar por porcentaje desc
+        krsort($ivaTotals);
+        $iva = array_values($ivaTotals);
+
+        $ops       = (int)($rowV['ops'] ?? 0);
+        $totalVtas = (float)($rowV['total_ventas'] ?? 0);
+
+        return [
+            'kpis' => [
+                'total_operaciones'  => $ops,
+                'total_ventas'       => $totalVtas,
+                'total_base'         => (float)($rowV['total_base'] ?? 0),
+                'beneficio_estimado' => round($margenTotal, 2),
+                'ticket_medio'       => $ops > 0 ? round($totalVtas / $ops, 2) : 0.0,
+            ],
+            'evolucion'    => $evolucion,
+            'categorias'   => $categorias,
+            'topProductos' => $topProductos,
+            'iva'          => $iva,
+            'agrupacion'   => $agrupacion,
+        ];
     }
 
     /**
@@ -2004,8 +2227,8 @@ class VentaPDO
 
         // [NUEVO] Registrar en verifactu_logs para mantener la cadena única
         if ($resultadoXML['ok']) {
-            $stmtLog = $db->prepare("INSERT INTO verifactu_logs (id_venta, tipo_registro, numero_serie, xml_path, hash_anterior, hash_actual, estado)
-                                     VALUES (:id, 'Alta', :serie, :path, :ant, :act, 'pendiente')");
+            $stmtLog = $db->prepare("INSERT INTO verifactu_logs (id_venta, tipo_registro, numero_serie, xml_path, hash_anterior, hash_actual, estado, fecha_registro)
+                                     VALUES (:id, 'Alta', :serie, :path, :ant, :act, 'pendiente', NOW())");
             $stmtLog->execute([
                 ':id'    => $idVenta,
                 ':serie' => $numeroSerie,
@@ -2106,15 +2329,17 @@ class VentaPDO
         $whereVenta = $relativeToId ? "AND id < " . (int)$relativeToId : "";
 
         // 1. Intentamos obtener el registro más reciente de los logs (excluyendo rechazos críticos)
-        $sqlLogs = "SELECT numero_serie as serie, DATE_FORMAT(fecha_registro, '%d-%m-%Y') as fecha, hash_actual as hash 
-                    FROM verifactu_logs 
-                    WHERE estado IN ('pendiente', 'enviado', 'subsanacion_pendiente')
+        // Se hace JOIN con ventas para obtener la fecha real de expedición (fecha_registro puede ser NULL)
+        $sqlLogs = "SELECT l.numero_serie as serie, DATE_FORMAT(v.fecha, '%d-%m-%Y') as fecha, l.hash_actual as hash
+                    FROM verifactu_logs l
+                    JOIN ventas v ON l.id_venta = v.id
+                    WHERE l.estado IN ('pendiente', 'enviado', 'subsanacion_pendiente')
                     $whereLog
-                    ORDER BY id DESC LIMIT 1 FOR UPDATE";
+                    ORDER BY l.id DESC LIMIT 1 FOR UPDATE";
         $stmtLogs = $db->query($sqlLogs);
         $resLogs = $stmtLogs->fetch(PDO::FETCH_ASSOC);
 
-        if ($resLogs) return $resLogs;
+        if ($resLogs && !empty($resLogs['fecha'])) return $resLogs;
 
         // 2. Fallback a la tabla de ventas (excluyendo rechazos críticos)
         $sqlVentas = "SELECT numero_ticket, fecha, es_factura, hash_actual 
@@ -2195,8 +2420,8 @@ class VentaPDO
         $res = $vfs->procesarAnulacion($datos);
         
         if ($res['ok']) {
-            $stmtLog = $db->prepare("INSERT INTO verifactu_logs (id_venta, tipo_registro, numero_serie, xml_path, hash_anterior, hash_actual, estado)
-                                     VALUES (:id, 'Anulacion', :serie, :path, :ant, :act, 'pendiente')");
+            $stmtLog = $db->prepare("INSERT INTO verifactu_logs (id_venta, tipo_registro, numero_serie, xml_path, hash_anterior, hash_actual, estado, fecha_registro)
+                                     VALUES (:id, 'Anulacion', :serie, :path, :ant, :act, 'pendiente', NOW())");
             $stmtLog->execute([
                 ':id'    => $idVenta,
                 ':serie' => $numFormated,
@@ -2309,12 +2534,11 @@ class VentaPDO
 
             $db->commit();
 
-            // 6. Procesar cola VeriFactu de forma inmediata (fuera de transacción)
             try {
                 require_once __DIR__ . '/AeatQueueService.php';
-                (new AeatQueueService())->procesarCola(); 
+                (new AeatQueueService())->procesarCola();
             } catch (\Exception $eVf) {
-                error_log("Error en envío inmediato VeriFactu (Anulación): " . $eVf->getMessage());
+                error_log("Error al disparar cola VeriFactu (Anulación): " . $eVf->getMessage());
             }
 
             return true;
