@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 $translations = [
     'menu_inicio' => 'ホーム',
     'menu_tpv' => 'POSシステム',
@@ -599,6 +599,8 @@ $translations = [
     'purchase_label_mark_paid' => '支払い済みとしてマーク',
     'purchase_btn_pay' => '請求書を支払う',
     'purchase_js_pay_confirm' => 'この請求書の支払いをどのように登録しますか？',
+    'purchase_js_insufficient_cash' => 'レジに現金が不足しています。',
+    'tpv_cash_in_drawer' => 'レジ内の現金残高',
     'purchase_modal_details_title' => '詳細',
     'purchase_no_pending_alb' => 'この仕入先の未処理の納品書はありません',
     'purchase_js_change_prov_title' => '仕入先の変更',
@@ -732,6 +734,10 @@ $translations = [
     'log_action_movimiento_dinero' => '現金の入出金',
     'log_action_apertura_caja' => 'レジ開設',
     'log_action_cierre_caja' => 'レジ閉鎖',
+    'log_action_vf_envio_exito' => 'VeriFactu: Accepted Submission',
+    'log_action_vf_envio_error' => 'VeriFactu: AEAT Rejection',
+    'log_action_vf_envio_reintento' => 'VeriFactu: Connection Error',
+    'log_action_vf_subsanacion' => 'VeriFactu: Correction Submitted',
     'log_action_crear_producto' => '製品作成',
     'log_action_editar_producto' => '製品編集',
     'log_action_eliminar_producto' => '製品削除',
@@ -893,6 +899,9 @@ $translations = [
     'history_status_debt' => '未収金',
     'history_status_returned' => '返品済み',
     'history_status_canceled' => '取り消し済み',
+    'history_status_annulled_pill' => '取消済み',
+    'history_status_rectified_pill' => '修正済み',
+    'history_status_abono_pill' => 'クレジット',
     'history_btn_view_ticket' => 'チケット表示',
     'history_btn_view_invoice' => '領収書表示',
     'history_btn_gen_invoice' => '領収書発行',

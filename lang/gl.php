@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 $translations = [
     'menu_inicio' => 'Inicio',
     'menu_tpv' => 'TPV',
@@ -641,6 +641,8 @@ $translations = [
     'purchase_label_mark_paid' => 'Marcar como pagada',
     'purchase_btn_pay' => 'Pagar Factura',
     'purchase_js_pay_confirm' => 'Como desexas rexistrar o pago desta factura?',
+    'purchase_js_insufficient_cash' => 'Efectivo insuficiente na caixa para realizar este pago.',
+    'tpv_cash_in_drawer' => 'Efectivo disponible na caixa',
     'purchase_modal_details_title' => 'Detalles',
     'purchase_no_pending_alb' => 'Non hai albaráns pendentes para este provedor',
     'purchase_js_change_prov_title' => 'Cambiar Provedor',
@@ -780,6 +782,10 @@ $translations = [
     'log_action_movimiento_dinero' => 'Movemento de Efectivo',
     'log_action_apertura_caja' => 'Abertura de Caixa',
     'log_action_cierre_caja' => 'Peche de Caixa',
+    'log_action_vf_envio_exito' => 'VeriFactu: Accepted Submission',
+    'log_action_vf_envio_error' => 'VeriFactu: AEAT Rejection',
+    'log_action_vf_envio_reintento' => 'VeriFactu: Connection Error',
+    'log_action_vf_subsanacion' => 'VeriFactu: Correction Submitted',
     'log_action_crear_producto' => 'Creación de Produto',
     'log_action_editar_producto' => 'Edición de Produto',
     'log_action_eliminar_producto' => 'Eliminar Produto',
@@ -951,6 +957,9 @@ $translations = [
     'history_status_debt' => 'Dybeda',
     'history_status_returned' => 'Venda devoltada',
     'history_status_canceled' => 'Venda anulada',
+    'history_status_annulled_pill' => 'ANULADA',
+    'history_status_rectified_pill' => 'RECTIFICADA',
+    'history_status_abono_pill' => 'ABONO',
     'history_btn_view_ticket' => 'Ver tique',
     'history_btn_view_invoice' => 'Ver factura',
     'history_btn_gen_invoice' => 'Xerar factura',

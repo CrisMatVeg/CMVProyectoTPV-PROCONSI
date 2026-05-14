@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 $translations = [
     'menu_inicio' => 'Inizio',
     'menu_tpv' => 'TPV',
@@ -758,6 +758,10 @@ $translations = [
     'log_action_movimiento_dinero' => 'Movimento Contanti',
     'log_action_apertura_caja' => 'Apertura Cassa',
     'log_action_cierre_caja' => 'Chiusura Cassa',
+    'log_action_vf_envio_exito' => 'VeriFactu: Accepted Submission',
+    'log_action_vf_envio_error' => 'VeriFactu: AEAT Rejection',
+    'log_action_vf_envio_reintento' => 'VeriFactu: Connection Error',
+    'log_action_vf_subsanacion' => 'VeriFactu: Correction Submitted',
     'log_action_crear_producto' => 'Creazione Prodotto',
     'log_action_editar_producto' => 'Modifica Prodotto',
     'log_action_eliminar_producto' => 'Eliminazione Prodotto',
@@ -937,6 +941,9 @@ $translations = [
     'history_status_debt' => 'Debito',
     'history_status_returned' => 'Resa',
     'history_status_canceled' => 'Annullata',
+    'history_status_annulled_pill' => 'ANNULLATA',
+    'history_status_rectified_pill' => 'RETTIFICATA',
+    'history_status_abono_pill' => 'NOTA DI CREDITO',
     'history_btn_view_ticket' => 'Vedi scontrino',
     'history_btn_view_invoice' => 'Vedi fattura',
     'history_btn_gen_invoice' => 'Genera fattura',
@@ -1469,6 +1476,8 @@ $translations = [
     'purchase_label_mark_paid' => 'purchase_label_mark_paid',
     'purchase_btn_pay' => 'purchase_btn_pay',
     'purchase_js_pay_confirm' => 'purchase_js_pay_confirm',
+    'purchase_js_insufficient_cash' => 'purchase_js_insufficient_cash',
+    'tpv_cash_in_drawer' => 'tpv_cash_in_drawer',
     'purchase_status_recibido' => 'purchase_status_recibido',
     'purchase_status_validado' => 'purchase_status_validado',
     'purchase_btn_validate' => 'purchase_btn_validate',

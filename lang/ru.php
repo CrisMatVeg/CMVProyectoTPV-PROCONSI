@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 $translations = [
     'menu_inicio' => 'Главная',
     'menu_tpv' => 'Касса',
@@ -641,6 +641,8 @@ $translations = [
     'purchase_label_mark_paid' => 'Отметить как оплаченный',
     'purchase_btn_pay' => 'Оплатить счет',
     'purchase_js_pay_confirm' => 'Как вы хотите зарегистрировать оплату?',
+    'purchase_js_insufficient_cash' => 'Недостаточно наличных в кассе для выполнения этого платежа.',
+    'tpv_cash_in_drawer' => 'Доступные наличные в кассе',
     'purchase_modal_details_title' => 'Детали',
     'purchase_no_pending_alb' => 'Нет накладных для этого поставщика',
     'purchase_js_change_prov_title' => 'Сменить поставщика',
@@ -780,6 +782,10 @@ $translations = [
     'log_action_movimiento_dinero' => 'Движение наличных',
     'log_action_apertura_caja' => 'Открытие смены',
     'log_action_cierre_caja' => 'Закрытие смены',
+    'log_action_vf_envio_exito' => 'VeriFactu: Accepted Submission',
+    'log_action_vf_envio_error' => 'VeriFactu: AEAT Rejection',
+    'log_action_vf_envio_reintento' => 'VeriFactu: Connection Error',
+    'log_action_vf_subsanacion' => 'VeriFactu: Correction Submitted',
     'log_action_crear_producto' => 'Создание товара',
     'log_action_editar_producto' => 'Изменение товара',
     'log_action_eliminar_producto' => 'Удаление товара',
@@ -951,6 +957,9 @@ $translations = [
     'history_status_debt' => 'Долг',
     'history_status_returned' => 'Возврат',
     'history_status_canceled' => 'Аннулирован',
+    'history_status_annulled_pill' => 'АННУЛИРОВАНО',
+    'history_status_rectified_pill' => 'ИСПРАВЛЕНО',
+    'history_status_abono_pill' => 'КРЕДИТ-НОТА',
     'history_btn_view_ticket' => 'Просмотр чека',
     'history_btn_view_invoice' => 'Просмотр счета',
     'history_btn_gen_invoice' => 'Создать счет',

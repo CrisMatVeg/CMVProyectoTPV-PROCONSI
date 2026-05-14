@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 $translations = [
     'menu_inicio' => 'Hasiera',
     'menu_tpv' => 'TPV',
@@ -643,6 +643,8 @@ $translations = [
     'purchase_label_mark_paid' => 'Markatu ordaindu gisa',
     'purchase_btn_pay' => 'Ordaindu faktura',
     'purchase_js_pay_confirm' => 'Nola erregistratu nahi duzu faktura honen ordainketa?',
+    'purchase_js_insufficient_cash' => 'Ez dago nahikoa dirutan kutxan ordainketa egiteko.',
+    'tpv_cash_in_drawer' => 'Eskuragarri dagoen dirua kutxan',
     'purchase_modal_details_title' => 'Xehetasunak',
     'purchase_no_pending_alb' => 'Ez dago hornitzaile honentzako zain dagoen albaranik',
     'purchase_js_change_prov_title' => 'Aldatu hornitzailea',
@@ -782,6 +784,10 @@ $translations = [
     'log_action_movimiento_dinero' => 'Diru mugimendua',
     'log_action_apertura_caja' => 'Kutxa irekitzea',
     'log_action_cierre_caja' => 'Kutxa ixtea',
+    'log_action_vf_envio_exito' => 'VeriFactu: Accepted Submission',
+    'log_action_vf_envio_error' => 'VeriFactu: AEAT Rejection',
+    'log_action_vf_envio_reintento' => 'VeriFactu: Connection Error',
+    'log_action_vf_subsanacion' => 'VeriFactu: Correction Submitted',
     'log_action_crear_producto' => 'Produktua sortzea',
     'log_action_editar_producto' => 'Produktua editatzea',
     'log_action_eliminar_producto' => 'Produktua ezabatzea',
@@ -953,6 +959,9 @@ $translations = [
     'history_status_debt' => 'Zorra',
     'history_status_returned' => 'Itzulitako salmenta',
     'history_status_canceled' => 'Baliogabetutako salmenta',
+    'history_status_annulled_pill' => 'BALIOGABETUA',
+    'history_status_rectified_pill' => 'ZUZENDUA',
+    'history_status_abono_pill' => 'KREDITUA',
     'history_btn_view_ticket' => 'Ikusi txartela',
     'history_btn_view_invoice' => 'Ikusi faktura',
     'history_btn_gen_invoice' => 'Sortu faktura',

@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 $translations = [
     'menu_inicio' => 'Inici',
     'menu_tpv' => 'TPV',
@@ -643,6 +643,8 @@ $translations = [
     'purchase_label_mark_paid' => 'Marcar com a pagada',
     'purchase_btn_pay' => 'Pagar Factura',
     'purchase_js_pay_confirm' => 'Com desitges registrar el pagament d\'aquesta factura?',
+    'purchase_js_insufficient_cash' => 'Efectiu insuficient a la caixa per realitzar aquest pagament.',
+    'tpv_cash_in_drawer' => 'Efectiu disponible a la caixa',
     'purchase_modal_details_title' => 'Detalls',
     'purchase_no_pending_alb' => 'No hi ha albarans pendents per a aquest proveïdor',
     'purchase_js_change_prov_title' => 'Canviar Proveïdor',
@@ -782,6 +784,10 @@ $translations = [
     'log_action_movimiento_dinero' => 'Moviment d\'Efectiu',
     'log_action_apertura_caja' => 'Obertura de Caixa',
     'log_action_cierre_caja' => 'Tancament de Caixa',
+    'log_action_vf_envio_exito' => 'VeriFactu: Accepted Submission',
+    'log_action_vf_envio_error' => 'VeriFactu: AEAT Rejection',
+    'log_action_vf_envio_reintento' => 'VeriFactu: Connection Error',
+    'log_action_vf_subsanacion' => 'VeriFactu: Correction Submitted',
     'log_action_crear_producto' => 'Creació de Producte',
     'log_action_editar_producto' => 'Edició de Producte',
     'log_action_eliminar_producto' => 'Eliminar Producte',
@@ -953,6 +959,9 @@ $translations = [
     'history_status_debt' => 'Deute',
     'history_status_returned' => 'Venda retornada',
     'history_status_canceled' => 'Venda anul·lada',
+    'history_status_annulled_pill' => 'ANULADA',
+    'history_status_rectified_pill' => 'RECTIFICADA',
+    'history_status_abono_pill' => 'ABONAMENT',
     'history_btn_view_ticket' => 'Veure tiquet',
     'history_btn_view_invoice' => 'Veure factura',
     'history_btn_gen_invoice' => 'Generar factura',

@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 $translations = [
     'menu_inicio' => '首页',
     'menu_tpv' => '销售点',
@@ -722,6 +722,8 @@ $translations = [
     'purchase_label_mark_paid' => '标记为已支付',
     'purchase_btn_pay' => '支付发票',
     'purchase_js_pay_confirm' => '您希望如何登记此发票的付款？',
+    'purchase_js_insufficient_cash' => '收银机中现金不足，无法完成此付款。',
+    'tpv_cash_in_drawer' => '收银机可用现金',
     'purchase_modal_details_title' => '详情',
     'purchase_no_pending_alb' => '此供应商没有待处理的送货单',
     'purchase_js_change_prov_title' => '更改供应商',
@@ -861,6 +863,10 @@ $translations = [
     'log_action_movimiento_dinero' => '资金变动',
     'log_action_apertura_caja' => '钱箱开启',
     'log_action_cierre_caja' => '钱箱关闭',
+    'log_action_vf_envio_exito' => 'VeriFactu: Accepted Submission',
+    'log_action_vf_envio_error' => 'VeriFactu: AEAT Rejection',
+    'log_action_vf_envio_reintento' => 'VeriFactu: Connection Error',
+    'log_action_vf_subsanacion' => 'VeriFactu: Correction Submitted',
     'log_action_crear_producto' => '创建产品',
     'log_action_editar_producto' => '编辑产品',
     'log_action_eliminar_producto' => '删除产品',
@@ -1032,6 +1038,9 @@ $translations = [
     'history_status_debt' => '欠款',
     'history_status_returned' => '已退货',
     'history_status_canceled' => '销售已作废',
+    'history_status_annulled_pill' => '已作废',
+    'history_status_rectified_pill' => '已更正',
+    'history_status_abono_pill' => '贷项',
     'history_btn_view_ticket' => '查看票据',
     'history_btn_view_invoice' => '查看发票',
     'history_btn_gen_invoice' => '生成发票',
