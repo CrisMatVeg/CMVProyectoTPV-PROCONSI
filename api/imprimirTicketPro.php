@@ -134,6 +134,20 @@ try {
         $detallesPago .= '<b>Pendiente: ' . $fmt2($pendiente) . '</b>';
     }
 
+    $valesAmt = 0;
+    if (!empty($venta['pagos'])) {
+        foreach ($venta['pagos'] as $pago) {
+            if ($pago['metodo_pago'] === 'vale') $valesAmt += (float)$pago['importe'];
+        }
+    }
+
+    $comentariosHtml = '';
+    if (!empty($venta['comentarios'])) {
+        $comentariosHtml = $esFactura
+            ? '<div style="margin-top:20px;padding:10px;border:1px dashed #000;font-style:italic;"><strong>Observaciones:</strong><br>' . nl2br(htmlspecialchars($venta['comentarios'])) . '</div>'
+            : '<div class="small" style="margin-top:5px;font-style:italic;border-top:1px dashed #ccc;padding-top:5px;"><strong>Observaciones:</strong> ' . nl2br(htmlspecialchars($venta['comentarios'])) . '</div>';
+    }
+
     if ($esFactura) {
         $lineasHTML = "";
         foreach ($venta['lineas'] as $l) {
@@ -172,7 +186,7 @@ try {
             '{{LINEAS}}' => $lineasHTML,
             '{{IVA_DESGLOSE}}' => $ivaDesgloseFacturaHtml,
             '{{DESCUENTO_AMT}}' => $fmt2($venta['descuento_amt']),
-            '{{TOTAL}}' => $fmt2($totalReal),
+            '{{TOTAL}}' => $fmt2($totalVenta),
             '{{DISPLAY_DESCUENTO}}' => (float)$venta['descuento_amt'] > 0 ? '' : 'display:none;',
             '{{DISPLAY_EFECTIVO}}' => $tieneEfectivo ? '' : 'display:none;',
             '{{EFECTIVO_RECIBIDO}}' => $fmt2($venta['efectivo_recibido'] ?? 0),
@@ -191,6 +205,12 @@ try {
             '{{VERIFACTU_TEXT}}' => $verifactuLabel,
             '{{TIPO_DOC_LABEL}}' => $tipoDocLabel,
             '{{REF_ORIGINAL}}' => $refOriginal,
+            '{{DISPLAY_VALES}}' => $valesAmt > 0 ? '' : 'display:none;',
+            '{{VALES_AMT}}' => $fmt2($valesAmt),
+            '{{COMENTARIOS}}' => $comentariosHtml,
+            '{{CLIENTE_DIRECCION}}' => htmlspecialchars($venta['direccion_cliente'] ?? ''),
+            '{{CLIENTE_POBLACION}}' => htmlspecialchars($venta['poblacion_cliente'] ?? ''),
+            '{{CLIENTE_EMAIL}}' => htmlspecialchars($venta['email_cliente'] ?? ''),
         ];
     } else {
         $lineasHTML = "";
@@ -251,6 +271,9 @@ try {
             '{{VERIFACTU_TEXT}}' => $verifactuLabel,
             '{{TIPO_DOC_LABEL}}' => $esTipoAbono ? 'ABONO / DEVOLUCIÓN' : '',
             '{{REF_ORIGINAL}}' => $refOriginalTicket,
+            '{{DISPLAY_VALES}}' => $valesAmt > 0 ? '' : 'display:none;',
+            '{{VALES_AMT}}' => $fmt2($valesAmt),
+            '{{COMENTARIOS}}' => $comentariosHtml,
         ];
     }
     foreach ($reemplazos as $key => $val) { $html = str_replace($key, $val, $html); }
