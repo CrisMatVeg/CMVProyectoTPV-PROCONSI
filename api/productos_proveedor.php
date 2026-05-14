@@ -13,13 +13,13 @@ header('Content-Type: application/json; charset=utf-8');
 // Verificar sesión y permisos
 if (!isset($_SESSION['usuarioActualTPV'])) {
     http_response_code(401);
-    echo json_encode(['success' => false, 'error' => 'Sesión no iniciada']);
+    echo json_encode(['ok' => false, 'error' => 'Sesión no iniciada']);
     exit;
 }
 
 if (!$_SESSION['usuarioActualTPV']->tienePermiso('gestionar_proveedores') && !$_SESSION['usuarioActualTPV']->tienePermiso('gestionar_productos')) {
     http_response_code(403);
-    echo json_encode(['success' => false, 'error' => 'No tienes permiso para gestionar la vinculación de productos']);
+    echo json_encode(['ok' => false, 'error' => 'No tienes permiso para gestionar la vinculación de productos']);
     exit;
 }
 
@@ -33,15 +33,15 @@ try {
         if ($accion === 'buscar_libres') {
             $termino = isset($_GET['term']) ? trim($_GET['term']) : '';
             $productos = ProductoPDO::buscarParaVincular($termino, $idProveedor);
-            echo json_encode(['success' => true, 'productos' => $productos]);
+            echo json_encode(['ok' => true, 'productos' => $productos]);
         } else {
             // Listar vinculados
             if ($idProveedor <= 0) {
-                echo json_encode(['success' => false, 'error' => 'ID de proveedor inválido']);
+                echo json_encode(['ok' => false, 'error' => 'ID de proveedor inválido']);
                 exit;
             }
             $productos = ProductoPDO::listarPorProveedor($idProveedor);
-            echo json_encode(['success' => true, 'productos' => $productos]);
+            echo json_encode(['ok' => true, 'productos' => $productos]);
         }
     } 
     elseif ($method === 'POST') {
@@ -52,27 +52,27 @@ try {
             $idProv = (int)($input['id_proveedor'] ?? 0);
             $ids = $input['ids'] ?? [];
             if ($idProv <= 0 || empty($ids)) {
-                echo json_encode(['success' => false, 'error' => 'Datos insuficientes']);
+                echo json_encode(['ok' => false, 'error' => 'Datos insuficientes']);
                 exit;
             }
             $res = ProductoPDO::vincularAProveedor($idProv, $ids);
-            echo json_encode(['success' => $res]);
+            echo json_encode(['ok' => $res]);
         } 
         elseif ($accion === 'desvincular') {
             $ids = $input['ids'] ?? [];
             if (empty($ids)) {
-                echo json_encode(['success' => false, 'error' => 'No hay productos seleccionados']);
+                echo json_encode(['ok' => false, 'error' => 'No hay productos seleccionados']);
                 exit;
             }
             $res = ProductoPDO::desvincularDeProveedor($ids);
-            echo json_encode(['success' => $res]);
+            echo json_encode(['ok' => $res]);
         }
         else {
-            echo json_encode(['success' => false, 'error' => 'Acción no reconocida']);
+            echo json_encode(['ok' => false, 'error' => 'Acción no reconocida']);
         }
     }
 } catch (Throwable $e) {
     error_log("API productos_proveedor: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
 }
