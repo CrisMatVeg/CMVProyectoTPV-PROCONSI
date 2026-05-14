@@ -242,7 +242,9 @@ const TpvApp = {
     AppState.stockFilter = elStock ? elStock.value : "all";
     AppState.sortOrder = elSort ? elSort.value : "name-asc";
 
-    this.refreshUI();
+    // Recargar del servidor para que el orden server-side se aplique correctamente
+    // (client-side sort solo funciona sobre productos ya cargados, rompiendo la paginación)
+    ProductManager.loadProducts(true).then(() => this.refreshUI());
   },
 
   selectTag(tag) {
@@ -460,6 +462,7 @@ const TpvApp = {
 window.app = TpvApp;
 window.TpvApp = TpvApp; // Security alias for modular string templates
 window.switchTicketTab = (tab) => TpvApp.switchTicketTab(tab);
+window.getEffectivePrice = (...args) => CartManager.getEffectivePrice(...args);
 
 // Auto-init when DOM ready
 document.addEventListener("DOMContentLoaded", () => TpvApp.init());

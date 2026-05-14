@@ -39,11 +39,48 @@ export const PaymentManager = {
     }
   },
 
-  /**
-   * Inicializa el proceso de pago
-   */
   async processPayment() {
-    // Resetear estado de comprobación de efectivo
+    await this._verificarEstadoCaja();
+    await this.syncCartPricesWithServer();
+
+    const totals = CartManager.calculateTotals();
+    this.totalVentaActual = totals ? totals.total : 0;
+
+    const activeSidebarBtn = document.querySelector(".pay-btn.selected");
+    if (activeSidebarBtn) {
+      this.checkoutContext = activeSidebarBtn.dataset.method;
+      AppState.selectedPayment = this.checkoutContext;
+    }
+
+    if (!AppState.clienteSeleccionado && !AppState.socioActual) {
+      const btnPart = document.getElementById("btnParticular");
+      if (btnPart) btnPart.click();
+    }
+
+    this._procesarVales();
+
+    if (typeof window.abrirModalPago === "function") {
+      window.abrirModalPago();
+    } else {
+      document.getElementById("clienteModal")?.classList.add("visible");
+    }
+
+    this.updateMixSummary();
+    this.updateTypeButtons();
+
+    document.querySelectorAll(".form-error").forEach((el) => (el.innerText = ""));
+
+    const valeContainer = document.getElementById("clienteValesContainer");
+    if (valeContainer) valeContainer.classList.add("d-none");
+
+    this.quitarPuntosCanjeados();
+    const puntosContainer = document.getElementById("clientePuntosContainer");
+    if (puntosContainer) puntosContainer.classList.add("d-none");
+
+    document.getElementById("clienteModal").classList.add("visible");
+  },
+
+  async _verificarEstadoCaja() {
     window.cajaEfectivoActual = null;
     try {
       const resp = await ApiService.request("./api/cajaEstadoActual.php");
@@ -56,75 +93,37 @@ export const PaymentManager = {
     } catch (e) {
       console.error("Error al obtener estado de caja:", e);
     }
+  },
 
-    await this.syncCartPricesWithServer();
-
-    const totals = CartManager.calculateTotals();
-    this.totalVentaActual = totals ? totals.total : 0;
-
-    const activeSidebarBtn = document.querySelector(".pay-btn.selected");
-    if (activeSidebarBtn) {
-      this.checkoutContext = activeSidebarBtn.dataset.method;
-      AppState.selectedPayment = this.checkoutContext;
-    }
-
-    // Resetear selección de cliente a Particular por defecto (si no hay uno ya activo)
-    if (!AppState.clienteSeleccionado && !AppState.socioActual) {
-      const btnPart = document.getElementById("btnParticular");
-      if (btnPart) btnPart.click();
-    }
-    
-    // Si hay un vale aplicado, lo añadimos como primer pago si no existe ya
+  _procesarVales() {
     if (AppState.valeAplicado) {
-       const existing = window.currentPayments.find(p => p.metodo === "vale");
-       if (!existing) {
-         window.currentPayments.push({
-           metodo: "vale",
-           importe: Math.min(this.totalVentaActual, parseFloat(AppState.valeAplicado.importe_restante)),
-           label: `Vale: ${AppState.valeAplicado.codigo}`
-         });
-       }
+      const existing = window.currentPayments.find(p => p.metodo === "vale");
+      if (!existing) {
+        window.currentPayments.push({
+          metodo: "vale",
+          importe: Math.min(this.totalVentaActual, parseFloat(AppState.valeAplicado.importe_restante)),
+          label: `Vale: ${AppState.valeAplicado.codigo}`
+        });
+      }
     }
 
     const totalPagadoVales = window.currentPayments.reduce((acc, p) => acc + (p.metodo === 'vale' ? p.importe : 0), 0);
     const pendiente = Math.max(0, this.totalVentaActual - totalPagadoVales);
 
-    // Pre-añadir el método seleccionado en el sidebar (Efectivo por defecto)
     if (pendiente > 0.01 && AppState.selectedPayment && AppState.selectedPayment !== 'mixto') {
       const existing = window.currentPayments.find(p => p.metodo === AppState.selectedPayment);
       if (existing) {
         existing.importe = pendiente;
-        existing.recibido = AppState.selectedPayment === 'efectivo' ? pendiente : pendiente;
+        existing.recibido = pendiente;
       } else {
         window.currentPayments.push({
-            metodo: AppState.selectedPayment,
-            importe: pendiente,
-            recibido: pendiente,
-            label: AppState.selectedPayment.charAt(0).toUpperCase() + AppState.selectedPayment.slice(1).replace('_', ' ')
-          });
+          metodo: AppState.selectedPayment,
+          importe: pendiente,
+          recibido: pendiente,
+          label: AppState.selectedPayment.charAt(0).toUpperCase() + AppState.selectedPayment.slice(1).replace('_', ' ')
+        });
       }
     }
-
-    if (typeof window.abrirModalPago === "function") {
-      window.abrirModalPago();
-    } else {
-      document.getElementById("clienteModal")?.classList.add("visible");
-    }
-
-    this.updateMixSummary();
-    this.updateTypeButtons();
-
-    document.querySelectorAll(".form-error").forEach((el) => (el.innerText = ""));
-    
-    // this.quitarValeAplicado(); // [ELIMINADO] No quitar el vale aquí, dejar que se gestione en el flujo de pagos
-    const valeContainer = document.getElementById("clienteValesContainer");
-    if (valeContainer) valeContainer.classList.add("d-none");
-
-    this.quitarPuntosCanjeados();
-    const puntosContainer = document.getElementById("clientePuntosContainer");
-    if (puntosContainer) puntosContainer.classList.add("d-none");
-
-    document.getElementById("clienteModal").classList.add("visible");
   },
 
   updateTypeButtons() {
