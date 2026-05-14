@@ -98,6 +98,7 @@ export const ApiService = {
         body: JSON.stringify({ nivel, mensaje, endpoint, data }),
       });
     } catch (e) {
+      console.warn('logUI: error al registrar log en servidor:', e);
     }
   },
 

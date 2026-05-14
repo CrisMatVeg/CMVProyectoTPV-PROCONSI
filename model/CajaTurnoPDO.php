@@ -115,13 +115,39 @@ class CajaTurnoPDO
      */
     public static function listarMovimientosTurno(int $idTurno): array
     {
-        $sql = "SELECT m.*, u.nombre as nombre_usuario 
+        $sql = "SELECT m.*, u.nombre as nombre_usuario
                 FROM caja_movimientos m
                 LEFT JOIN usuarios u ON m.id_usuario = u.id
-                WHERE m.id_turno = :id 
+                WHERE m.id_turno = :id
                 ORDER BY m.created_at ASC";
         $q = DBPDO::ejecutarConsulta($sql, [':id' => $idTurno]);
         return $q->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Carga los movimientos de múltiples turnos en una sola query (evita N+1).
+     * Devuelve un array indexado por id_turno.
+     * @param int[] $idsTurnos
+     * @return array<int, array>
+     */
+    public static function listarMovimientosPorTurnos(array $idsTurnos): array
+    {
+        if (empty($idsTurnos)) {
+            return [];
+        }
+        $placeholders = implode(',', array_map('intval', $idsTurnos));
+        $sql = "SELECT m.*, u.nombre as nombre_usuario
+                FROM caja_movimientos m
+                LEFT JOIN usuarios u ON m.id_usuario = u.id
+                WHERE m.id_turno IN ({$placeholders})
+                ORDER BY m.created_at ASC";
+        $q = DBPDO::ejecutarConsulta($sql, []);
+        $rows = $q->fetchAll(PDO::FETCH_ASSOC);
+        $resultado = [];
+        foreach ($rows as $row) {
+            $resultado[(int)$row['id_turno']][] = $row;
+        }
+        return $resultado;
     }
 
     public static function cerrarTurno(

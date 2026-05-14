@@ -31,23 +31,22 @@ try {
     // Buscar turnos asociados a este cierre mediante la columna num_z
     $turnos = CajaTurnoPDO::listarTurnosPorCierre($idCierre);
 
-    $retiros = [];
-    foreach ($turnos as &$t) {
-        $t['movimientos'] = CajaTurnoPDO::listarMovimientosTurno((int)$t['id']);
-        foreach ($t['movimientos'] as $m) {
-            $retiros[] = $m;
-        }
-    }
-    // Eliminar duplicados por id si los hubiera
-    $retirosUnicos = [];
+    // Cargar todos los movimientos en una sola query (evita N+1)
+    $idsTurnos = array_column($turnos, 'id');
+    $movimientosPorTurno = CajaTurnoPDO::listarMovimientosPorTurnos($idsTurnos);
+
     $idsVistos = [];
-    foreach ($retiros as $r) {
-        if (!in_array($r['id'], $idsVistos)) {
-            $retirosUnicos[] = $r;
-            $idsVistos[] = $r['id'];
+    $retiros   = [];
+    foreach ($turnos as &$t) {
+        $t['movimientos'] = $movimientosPorTurno[(int)$t['id']] ?? [];
+        foreach ($t['movimientos'] as $m) {
+            if (!in_array($m['id'], $idsVistos)) {
+                $retiros[]   = $m;
+                $idsVistos[] = $m['id'];
+            }
         }
     }
-    $retiros = $retirosUnicos;
+    unset($t);
 
     $deudas = CajaDeudaPDO::listarPorCierre($idCierre);
 

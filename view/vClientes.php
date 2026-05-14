@@ -48,7 +48,7 @@
         <div class="flex-1">
             <div class="search-input-fancy" style="border-radius: 12px; background: var(--surface); padding-left: 15px;">
                 <i class="fa-solid fa-magnifying-glass opacity-50" aria-hidden="true"></i>
-                <input type="text" id="filtroNombre" placeholder="<?php echo L('client_search_placeholder'); ?>" aria-label="<?php echo L('client_search_placeholder'); ?>" oninput="filtrarClientes()" style="height: 48px; border: none; background: transparent; width: 100%; padding-left: 10px;">
+                <input type="text" id="filtroNombre" placeholder="<?php echo L('client_search_placeholder'); ?>" aria-label="<?php echo L('client_search_placeholder'); ?>" style="height: 48px; border: none; background: transparent; width: 100%; padding-left: 10px;">
             </div>
         </div>
 
@@ -252,6 +252,7 @@
                 <textarea id="clienteNotas" class="form-input" rows="2"></textarea>
             </div>
             <div class="form-group mb-0 mt-10">
+                <label class="form-label" style="display:flex;justify-content:space-between;align-items:center;">
                     <span><?php echo L('client_label_rol'); ?></span>
                     <span style="display:inline-flex;gap:8px;">
                         <button type="button" class="btn-text fs-12 text-blue p-0" style="background:none;border:none;cursor:pointer;" onclick="crearNuevoRol()"><?php echo L('client_btn_new_rol'); ?></button>
