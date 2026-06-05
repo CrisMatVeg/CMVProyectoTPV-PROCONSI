@@ -421,37 +421,51 @@
 
 
                         <!-- PASO 3: Cantidad a sacar (Calculado) -->
-                        <div class="bg-surface2 p-32 br-20 border shadow-md" style="background: linear-gradient(145deg, var(--surface2) 0%, rgba(var(--accent-rgb), 0.05) 100%);">
-                            <div class="d-flex ai-center jc-between flex-wrap gap-32">
-                                <div class="d-flex ai-center gap-24">
-                                    <div class="w-72 h-72 br-16 bg-surface shadow-sm d-flex ai-center jc-center border" style="flex-shrink: 0;"><i class="fa-solid fa-arrow-right-from-bracket text-accent fs-32"></i></div>
-                                    <div>
-                                        <div class="fs-14 tt-uppercase text-accent font-bold mb-4"><?php echo L('cash_close_step_3'); ?></div>
-                                        <div id="importeRetiradaCierre" class="fs-48 font-mono font-bold" style="letter-spacing: -1px; line-height: 1;">0,00 €</div>
-                                    </div>
-                                </div>
-                                
-                                <div class="d-flex flex-column ai-end gap-16">
-                                    <div class="d-flex gap-16">
-                                        <?php if ($avCierreCaja['canCerrarTurno']): ?>
-                                            <button type="submit" name="doCierreTurno" class="btn-cancel h-56 px-24 fs-14 border-2 shadow-sm hover-scale-sm d-flex ai-center gap-10 m-0" style="background: var(--surface); border-radius: 14px;">
-                                                <i class="fa-solid fa-clock-rotate-left"></i> <?php echo L('cash_close_btn_only_close_shift'); ?>
-                                            </button>
-                                        <?php endif; ?>
-
-                                        <?php if ($avCierreCaja['canCerrarCaja']): ?>
-                                            <button type="submit" name="doCierreZ" class="btn-save h-56 px-40 fs-16 shadow-lg hover-scale-sm d-flex ai-center gap-10 m-0" style="background: var(--green); border-color: var(--green); white-space: nowrap; border-radius: 14px;">
-                                                <i class="fa-solid fa-check-double fs-18"></i> <span class="font-bold"><?php echo L('cash_close_btn_do_z'); ?></span>
-                                            </button>
-                                        <?php endif; ?>
-                                    </div>
-                                    
-                                    <div class="fs-12 text-muted text-right max-w-500 opacity-70">
-                                        <i class="fa-solid fa-circle-info mr-4"></i>
-                                        <?php echo L('cash_close_help_close_shift'); ?> · <?php echo L('cash_close_help_do_z'); ?>
-                                    </div>
+                        <div class="bg-surface2 p-32 br-20 border shadow-md mb-24" style="background: linear-gradient(145deg, var(--surface2) 0%, rgba(var(--accent-rgb), 0.05) 100%);">
+                            <div class="d-flex ai-center gap-24">
+                                <div class="w-72 h-72 br-16 bg-surface shadow-sm d-flex ai-center jc-center border" style="flex-shrink: 0;"><i class="fa-solid fa-arrow-right-from-bracket text-accent fs-32"></i></div>
+                                <div>
+                                    <div class="fs-14 tt-uppercase text-accent font-bold mb-4"><?php echo L('cash_close_step_3'); ?></div>
+                                    <div id="importeRetiradaCierre" class="fs-48 font-mono font-bold" style="letter-spacing: -1px; line-height: 1;">0,00 €</div>
                                 </div>
                             </div>
+                        </div>
+
+                        <!-- ACCIONES DE CIERRE: dos opciones claramente diferenciadas -->
+                        <div class="grid-2 gap-20">
+                            <?php if ($avCierreCaja['canCerrarTurno']): ?>
+                            <div class="p-24 br-20 border-2 bg-surface shadow-sm d-flex flex-column gap-16" style="border-color: var(--border);">
+                                <div class="d-flex ai-center gap-12">
+                                    <div class="w-40 h-40 br-10 bg-surface2 text-muted d-flex ai-center jc-center shadow-xs border" style="flex-shrink:0;">
+                                        <i class="fa-solid fa-clock-rotate-left fs-18"></i>
+                                    </div>
+                                    <div>
+                                        <div class="fs-13 font-bold text-text"><?php echo L('cash_close_btn_only_close_shift'); ?></div>
+                                        <div class="fs-11 text-muted mt-2"><?php echo L('cash_close_help_close_shift'); ?></div>
+                                    </div>
+                                </div>
+                                <button type="submit" name="doCierreTurno" class="btn-cancel h-48 fs-14 border-2 shadow-sm hover-scale-sm d-flex ai-center jc-center gap-10 m-0 w-100" style="background: var(--surface); border-radius: 12px;">
+                                    <i class="fa-solid fa-clock-rotate-left"></i> <?php echo L('cash_close_btn_only_close_shift'); ?>
+                                </button>
+                            </div>
+                            <?php endif; ?>
+
+                            <?php if ($avCierreCaja['canCerrarCaja']): ?>
+                            <div class="p-24 br-20 border-2 bg-surface shadow-md d-flex flex-column gap-16" style="border-color: var(--green); background: linear-gradient(145deg, var(--surface) 0%, rgba(46,204,113,0.04) 100%);">
+                                <div class="d-flex ai-center gap-12">
+                                    <div class="w-40 h-40 br-10 bg-green text-white d-flex ai-center jc-center shadow-sm" style="flex-shrink:0;">
+                                        <i class="fa-solid fa-check-double fs-18"></i>
+                                    </div>
+                                    <div>
+                                        <div class="fs-13 font-bold text-text"><?php echo L('cash_close_btn_do_z'); ?></div>
+                                        <div class="fs-11 text-muted mt-2"><?php echo L('cash_close_help_do_z'); ?></div>
+                                    </div>
+                                </div>
+                                <button type="submit" name="doCierreZ" class="btn-save h-48 fs-15 shadow-lg hover-scale-sm d-flex ai-center jc-center gap-10 m-0 w-100 font-bold" style="background: var(--green); border-color: var(--green); border-radius: 12px;">
+                                    <i class="fa-solid fa-check-double fs-18"></i> <?php echo L('cash_close_btn_do_z'); ?>
+                                </button>
+                            </div>
+                            <?php endif; ?>
                         </div>
 
                     </form>

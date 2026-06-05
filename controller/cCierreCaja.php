@@ -114,6 +114,8 @@ if (isset($_POST['doCierreTurno'])) {
             $realEfectivoForm,
             $fondoSiguiente
         );
+        $_SESSION['cajaAbierta'] = false;
+        $_SESSION['turnoSesion'] = null;
 
         // [NUEVO] Si era un arqueo pendiente y hay OTRO turno abierto, transferir el fondo
         if (isset($avCierreCaja['modoEdicionPendiente']) && $avCierreCaja['modoEdicionPendiente']) {
@@ -143,11 +145,10 @@ if (isset($_POST['doCierreZ'])) {
             $mensajeError = "No tienes permiso para realizar el cierre de caja.";
         } else {
             $resumenParaZ = CierreFiscalPDO::obtenerResumenParaCierre();
+            $totalGeneralZ = (float)($resumenParaZ['total_general'] ?? 0);
 
-            if (($resumenParaZ['total_general'] ?? $resumenParaZ['totalBruto'] ?? 0) > 0 || $turnoActual) {
-                // ... (rest of the logic inside if)
-                // (Note: identifying lines 152 to 184)
-                $totalEfectivo = (float)($resumenParaZ['total_efectivo'] ?? $resumenParaZ['totalEfectivo'] ?? 0);
+            if ($totalGeneralZ > 0) {
+                $totalEfectivo = (float)($resumenParaZ['total_efectivo'] ?? 0);
                 $totalTarjeta  = (float)($resumenParaZ['total_tarjeta'] ?? $resumenParaZ['totalTarjeta'] ?? 0);
                 $totalBizum    = (float)($resumenParaZ['total_bizum'] ?? $resumenParaZ['totalBizum'] ?? 0);
                 $totalGeneral  = (float)($resumenParaZ['total_general'] ?? $resumenParaZ['totalBruto'] ?? 0);
@@ -163,6 +164,8 @@ if (isset($_POST['doCierreZ'])) {
                         $realEfectivoForm,
                         $fondoSiguiente
                     );
+                    $_SESSION['cajaAbierta'] = false;
+                    $_SESSION['turnoSesion'] = null;
                 }
 
                 // 2. Luego hacer el cierre Z
@@ -175,26 +178,52 @@ if (isset($_POST['doCierreZ'])) {
                     $turnoActual ? (int)$turnoActual['id'] : null
                 );
 
+                // Si había turno abierto, ya está cerrado; transferir fondo si es arqueo pendiente
                 if ($turnoActual) {
                     if (isset($avCierreCaja['modoEdicionPendiente']) && $avCierreCaja['modoEdicionPendiente']) {
                         $transferido = CajaTurnoPDO::sumarFondoCajaAbierta($fondoSiguiente, $_SESSION['usuarioActualTPV']->getId());
                         $mensajeExito = $transferido
                             ? "Cierre de arqueo pendiente realizado. Fondo de " . number_format($fondoSiguiente, 2, ',', '.') . " € transferido a la caja activa."
                             : "Cierre de arqueo pendiente realizado.";
-                    } else {
-                        $mensajeExito = "Cierre de caja realizado correctamente. Jornada fiscal concluida.";
                     }
-
-                    LogPDO::addLog('CIERRE_CAJA', "Cierre de caja Z realizado. Total: " . number_format($totalGeneral, 2, ',', '.') . "€");
                     $turnoActual = null;
                     $avCierreCaja['modoEdicionPendiente'] = false;
                 }
-            } else {
-                // Solo mostramos error si tampoco hay arqueos pendientes
-                $pendientes = CajaTurnoPDO::obtenerTurnosPendientesArqueo();
-                if (empty($pendientes)) {
-                    $mensajeError = "No hay ventas pendientes de cierre de caja.";
+
+                // Mensaje de éxito y log siempre que se cree el Z
+                if (empty($mensajeExito)) {
+                    $mensajeExito = "Cierre de caja Z realizado correctamente. Total: " . number_format($totalGeneral, 2, ',', '.') . " €";
                 }
+                LogPDO::addLog('CIERRE_CAJA', "Cierre de caja Z #$idZ realizado. Total: " . number_format($totalGeneral, 2, ',', '.') . "€");
+
+            } else {
+                // Sin ventas pendientes: se genera igualmente un cierre Z con totales a 0
+                $realEfectivoForm = max(0, (float)($_POST['realEfectivo'] ?? 0));
+                $fondoSiguiente   = max(0, (float)($_POST['fondoSiguiente'] ?? 0));
+
+                if ($turnoActual) {
+                    CajaTurnoPDO::cerrarTurno(
+                        (int)$turnoActual['id'],
+                        $_SESSION['usuarioActualTPV']->getId(),
+                        $realEfectivoForm,
+                        $fondoSiguiente
+                    );
+                    $_SESSION['cajaAbierta'] = false;
+                    $_SESSION['turnoSesion'] = null;
+                }
+
+                $idZ = CierreFiscalPDO::realizarCierre(
+                    $_SESSION['usuarioActualTPV']->getId(),
+                    0,
+                    0,
+                    0,
+                    0,
+                    $turnoActual ? (int)$turnoActual['id'] : null
+                );
+
+                $turnoActual = null;
+                $mensajeExito = "Cierre de caja Z #$idZ realizado correctamente. No había ventas pendientes (total: 0,00 €).";
+                LogPDO::addLog('CIERRE_CAJA', "Cierre de caja Z #$idZ realizado sin ventas pendientes. Efectivo real: " . number_format($realEfectivoForm, 2, ',', '.') . "€, Fondo siguiente: " . number_format($fondoSiguiente, 2, ',', '.') . "€");
             }
         }
         $db->commit();
@@ -257,7 +286,8 @@ $_SESSION['paginaEnCurso'] = 'cierreCaja';
 // 6. Detectar si la próxima apertura será un relevo o un nuevo día
 $ultimoCerrado = CajaTurnoPDO::obtenerUltimoTurnoCerrado();
 $esRelevo = false;
-if ($ultimoCerrado && is_null($ultimoCerrado['num_z'])) {
+// num_z = 0 equivale a "sin cierre Z" cuando la BD usa INT NOT NULL sin default
+if ($ultimoCerrado && ($ultimoCerrado['num_z'] === null || (int)$ultimoCerrado['num_z'] === 0)) {
     $esRelevo = true;
 }
 

@@ -422,7 +422,7 @@
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th style="width: 85px;"><?php echo L('history_th_id_z'); ?></th>
+                        <th style="width: 85px; white-space: nowrap;"><?php echo L('history_th_id_z'); ?></th>
                         <th style="width: 150px;"><?php echo L('history_th_date_z'); ?></th>
                         <th><?php echo L('history_th_cashier_z'); ?></th>
                         <th class="text-right" style="padding-left: 10px; padding-right: 10px;"><?php echo L('history_th_tickets_z'); ?></th>
@@ -446,7 +446,7 @@
 
                     <?php foreach ($avHistorial['cierres'] as $c): ?>
                         <tr>
-                            <td class="font-mono font-bold text-accent">#Z-<?php echo str_pad($c['id'], 3, '0', STR_PAD_LEFT); ?></td>
+                            <td class="font-mono font-bold text-accent" style="white-space: nowrap;">#Z-<?php echo str_pad($c['id'], 3, '0', STR_PAD_LEFT); ?></td>
                             <td class="text-muted fs-13">
                                 <?php echo date('d/m/Y H:i', strtotime($c['fecha'])); ?>
                             </td>
