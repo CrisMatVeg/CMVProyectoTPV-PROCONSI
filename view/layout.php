@@ -10,8 +10,6 @@
     <link rel="stylesheet" href="./webroot/css/estilos.css?v=40" />
     <link rel="stylesheet" href="./webroot/css/components.css?v=47" />
     <link rel="stylesheet" href="./webroot/css/app.css?v=46" />
-    <!-- Generación de PDF en cliente -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <link rel="stylesheet" href="./webroot/css/fonts.css" />
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -27,31 +25,32 @@
     $empresaDireccion = $appConfig['empresa_direccion'] ?? '';
     $empresaNif = $appConfig['empresa_nif'] ?? '';
 
-    // Cargar tema del usuario actual (si existe)
+    // Cargar tema del usuario actual (si existe) — cacheado en sesión 10 min
     $themeMode = 'light';
     $themeAccent = 'blue';
     $themeFont = 'dm-mono';
     if (isset($_SESSION['usuarioActualTPV'])) {
-        try {
-            $qTheme = DBPDO::ejecutarConsulta(
-                "SELECT theme_mode, theme_accent, theme_font FROM usuarios WHERE id = :id",
-                [':id' => $_SESSION['usuarioActualTPV']->getId()]
-            );
-            $rowTheme = $qTheme->fetch(PDO::FETCH_ASSOC);
-            if ($rowTheme) {
-                if (!empty($rowTheme['theme_mode'])) {
-                    $themeMode = $rowTheme['theme_mode'];
-                }
-                if (!empty($rowTheme['theme_accent'])) {
-                    $themeAccent = $rowTheme['theme_accent'];
-                }
-                if (!empty($rowTheme['theme_font'])) {
-                    $themeFont = $rowTheme['theme_font'];
-                }
+        $uid = $_SESSION['usuarioActualTPV']->getId();
+        $themeCacheKey = '_cache_theme_' . $uid;
+        $themeTs = $themeCacheKey . '_ts';
+        if (!isset($_SESSION[$themeCacheKey], $_SESSION[$themeTs]) || (time() - $_SESSION[$themeTs]) > 600) {
+            try {
+                $qTheme = DBPDO::ejecutarConsulta(
+                    "SELECT theme_mode, theme_accent, theme_font FROM usuarios WHERE id = :id",
+                    [':id' => $uid]
+                );
+                $rowTheme = $qTheme->fetch(PDO::FETCH_ASSOC);
+                $_SESSION[$themeCacheKey] = $rowTheme ?: [];
+                $_SESSION[$themeTs] = time();
+            } catch (\Throwable $e) {
+                $_SESSION[$themeCacheKey] = [];
+                $_SESSION[$themeTs] = time();
             }
-        } catch (\Throwable $e) {
-            // Ignorar errores de tema y usar valores por defecto
         }
+        $rowTheme = $_SESSION[$themeCacheKey];
+        if (!empty($rowTheme['theme_mode']))   $themeMode   = $rowTheme['theme_mode'];
+        if (!empty($rowTheme['theme_accent'])) $themeAccent = $rowTheme['theme_accent'];
+        if (!empty($rowTheme['theme_font']))   $themeFont   = $rowTheme['theme_font'];
     }
     ?>
     <script>
@@ -61,7 +60,7 @@
         window.USER_ROLE = <?php echo json_encode($avInicioPrivado['rol'] ?? ''); ?>;
         window.CAJERO_NOMBRE = <?php echo json_encode($avInicioPrivado['nombre_completo'] ?? (isset($_SESSION['usuarioActualTPV']) ? $_SESSION['usuarioActualTPV']->getNombreCompleto() : '')); ?>;
         window.IS_TPV = <?php echo json_encode(isset($_SESSION['paginaEnCurso']) && $_SESSION['paginaEnCurso'] === 'inicioPrivado'); ?>;
-        window.CAJA_ABIERTA = <?php echo json_encode($_SESSION['cajaAbierta'] ?? false); ?>;
+        window.CAJA_ABIERTA = <?php echo json_encode((bool)CajaTurnoPDO::obtenerTurnoAbierto()); ?>;
         const ESC_POS_ENABLED = true;
         const USER_THEME_MODE = <?php echo json_encode($themeMode); ?>;
         const USER_THEME_ACCENT = <?php echo json_encode($themeAccent); ?>;
@@ -436,7 +435,7 @@
     ?>
 
     <div class="modal-overlay" id="ticketModal">
-        <div class="modal ticket-wrapper" id="ticketContenido" style="display: flex; flex-direction: column; max-height: 90vh; overflow: hidden; padding: 0;">
+        <div class="modal ticket-wrapper" id="ticketContenido" style="display: flex; flex-direction: column; max-height: 90vh; overflow: hidden; padding: 0; min-height: 0;">
             <div class="ticket-brand-header">
                 <div class="title"><i class="fa-solid fa-bolt-lightning"></i> <?= $empresaNombre ?></div>
                 <div class="info"><?= $empresaDireccion ?> · NIF: <?= $empresaNif ?></div>
@@ -453,7 +452,7 @@
                 </button>
             </div>
 
-            <div class="ticket-body" style="flex: 1; overflow-y: auto; padding: 0;">
+            <div class="ticket-body" style="flex: 1; min-height: 0; overflow-y: auto; padding: 0;">
                 <div id="tkSummaryTab" class="ticket-tab-content active p-20">
                     <div class="ticket-meta">
                         <span id="tkTipoDoc" class="doc-type"><?php echo L('ticket_type_sale'); ?></span>
@@ -600,7 +599,7 @@
                 }
             </style>
             
-            <div class="tk-footer-grid" id="ticketFooter">
+            <div class="tk-footer-grid" id="ticketFooter" style="flex-shrink: 0;">
                 <button onclick="imprimirTicket()" class="btn-secondary btn-tk-action" title="<?php echo L('ticket_btn_print'); ?>">
                     <i class="fa-solid fa-print"></i> 
                     <span><?php echo L('ticket_btn_print'); ?></span>
@@ -1007,13 +1006,12 @@
             border-color: var(--red);
         }
     </style>
-    <link rel="stylesheet" href="./webroot/css/app.css?v=47" />
     <!-- Generación de PDF en cliente -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    <script src="./webroot/js/validaciones.js?v=2"></script>
-    <script src="./webroot/js/utils_global.js?v=16"></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script defer src="./webroot/js/validaciones.js?v=2"></script>
+    <script defer src="./webroot/js/utils_global.js?v=16"></script>
     <?php if (isset($_SESSION['usuarioActualTPV']) && ($_SESSION['paginaEnCurso'] ?? '') !== 'Login'): ?>
-        <script src="./webroot/js/main.js?v=46"></script>
+        <script defer src="./webroot/js/main.js?v=46"></script>
         <script src="./webroot/js/app.js?v=46" type="module"></script>
     <?php endif; ?>
     <!-- SISTEMA DE MODALES GLOBALES (ALERTAS Y CONFIRMACIONES) -->

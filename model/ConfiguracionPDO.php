@@ -29,21 +29,38 @@ class ConfiguracionPDO
 
     /**
      * Obtiene todos los parámetros de configuración como un array asociativo [clave => valor]
+     * Resultado cacheado en sesión 5 minutos para evitar queries en cada carga de página.
      * @return array
      */
-    public static function obtenerConfiguracion()
+    public static function obtenerConfiguracion(): array
     {
+        $cacheKey = '_cache_config';
+        $tsKey    = '_cache_config_ts';
+        if (isset($_SESSION[$cacheKey], $_SESSION[$tsKey]) && (time() - $_SESSION[$tsKey]) < 300) {
+            return $_SESSION[$cacheKey];
+        }
+
         $config = [];
         $sql = "SELECT clave, valor FROM configuracion";
         $result = DBPDO::ejecutarConsulta($sql);
-
         while ($row = $result->fetch(PDO::FETCH_ASSOC)) {
             $val = $row['valor'];
             if ($row['clave'] === 'smtp_pass') $val = self::decrypt($val);
             $config[$row['clave']] = $val;
         }
 
+        $_SESSION[$cacheKey] = $config;
+        $_SESSION[$tsKey]    = time();
         return $config;
+    }
+
+    /**
+     * Invalida la caché de configuración en sesión.
+     * Llamar tras guardar cambios de configuración.
+     */
+    public static function invalidarCache(): void
+    {
+        unset($_SESSION['_cache_config'], $_SESSION['_cache_config_ts']);
     }
 
     /**
@@ -97,6 +114,7 @@ class ConfiguracionPDO
             }
  
             $db->commit();
+            self::invalidarCache();
             return true;
         } catch (Exception $e) {
             $db->rollBack();

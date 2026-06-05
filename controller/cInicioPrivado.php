@@ -49,6 +49,15 @@ foreach ($oProductos as $oProducto) {
 }
 
 
+// Estado VeriFactu (cacheado 2 min en sesión para no ejecutar queries en cada recarga)
+require_once 'model/AeatQueueService.php';
+$aeatTs = '_cache_aeat_ts';
+if (!isset($_SESSION['_cache_aeat'], $_SESSION[$aeatTs]) || (time() - $_SESSION[$aeatTs]) > 120) {
+    $_SESSION['_cache_aeat'] = (new AeatQueueService())->obtenerResumenEstado();
+    $_SESSION[$aeatTs] = time();
+}
+$resumenAEAT = $_SESSION['_cache_aeat'];
+
 // Cargar categorías dinámicas
 require_once 'model/CategoriaPDO.php';
 $listaCategorias = CategoriaPDO::listarTodas();

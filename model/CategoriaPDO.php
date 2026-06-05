@@ -11,9 +11,22 @@ class CategoriaPDO
 {
     public static function listarTodas(): array
     {
+        $cacheKey = '_cache_categorias';
+        $tsKey    = '_cache_categorias_ts';
+        if (isset($_SESSION[$cacheKey], $_SESSION[$tsKey]) && (time() - $_SESSION[$tsKey]) < 300) {
+            return $_SESSION[$cacheKey];
+        }
         $sql = "SELECT * FROM categorias ORDER BY nombre ASC";
         $q = DBPDO::ejecutarConsulta($sql);
-        return $q->fetchAll(PDO::FETCH_ASSOC);
+        $rows = $q->fetchAll(PDO::FETCH_ASSOC);
+        $_SESSION[$cacheKey] = $rows;
+        $_SESSION[$tsKey]    = time();
+        return $rows;
+    }
+
+    private static function invalidarCache(): void
+    {
+        unset($_SESSION['_cache_categorias'], $_SESSION['_cache_categorias_ts']);
     }
 
     public static function agregar(string $codigo, string $nombre): bool
@@ -24,6 +37,7 @@ class CategoriaPDO
                 ':codigo' => strtolower(trim($codigo)),
                 ':nombre' => trim($nombre)
             ]);
+            self::invalidarCache();
             return true;
         } catch (Exception $e) {
             return false;
@@ -35,6 +49,7 @@ class CategoriaPDO
         $sql = "DELETE FROM categorias WHERE id = :id";
         try {
             DBPDO::ejecutarConsulta($sql, [':id' => $id]);
+            self::invalidarCache();
             return true;
         } catch (Exception $e) {
             return false;
@@ -84,6 +99,7 @@ class CategoriaPDO
             ]);
 
             $db->commit();
+            self::invalidarCache();
             return true;
         } catch (Exception $e) {
             if (isset($db)) $db->rollBack();
@@ -123,6 +139,7 @@ class CategoriaPDO
             }
 
             $db->commit();
+            self::invalidarCache();
             return true;
         } catch (Exception $e) {
             if (isset($db)) $db->rollBack();
