@@ -277,12 +277,22 @@ export const CartManager = {
     if (promo) {
       const totals = this.calculateTotals();
       const minSub = parseFloat(promo.min_subtotal) || 0;
-      
+
       if (totals.subtotal < minSub) {
         return { ok: false, error: `Pedido mínimo: ${Utils.formatCurrency(minSub)}` };
       }
-      
+
       AppState.currentPromo = { ...promo, _manual: true };
+
+      // Avisar si hay items con precio manual que quedan excluidos del descuento
+      const customCount = Object.values(AppState.cart).filter(i => i._customPrice).length;
+      if (customCount > 0) {
+        Utils.showToast(
+          `${customCount} producto${customCount > 1 ? 's' : ''} con precio manual ${customCount > 1 ? 'quedan excluidos' : 'queda excluido'} del descuento`,
+          'warning'
+        );
+      }
+
       return { ok: true, promo };
     }
     
@@ -290,7 +300,8 @@ export const CartManager = {
   },
 
   autoApplyBundles() {
-    if (AppState.currentPromo && AppState.currentPromo.codigo) return;
+    // Solo bloquear si hay un cupón aplicado MANUALMENTE en esta venta
+    if (AppState.currentPromo && AppState.currentPromo._manual && AppState.currentPromo.codigo) return;
 
     const items = Object.values(AppState.cart);
     if (!items.length) {
@@ -307,13 +318,21 @@ export const CartManager = {
 
     const autoPromo = AppConfig.promos.find(p => {
       if (p.tipo !== "bundle" && p.tipo !== "fixed_bundle") return false;
-      if (p.codigo) return false;
-      
+      // Los bundles auto-aplican aunque tengan código interno (el código es solo un identificador)
+
       const buyQty = parseInt(p.bundle_buy_qty) || 0;
+      if (buyQty === 0) return false;
+
       return Object.entries(qtyByBaseId).some(([id, qty]) => {
         if (qty < buyQty) return false;
-        if (!p.id_producto && !p.categoria_code) return true;
+        if (!p.id_producto && !p.producto_ids && !p.categoria_code) return true;
         if (p.id_producto && p.id_producto == id) return true;
+        if (p.producto_ids) {
+          try {
+            const ids = JSON.parse(p.producto_ids);
+            if (Array.isArray(ids) && ids.map(Number).includes(Number(id))) return true;
+          } catch (e) {}
+        }
         if (p.categoria_code && p.categoria_code.split(',').includes(catByBaseId[id])) return true;
         return false;
       });
@@ -332,19 +351,25 @@ export const CartManager = {
     this.autoApplyBundles();
     const items = Object.values(AppState.cart);
     let subtotal = 0;
+    let subtotalNormal = 0; // Items sin precio manual (participan en descuentos)
     let bundleDiscountTotal = 0;
 
     // 1. Calculate base subtotal (pre-promo)
+    // Los items con precio editado manualmente contribuyen al subtotal pero no a los descuentos
     items.forEach((item) => {
       let p = parseFloat(item.price || 0);
       const q = parseInt(item.qty || 0);
-      subtotal += p * q;
+      const lineTotal = p * q;
+      subtotal += lineTotal;
+      if (!item._customPrice) subtotalNormal += lineTotal;
     });
 
     // 2. Apply bundle discounts (2x1, fixed Price bundle, etc.)
+    // Items con precio manual quedan excluidos de bundles
     if (AppState.currentPromo && (AppState.currentPromo.tipo === "bundle" || AppState.currentPromo.tipo === "fixed_bundle")) {
       const groups = {};
       items.forEach((item) => {
+        if (item._customPrice) return; // precio manual: excluido de bundles
         const key = item.id;
         const p = parseFloat(item.price || 0);
         const q = parseInt(item.qty || 0);
@@ -354,11 +379,17 @@ export const CartManager = {
 
       Object.values(groups).forEach((group) => {
         let promoApplies = false;
-        if (AppState.currentPromo.id_producto && AppState.currentPromo.id_producto == group.baseId) promoApplies = true;
-        else if (AppState.currentPromo.categoria_code) {
+        if (AppState.currentPromo.id_producto && AppState.currentPromo.id_producto == group.baseId) {
+          promoApplies = true;
+        } else if (AppState.currentPromo.producto_ids) {
+          try {
+            const ids = JSON.parse(AppState.currentPromo.producto_ids);
+            if (Array.isArray(ids) && ids.map(Number).includes(Number(group.baseId))) promoApplies = true;
+          } catch (e) {}
+        } else if (AppState.currentPromo.categoria_code) {
           const allowedCats = AppState.currentPromo.categoria_code.split(',');
           if (allowedCats.includes(group.cat)) promoApplies = true;
-        } else if (!AppState.currentPromo.id_producto && !AppState.currentPromo.categoria_code) {
+        } else if (!AppState.currentPromo.id_producto && !AppState.currentPromo.producto_ids && !AppState.currentPromo.categoria_code) {
           promoApplies = true;
         }
 
@@ -385,21 +416,23 @@ export const CartManager = {
     }
 
     // 3. Apply general discounts (percent or fixed amount)
-    const subtotalAfterBundles = subtotal - bundleDiscountTotal;
+    // Se aplican solo sobre el subtotal de items SIN precio manual
+    const subtotalNormalAfterBundles = subtotalNormal - bundleDiscountTotal;
     let generalDiscount = 0;
 
     if (AppState.currentPromo && (AppState.currentPromo.tipo === "percent" || AppState.currentPromo.tipo === "amount")) {
       const val = parseFloat(AppState.currentPromo.valor || 0);
       if (AppState.currentPromo.tipo === "percent") {
-        generalDiscount = (subtotalAfterBundles * val) / 100;
+        generalDiscount = (subtotalNormalAfterBundles * val) / 100;
       } else {
-        generalDiscount = Math.min(subtotalAfterBundles, val);
+        generalDiscount = Math.min(subtotalNormalAfterBundles, val);
       }
     }
 
     // 4. Partner (Socio) Discount (accumulative 5% over remainder)
-    const socioAmt = (AppState.socioActual && AppState.socioActual.es_socio) 
-      ? (subtotalAfterBundles - generalDiscount) * (AppConfig.socioDiscount / 100) 
+    // Solo sobre items sin precio manual
+    const socioAmt = (AppState.socioActual && AppState.socioActual.es_socio)
+      ? (subtotalNormalAfterBundles - generalDiscount) * (AppConfig.socioDiscount / 100)
       : 0;
 
     // IMPORTANT: Loyalty points are treated as a direct "discount" on the price per final requirements.

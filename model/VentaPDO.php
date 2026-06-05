@@ -324,9 +324,9 @@ class VentaPDO
                     }
                 }
 
-                // PriceEngine es la fuente autoritativa de precio y descuentos para productos reales.
-                // Los comodines (id <= 0) usan el precio introducido manualmente.
-                if ($idProducto > 0) {
+                // PriceEngine es la fuente autoritativa de precio para productos reales.
+                // Excepciones: comodines (id <= 0) o precio editado manualmente (customPrice=true).
+                if ($idProducto > 0 && empty($linea['customPrice'])) {
                     try {
                         require_once __DIR__ . '/PriceEngine.php';
                         $breakdown          = PriceEngine::calculate($idProducto, $idCliente, $qty, $datos['codigoCupon'] ?? null);
@@ -340,8 +340,8 @@ class VentaPDO
                         $descuentosLog      = isset($linea['descuentos']) ? $linea['descuentos'] : [];
                     }
                 } else {
-                    // Comodín: precio introducido manualmente, sin tarifas
-                    $precioBaseSnapshot = $precioUnit;
+                    // Comodín o precio editado manualmente: respetar precio del frontend sin tarifas
+                    $precioBaseSnapshot = isset($linea['basePriceSnapshot']) ? (float)$linea['basePriceSnapshot'] : $precioUnit;
                     $descuentosLog      = [];
                 }
 
@@ -674,9 +674,10 @@ class VentaPDO
         // Técnica: Late Row Lookup. Primero obtenemos solo los IDs de forma eficiente.
         $innerJoin = ($ordenPor === 'nombre_cajero') ? "JOIN usuarios u_sub ON v_sub.id_usuario = u_sub.id" : "";
         
+        // Subquery derivada para el último envío AEAT (evita subquery correlacionada por fila)
         $sql = "SELECT v.*, u.nombre as nombre_cajero, vo.numero_ticket as numero_ticket_origen, c_aeat.ultimo_error as aeat_error, v.id as id_venta_proconsis, v.id as id
                 FROM (
-                    SELECT v_sub.id 
+                    SELECT v_sub.id
                     FROM ventas v_sub
                     $innerJoin
                     $whereClause
@@ -686,9 +687,15 @@ class VentaPDO
                 JOIN ventas v ON v.id = sub.id
                 LEFT JOIN usuarios u ON v.id_usuario = u.id
                 LEFT JOIN ventas vo ON v.id_venta_origen = vo.id
-                LEFT JOIN cola_envios c_aeat ON c_aeat.id = (
-                    SELECT MAX(id) FROM cola_envios WHERE id_venta = v.id
-                )
+                LEFT JOIN (
+                    SELECT ce.id_venta, ce.ultimo_error
+                    FROM cola_envios ce
+                    INNER JOIN (
+                        SELECT id_venta, MAX(id) AS max_id
+                        FROM cola_envios
+                        GROUP BY id_venta
+                    ) ce_top ON ce.id = ce_top.max_id
+                ) c_aeat ON c_aeat.id_venta = v.id
                 ORDER BY $campoFinalOrder $ordenDir";
         
         // PDO no permite bindParam en LIMIT/OFFSET en algunas versiones si no se emula,
@@ -920,7 +927,7 @@ class VentaPDO
             }
 
             return true;
-        } catch (Exception $e) {
+        } catch (\Throwable $e) {
             if ($db->inTransaction()) $db->rollBack();
             throw $e;
         }
@@ -955,6 +962,22 @@ class VentaPDO
      * Marca una línea de venta como devuelta, repone stock y gestiona el reembolso.
      */
     public static function devolverLinea(int $idLinea, ?string $motivo = null, string $metodoReembolso = 'efectivo', ?int $cantidadADevolver = null): bool
+    {
+        $db = DBPDO::getPDO();
+        $ownTransaction = !$db->inTransaction();
+        if ($ownTransaction) $db->beginTransaction();
+
+        try {
+        $resultado = self::_devolverLineaInterna($idLinea, $motivo, $metodoReembolso, $cantidadADevolver, $db);
+        if ($ownTransaction) $db->commit();
+        return $resultado;
+        } catch (\Throwable $e) {
+            if ($ownTransaction && $db->inTransaction()) $db->rollBack();
+            throw $e;
+        }
+    }
+
+    private static function _devolverLineaInterna(int $idLinea, ?string $motivo, string $metodoReembolso, ?int $cantidadADevolver, PDO $db): bool
     {
         // 1. Obtener datos de la línea original
         $sql = "SELECT * FROM lineas_venta WHERE id = :id";
@@ -1110,14 +1133,22 @@ class VentaPDO
         $v = self::obtenerVentaPorTicket($numTicket);
         if (!$v || $v['estado'] !== 'completada') return false;
 
-        foreach ($v['lineas'] as $l) {
-            if (!$l['devuelta']) {
-                self::devolverLinea((int)$l['id'], $motivo);
+        $db = DBPDO::getPDO();
+        $db->beginTransaction();
+        try {
+            foreach ($v['lineas'] as $l) {
+                if (!$l['devuelta']) {
+                    self::devolverLinea((int)$l['id'], $motivo);
+                }
             }
-        }
 
-        DBPDO::ejecutarConsulta("UPDATE ventas SET estado = 'devuelta' WHERE id = :id", [':id' => $v['id']]);
-        return true;
+            DBPDO::ejecutarConsulta("UPDATE ventas SET estado = 'devuelta' WHERE id = :id", [':id' => $v['id']]);
+            $db->commit();
+            return true;
+        } catch (\Throwable $e) {
+            if ($db->inTransaction()) $db->rollBack();
+            throw $e;
+        }
     }
 
     /**
@@ -1455,31 +1486,29 @@ class VentaPDO
 
         $nuevoPagado = round((float)$v['pagado_a_cuenta'] + $importe, 2);
         $totalVenta = round((float)$v['total'], 2);
+        $nuevoEstado = ($nuevoPagado >= $totalVenta) ? 'completada' : 'pendiente_pago';
 
-        // 2. Insert payment record
         require_once __DIR__ . '/PagoPDO.php';
         require_once __DIR__ . '/CajaTurnoPDO.php';
         $turno = CajaTurnoPDO::obtenerTurnoAbierto();
         $idTurno = $turno ? (int)$turno['id'] : null;
 
-        PagoPDO::registrarPago($idVenta, $importe, $metodo, $idUsuario, 'Abono de deuda parcial o total', $idTurno);
+        $db = DBPDO::getPDO();
+        $db->beginTransaction();
+        try {
+            PagoPDO::registrarPago($idVenta, $importe, $metodo, $idUsuario, 'Abono de deuda parcial o total', $idTurno);
 
-        // 3. Actualizar importe pagado
-        // Si el nuevo total pagado es igual o mayor al total de la venta, la marcamos como completada
-        $nuevoEstado = ($nuevoPagado >= $totalVenta) ? 'completada' : 'pendiente_pago';
+            DBPDO::ejecutarConsulta(
+                "UPDATE ventas SET pagado_a_cuenta = :pagado, estado = :estado, metodo_pago = :metodo WHERE id = :id",
+                [':pagado' => $nuevoPagado, ':estado' => $nuevoEstado, ':metodo' => $metodo, ':id' => $idVenta]
+            );
 
-        $sqlUpd = "UPDATE ventas 
-                   SET pagado_a_cuenta = :pagado, estado = :estado, metodo_pago = :metodo 
-                   WHERE id = :id";
-
-        DBPDO::ejecutarConsulta($sqlUpd, [
-            ':pagado' => $nuevoPagado,
-            ':estado' => $nuevoEstado,
-            ':metodo' => $metodo,
-            ':id'     => $idVenta
-        ]);
-
-        return true;
+            $db->commit();
+            return true;
+        } catch (\Throwable $e) {
+            if ($db->inTransaction()) $db->rollBack();
+            throw $e;
+        }
     }
 
     /**

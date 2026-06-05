@@ -51,25 +51,7 @@ export function showToast(msg, type = "info") {
 export function formatCurrency(val) {
     const n = parseFloat(val);
     if (isNaN(n)) return "0,00€";
-    
-    // Solo mostrar más de 2 decimales si ALGÚN producto en el carrito tiene más de 2 decimales
-    let requiereAltaPrecision = false;
-    if (typeof window !== 'undefined' && window.cart) {
-        requiereAltaPrecision = Object.values(window.cart).some(item => {
-            const precio = parseFloat(item.price || 0);
-            return (Math.round(precio * 100) / 100) !== precio;
-        });
-    }
-
-    const str = n.toString();
-    const parts = str.split('.');
-    
-    if (requiereAltaPrecision && parts.length > 1 && parts[1].length > 2) {
-        // Formato de alta precisión (solo si el producto lo requiere)
-        return n.toString().replace(".", ",") + " €";
-    }
-    
-    return n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
+    return n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 /**

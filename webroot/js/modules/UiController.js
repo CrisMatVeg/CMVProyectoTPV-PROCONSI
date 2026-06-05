@@ -349,7 +349,19 @@ export const UiController = {
     }
 
     const discRow = document.getElementById("discountRow");
-    if (discRow) discRow.style.display = totals.totalDiscount > 0 ? "flex" : "none";
+    if (discRow) {
+      discRow.style.display = totals.totalDiscount > 0 ? "flex" : "none";
+      const discLabel = document.getElementById("discountLabel");
+      if (discLabel) {
+        const promo = AppState.currentPromo;
+        if (promo) {
+          const name = promo.label || promo.codigo || '';
+          discLabel.textContent = name ? `Descuento (${name})` : (window.I18N?.discount || 'Descuento');
+        } else {
+          discLabel.textContent = window.I18N?.discount || 'Descuento';
+        }
+      }
+    }
     
     const chargeBtn = document.getElementById("chargeBtn");
     if (chargeBtn) chargeBtn.disabled = Object.keys(AppState.cart).length === 0;
@@ -383,10 +395,13 @@ export const UiController = {
 
   templates: {
     productCard(p) {
+        const fmtP = (val, prec) => parseInt(prec)
+            ? (Math.round(parseFloat(val) * 100000) / 100000).toString().replace('.', ',') + ' €'
+            : Utils.fmt2(val);
         const effectivePrice = AppState.getEffectivePrice ? AppState.getEffectivePrice(p) : p.price;
-        const priceHtml = Math.abs(effectivePrice - p.price) > 0.01 
-            ? `<span class="price-old">${Utils.fmt2(p.price)}</span> <span class="price-current">${Utils.fmt2(effectivePrice)}</span>`
-            : `<span class="price-current">${Utils.fmt2(p.price)}</span>`;
+        const priceHtml = Math.abs(effectivePrice - p.price) > 0.01
+            ? `<span class="price-old">${fmtP(p.price, p.mantener_precision)}</span> <span class="price-current">${fmtP(effectivePrice, p.mantener_precision)}</span>`
+            : `<span class="price-current">${fmtP(p.price, p.mantener_precision)}</span>`;
 
         const stockClass = p.stock <= 0 ? "none" : (p.stock <= 5 ? "low" : "");
         const stockLabel = p.stock <= 0 ? (window.I18N?.outOfStock || "Agotado") : `${window.I18N?.stock || "Stock"}: ${p.stock}`;
@@ -437,7 +452,14 @@ export const UiController = {
           </div>`;
     },
     cartItem(item) {
+        const fmtP = (val, prec) => parseInt(prec)
+            ? (Math.round(parseFloat(val) * 100000) / 100000).toString().replace('.', ',') + ' €'
+            : Utils.fmt2(val);
         const priceModified = item._customPrice && item.basePriceSnapshot != null && Math.abs(item.price - item.basePriceSnapshot) > 0.001;
+        const priceStep = parseInt(item.mantener_precision) ? '0.00001' : '0.01';
+        const priceVal = parseInt(item.mantener_precision)
+            ? (Math.round(parseFloat(item.price) * 100000) / 100000).toString()
+            : parseFloat(item.price).toFixed(2);
         return `
           <div class="order-item">
             <span class="order-item-emoji">
@@ -445,7 +467,7 @@ export const UiController = {
             </span>
             <div class="order-item-info">
               <div class="order-item-name">${item.name}</div>
-              <div class="order-item-price"><input type="number" class="price-input${priceModified ? ' price-modified' : ''}" value="${parseFloat(item.price).toFixed(2)}" min="0" step="0.01" onchange="app.setItemPrice('${item.cartKey}', this.value)" onfocus="this.select()" title="Editar precio (solo esta venta)">€ × ${item.qty}</div>
+              <div class="order-item-price"><input type="number" class="price-input${priceModified ? ' price-modified' : ''}" value="${priceVal}" min="0" step="${priceStep}" onchange="app.setItemPrice('${item.cartKey}', this.value)" onfocus="this.select()" title="Editar precio (solo esta venta)">€ × ${item.qty}${priceModified ? ' <i class="fa-solid fa-lock fs-10 text-warning opacity-80" title="Precio manual: tarifas y descuentos no aplican a este producto"></i>' : ''}</div>
             </div>
             <div class="qty-ctrl">
               <button class="qty-btn" onclick="app.changeQty('${item.cartKey}', -1)" aria-label="${window.I18N?.reduceQty || "Reducir cantidad"}"><i class="fa-solid fa-minus" aria-hidden="true"></i></button>

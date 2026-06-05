@@ -131,6 +131,7 @@ const TpvApp = {
 
   handleFacturaToggle(val) {
     AppState.esFactura = val;
+    PaymentManager.checkMostrarPanelNif();
   },
 
   applyDiscount() {
@@ -452,6 +453,7 @@ const TpvApp = {
 
   nuevaVenta() {
     document.getElementById("ticketModal").classList.remove("visible");
+    AppState.currentPromo = null;
     AppState.cart = {};
     AppState.saveCart();
     this.refreshUI();
