@@ -159,6 +159,14 @@ try {
         }
     }
 
+    // Si se proporcionó un NIF nuevo (cliente sin NIF previo), actualizarlo en su ficha
+    if ($clienteIdParaVenta && !empty($datos['nifEsNuevo']) && !empty($nif_cliente)) {
+        DBPDO::ejecutarConsulta(
+            "UPDATE clientes SET nif = :nif, aeat_id_type = :idtype, aeat_codigo_pais = :pais WHERE id = :id AND (nif IS NULL OR nif = '')",
+            [':nif' => $nif_cliente, ':idtype' => $aeat_id_type, ':pais' => $aeat_codigo_pais, ':id' => $clienteIdParaVenta]
+        );
+    }
+
     // Guardar la venta en BD
     $idUsuario  = $_SESSION['usuarioActualTPV']->getId();
     if ($clienteIdParaVenta) {

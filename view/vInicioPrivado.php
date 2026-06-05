@@ -1,7 +1,6 @@
     <!-- NOTIFICACIONES VERIFACTU -->
     <?php
-    require_once __DIR__ . '/../model/AeatQueueService.php';
-    $resumenAEAT = (new AeatQueueService())->obtenerResumenEstado();
+    // $resumenAEAT es calculado en el controlador (con caché de 2 min)
     if ($resumenAEAT['criticos'] > 0 || $resumenAEAT['pendientes_24h'] > 0 || $resumenAEAT['subsanaciones'] > 0): ?>
         <div class="verifactu-alert-banner">
             <div class="d-flex ai-center gap-12">
@@ -381,6 +380,65 @@
         });
     </script>
 
+    <script>
+        // ── Modal DNI Rápido ─────────────────────────────────────────────────────
+        window._dniRapidoClienteId = null;
+
+        window.abrirModalDniRapido = function(clienteId, nombreCliente) {
+            window._dniRapidoClienteId = clienteId;
+            const el = document.getElementById('dniRapidoNombreCliente');
+            if (el) el.textContent = nombreCliente || '';
+            const inp = document.getElementById('dniRapidoValor');
+            if (inp) { inp.value = ''; setTimeout(() => inp.focus(), 150); }
+            const errEl = document.getElementById('dniRapidoError');
+            if (errEl) errEl.classList.add('d-none');
+            const modal = document.getElementById('modalDniRapido');
+            if (modal) modal.classList.add('visible');
+        };
+
+        window.cerrarModalDniRapido = function() {
+            const modal = document.getElementById('modalDniRapido');
+            if (modal) modal.classList.remove('visible');
+            window._dniRapidoClienteId = null;
+        };
+
+        window.guardarDniRapido = async function() {
+            const id = window._dniRapidoClienteId;
+            if (!id) return;
+            const nif = (document.getElementById('dniRapidoValor')?.value || '').trim().toUpperCase();
+            const tipo = document.getElementById('dniRapidoTipo')?.value || '01';
+            const pais = (document.getElementById('dniRapidoPais')?.value || 'ES').trim().toUpperCase();
+            const errEl = document.getElementById('dniRapidoError');
+            if (errEl) errEl.classList.add('d-none');
+
+            if (!nif) {
+                if (errEl) { errEl.textContent = 'Introduce el DNI/NIF.'; errEl.classList.remove('d-none'); }
+                return;
+            }
+            try {
+                const r = await fetch('api/gestionCliente.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ accion: 'actualizarNif', id, nif, aeat_id_type: tipo, aeat_codigo_pais: pais }),
+                });
+                const data = await r.json();
+                if (data.ok) {
+                    // Actualizar AppState para que la venta actual ya tenga el NIF
+                    if (window.AppState) {
+                        if (AppState.socioActual && String(AppState.socioActual.id) === String(id)) AppState.socioActual.nif = data.nif;
+                        if (AppState.clienteSeleccionado && String(AppState.clienteSeleccionado.id) === String(id)) AppState.clienteSeleccionado.nif = data.nif;
+                    }
+                    cerrarModalDniRapido();
+                    if (window.Utils) Utils.showToast('DNI guardado correctamente', 'success');
+                } else {
+                    if (errEl) { errEl.textContent = data.error || 'Error al guardar'; errEl.classList.remove('d-none'); }
+                }
+            } catch (e) {
+                if (errEl) { errEl.textContent = 'Error de conexión'; errEl.classList.remove('d-none'); }
+            }
+        };
+    </script>
+
     <!-- ORDER PANEL -->
     <div class="order-panel">
         <div class="order-header">
@@ -415,7 +473,7 @@
             <div
                 class="total-row d-none text-green"
                 id="discountRow">
-                <span><?php echo L('tpv_discount'); ?></span>
+                <span id="discountLabel"><?php echo L('tpv_discount'); ?></span>
                 <span id="discountAmt">-0,00 €</span>
             </div>
             <div class="total-row main">
@@ -728,6 +786,9 @@
                         <button type="button" onclick="app.buscarClienteGuardado()" class="btn-save w-auto p-4-12" aria-label="Buscar cliente">
                             <i class="fa-solid fa-search" aria-hidden="true"></i>
                         </button>
+                        <button type="button" onclick="app.mostrarRegistroCliente()" title="<?php echo L('client_new_quick_btn'); ?>" aria-label="<?php echo L('client_new_quick_btn'); ?>" style="width:32px;height:32px;min-width:32px;border-radius:50%;border:1px solid var(--border);background:var(--surface3);color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                            <i class="fa-solid fa-plus fs-11" aria-hidden="true"></i>
+                        </button>
                     </div>
                     <div id="clienteResultados" class="fs-12 mt-4 text-accent font-bold"></div>
                     <button id="btnAddCliente" onclick="app.mostrarRegistroCliente()" class="cat-tab p-4-8 fs-11 d-none"><?php echo L('client_new_btn'); ?></button>
@@ -847,6 +908,30 @@
                             <span><?php echo L('tpv_points_discount'); ?>: <strong id="puntosDiscountVal">-0,00 €</strong> (<span id="puntosRedeemedVal">0</span> pts)</span>
                         </div>
                         <button onclick="app.quitarPuntosCanjeados()" class="btn-close-modal text-white" style="font-size:16px;" aria-label="Quitar puntos canjeados">×</button>
+                    </div>
+                </div>
+
+                <!-- Panel NIF para factura: aparece si el cliente seleccionado no tiene NIF registrado -->
+                <div id="panelNifFactura" class="d-none flex-column gap-8 p-12 br-8 border-2" style="border-color: var(--accent); background: var(--surface2);">
+                    <div class="fs-12 font-bold text-accent d-flex ai-center gap-6">
+                        <i class="fa-solid fa-circle-exclamation"></i>
+                        <?php echo L('tpv_nif_required_for_invoice'); ?>
+                    </div>
+                    <div class="d-flex gap-4">
+                        <select id="facturaClienteIdType" class="form-input fs-11 p-2-4" style="width: 100px;">
+                            <option value="01">01 - NIF ES</option>
+                            <option value="02">02 - NIF IVA</option>
+                            <option value="03">03 - PASAP.</option>
+                            <option value="04">04 - ID OFIC.</option>
+                            <option value="05">05 - CERTIF.</option>
+                            <option value="06">06 - OTRO</option>
+                        </select>
+                        <input id="facturaClienteNif" class="form-input fs-12 font-mono flex-1" placeholder="NIF / Documento" autocomplete="off" style="text-transform: uppercase;" />
+                        <input id="facturaClientePais" class="form-input fs-12 font-mono" style="width: 45px;" placeholder="ES" maxlength="2" value="ES" />
+                    </div>
+                    <div class="fs-11 text-muted d-flex ai-center gap-6">
+                        <i class="fa-solid fa-floppy-disk"></i>
+                        <?php echo L('tpv_nif_will_be_saved'); ?>
                     </div>
                 </div>
 
@@ -1045,6 +1130,46 @@ $ivasVigentes = TipoIVAPDO::listarVigentesActuales();
     </div>
 </div>
 
+
+<!-- MODAL DNI RÁPIDO: aparece al seleccionar cliente sin DNI -->
+<div id="modalDniRapido" class="modal-overlay" role="dialog" aria-modal="true">
+    <div class="modal modal-content ai-stretch w-380 p-0" style="border-radius: 16px; overflow: hidden;">
+        <div class="d-flex ai-center gap-16 p-20 border-bottom">
+            <div class="modal-icon text-accent bg-accent-light m-0">
+                <i class="fa-solid fa-id-card"></i>
+            </div>
+            <div>
+                <div class="fs-16 fw-700">DNI / NIF del cliente</div>
+                <div class="fs-12 text-muted" id="dniRapidoNombreCliente"></div>
+            </div>
+            <button onclick="cerrarModalDniRapido()" class="btn-close-modal" style="margin-left: auto;">&times;</button>
+        </div>
+        <div class="p-20 grid gap-16">
+            <p class="fs-13 text-muted m-0">Este cliente no tiene DNI/NIF registrado. Puedes añadirlo ahora y quedará guardado en su ficha.</p>
+            <div class="d-flex gap-8">
+                <select id="dniRapidoTipo" class="form-input fs-12" style="width: 110px;">
+                    <option value="01">NIF (ES)</option>
+                    <option value="02">NIE</option>
+                    <option value="03">Pasaporte</option>
+                    <option value="05">ID UE</option>
+                    <option value="06">Otro</option>
+                </select>
+                <input id="dniRapidoValor" type="text" class="form-input font-mono fw-700 flex-1"
+                    placeholder="NIF / Documento" autocomplete="off" style="text-transform: uppercase;"
+                    onkeydown="if(event.key==='Enter') guardarDniRapido()">
+                <input id="dniRapidoPais" type="text" class="form-input font-mono" style="width: 48px;"
+                    placeholder="ES" maxlength="2" value="ES">
+            </div>
+            <div id="dniRapidoError" class="d-none text-red fs-12 font-bold"></div>
+        </div>
+        <div class="modal-footer full-width jc-end p-16 border-top">
+            <button onclick="cerrarModalDniRapido()" class="btn-cancel">Ahora no</button>
+            <button onclick="guardarDniRapido()" class="btn-save d-flex ai-center gap-8">
+                <i class="fa-solid fa-floppy-disk"></i> Guardar DNI
+            </button>
+        </div>
+    </div>
+</div>
 
 <style>
     .qty-input {

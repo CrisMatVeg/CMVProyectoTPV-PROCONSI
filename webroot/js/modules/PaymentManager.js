@@ -17,6 +17,7 @@ export const PaymentManager = {
   // State (Recovered)
   totalVentaActual: 0,
   checkoutContext: 'efectivo',
+  _isSaving: false,
 
   init() {
     this.setupEventListeners();
@@ -41,7 +42,23 @@ export const PaymentManager = {
 
   async processPayment() {
     await this._verificarEstadoCaja();
-    await this.syncCartPricesWithServer();
+
+    if (AppState.socioActual || AppState.clienteSeleccionado) {
+      // Solo sincronizar con servidor si hay cliente identificado
+      await this.syncCartPricesWithServer();
+    } else {
+      // Sin cliente: resetear cualquier tarifa residual y recalcular desde cero
+      const cartReset = AppState.cart;
+      Object.keys(cartReset).forEach(key => {
+        const item = cartReset[key];
+        if (item._customPrice) return;
+        item._tariffApplied = false;
+        item.appliedTariffs = [];
+        if (item.basePriceSnapshot != null) item.price = item.basePriceSnapshot;
+      });
+      AppState.cart = cartReset;
+      CartManager.recalculateCartPrices();
+    }
 
     const totals = CartManager.calculateTotals();
     this.totalVentaActual = totals ? totals.total : 0;
@@ -53,8 +70,7 @@ export const PaymentManager = {
     }
 
     if (!AppState.clienteSeleccionado && !AppState.socioActual) {
-      const btnPart = document.getElementById("btnParticular");
-      if (btnPart) btnPart.click();
+      await this.seleccionarTipoCliente("particular");
     }
 
     this._procesarVales();
@@ -139,9 +155,6 @@ export const PaymentManager = {
     AppState.tipoClienteActual = tipo;
     this.updateTypeButtons();
 
-    await this.syncCartPricesWithServer();
-    this.updateMixSummary();
-
     const empD = document.getElementById("empresaDatos");
     if (empD) empD.classList.add("d-none");
     const socB = document.getElementById("socioBusqueda");
@@ -175,9 +188,23 @@ export const PaymentManager = {
       if (gen) gen.classList.remove("d-none");
     }
 
+    // Resetear flags de tarifa para que recalculateCartPrices pueda recalcular
+    // sin cliente (no resetear items con precio editado manualmente)
+    const cartReset = AppState.cart;
+    Object.keys(cartReset).forEach(key => {
+      const item = cartReset[key];
+      if (item._customPrice) return;
+      item._tariffApplied = false;
+      item.appliedTariffs = [];
+      if (item.basePriceSnapshot != null) item.price = item.basePriceSnapshot;
+    });
+    AppState.cart = cartReset;
+
     CartManager.recalculateCartPrices();
     const totals = CartManager.calculateTotals();
     UiController.renderCart(totals);
+    this.updateMixSummary();
+    this.checkMostrarPanelNif();
   },
 
   async buscarSocio() {
@@ -209,6 +236,7 @@ export const PaymentManager = {
         Utils.showToast("Socio identificado");
         this.cargarValesCliente(r.cliente.id);
         this.mostrarPuntosCliente(r.cliente);
+        this.checkMostrarPanelNif();
         
         await this.syncCartPricesWithServer();
 
@@ -258,12 +286,28 @@ export const PaymentManager = {
     
     this.quitarValeAplicado();
     this.quitarPuntosCanjeados();
-    
-    // Recalcular precios (quitar tarifas de socio si las hubiera)
+
+    // Ocultar y limpiar panel NIF para factura
+    const panelNif = document.getElementById("panelNifFactura");
+    if (panelNif) panelNif.classList.add("d-none");
+    const nifInput = document.getElementById("facturaClienteNif");
+    if (nifInput) nifInput.value = "";
+
+    // Resetear flags de tarifa antes de recalcular (sin cliente = sin tarifa)
+    const cartReset = AppState.cart;
+    Object.keys(cartReset).forEach(key => {
+      const item = cartReset[key];
+      if (item._customPrice) return;
+      item._tariffApplied = false;
+      item.appliedTariffs = [];
+      if (item.basePriceSnapshot != null) item.price = item.basePriceSnapshot;
+    });
+    AppState.cart = cartReset;
+
     CartManager.recalculateCartPrices();
     const totals = CartManager.calculateTotals();
     UiController.renderCart(totals);
-    
+
     this.updateMixSummary();
     Utils.showToast("Cliente deseleccionado");
   },
@@ -357,10 +401,31 @@ export const PaymentManager = {
   },
 
   getClienteNif() {
-    if (AppState.tipoClienteActual === "empresa") return document.getElementById("empresaNif").value;
-    if (AppState.socioActual) return AppState.socioActual.nif;
-    if (AppState.clienteSeleccionado) return AppState.clienteSeleccionado.nif;
+    if (AppState.tipoClienteActual === "empresa") return document.getElementById("empresaNif")?.value || null;
+    const panelNif = document.getElementById("facturaClienteNif")?.value.trim() || null;
+    if (AppState.socioActual) return AppState.socioActual.nif || panelNif;
+    if (AppState.clienteSeleccionado) return AppState.clienteSeleccionado.nif || panelNif;
     return null;
+  },
+
+  // Muestra u oculta el panel de NIF extra si el cliente seleccionado no tiene NIF y se requiere factura
+  checkMostrarPanelNif() {
+    const panel = document.getElementById("panelNifFactura");
+    if (!panel) return;
+
+    // Solo relevante si factura está activa y el tipo no es empresa (empresa ya tiene su propio campo NIF)
+    if (!AppState.esFactura || AppState.tipoClienteActual === "empresa") {
+      panel.classList.add("d-none");
+      return;
+    }
+
+    const cliente = AppState.socioActual || AppState.clienteSeleccionado;
+    if (cliente && !cliente.nif) {
+      panel.classList.remove("d-none");
+      setTimeout(() => document.getElementById("facturaClienteNif")?.focus(), 100);
+    } else {
+      panel.classList.add("d-none");
+    }
   },
 
   getDescuentoLabel() {
@@ -609,7 +674,13 @@ export const PaymentManager = {
 
     Utils.showToast("Cliente seleccionado: " + c.nombre);
     this.mostrarPuntosCliente(c);
-    
+    this.checkMostrarPanelNif();
+
+    // Si el cliente no tiene DNI, ofrecer introducirlo ahora
+    if (!c.nif && typeof window.abrirModalDniRapido === 'function') {
+      setTimeout(() => window.abrirModalDniRapido(c.id, c.nombre), 300);
+    }
+
     CartManager.recalculateCartPrices();
     const totals = CartManager.calculateTotals();
     UiController.renderCart(totals);
@@ -818,10 +889,15 @@ export const PaymentManager = {
     const el_PromoText = document.getElementById("promoNoticeText");
     if (el_PromoNotice) {
       if (AppState.currentPromo) {
-        let descText = AppState.currentPromo.nombre || AppState.currentPromo.codigo;
-        if (AppState.currentPromo.tipo === "percent") descText += ` (-${AppState.currentPromo.valor}%)`;
-        else if (AppState.currentPromo.tipo === "amount") descText += ` (-${Utils.formatCurrency(AppState.currentPromo.valor)})`;
-        
+        const p = AppState.currentPromo;
+        let descText = p.label || p.codigo || p.nombre || '—';
+        if (p.tipo === "bundle" && p.bundle_buy_qty && p.bundle_pay_qty) {
+          descText += ` (${p.bundle_buy_qty}x${p.bundle_pay_qty})`;
+        } else if (p.tipo === "percent") {
+          descText += ` (-${p.valor}%)`;
+        } else if (p.tipo === "amount") {
+          descText += ` (-${Utils.formatCurrency(p.valor)})`;
+        }
         el_PromoText.textContent = "Promo: " + descText;
         el_PromoNotice.classList.remove("d-none");
         el_PromoNotice.classList.add("d-flex");
@@ -1239,6 +1315,9 @@ export const PaymentManager = {
    * Logic recovered and standardized for modular architecture.
    */
   async ejecutarCobroFinal() {
+    if (this._isSaving) return;
+    this._isSaving = true;
+
     const btn = document.getElementById("confirmarClienteBtn");
     if (btn) {
       btn.disabled = true;
@@ -1289,7 +1368,7 @@ export const PaymentManager = {
       }
     }
 
-    // 1. Validar Factura: si está activada, el cliente debe estar identificado (Nombre y NIF)
+    // 1. Validar Factura: cliente identificado con nombre y NIF
     if (AppState.esFactura) {
       const tieneSocio = !!AppState.socioActual;
       const tieneEmpresa = !!(document.getElementById("empresaNombre")?.value && document.getElementById("empresaNif")?.value);
@@ -1301,14 +1380,30 @@ export const PaymentManager = {
         if (btn) { btn.disabled = false; btn.textContent = "Confirmar Cobro"; }
         return;
       }
+
+      // Validar que hay NIF (ya sea registrado o introducido en el panel)
+      const nifActual = this.getClienteNif();
+      if (!nifActual) {
+        this.checkMostrarPanelNif();
+        Utils.showToast('<i class="fa-solid fa-circle-exclamation"></i> Introduce el NIF del cliente para generar la factura.', "error");
+        document.getElementById("facturaClienteNif")?.focus();
+        if (btn) { btn.disabled = false; btn.textContent = "Confirmar Cobro"; }
+        return;
+      }
     }
 
-    // [NUEVO] Capturar metadatos AEAT de identificación si es empresa manual
+    // Capturar metadatos AEAT: de empresa manual o del panel NIF para factura
     let manualAeatIdType = null;
     let manualAeatPais = null;
     if (AppState.tipoClienteActual === 'empresa') {
         manualAeatIdType = document.getElementById("empresaIdType")?.value;
         manualAeatPais = document.getElementById("empresaPais")?.value.trim() || 'ES';
+    } else {
+        const panelNif = document.getElementById("facturaClienteNif")?.value.trim();
+        if (panelNif) {
+            manualAeatIdType = document.getElementById("facturaClienteIdType")?.value || '01';
+            manualAeatPais = document.getElementById("facturaClientePais")?.value.trim() || 'ES';
+        }
     }
 
     // 3. Preparar payload
@@ -1322,10 +1417,17 @@ export const PaymentManager = {
         ? 'mixto'
         : (window.currentPayments[0]?.metodo || AppState.selectedPayment || 'efectivo');
 
+    const panelNifValue = document.getElementById("facturaClienteNif")?.value.trim() || null;
+    const clienteNifRegistrado = AppState.socioActual?.nif || AppState.clienteSeleccionado?.nif || null;
+    // nifEsNuevo: el NIF vino del panel porque el cliente no tenía uno registrado
+    const nifEsNuevo = !!(panelNifValue && !clienteNifRegistrado && (AppState.socioActual || AppState.clienteSeleccionado));
+
     const payload = {
       cliente: AppState.clienteSeleccionado,
       socio: AppState.socioActual,
       tipoCliente: AppState.tipoClienteActual,
+      nifCliente: this.getClienteNif() || null,
+      nifEsNuevo: nifEsNuevo,
       aeatIdType: manualAeatIdType,
       aeatCodigoPais: manualAeatPais,
       lineas: Object.values(window.cart).map(it => ({
@@ -1338,7 +1440,8 @@ export const PaymentManager = {
         variant: it.variant,
         basePriceSnapshot: it.basePriceSnapshot,
         descuentos: it.appliedTariffs,
-        appliedTariffs: it.appliedTariffs
+        appliedTariffs: it.appliedTariffs,
+        customPrice: !!it._customPrice
       })),
       pagos: window.currentPayments,
       metodoPago: derivedMetodoPago,
@@ -1347,6 +1450,7 @@ export const PaymentManager = {
       subtotal: totals.subtotal,
       descuentoAmt: totals.totalDiscount,
       descuentoPct: (AppState.currentPromo && AppState.currentPromo.tipo === 'percent') ? AppState.currentPromo.valor : 0,
+      descuentoLabel: AppState.currentPromo ? (AppState.currentPromo.label || AppState.currentPromo.codigo || null) : null,
       esFactura: AppState.esFactura ? 1 : 0,
       puntosCanjeados: AppState.puntosCanjeados || 0,
       puntosDescuentoAmt: AppState.puntosDescuentoAmt || 0,
@@ -1390,6 +1494,7 @@ export const PaymentManager = {
       console.error("Save error:", err);
       Utils.showToast(err.message, "error");
     } finally {
+      this._isSaving = false;
       if (btn) {
         btn.disabled = false;
         btn.textContent = "Confirmar Cobro";
