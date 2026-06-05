@@ -145,10 +145,17 @@ class PriceEngine
         $q = DBPDO::ejecutarConsulta($sql, $params);
         $todas = $q->fetchAll(PDO::FETCH_ASSOC);
 
+        // Carga en una sola query todas las tarifas que incluyen este producto (evita N+1)
+        $qTp = DBPDO::ejecutarConsulta(
+            "SELECT id_tarifa FROM tarifa_productos WHERE id_producto = :p",
+            [':p' => (int)$idProducto]
+        );
+        $tarifasDelProducto = array_flip(array_column($qTp->fetchAll(PDO::FETCH_ASSOC), 'id_tarifa'));
+
         $aplicables = [];
         foreach ($todas as $t) {
             $aplica = false;
-            
+
             // Defensive: ensure product exists
             if (!$pro) return [];
 
@@ -164,11 +171,7 @@ class PriceEngine
             } elseif ($t['scope'] === 'categoria' && $t['categoria'] === $cat) {
                 $aplica = true;
             } elseif ($t['scope'] === 'productos') {
-                $check = DBPDO::ejecutarConsulta("SELECT 1 FROM tarifa_productos WHERE id_tarifa = :t AND id_producto = :p", [
-                    ':t' => (int)$t['id'],
-                    ':p' => (int)$idProducto
-                ])->fetch();
-                if ($check) $aplica = true;
+                if (isset($tarifasDelProducto[(int)$t['id']])) $aplica = true;
             }
 
             if ($aplica && !$ignoreContextFilters && !self::esValidoPorFiltros($t, $idCliente)) {
