@@ -241,6 +241,10 @@ function parseAeatResponse($xmlString) {
         .badge-error_critico { background: #fee2e2; color: #991b1b; }
         .badge-bloqueado { background: #e2e8f0; color: #475569; }
 
+        .badge-lote { padding: 3px 8px; border-radius: 6px; font-size: 11px; font-family: monospace; background: #ede9fe; color: #5b21b6; border: 1px solid #c4b5fd; transition: background 0.15s; }
+        .badge-lote:hover { background: #c4b5fd; }
+        .badge-lote-active { background: var(--primary); color: white; border-color: var(--primary); }
+
         tr.row-error { background-color: #fff1f2; }
         tr.row-warning { background-color: #fffbeb; }
 
@@ -440,7 +444,7 @@ function parseAeatResponse($xmlString) {
             if (!tbody) return;
 
             if (!rows || rows.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6">
+                tbody.innerHTML = `<tr><td colspan="7">
                     <div class="empty-state">
                         <i class="fa-solid ${isQueue ? 'fa-circle-check' : 'fa-folder-open'}"></i>
                         <p>${isQueue ? 'No hay envíos pendientes en la cola automática.' : 'No hay registros en el historial.'}</p>
@@ -448,31 +452,43 @@ function parseAeatResponse($xmlString) {
                 return;
             }
 
-            tbody.innerHTML = rows.map((row, index) => {
+            const filteredRows = _activeLoteFilter
+                ? rows.filter(r => r.lote_id === _activeLoteFilter)
+                : rows;
+
+            tbody.innerHTML = filteredRows.map((row, index) => {
                 const rowClass = row.estado === 'error_critico' ? 'row-error' : (row.estado === 'pendiente' && row.intentos > 0 ? 'row-warning' : '');
                 const timeCol = isQueue
                     ? (row.fecha_proximo_intento ? fmtTime(row.fecha_proximo_intento) : '<span style="color:var(--primary);font-weight:600;">Inmediato</span>')
                     : (row.fecha_envio ? fmtTime(row.fecha_envio) : '—');
-                
+
                 const errorText = row.ultimo_error || '—';
                 const msgCol = errorText.length > 80 ? `<span title="${errorText.replace(/"/g, '&quot;')}">${errorText.substring(0,80)}…</span>` : errorText;
-                
+
                 const storeKey = isQueue ? 'queue' : 'logs';
-                
+                const realIndex = rows.indexOf(row);
+
                 const subsanarBtn = (row.estado === 'error_critico' && isQueue)
                     ? `<button class="btn-view" style="background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;"
-                           onclick="handleSubsanarFromStore('${storeKey}', ${index})">Subsanar</button>`
+                           onclick="handleSubsanarFromStore('${storeKey}', ${realIndex})">Subsanar</button>`
                     : '';
+
+                const loteCell = row.lote_id
+                    ? `<span class="badge-lote${_activeLoteFilter === row.lote_id ? ' badge-lote-active' : ''}"
+                             title="${row.lote_id}" style="cursor:pointer;"
+                             onclick="filterByLote('${row.lote_id}')">${row.lote_id.substring(0,8)}…</span>`
+                    : `<span style="color:var(--text-light);">—</span>`;
 
                 return `<tr class="${rowClass}">
                     <td class="text-mono"><strong>#${row.numero_ticket || row.id_venta}</strong><div class="small-text">ID Venta: ${row.id_venta}</div></td>
                     <td>${fmtBadge(row.estado)}</td>
                     <td style="text-align:center;">${row.intentos || 0}</td>
+                    <td>${loteCell}</td>
                     <td>${timeCol}</td>
                     <td style="max-width:300px;font-size:13px;">${msgCol}</td>
                     <td><div style="display:flex;gap:5px;">
-                        <button class="btn-view" onclick="viewFromStore('${storeKey}', ${index}, 'req')">XML</button>
-                        <button class="btn-view" onclick="viewFromStore('${storeKey}', ${index}, 'resp')">RESP</button>
+                        <button class="btn-view" onclick="viewFromStore('${storeKey}', ${realIndex}, 'req')">XML</button>
+                        <button class="btn-view" onclick="viewFromStore('${storeKey}', ${realIndex}, 'resp')">RESP</button>
                         ${subsanarBtn}
                     </div></td>
                 </tr>`;
@@ -537,6 +553,33 @@ function parseAeatResponse($xmlString) {
         // Polling activo solo cuando hay ítems en cola; 3 s entre actualizaciones
         let _pollTimer = null;
         let _queueActive = (<?= (int)(($stats['pendientes'] ?? 0) + ($stats['errores'] ?? 0) + ($stats['bloqueados'] ?? 0)) ?> > 0);
+        let _activeLoteFilter = null;
+
+        function filterByLote(loteId) {
+            if (_activeLoteFilter === loteId) {
+                _activeLoteFilter = null;
+            } else {
+                _activeLoteFilter = loteId;
+            }
+            updateLoteBanner();
+            const isQ = currentTab === 'queue';
+            renderTableRows(isQ ? liveDataStore.queue : liveDataStore.logs, isQ);
+        }
+
+        function updateLoteBanner() {
+            let banner = document.getElementById('lote-filter-banner');
+            if (_activeLoteFilter) {
+                if (!banner) {
+                    banner = document.createElement('div');
+                    banner.id = 'lote-filter-banner';
+                    banner.style.cssText = 'background:var(--primary);color:white;padding:8px 16px;border-radius:8px;margin-bottom:10px;display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600;';
+                    document.querySelector('.card').before(banner);
+                }
+                banner.innerHTML = `<i class="fa-solid fa-layer-group"></i> Filtrando por lote: <code style="background:rgba(255,255,255,0.2);padding:2px 6px;border-radius:4px;">${_activeLoteFilter}</code> <button onclick="filterByLote('${_activeLoteFilter}')" style="margin-left:auto;background:rgba(255,255,255,0.2);border:none;color:white;padding:3px 10px;border-radius:6px;cursor:pointer;font-size:12px;">✕ Quitar filtro</button>`;
+            } else if (banner) {
+                banner.remove();
+            }
+        }
 
         function schedulePoll() {
             clearTimeout(_pollTimer);
@@ -644,6 +687,7 @@ function parseAeatResponse($xmlString) {
                 <th>Ticket / ID</th>
                 <th>Estado</th>
                 <th>Nº Intentos</th>
+                <th>Lote</th>
                 <th><?= $tab === 'queue' ? 'Programado para' : 'Última Transmisión' ?></th>
                 <th><?= $tab === 'queue' ? 'Motivo espera / Error' : 'Último Mensaje' ?></th>
                 <th>Acciones</th>
@@ -652,7 +696,7 @@ function parseAeatResponse($xmlString) {
             <tbody id="main-tbody">
             <?php if (empty($logs)): ?>
                 <tr>
-                    <td colspan="6">
+                    <td colspan="7">
                         <div class="empty-state">
                             <i class="fa-solid <?= $tab === 'queue' ? 'fa-circle-check text-green' : 'fa-folder-open' ?>"></i>
                             <p><?= $tab === 'queue' ? 'No hay envíos pendientes en la cola automática.' : 'No hay registros en el historial.' ?></p>
@@ -676,6 +720,17 @@ function parseAeatResponse($xmlString) {
                         </td>
                         <td><span class="badge badge-<?= $row['estado'] ?>"><?= $row['estado'] ?></span></td>
                         <td style="text-align: center;"><?= $row['intentos'] ?></td>
+                        <td>
+                            <?php if (!empty($row['lote_id'])): ?>
+                                <span class="badge-lote" title="<?= htmlspecialchars($row['lote_id']) ?>"
+                                      onclick="filterByLote('<?= htmlspecialchars($row['lote_id']) ?>')"
+                                      style="cursor:pointer;">
+                                    <?= substr($row['lote_id'], 0, 8) ?>…
+                                </span>
+                            <?php else: ?>
+                                <span style="color:var(--text-light);">—</span>
+                            <?php endif; ?>
+                        </td>
                         <td>
                             <?php if ($tab === 'queue'): ?>
                                 <span style="color: var(--primary); font-weight: 600;">

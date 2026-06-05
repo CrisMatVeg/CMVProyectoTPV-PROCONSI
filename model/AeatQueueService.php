@@ -236,7 +236,8 @@ class AeatQueueService
     private function enviarLoteUnificado(array $lote): array
     {
         $resumen = ['exitos' => 0, 'fallos' => 0];
-        
+        $loteId  = bin2hex(random_bytes(16));
+
         $loteIds  = [];
         $xmlPaths = [];
         $idVentas = [];
@@ -267,7 +268,7 @@ class AeatQueueService
             LogPDO::addLog('VF_ENVIO_EXITO', "Lote de " . count($loteIds) . " registros enviado correctamente.");
             foreach ($loteIds as $index => $idCola) {
                 $idV = $idVentas[$index];
-                $this->marcarEnviado($idCola, $idV, $respuesta['raw_response'] ?? '');
+                $this->marcarEnviado($idCola, $idV, $respuesta['raw_response'] ?? '', $loteId);
                 DBPDO::ejecutarConsulta(
                     "UPDATE verifactu_logs SET estado = 'enviado' WHERE id_venta = :idv AND estado = 'pendiente'",
                     [':idv' => $idV]
@@ -304,7 +305,7 @@ class AeatQueueService
                             $descErr = $resultadoLinea['mensaje'];
 
                             if ($stReg === 'Correcto' || $codErr === '3000') {
-                                $this->marcarEnviado($idCola, $idV, $raw);
+                                $this->marcarEnviado($idCola, $idV, $raw, $loteId);
                                 DBPDO::ejecutarConsulta("UPDATE verifactu_logs SET estado = 'enviado' WHERE id_venta = :idv AND estado = 'pendiente'", [':idv' => $idV]);
                                 $resumen['exitos']++;
                             } else {
@@ -469,15 +470,16 @@ class AeatQueueService
         }
     }
 
-    private function marcarEnviado(int $idCola, int $idVenta, string $respuestaAeat)
+    private function marcarEnviado(int $idCola, int $idVenta, string $respuestaAeat, string $loteId = '')
     {
         $sql = "UPDATE cola_envios
                 SET estado = 'enviado',
                     intentos = intentos + 1,
                     respuesta_aeat = :resp,
-                    fecha_envio = CURRENT_TIMESTAMP
+                    fecha_envio = CURRENT_TIMESTAMP,
+                    lote_id = :lote_id
                 WHERE id = :id";
-        DBPDO::ejecutarConsulta($sql, [':id' => $idCola, ':resp' => $respuestaAeat]);
+        DBPDO::ejecutarConsulta($sql, [':id' => $idCola, ':resp' => $respuestaAeat, ':lote_id' => $loteId ?: null]);
 
         // Si quedan otras entradas pendientes para esta venta (ej. anulación + alta correctiva),
         // no marcar como 'enviado' hasta que todas hayan sido procesadas.
