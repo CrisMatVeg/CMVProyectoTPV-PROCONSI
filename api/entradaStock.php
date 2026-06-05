@@ -14,6 +14,7 @@ try {
     require_once __DIR__ . '/../model/DBPDO.php';
     require_once __DIR__ . '/../model/Usuario.php';
     require_once __DIR__ . '/../model/EntradaStockPDO.php';
+    require_once __DIR__ . '/../model/LogPDO.php';
 
     // session_start(); // Handled by csrf_check.php
 
@@ -65,6 +66,11 @@ try {
         $idUsuario,
         $notas
     );
+
+    LogPDO::addLog('ENTRADA_STOCK', "Entrada de {$cantidad} uds. en producto #{$idProducto} (CMP: {$resultado['cmp_resultante']}€)", [
+        'id_producto' => $idProducto, 'cantidad' => $cantidad,
+        'precio_coste' => $precioCoste, 'cmp_resultante' => $resultado['cmp_resultante'],
+    ]);
 
     echo json_encode([
         'ok'  => true,

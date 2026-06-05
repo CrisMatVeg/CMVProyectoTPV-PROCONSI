@@ -15,6 +15,7 @@ try {
     require_once __DIR__ . '/../model/DBPDO.php';
     require_once __DIR__ . '/../model/PromocionPDO.php';
     require_once __DIR__ . '/../model/Usuario.php';
+    require_once __DIR__ . '/../model/LogPDO.php';
 
     // session_start(); // Handled by csrf_check.php
     if (!isset($_SESSION['usuarioActualTPV']) || !$_SESSION['usuarioActualTPV']->tienePermiso('gestionar_promociones')) {
@@ -39,6 +40,9 @@ try {
                 break;
             }
             PromocionPDO::agregar($input);
+            LogPDO::addLog('CREATE_PROMOCION', "Promoción creada: {$input['descripcion']}", [
+                'descripcion' => $input['descripcion'], 'tipo' => $input['tipo'] ?? '', 'valor' => $input['valor'] ?? null,
+            ]);
             echo json_encode(['ok' => true]);
             break;
 
@@ -53,6 +57,9 @@ try {
                 break;
             }
             PromocionPDO::editar($id, $input);
+            LogPDO::addLog('UPDATE_PROMOCION', "Promoción #{$id} actualizada: {$input['descripcion']}", [
+                'id' => $id, 'descripcion' => $input['descripcion'],
+            ]);
             echo json_encode(['ok' => true]);
             break;
 
@@ -62,6 +69,7 @@ try {
                 throw new Exception('ID de promoción inválido');
             }
             PromocionPDO::eliminar($id);
+            LogPDO::addLog('DELETE_PROMOCION', "Promoción #{$id} eliminada", ['id' => $id]);
             echo json_encode(['ok' => true]);
             break;
 
@@ -71,6 +79,9 @@ try {
                 throw new Exception('ID de promoción inválido');
             }
             $activo = PromocionPDO::toggleActivo($id);
+            LogPDO::addLog('TOGGLE_PROMOCION', "Promoción #{$id} " . ($activo ? 'activada' : 'desactivada'), [
+                'id' => $id, 'activo' => (bool)$activo,
+            ]);
             echo json_encode(['ok' => true, 'activo' => $activo]);
             break;
 

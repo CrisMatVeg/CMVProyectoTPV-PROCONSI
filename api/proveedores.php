@@ -16,6 +16,7 @@ try {
     require_once __DIR__ . '/../model/Usuario.php';
     require_once __DIR__ . '/../model/ProveedorPDO.php';
     require_once __DIR__ . '/../model/Validador.php';
+    require_once __DIR__ . '/../model/LogPDO.php';
 
     // session_start(); // Handled by csrf_check.php
 
@@ -95,6 +96,9 @@ try {
                     $data['notas'] ?? '', $data['activo'] ?? true,
                     $data['vencimiento_dias'] ?? 0
                 );
+                LogPDO::addLog('UPDATE_PROVEEDOR', "Proveedor #{$data['id']} actualizado: {$data['nombre']}", [
+                    'id' => (int)$data['id'], 'nombre' => $data['nombre'], 'cif_nif' => $data['cif_nif'],
+                ]);
                 echo json_encode(['ok' => true, 'success' => $success]);
             } else {
                 $id = ProveedorPDO::agregarProveedor(
@@ -103,6 +107,9 @@ try {
                     $data['aplica_re'] ?? false, $data['notas'] ?? '',
                     $data['vencimiento_dias'] ?? 0
                 );
+                LogPDO::addLog('CREATE_PROVEEDOR', "Proveedor creado: {$data['nombre']} ({$data['cif_nif']})", [
+                    'id' => (int)$id, 'nombre' => $data['nombre'], 'cif_nif' => $data['cif_nif'],
+                ]);
                 echo json_encode(['ok' => true, 'success' => (bool)$id, 'id' => $id]);
             }
             break;
@@ -110,6 +117,9 @@ try {
         case 'DELETE':
             if (isset($_GET['id'])) {
                 $success = ProveedorPDO::borrarProveedor($_GET['id']);
+                LogPDO::addLog('DELETE_PROVEEDOR', "Proveedor #{$_GET['id']} eliminado", [
+                    'id' => (int)$_GET['id'],
+                ]);
                 echo json_encode(['ok' => true, 'success' => $success]);
             }
             break;

@@ -15,6 +15,7 @@ try {
     require_once __DIR__ . '/../model/DBPDO.php';
     require_once __DIR__ . '/../model/TarifaPrecioPDO.php';
     require_once __DIR__ . '/../model/Usuario.php';
+    require_once __DIR__ . '/../model/LogPDO.php';
 
     // session_start(); // Handled by csrf_check.php
     if (!isset($_SESSION['usuarioActualTPV']) || !$_SESSION['usuarioActualTPV']->tienePermiso('gestionar_tarifas')) {
@@ -44,6 +45,9 @@ try {
                 break;
             }
             TarifaPrecioPDO::agregar($input, $_SESSION['usuarioActualTPV']->getId());
+            LogPDO::addLog('CREATE_TARIFA', "Tarifa creada: {$input['nombre']}", [
+                'nombre' => $input['nombre'], 'tipo' => $input['tipo'] ?? '', 'valor' => $input['valor'] ?? null, 'scope' => $input['scope'] ?? 'todos',
+            ]);
             echo json_encode(['ok' => true]);
             break;
 
@@ -60,6 +64,9 @@ try {
                 break;
             }
             TarifaPrecioPDO::editar($id, $input);
+            LogPDO::addLog('UPDATE_TARIFA', "Tarifa #{$id} actualizada: {$input['nombre']}", [
+                'id' => $id, 'nombre' => $input['nombre'],
+            ]);
             echo json_encode(['ok' => true]);
             break;
 
@@ -69,6 +76,9 @@ try {
             $tarifa = TarifaPrecioPDO::obtenerPorId($id);
             if ($tarifa && $tarifa['aplicada']) throw new Exception('No se puede eliminar una tarifa que ya ha sido aplicada permanentemente');
             TarifaPrecioPDO::eliminar($id);
+            LogPDO::addLog('DELETE_TARIFA', "Tarifa #{$id} eliminada: " . ($tarifa['nombre'] ?? ''), [
+                'id' => $id, 'nombre' => $tarifa['nombre'] ?? '',
+            ]);
             echo json_encode(['ok' => true]);
             break;
 
@@ -76,6 +86,9 @@ try {
             $id = (int)($input['id'] ?? 0);
             if ($id <= 0) throw new Exception('ID de tarifa inválido');
             $activo = TarifaPrecioPDO::toggleActivo($id);
+            LogPDO::addLog('TOGGLE_TARIFA', "Tarifa #{$id} " . ($activo ? 'activada' : 'desactivada'), [
+                'id' => $id, 'activo' => (bool)$activo,
+            ]);
             echo json_encode(['ok' => true, 'activo' => $activo]);
             break;
 

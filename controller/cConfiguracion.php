@@ -47,6 +47,9 @@ if (isset($_POST['guardarConfiguracion'])) {
         if (!empty($configuracionesAGuardar)) {
             $exito = ConfiguracionPDO::guardarConfiguracion($configuracionesAGuardar);
             if ($exito) {
+                LogPDO::addLog('UPDATE_CONFIGURACION', "Configuración del sistema actualizada", [
+                    'campos_modificados' => array_keys($configuracionesAGuardar),
+                ]);
                 $showSuccess = true;
             } else {
                 $aErrores['general'] = "Hubo un error al guardar la configuración.";

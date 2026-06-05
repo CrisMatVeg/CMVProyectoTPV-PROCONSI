@@ -38,6 +38,7 @@ $aErrores = [
     'email' => null
 ];
 $entradaOK = true;
+$showModal = false;
 // Obtener lista de roles para los formularios
 $listaRoles = RolPDO::listarRoles();
 
@@ -74,6 +75,9 @@ if (isset($_REQUEST['addUsuario'])) {
         }
 
         UsuarioPDO::agregarUsuario($nombre, $login, $pass, $nombreRol, $idRol, $email);
+        LogPDO::addLog('CREATE_USUARIO', "Usuario creado: {$nombre} ({$login})", [
+            'login' => $login, 'rol' => $nombreRol,
+        ]);
         header('Location: index.php?irUsuarios=1'); // Recargar para ver cambios
         exit;
     }
@@ -87,6 +91,9 @@ if (isset($_REQUEST['editUsuario'])) {
 
     if (!empty($nombre)) {
         UsuarioPDO::editarUsuario($id, $nombre, $email);
+        LogPDO::addLog('UPDATE_USUARIO', "Usuario #{$id} editado: {$nombre}", [
+            'id' => $id, 'nombre' => $nombre,
+        ]);
     }
     header('Location: index.php?irUsuarios=1');
     exit;
@@ -109,6 +116,9 @@ if (isset($_REQUEST['cambiarRol'])) {
     // No permitir que un usuario se cambie el rol a sí mismo
     if ($id !== $_SESSION['usuarioActualTPV']->getId()) {
         UsuarioPDO::editarRol($id, $nombreRol, $idRol);
+        LogPDO::addLog('UPDATE_ROL_USUARIO', "Rol de usuario #{$id} cambiado a '{$nombreRol}'", [
+            'id' => $id, 'rol' => $nombreRol,
+        ]);
     }
     header('Location: index.php');
     exit;
@@ -120,6 +130,9 @@ if (isset($_REQUEST['toggleEstado'])) {
     // No permitir que un usuario se dé de baja a sí mismo
     if ($id !== $_SESSION['usuarioActualTPV']->getId()) {
         UsuarioPDO::toggleEstatus($id);
+        LogPDO::addLog('TOGGLE_USUARIO', "Estado de usuario #{$id} cambiado", [
+            'id' => $id,
+        ]);
     }
     header('Location: index.php');
     exit;

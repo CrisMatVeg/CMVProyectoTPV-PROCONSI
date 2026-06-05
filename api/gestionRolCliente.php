@@ -14,6 +14,7 @@ try {
     require_once __DIR__ . '/../model/DBPDO.php';
     require_once __DIR__ . '/../model/Usuario.php';
     require_once __DIR__ . '/../model/RolClientePDO.php';
+    require_once __DIR__ . '/../model/LogPDO.php';
 
     // session_start(); // Handled by csrf_check.php
 
@@ -50,6 +51,9 @@ try {
         }
 
         $id = RolClientePDO::agregarRol($nombre);
+        LogPDO::addLog('CREATE_ROL_CLIENTE', "Rol de cliente creado: {$nombre}", [
+            'id' => (int)$id, 'nombre' => strtolower($nombre),
+        ]);
         echo json_encode(['ok' => true, 'id' => $id, 'nombre' => strtolower($nombre)]);
         exit;
     }
@@ -67,6 +71,7 @@ try {
         }
 
         RolClientePDO::eliminarRol($nombre);
+        LogPDO::addLog('DELETE_ROL_CLIENTE', "Rol de cliente eliminado: {$nombre}", ['nombre' => $nombre]);
         echo json_encode(['ok' => true]);
         exit;
     }

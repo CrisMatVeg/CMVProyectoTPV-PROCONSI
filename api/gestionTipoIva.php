@@ -14,6 +14,7 @@ try {
     require_once __DIR__ . '/../model/DBPDO.php';
     require_once __DIR__ . '/../model/TipoIVAPDO.php';
     require_once __DIR__ . '/../model/Usuario.php';
+    require_once __DIR__ . '/../model/LogPDO.php';
 
     // session_start(); // Handled by csrf_check.php
     if (!isset($_SESSION['usuarioActualTPV']) || !$_SESSION['usuarioActualTPV']->tienePermiso('gestionar_iva')) {
@@ -44,6 +45,9 @@ try {
                 break;
             }
             TipoIVAPDO::agregar($input);
+            LogPDO::addLog('CREATE_TIPO_IVA', "Tipo IVA creado: {$input['nombre']} ({$input['codigo']} - {$input['porcentaje']}%)", [
+                'codigo' => $input['codigo'], 'nombre' => $input['nombre'], 'porcentaje' => $input['porcentaje'],
+            ]);
             echo json_encode(['ok' => true]);
             break;
 
@@ -64,6 +68,9 @@ try {
                 break;
             }
             TipoIVAPDO::editar($id, $input);
+            LogPDO::addLog('UPDATE_TIPO_IVA', "Tipo IVA #{$id} actualizado: {$input['nombre']} ({$input['codigo']} - {$input['porcentaje']}%)", [
+                'id' => $id, 'codigo' => $input['codigo'], 'nombre' => $input['nombre'], 'porcentaje' => $input['porcentaje'],
+            ]);
 
             $hoy    = date('Y-m-d');
             $codigo = $input['codigo'];
@@ -102,6 +109,9 @@ try {
                 break;
             }
             TipoIVAPDO::eliminar($id);
+            LogPDO::addLog('DELETE_TIPO_IVA', "Tipo IVA #{$id} eliminado: {$tipoIva['nombre']} ({$tipoIva['codigo']})", [
+                'id' => $id, 'codigo' => $tipoIva['codigo'], 'nombre' => $tipoIva['nombre'],
+            ]);
             echo json_encode(['ok' => true]);
             break;
 

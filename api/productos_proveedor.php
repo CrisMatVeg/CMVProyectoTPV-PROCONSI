@@ -7,6 +7,7 @@ require_once __DIR__ . '/csrf_check.php';
 require_once __DIR__ . '/../model/Usuario.php';
 require_once __DIR__ . '/../model/DBPDO.php';
 require_once __DIR__ . '/../model/ProductoPDO.php';
+require_once __DIR__ . '/../model/LogPDO.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -56,6 +57,9 @@ try {
                 exit;
             }
             $res = ProductoPDO::vincularAProveedor($idProv, $ids);
+            LogPDO::addLog('VINCULAR_PRODUCTOS_PROVEEDOR', count($ids) . " producto(s) vinculados al proveedor #{$idProv}", [
+                'id_proveedor' => $idProv, 'ids_productos' => $ids,
+            ]);
             echo json_encode(['ok' => $res]);
         } 
         elseif ($accion === 'desvincular') {
@@ -65,6 +69,9 @@ try {
                 exit;
             }
             $res = ProductoPDO::desvincularDeProveedor($ids);
+            LogPDO::addLog('DESVINCULAR_PRODUCTOS_PROVEEDOR', count($ids) . " producto(s) desvinculados del proveedor", [
+                'ids_productos' => $ids,
+            ]);
             echo json_encode(['ok' => $res]);
         }
         else {

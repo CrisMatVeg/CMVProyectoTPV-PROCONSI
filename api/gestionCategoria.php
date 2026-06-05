@@ -14,6 +14,7 @@ try {
     require_once __DIR__ . '/../model/DBPDO.php';
     require_once __DIR__ . '/../model/Usuario.php';
     require_once __DIR__ . '/../model/CategoriaPDO.php';
+    require_once __DIR__ . '/../model/LogPDO.php';
 
     // session_start(); // Handled by csrf_check.php
 
@@ -36,6 +37,12 @@ try {
                 break;
             }
             $res = CategoriaPDO::agregar($codigo, $nombre);
+            if ($res) {
+                $newId = (int)DBPDO::ejecutarConsulta("SELECT LAST_INSERT_ID()")->fetchColumn();
+                LogPDO::addLog('CREATE_CATEGORIA', "Categoría creada: {$nombre} ({$codigo})", [
+                    'id' => $newId, 'codigo' => $codigo, 'nombre' => $nombre,
+                ]);
+            }
             echo json_encode(['ok' => $res]);
             break;
 
@@ -46,6 +53,9 @@ try {
                 break;
             }
             $res = CategoriaPDO::eliminar($id);
+            if ($res) {
+                LogPDO::addLog('DELETE_CATEGORIA', "Categoría #{$id} eliminada", ['id' => $id]);
+            }
             echo json_encode(['ok' => $res]);
             break;
 
@@ -57,6 +67,11 @@ try {
                 break;
             }
             $res = CategoriaPDO::asignarIVA($idCategoria, $idTipoIva);
+            if ($res) {
+                LogPDO::addLog('ASIGNAR_IVA_CATEGORIA', "IVA #{$idTipoIva} asignado a categoría #{$idCategoria}", [
+                    'id_categoria' => $idCategoria, 'id_tipo_iva' => $idTipoIva,
+                ]);
+            }
             echo json_encode(['ok' => $res]);
             break;
 
@@ -69,6 +84,11 @@ try {
                 break;
             }
             $res = CategoriaPDO::editar($id, $codigo, $nombre);
+            if ($res) {
+                LogPDO::addLog('UPDATE_CATEGORIA', "Categoría #{$id} actualizada: {$nombre} ({$codigo})", [
+                    'id' => $id, 'codigo' => $codigo, 'nombre' => $nombre,
+                ]);
+            }
             echo json_encode(['ok' => $res]);
             break;
 
