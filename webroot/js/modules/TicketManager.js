@@ -157,14 +157,15 @@ export const TicketManager = {
 
         const el_tkDescRow = document.getElementById("tkDescRow");
         if (el_tkDescRow) {
-            const diff = Math.max(0, vSubtotal - vTotal);
-            // Si hay un descuento explícito o una diferencia entre subtotal y total
-            if (vDescAmt > 0 || diff > 0.01) {
+            // Descuento excluyendo puntos (los puntos tienen su propia fila)
+            const vDescSinPuntos = Math.max(0, vDescAmt - vPuntosAmt);
+            const diff = Math.max(0, vSubtotal - vTotal - vPuntosAmt);
+            if (vDescSinPuntos > 0.001 || diff > 0.01) {
                 el_tkDescRow.classList.remove("d-none");
                 el_tkDescRow.style.display = "flex";
                 const el_tkDescLabel = document.getElementById("tkDescLabel");
                 const el_tkDescAmt = document.getElementById("tkDescAmt");
-                
+
                 if (el_tkDescLabel) {
                     if (v.descuento_label) {
                         el_tkDescLabel.textContent = `Descuento (${v.descuento_label})`;
@@ -175,7 +176,7 @@ export const TicketManager = {
                     }
                 }
                 if (el_tkDescAmt) {
-                    const amt = diff > 0.01 ? diff : vDescAmt;
+                    const amt = diff > 0.01 ? diff : vDescSinPuntos;
                     el_tkDescAmt.textContent = "−" + fmt2(amt);
                 }
             } else {

@@ -238,7 +238,7 @@ try {
             ? 'ABONO s/ ref: ' . VentaPDO::formatTicketNumber($venta['numero_ticket_origen'], $venta['fecha'], false, 'venta')
             : '';
         
-        $descLabelText = !empty($venta['descuento_label']) ? $venta['descuento_label'] : (!empty($venta['descuento_pct']) ? $venta['descuento_pct'] . '%' : 'Global');
+        $descLabelText = !empty($venta['descuento_label']) ? $venta['descuento_label'] : ((float)$venta['descuento_pct'] > 0 ? $venta['descuento_pct'] . '%' : 'Descuento');
 
         $reemplazos = [
             '{{NUMERO_TICKET}}' => $numFormated,

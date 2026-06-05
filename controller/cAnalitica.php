@@ -59,7 +59,7 @@ if (isset($_GET['ajax'])) {
                     $cacheDir  = dirname(__DIR__) . '/storage/analitica_cache/';
                     @mkdir($cacheDir, 0755, true);
                     $cacheFile = $cacheDir . md5("{$desde}:{$hasta}:{$agrupacion}") . '.json';
-                    $ttl       = $diffDays > 90 ? 600 : 300; // 10 min para >90 días, 5 min para el resto
+                    $ttl       = $diffDays > 365 ? 3600 : ($diffDays > 90 ? 600 : 300); // 1h para >1año, 10min para >90d, 5min resto
                     if (file_exists($cacheFile) && (time() - filemtime($cacheFile)) < $ttl) {
                         while (ob_get_level() > 0) @ob_end_clean();
                         header('Content-Type: application/json; charset=utf-8');

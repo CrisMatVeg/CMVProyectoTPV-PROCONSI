@@ -171,7 +171,7 @@ class PDFServiceV2
 
         if ($diff > 0.01 || (!empty($venta['descuento_amt']) && (float)$venta['descuento_amt'] > 0)) {
             $amtToShow = $diff > 0.01 ? $diff : (float)$venta['descuento_amt'];
-            $label = !empty($venta['descuento_label']) ? $venta['descuento_label'] : (!empty($venta['descuento_pct']) ? $venta['descuento_pct'] . '%' : 'Global');
+            $label = !empty($venta['descuento_label']) ? $venta['descuento_label'] : ((float)$venta['descuento_pct'] > 0 ? $venta['descuento_pct'] . '%' : 'Descuento');
             $pdf->Cell(40, 4, self::decode("Descuento (" . $label . "):"), 0, 0);
             $pdf->Cell(20, 4, "- " . self::formatEuros($amtToShow), 0, 1, 'R');
         }
@@ -416,7 +416,7 @@ class PDFServiceV2
 
         if ($diff > 0.01 || (!empty($venta['descuento_amt']) && (float)$venta['descuento_amt'] > 0)) {
             $amtToShow = $diff > 0.01 ? $diff : (float)$venta['descuento_amt'];
-            $label = !empty($venta['descuento_label']) ? $venta['descuento_label'] : (!empty($venta['descuento_pct']) ? $venta['descuento_pct'] . '%' : 'Global');
+            $label = !empty($venta['descuento_label']) ? $venta['descuento_label'] : ((float)$venta['descuento_pct'] > 0 ? $venta['descuento_pct'] . '%' : 'Descuento');
             $pdf->SetX(130);
             $pdf->Cell(40, 6, self::decode("Descuento (" . $label . "):"), 0, 0, 'R');
             $pdf->Cell(30, 6, "- " . self::formatEuros($amtToShow), 0, 1, 'R');

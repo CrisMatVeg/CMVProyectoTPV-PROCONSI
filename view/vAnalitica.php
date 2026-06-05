@@ -219,6 +219,15 @@
             });
         });
 
+        // Pre-calentar caché de "todo el historial" en background (solo si no estamos ya en ese periodo).
+        // Así cuando el usuario cambie al selector "Todo el historial" la respuesta es inmediata.
+        if (fechaDesde !== '2000-01-01') {
+            const hoy = new Date().toISOString().split('T')[0];
+            fetch(`index.php?menu=Analitica&ajax=loadAll&fechaDesde=2000-01-01&fechaHasta=${hoy}`, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            }).catch(() => {});
+        }
+
         // Helpers
         function updateKPI(id, val, suffix, colorize = false) {
             const valEl = document.getElementById('val_' + id);

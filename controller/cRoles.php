@@ -48,12 +48,18 @@ if (isset($_REQUEST['accion'])) {
                 // Podríamos añadir editarRol en RolPDO
                 $sql = "UPDATE roles SET nombre = :nom, descripcion = :des WHERE id = :id";
                 DBPDO::ejecutarConsulta($sql, [':nom' => $nombre, ':des' => $desc, ':id' => $idRol]);
+                RolPDO::asignarPermisos($idRol, $permisosIds);
+                LogPDO::addLog('UPDATE_ROL', "Rol #{$idRol} ({$nombre}) actualizado", [
+                    'id' => $idRol, 'nombre' => $nombre, 'permisos_count' => count($permisosIds),
+                ]);
             } else {
                 $idRol = RolPDO::agregarRol($nombre, $desc);
+                RolPDO::asignarPermisos($idRol, $permisosIds);
+                LogPDO::addLog('CREATE_ROL', "Rol creado: {$nombre}", [
+                    'id' => (int)$idRol, 'nombre' => $nombre, 'permisos_count' => count($permisosIds),
+                ]);
             }
 
-            error_log("GUARDANDO ROL ID: " . $idRol . " CON PERMISOS: " . print_r($permisosIds, true));
-            RolPDO::asignarPermisos($idRol, $permisosIds);
             $mensajeOk = "Rol guardado correctamente.";
         } else {
             $error = "El nombre del rol es obligatorio.";

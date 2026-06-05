@@ -190,23 +190,7 @@ document.addEventListener("DOMContentLoaded", function () {
 // ── Formato monetario ──────────────────────────────────────────────────────────
 function fmt(n) {
   const val = typeof n === "number" ? n : parseFloat(n) || 0;
-  
-  // Solo mostrar más de 2 decimales si ALGÚN producto en el carrito tiene más de 2 decimales
-  let requiereAltaPrecision = false;
-  if (typeof cart !== 'undefined') {
-    requiereAltaPrecision = Object.values(cart).some(item => {
-      const precio = parseFloat(item.price || 0);
-      return (Math.round(precio * 100) / 100) !== precio;
-    });
-  }
-
-  const str = val.toString();
-  const parts = str.split('.');
-  
-  if (requiereAltaPrecision && parts.length > 1 && parts[1].length > 2) {
-    return val.toString().replace(".", ",") + " €";
-  }
-  return val.toFixed(2).replace(".", ",") + " €";
+  return val.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 // ── Catálogo ───────────────────────────────────────────────────────────────────
@@ -297,6 +281,7 @@ function clearCart() {
   window.cart = cart;
   discountPct = 0;
   currentPromo = null;
+  window.currentPromo = null;
   currentPayments = [];
   localStorage.removeItem("tpv_cart");
 
@@ -2140,6 +2125,8 @@ function editProduct(e, id) {
   document.getElementById("editCost").value = p.precio_coste || 0;
   document.getElementById("editMesesGarantia").value = p.meses_garantia || 24;
   document.getElementById("editEmoji").value = p.icono;
+  const checkPrec = document.getElementById("editMantenerPrecision");
+  if (checkPrec) checkPrec.checked = !!(parseInt(p.mantener_precision || 0));
   updateEditMargin();
 
   const preview = document.getElementById("editImgPreview");
@@ -2191,7 +2178,11 @@ async function saveEdit() {
     const name = document.getElementById("editName")?.value.trim();
     const codigo = document.getElementById("editSku")?.value.trim();
     const modalPrice = parseFloat(document.getElementById("editPrice")?.value);
-    const priceToSave = modalPrice / (window._currentEditFactor || 1);
+    const mantenerPrecision = document.getElementById("editMantenerPrecision")?.checked ? 1 : 0;
+    const rawPrice = modalPrice / (window._currentEditFactor || 1);
+    const priceToSave = mantenerPrecision
+      ? Math.round(rawPrice * 100000) / 100000
+      : parseFloat(rawPrice.toFixed(2));
     const pOrig = PRODUCTS.find((x) => x.id === id);
     const iva = pOrig.iva || 21;
     const mesesGarantia =
@@ -2216,6 +2207,7 @@ async function saveEdit() {
         categoria: pOrig.cat,
         descripcion: pOrig.descripcion || "",
         variantes: getVariantsFromUI("edit"),
+        mantener_precision: mantenerPrecision,
         motivo_cambio_precio: "Cambio rápido desde TPV"
       }),
     });
@@ -2244,6 +2236,7 @@ async function saveEdit() {
     p.meses_garantia = mesesGarantia;
     p.icono = icono || p.icono;
     p.variantes = getVariantsFromUI("edit");
+    p.mantener_precision = mantenerPrecision;
 
     document.getElementById("editModal").classList.remove("visible");
     renderProducts();

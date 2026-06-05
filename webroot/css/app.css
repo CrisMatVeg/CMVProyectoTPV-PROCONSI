@@ -35,7 +35,7 @@
   --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.12);
   --shadow-xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
   --header-bg: linear-gradient(135deg, #0f1c8c 0%, #1d4ed8 60%, #1890d0 100%);
-  --sidebar-width: 360px;
+  --sidebar-width: 420px;
 }
 
 /* Theme Modes */

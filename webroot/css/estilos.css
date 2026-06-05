@@ -1834,7 +1834,7 @@ input:focus + .slider {
 
 /* 1. Root: reduce sidebar width so it fits on screen */
 :root {
-  --sidebar-width: 360px;
+  --sidebar-width: 420px;
 }
 
 /* 2. Main grid: use the CSS variable so both columns stay in sync */
@@ -1896,7 +1896,7 @@ input:focus + .slider {
 /* 7. On very wide screens allow a slightly wider sidebar */
 @media (min-width: 1400px) {
   :root {
-    --sidebar-width: 400px;
+    --sidebar-width: 460px;
   }
 }
 

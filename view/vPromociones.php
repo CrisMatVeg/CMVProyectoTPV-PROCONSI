@@ -298,8 +298,31 @@
             if (r.ok) {
                 location.reload();
             } else if (r.aErrores) {
+                // Mapa campo → id del tab que lo contiene
+                const campoTab = {
+                    codigo: 'tab-promo-general',
+                    descripcion: 'tab-promo-general',
+                    tipo: 'tab-promo-config',
+                    valor: 'tab-promo-config',
+                    bundle_buy_qty: 'tab-promo-config',
+                    bundle_pay_qty: 'tab-promo-config',
+                };
+                let primerTab = null;
                 for (const [field, msg] of Object.entries(r.aErrores)) {
                     setText('err-' + field, msg);
+                    if (!primerTab && campoTab[field]) primerTab = campoTab[field];
+                }
+                // Saltar al tab que contiene el primer error para que sea visible
+                if (primerTab) {
+                    const dataTabMap = {
+                        'tab-promo-general': 'general',
+                        'tab-promo-config': 'config',
+                    };
+                    const dataTabVal = dataTabMap[primerTab];
+                    if (dataTabVal) {
+                        const targetBtn = document.querySelector(`#promoModal .tab-btn[data-tab="${dataTabVal}"]`);
+                        if (targetBtn) switchTabPromo(targetBtn, primerTab);
+                    }
                 }
             } else {
                 showCustomAlert('Error', r.error || 'No se pudo guardar la promoción', 'error');

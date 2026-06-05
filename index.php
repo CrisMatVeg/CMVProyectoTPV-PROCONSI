@@ -39,7 +39,12 @@ if (isset($_GET['menu']) && isset($controller[$_GET['menu']])) {
 }
 
 // NAVIGATION: Handle global navigation requests before loading controllers
-if (isset($_SESSION['usuarioActualTPV'])) {
+// Para AJAX internos (ej: analítica con ?ajax=...), liberar lock de sesión
+// antes del bloque de navegación para evitar bloqueos con peticiones concurrentes.
+if (isset($_GET['ajax']) && isset($_SESSION['usuarioActualTPV'])) {
+    session_write_close();
+    $turnoCajaGlobal = null;
+} elseif (isset($_SESSION['usuarioActualTPV'])) {
     // Centralizar estado de caja para toda la App
     require_once 'model/CajaTurnoPDO.php';
     // CajaTurnoPDO::verificarYRealizarCierreAutomatico();

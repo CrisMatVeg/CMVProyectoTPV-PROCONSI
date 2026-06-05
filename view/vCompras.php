@@ -161,17 +161,70 @@
 <!-- MODAL NUEVO ALBARÁN (Stock Entry) -->
 <style>
     /* === ALBARAN MODAL === */
-    #modalNuevoAlbaran .modal-header h2 {
-        font-size: 18px;
+    #modalNuevoAlbaran .modal-header {
+        padding: 18px 24px 16px;
+        border-bottom: 1px solid var(--border);
     }
 
-    #modalNuevoAlbaran .modal-header {
-        padding-bottom: 16px;
+    #modalNuevoAlbaran .modal-header h2 {
+        font-size: 16px;
+        font-weight: 800;
+        margin: 0 0 2px 0;
+    }
+
+    .alb-header-icon {
+        width: 38px;
+        height: 38px;
+        border-radius: 10px;
+        background: rgba(var(--accent-rgb), 0.12);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--accent);
+        font-size: 17px;
+        flex-shrink: 0;
+    }
+
+    .alb-section-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 10px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-muted);
+        margin-bottom: 10px;
+    }
+
+    .alb-section-label::after {
+        content: '';
+        flex: 1;
+        height: 1px;
+        background: var(--border);
+    }
+
+    .alb-step-num {
+        display: inline-flex;
+        width: 17px;
+        height: 17px;
+        border-radius: 50%;
+        background: var(--accent);
+        color: white;
+        font-size: 10px;
+        font-weight: 900;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
     }
 
     #albLineas tr td {
-        padding: 6px 8px;
+        padding: 7px 8px;
         vertical-align: middle;
+    }
+
+    #albLineas tr:not(#albEmptyRow):hover td {
+        background: var(--surface2);
     }
 
     #albLineas input[type="number"] {
@@ -180,55 +233,79 @@
     }
 
     #albLineas .price-cell {
+        display: inline-block;
         background: var(--surface2);
         border-radius: 6px;
         padding: 4px 8px;
         text-align: right;
         font-weight: 700;
         font-family: monospace;
-        min-width: 100px;
+        min-width: 90px;
+        font-size: 13px;
+    }
+
+    #albLineas .price-cell.zero {
+        background: #fef2f2;
+        color: #991b1b;
+        border: 1.5px solid #fca5a5;
+    }
+
+    .alb-prod-name {
+        font-weight: 700;
+        font-size: 13px;
+        line-height: 1.3;
+    }
+
+    .alb-prod-ref {
+        font-size: 11px;
+        color: var(--text-muted);
+        font-family: monospace;
     }
 
     .alb-info-box {
-        background: linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(99, 102, 241, 0.06));
-        border: 1px solid rgba(59, 130, 246, 0.2);
-        border-radius: 12px;
-        padding: 14px 16px;
+        background: rgba(59, 130, 246, 0.06);
+        border: 1px solid rgba(59, 130, 246, 0.18);
+        border-radius: 10px;
+        padding: 10px 14px;
         display: flex;
-        align-items: center;
-        gap: 12px;
-        margin-bottom: 16px;
+        align-items: flex-start;
+        gap: 10px;
         font-size: 12px;
         line-height: 1.5;
         color: var(--text-muted);
     }
 
-    .alb-info-box strong {
-        color: var(--text);
+    .alb-info-box > i {
+        margin-top: 1px;
+        flex-shrink: 0;
     }
 
-    .alb-total-box {
-        background: var(--surface);
-        border: 2px solid var(--accent);
-        border-radius: 12px;
-        padding: 16px 24px;
-        text-align: right;
-        width: 100%;
-        margin-bottom: 20px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    .alb-footer-bar {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 14px 24px;
+        background: var(--surface2);
+        border-top: 1px solid var(--border);
+        flex-shrink: 0;
+    }
+
+    .alb-total-display {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
     }
 
     .alb-total-label {
-        font-size: 11px;
-        font-weight: 700;
+        font-size: 10px;
+        font-weight: 800;
         text-transform: uppercase;
-        letter-spacing: 0.05em;
+        letter-spacing: 0.06em;
         color: var(--text-muted);
-        margin-bottom: 4px;
     }
 
     .alb-total-amount {
-        font-size: 28px;
+        font-size: 26px;
         font-weight: 800;
         font-family: monospace;
         color: var(--accent);
@@ -237,128 +314,163 @@
 
     .empty-lines-state {
         text-align: center;
-        padding: 32px;
+        padding: 36px 32px;
         color: var(--text-muted);
         font-size: 13px;
     }
 
     .empty-lines-state i {
-        font-size: 28px;
-        margin-bottom: 8px;
-        opacity: 0.3;
+        font-size: 30px;
+        margin-bottom: 10px;
+        opacity: 0.25;
         display: block;
     }
 </style>
 
 <div id="modalNuevoAlbaran" class="modal-overlay-bg">
-    <div class="modal-content" style="max-width: 1000px; width: 95%; height: auto; max-height: 90vh; border-radius: 20px; overflow: hidden; display: flex; flex-direction: column;">
+    <div class="modal-content" style="max-width: 1160px; width: 96%; max-height: 92vh; border-radius: 20px; overflow: hidden; display: flex; flex-direction: column;">
+
+        <!-- Header -->
         <div class="modal-header">
-            <div>
-                <h2 style="margin:0 0 2px 0"><?php echo L('purchase_modal_albaran_title'); ?></h2>
-                <span style="font-size:12px; color: var(--text-muted); font-weight:400;"><?php echo L('purchase_modal_albaran_sub'); ?></span>
+            <div class="d-flex ai-center gap-12">
+                <div class="alb-header-icon">
+                    <i class="fa-solid fa-truck-ramp-box"></i>
+                </div>
+                <div>
+                    <h2><?php echo L('purchase_modal_albaran_title'); ?></h2>
+                    <span style="font-size:12px; color: var(--text-muted); font-weight:400;"><?php echo L('purchase_modal_albaran_sub'); ?></span>
+                </div>
             </div>
             <button class="btn-close-modal" onclick="cerrarModalNuevoAlbaran()">&times;</button>
         </div>
 
-        <div class="p-24 overflow-y-auto" style="flex: 1; min-height: 0;">
-            <!-- Cabecera del albarán -->
-            <div class="d-grid grid-3 gap-16 mb-20 p-16 bg-surface2 br-12 border-2">
-                <div class="form-group mb-0">
-                    <label class="form-label fs-11 tt-uppercase"><?php echo L('prod_modal_label_provider'); ?> *</label>
-                    <select id="albProveedor" class="form-input" onchange="actualizarREAlbaran()">
-                        <option value="">-- <?php echo L('purchase_select_prov_hint'); ?> --</option>
-                        <?php foreach ($avInicioPrivado['proveedores'] as $p): ?>
-                            <option value="<?php echo $p['id']; ?>" data-re="<?php echo $p['aplica_re'] ? '1' : '0'; ?>">
-                                <?php echo htmlspecialchars($p['nombre']); ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
+        <!-- Body: dos paneles lado a lado -->
+        <div style="flex: 1; min-height: 0; display: flex; overflow: hidden;">
+
+            <!-- PANEL IZQUIERDO: datos del albarán + info -->
+            <div style="width: 300px; flex-shrink: 0; padding: 20px 18px; border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 16px; overflow-y: auto;">
+
+                <!-- Sección 1: Datos del albarán -->
+                <div>
+                    <div class="alb-section-label">
+                        <span class="alb-step-num">1</span> Datos del albarán
+                    </div>
+                    <div class="d-flex flex-column gap-12 p-16 bg-surface2 br-12 border-2">
+                        <div class="form-group mb-0">
+                            <label class="form-label fs-11 tt-uppercase">
+                                <i class="fa-solid fa-building mr-4 opacity-50"></i><?php echo L('prod_modal_label_provider'); ?> *
+                            </label>
+                            <select id="albProveedor" class="form-input" onchange="actualizarREAlbaran()">
+                                <option value="">-- <?php echo L('purchase_select_prov_hint'); ?> --</option>
+                                <?php foreach ($avInicioPrivado['proveedores'] as $p): ?>
+                                    <option value="<?php echo $p['id']; ?>" data-re="<?php echo $p['aplica_re'] ? '1' : '0'; ?>">
+                                        <?php echo htmlspecialchars($p['nombre']); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="form-group mb-0">
+                            <label class="form-label fs-11 tt-uppercase">
+                                <i class="fa-solid fa-hashtag mr-4 opacity-50"></i><?php echo L('purchase_label_albaran_ref'); ?> *
+                            </label>
+                            <input type="text" id="albNum" class="form-input font-mono" placeholder="<?php echo L('purchase_placeholder_alb_ref'); ?>">
+                        </div>
+                        <div class="form-group mb-0">
+                            <label class="form-label fs-11 tt-uppercase">
+                                <i class="fa-regular fa-calendar mr-4 opacity-50"></i><?php echo L('purchase_label_entry_date'); ?>
+                            </label>
+                            <input type="date" id="albFecha" class="form-input" value="<?php echo date('Y-m-d'); ?>">
+                        </div>
+                    </div>
                 </div>
-                <div class="form-group mb-0">
-                    <label class="form-label fs-11 tt-uppercase"><?php echo L('purchase_label_albaran_ref'); ?> *</label>
-                    <input type="text" id="albNum" class="form-input font-mono" placeholder="<?php echo L('purchase_placeholder_alb_ref'); ?>">
-                </div>
-                <div class="form-group mb-0">
-                    <label class="form-label fs-11 tt-uppercase"><?php echo L('purchase_label_entry_date'); ?></label>
-                    <input type="date" id="albFecha" class="form-input" value="<?php echo date('Y-m-d'); ?>">
+
+                <!-- Spacer -->
+                <div style="flex: 1;"></div>
+
+                <!-- Aviso (abajo del panel izquierdo) -->
+                <div class="alb-info-box">
+                    <i class="fa-solid fa-circle-info text-accent fs-14"></i>
+                    <p class="m-0"><?php echo L('purchase_info_stock_cmp'); ?> <?php echo L('purchase_info_pending'); ?></p>
                 </div>
             </div>
 
-            <!-- Búsqueda de productos -->
-            <div class="search-bar mb-12">
-                <div class="search-input-wrap flex-1">
-                    <i class="fa-solid fa-magnifying-glass"></i>
-                    <input type="text" id="albBusqueda" class="search-input" placeholder="<?php echo L('purchase_search_placeholder'); ?>" onkeyup="buscarProductoAlbaran(this.value)">
-                    <div id="albResultados" class="search-results-dropdown d-none"></div>
-                </div>
-            </div>
+            <!-- PANEL DERECHO: líneas de entrada -->
+            <div style="flex: 1; min-width: 0; padding: 20px 20px; display: flex; flex-direction: column; gap: 12px; overflow: hidden;">
 
-            <!-- Tabla de líneas -->
-            <div class="table-container mb-16">
-                <div style="max-height: 320px; overflow-y: auto; overflow-x: auto;">
-                    <table class="data-table mb-0" style="min-width: 700px;">
-                        <thead style="position: sticky; top: 0; z-index: 10;">
-                            <tr>
-                                <th class="pl-20"><?php echo L('prod_th_name'); ?></th>
-                                <th class="w-100 text-center"><?php echo L('prod_th_qty'); ?></th>
-                                <th class="w-180 text-right"><?php echo L('purchase_th_cost_net'); ?></th>
-                                <th class="w-70 text-center"><?php echo L('modal_label_iva'); ?></th>
-                                <th class="w-70 text-center th-re">RE</th>
-                                <th class="w-140 text-right"><?php echo L('purchase_th_line_total'); ?></th>
-                                <th class="w-50"></th>
-                            </tr>
-                        </thead>
-                        <tbody id="albLineas">
-                            <tr id="albEmptyRow">
-                                <td colspan="7">
-                                    <div class="empty-lines-state">
-                                        <i class="fa-solid fa-box-open"></i>
-                                        <?php echo L('purchase_empty_lines'); ?>
-                                    </div>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                <div class="alb-section-label">
+                    <span class="alb-step-num">2</span> Líneas de entrada
                 </div>
-            </div>
 
-            <!-- Info de stock -->
-            <div class="alb-info-box">
-                <i class="fa-solid fa-circle-info text-accent fs-20"></i>
-                <p class="m-0">
-                    <?php echo L('purchase_info_stock_cmp'); ?>
-                    <?php echo L('purchase_info_pending'); ?>
-                </p>
+                <!-- Búsqueda -->
+                <div class="search-bar" style="flex-shrink: 0;">
+                    <div class="search-input-wrap flex-1">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <input type="text" id="albBusqueda" class="search-input" placeholder="<?php echo L('purchase_search_placeholder'); ?>" onkeyup="buscarProductoAlbaran(this.value)">
+                        <div id="albResultados" class="search-results-dropdown d-none"></div>
+                    </div>
+                </div>
+
+                <!-- Tabla de líneas (ocupa todo el alto disponible) -->
+                <div class="table-container" style="flex: 1; min-height: 0; overflow: hidden;">
+                    <div style="height: 100%; overflow-y: auto; overflow-x: auto;">
+                        <table class="data-table mb-0" style="min-width: 580px;">
+                            <thead style="position: sticky; top: 0; z-index: 10;">
+                                <tr>
+                                    <th class="pl-16"><?php echo L('prod_th_name'); ?></th>
+                                    <th class="w-90 text-center"><?php echo L('prod_th_qty'); ?></th>
+                                    <th class="w-160 text-right"><?php echo L('purchase_th_cost_net'); ?></th>
+                                    <th class="w-60 text-center"><?php echo L('modal_label_iva'); ?></th>
+                                    <th class="w-60 text-center th-re">RE</th>
+                                    <th class="w-130 text-right"><?php echo L('purchase_th_line_total'); ?></th>
+                                    <th class="w-44"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="albLineas">
+                                <tr id="albEmptyRow">
+                                    <td colspan="7">
+                                        <div class="empty-lines-state">
+                                            <i class="fa-solid fa-box-open"></i>
+                                            <?php echo L('purchase_empty_lines'); ?>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <div class="modal-footer border-top p-32 bg-surface2" style="flex-shrink: 0; z-index: 5; flex-direction: column; display: flex;">
-            <div class="alb-total-box">
+        <!-- Footer con total + botones en una sola fila -->
+        <div class="alb-footer-bar">
+            <div class="alb-total-display">
                 <div class="alb-total-label"><?php echo L('purchase_total_albaran'); ?></div>
-                <div class="alb-total-amount"><span id="albTotal">0,00</span> <span style="font-size:18px">€</span></div>
+                <div class="alb-total-amount">
+                    <span id="albTotal">0,00</span>
+                    <span style="font-size: 15px; font-weight: 700; opacity: 0.65;">€</span>
+                </div>
             </div>
-            
-            <div class="d-flex w-100 ai-center" style="margin-top: 4px;">
-                <button class="btn-cancel" onclick="cerrarModalNuevoAlbaran()"><?php echo L('modal_cancel'); ?></button>
-                <div class="flex-1"></div>
-                <button id="btnGuardarAlbaran" class="btn-save w-auto px-32" onclick="guardarAlbaran()">
-                    <i class="fa-solid fa-check-circle mr-8"></i> <?php echo L('purchase_btn_process'); ?>
-                </button>
-            </div>
+            <div class="flex-1"></div>
+            <button class="btn-cancel" onclick="cerrarModalNuevoAlbaran()"><?php echo L('modal_cancel'); ?></button>
+            <button id="btnGuardarAlbaran" class="btn-save w-auto px-32" onclick="guardarAlbaran()">
+                <i class="fa-solid fa-check-circle mr-8"></i><?php echo L('purchase_btn_process'); ?>
+            </button>
         </div>
     </div>
 </div>
 
 <!-- MODAL REGISTRAR FACTURA (Billing and Payment) -->
 <div id="modalNuevaFactura" class="modal-overlay-bg">
-    <div class="modal-content w-700" style="max-width: 700px; border-radius: 20px; overflow: hidden;">
-        <div class="modal-header">
+    <div class="modal-content w-700" style="max-width: 700px; border-radius: 20px; overflow: hidden; display: flex; flex-direction: column; max-height: 90vh; padding: 0;">
+        <!-- Cabecera fija -->
+        <div class="modal-header" style="flex-shrink: 0; padding: 20px 24px 16px; margin-bottom: 0; border-bottom: 1px solid var(--border);">
             <h2><?php echo L('purchase_modal_fac_title'); ?></h2>
             <button class="btn-close-modal" onclick="cerrarModalNuevaFactura()">&times;</button>
         </div>
 
-        <div class="p-24">
-            <div class="d-grid grid-2 gap-16 mb-24">
+        <!-- Zona de scroll: formulario + lista de albaranes -->
+        <div style="flex: 1; min-height: 0; overflow-y: auto; padding: 20px 24px;">
+            <div class="d-grid grid-2 gap-16 mb-20">
                 <div class="form-group">
                     <label class="form-label fs-11 tt-uppercase"><?php echo L('prod_modal_label_provider'); ?></label>
                     <select id="facProveedor" class="form-input" onchange="cargarAlbaranesPendientes()">
@@ -384,26 +496,28 @@
                         <option value="otro"><?php echo L('purchase_method_other'); ?></option>
                     </select>
                 </div>
-                <div class="form-group d-flex ai-center gap-8 mt-24">
-                    <input type="checkbox" id="facPagada" checked style="width: 20px; height: 20px;">
+                <div class="form-group d-flex ai-center gap-8" style="align-self: end; padding-bottom: 4px;">
+                    <input type="checkbox" id="facPagada" checked style="width: 20px; height: 20px; flex-shrink: 0;">
                     <label for="facPagada" class="form-label mb-0 fs-13 fw-700"><?php echo L('purchase_label_mark_paid'); ?></label>
                 </div>
             </div>
 
             <div class="mb-8 fs-12 fw-700 tt-uppercase opacity-50"><?php echo L('purchase_label_pending_alb'); ?></div>
-            <div id="listaAlbaranesPendientes" class="border-2 br-12 p-8 overflow-y-auto mb-24" style="max-height: 200px; background: var(--surface2);">
+            <div id="listaAlbaranesPendientes" class="border-2 br-12 p-8" style="max-height: 240px; overflow-y: auto; background: var(--surface2);">
                 <div class="p-20 text-center opacity-50 fs-13"><?php echo L('purchase_select_prov_hint'); ?></div>
-            </div>
-
-            <div class="bg-surface p-20 br-16 border-2 text-right">
-                <div class="d-flex jc-space-between ai-center">
-                    <span class="font-bold text-accent"><?php echo L('purchase_total_to_pay'); ?></span>
-                    <span class="fs-24 font-bold text-accent font-mono"><span id="facTotal">0,00</span> €</span>
-                </div>
             </div>
         </div>
 
-        <div class="modal-footer pt-16 border-top p-24">
+        <!-- Total fijo (siempre visible) -->
+        <div style="flex-shrink: 0; padding: 12px 24px; border-top: 1px solid var(--border); background: var(--surface);">
+            <div class="d-flex jc-space-between ai-center">
+                <span class="font-bold text-accent fs-14"><?php echo L('purchase_total_to_pay'); ?></span>
+                <span class="fs-22 font-bold text-accent font-mono"><span id="facTotal">0,00</span> €</span>
+            </div>
+        </div>
+
+        <!-- Footer con botones fijo -->
+        <div style="flex-shrink: 0; display: flex; align-items: center; gap: 12px; padding: 14px 24px; border-top: 1px solid var(--border);">
             <button class="btn-cancel" onclick="cerrarModalNuevaFactura()"><?php echo L('modal_cancel'); ?></button>
             <div class="flex-1"></div>
             <button id="btnGuardarFactura" class="btn-save w-auto px-32" onclick="guardarFactura()" disabled>
@@ -676,8 +790,6 @@
     }
 
     function insertarLineaProcesada(p) {
-        const nombreMostrar = `${p.nombre} (${p.referencia})`;
-
         if (albLineas.find(l => l.producto_id === p.id)) {
             return showCustomAlert(<?php echo json_encode(L('prod_th_status')); ?>, <?php echo json_encode(L('purchase_js_product_added')); ?>, 'warning');
         }
@@ -689,7 +801,8 @@
 
         albLineas.push({
             producto_id: p.id,
-            nombre: nombreMostrar,
+            nombre: p.nombre,
+            referencia: p.referencia || '',
             cantidad: 1,
             precio_coste_neto: 0,
             iva_pct: parseFloat(p.iva),
@@ -702,13 +815,9 @@
 
     function renderLineasAlbaran() {
         const tbody = document.getElementById('albLineas');
-        const emptyRow = document.getElementById('albEmptyRow');
-
-        // Limpiamos el contenido previo (excepto el emptyRow si queremos reusarlo, pero es más limpio reconstruir)
         tbody.innerHTML = '';
 
         if (albLineas.length === 0) {
-            // Reinsertamos el emptyRow si la lista está vacía
             tbody.innerHTML = `
                 <tr id="albEmptyRow">
                     <td colspan="7">
@@ -725,20 +834,39 @@
 
         const rows = albLineas.map((l, i) => {
             const isZero = parseFloat(l.precio_coste_neto) <= 0;
-            const priceStyle = isZero ? 'border: 2px solid #ef4444; background: #fef2f2; color:#991b1b;' : '';
             const totalLinea = l.cantidad * l.precio_coste_neto * (1 + (l.iva_pct / 100) + (albAplicaRE ? l.re_pct / 100 : 0));
+            const priceCellClass = isZero ? 'price-cell zero' : 'price-cell';
 
             return `
                 <tr>
-                    <td class="font-bold pl-20" style="max-width:220px;">
-                        ${l.nombre}
+                    <td class="pl-20" style="max-width: 230px;">
+                        <div class="alb-prod-name">${l.nombre}</div>
+                        ${l.referencia ? `<div class="alb-prod-ref">${l.referencia}</div>` : ''}
                     </td>
-                    <td style="width:90px;"><input type="number" class="form-input text-center" style="width:80px;padding:6px;" value="${l.cantidad}" min="1" onchange="albLineas[${i}].cantidad=Math.max(1,parseFloat(this.value)||1);renderLineasAlbaran()"></td>
-                    <td style="width:160px;"><input type="number" class="form-input text-right font-mono" style="width:140px;padding:6px;${priceStyle}" value="${parseFloat(l.precio_coste_neto).toFixed(2)}" step="0.01" placeholder="0.00" onchange="albLineas[${i}].precio_coste_neto=parseFloat(this.value)||0;renderLineasAlbaran()"></td>
-                    <td class="text-center fs-12 text-muted" style="width:60px;">${l.iva_pct}%</td>
-                    <td class="text-center fs-12 text-muted th-re" style="width:60px;">${l.re_pct}%</td>
-                    <td class="text-right font-bold font-mono" style="width:120px;">${totalLinea.toFixed(2)} €</td>
-                    <td style="width:40px;"><button class="btn-icon text-red" title="<?php echo L('purchase_js_del_line'); ?>" onclick="albLineas.splice(${i},1);renderLineasAlbaran()"><i class="fa-solid fa-trash-can"></i></button></td>
+                    <td style="width:90px;">
+                        <input type="number" class="form-input text-center" style="width:74px; padding:5px 6px;" value="${l.cantidad}" min="1"
+                            onchange="albLineas[${i}].cantidad=Math.max(1,parseFloat(this.value)||1);renderLineasAlbaran()">
+                    </td>
+                    <td style="width:160px;">
+                        <input type="number" class="form-input text-right font-mono" style="width:140px; padding:5px 8px;${isZero ? ' border-color:#fca5a5; background:#fef2f2; color:#991b1b;' : ''}"
+                            value="${parseFloat(l.precio_coste_neto).toFixed(2)}" step="0.01" placeholder="0.00"
+                            onchange="albLineas[${i}].precio_coste_neto=parseFloat(this.value)||0;renderLineasAlbaran()">
+                    </td>
+                    <td class="text-center" style="width:60px;">
+                        <span class="fs-12 font-mono text-muted">${l.iva_pct}%</span>
+                    </td>
+                    <td class="text-center th-re" style="width:60px;">
+                        <span class="fs-12 font-mono text-muted">${l.re_pct}%</span>
+                    </td>
+                    <td class="text-right" style="width:120px;">
+                        <span class="${priceCellClass}">${totalLinea.toFixed(2)} €</span>
+                    </td>
+                    <td style="width:44px; text-align:center;">
+                        <button class="btn-icon text-red" title="<?php echo L('purchase_js_del_line'); ?>"
+                            onclick="albLineas.splice(${i},1);renderLineasAlbaran()">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </td>
                 </tr>
             `;
         }).join('');
