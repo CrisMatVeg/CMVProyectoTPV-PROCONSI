@@ -306,7 +306,7 @@ class ProductoPDO
 
         $precioProveedor = (float)($datos['precio_proveedor'] ?? 0);
         $codigoIva = $datos['codigo_iva'] ?? 'GENERAL';
-        $idProveedor = !empty($datos['id_proveedor']) ? (int)$datos['id_proveedor'] : null;
+        $idProveedor = !empty($datos['id_proveedor']) ? (int)$datos['id_proveedor'] : 0;
         $aplicaRE = 0;
         if ($idProveedor) {
             require_once __DIR__ . '/ProveedorPDO.php';
@@ -323,7 +323,7 @@ class ProductoPDO
 
         require_once __DIR__ . '/TipoIVAPDO.php';
         $oIva = TipoIVAPDO::obtenerVigentePorCodigo($codigoIva, date('Y-m-d'));
-        $idTipoIva = $oIva['id'] ?? null;
+        $idTipoIva = $oIva['id'] ?? 1; // fallback al IVA GENERAL (id=1)
 
         DBPDO::ejecutarConsulta($sql, [
             ':referencia'     => $ref,
@@ -399,7 +399,7 @@ class ProductoPDO
         }
 
         $codigoIva = $datos['codigo_iva'] ?? 'GENERAL';
-        $idProveedor = !empty($datos['id_proveedor']) ? (int)$datos['id_proveedor'] : null;
+        $idProveedor = !empty($datos['id_proveedor']) ? (int)$datos['id_proveedor'] : 0;
         $aplicaRE = 0;
         if ($idProveedor) {
             require_once __DIR__ . '/ProveedorPDO.php';
@@ -419,7 +419,7 @@ class ProductoPDO
 
         require_once 'TipoIVAPDO.php';
         $oIva = TipoIVAPDO::obtenerVigentePorCodigo($codigoIva, date('Y-m-d'));
-        $idTipoIva = $oIva['id'] ?? null;
+        $idTipoIva = $oIva['id'] ?? 1;
 
         $sql = "UPDATE productos
                 SET referencia = :referencia, nombre = :nombre, descripcion = :descripcion, 
@@ -576,9 +576,9 @@ class ProductoPDO
      * Normaliza los atributos antes de guardarlos en BD.
      * Guarda el campo como un JSON Array simple Ej: ["Novedad", "Oferta"]
      */
-    private static function normalizarAtributos($atributos): ?string
+    private static function normalizarAtributos($atributos): string
     {
-        if ($atributos === null || $atributos === '' || $atributos === 'null' || $atributos === '[]') return null;
+        if ($atributos === null || $atributos === '' || $atributos === 'null' || $atributos === '[]') return '[]';
 
         $finalArray = [];
 
@@ -587,14 +587,13 @@ class ProductoPDO
             if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
                 $finalArray = $decoded;
             } else {
-                // Not a JSON array, treat as comma-separated string
                 $finalArray = explode(',', $atributos);
             }
         } elseif (is_array($atributos)) {
             $finalArray = $atributos;
         }
 
-        if (empty($finalArray)) return null;
+        if (empty($finalArray)) return '[]';
 
         // Flatten (one level) and clean
         $clean = [];
@@ -608,8 +607,8 @@ class ProductoPDO
         if (count($clean) > 0) {
             return json_encode($clean, JSON_UNESCAPED_UNICODE);
         }
-        
-        return null;
+
+        return '[]';
     }
 
     public static function toggleBaja(int $id): bool
@@ -965,6 +964,187 @@ class ProductoPDO
         return ['actualizados' => $actualizados];
     }
 
+    /**
+     * Ajuste masivo unificado: tipos percent | amount | margin | round.
+     * Si $fechaAplicacion es futura, solo registra en log con estado='pendiente'.
+     */
+    public static function ajusteMasivoUnificado(
+        string $tipo,
+        float  $valor,
+        ?string $categoria,
+        array  $excepciones,
+        string $motivo,
+        float  $redondeoA = 1.0,
+        ?string $fechaAplicacion = null
+    ): array {
+        $idUsuario = isset($_SESSION['usuarioActualTPV']) ? $_SESSION['usuarioActualTPV']->getId() : null;
+
+        // Si tiene plazo futuro → guardar como pendiente y salir
+        if ($fechaAplicacion !== null) {
+            $ts = strtotime($fechaAplicacion);
+            if ($ts !== false && $ts > time()) {
+                $params = [
+                    'tipo' => $tipo, 'valor' => $valor, 'categoria' => $categoria,
+                    'excepciones' => $excepciones, 'redondeo_a' => $redondeoA,
+                ];
+                $catNombre = 'Todas';
+                if ($categoria) {
+                    $qCat = DBPDO::ejecutarConsulta("SELECT nombre FROM categorias WHERE codigo = :c OR id = :c", [':c' => $categoria]);
+                    $rowCat = $qCat->fetch();
+                    if ($rowCat) $catNombre = $rowCat['nombre'];
+                }
+                DBPDO::ejecutarConsulta(
+                    "INSERT INTO log_ajustes_globales
+                     (fecha, id_usuario, tipo_operacion, valor, tipo_valor, categoria_nom, motivo, productos_afectados, fecha_aplicacion, estado, params_json)
+                     VALUES (:fecha, :uid, :op, :val, :tval, :cat, :motivo, 0, :fap, 'pendiente', :pjson)",
+                    [
+                        ':fecha'  => date('Y-m-d H:i:s'),
+                        ':uid'    => $idUsuario,
+                        ':op'     => 'ajuste_' . $tipo,
+                        ':val'    => $valor,
+                        ':tval'   => $tipo,
+                        ':cat'    => $catNombre,
+                        ':motivo' => $motivo,
+                        ':fap'    => date('Y-m-d H:i:s', $ts),
+                        ':pjson'  => json_encode($params),
+                    ]
+                );
+                return ['pendiente' => true, 'fecha_aplicacion' => date('Y-m-d H:i:s', $ts)];
+            }
+        }
+
+        return self::_ejecutarAjusteUnificado($tipo, $valor, $categoria, $excepciones, $motivo, $redondeoA, $idUsuario, $fechaAplicacion);
+    }
+
+    private static function _ejecutarAjusteUnificado(
+        string $tipo, float $valor, ?string $categoria, array $excepciones,
+        string $motivo, float $redondeoA, $idUsuario, ?string $fechaAplicacion
+    ): array {
+        // Construir WHERE
+        $needsCoste = ($tipo === 'margin');
+        $baseWhere  = $needsCoste ? "p.es_pack = 0 AND p.activo = 1 AND p.precio_coste > 0"
+                                  : "es_pack = 0 AND activo = 1";
+        $params = [];
+
+        if ($categoria !== null && $categoria !== '') {
+            $baseWhere .= $needsCoste ? " AND p.categoria = ?" : " AND categoria = ?";
+            $params[] = $categoria;
+        }
+
+        if (!empty($excepciones)) {
+            $ids = array_filter($excepciones, 'is_numeric');
+            if (!empty($ids)) {
+                $phs = implode(',', array_fill(0, count($ids), '?'));
+                $cond = $needsCoste ? "p.id NOT IN ($phs)" : "id NOT IN ($phs)";
+                $baseWhere .= " AND $cond";
+                foreach ($ids as $id) $params[] = $id;
+            }
+        }
+
+        if ($needsCoste) {
+            $sql = "SELECT p.id, p.precio_coste, p.precio_venta, COALESCE(t.porcentaje, 21.0) AS iva_pct
+                    FROM productos p LEFT JOIN tipos_iva t ON p.id_tipo_iva = t.id WHERE {$baseWhere}";
+        } else {
+            $sql = "SELECT p.id, p.precio_venta, p.precio_coste,
+                           COALESCE(t.porcentaje, 21.0) AS iva_pct
+                    FROM productos p LEFT JOIN tipos_iva t ON p.id_tipo_iva = t.id WHERE {$baseWhere}";
+        }
+
+        $productos  = DBPDO::ejecutarConsulta($sql, $params)->fetchAll(PDO::FETCH_ASSOC);
+        $actualizados = 0;
+        $omitidos     = 0;
+
+        foreach ($productos as $p) {
+            $pvpActual = (float)$p['precio_venta'];
+            $coste     = (float)($p['precio_coste'] ?? 0);
+            $ivaPct    = (float)($p['iva_pct'] ?? 21.0);
+
+            switch ($tipo) {
+                case 'percent':
+                    $pvpNuevo = round($pvpActual * (1 + ($valor / 100.0)), 2);
+                    break;
+                case 'amount':
+                    $pvpNuevo = round($pvpActual + $valor, 2);
+                    break;
+                case 'margin':
+                    if ($coste <= 0) { $omitidos++; continue 2; }
+                    $pvpNuevo = round($coste * (1 + ($valor / 100)) * (1 + ($ivaPct / 100)), 2);
+                    break;
+                case 'round':
+                    $n = max(0.0001, $redondeoA);
+                    $pvpNuevo = round($pvpActual / $n) * $n;
+                    $pvpNuevo = round($pvpNuevo, 4); // evitar flotantes raros
+                    break;
+                default:
+                    continue 2;
+            }
+
+            if ($pvpNuevo <= 0) { $omitidos++; continue; }
+            if (abs($pvpNuevo - $pvpActual) < 0.0001) continue;
+
+            // Recalcular margen
+            $pvpSinIva   = $pvpNuevo / (1 + ($ivaPct / 100));
+            $nuevoMargen = ($coste > 0) ? (($pvpSinIva / $coste) - 1) * 100 : 0;
+
+            DBPDO::ejecutarConsulta(
+                "UPDATE productos SET precio_venta = :pvp, margen = :margen WHERE id = :id",
+                [':pvp' => $pvpNuevo, ':margen' => $nuevoMargen, ':id' => $p['id']]
+            );
+            DBPDO::ejecutarConsulta(
+                "INSERT INTO auditoria_precios_base (id_producto, precio_old, precio_new, motivo, id_usuario, fecha)
+                 VALUES (:id, :old, :new, :m, :user, :fecha)",
+                [
+                    ':id'   => $p['id'],
+                    ':old'  => $pvpActual,
+                    ':new'  => $pvpNuevo,
+                    ':m'    => "Ajuste {$tipo} masivo ({$valor})" . ($categoria ? " [Cat: {$categoria}]" : ''),
+                    ':user' => $idUsuario,
+                    ':fecha'=> date('Y-m-d H:i:s'),
+                ]
+            );
+            $actualizados++;
+        }
+
+        return ['actualizados' => $actualizados, 'omitidos' => $omitidos];
+    }
+
+    /**
+     * Aplica ajustes masivos que tenían fecha_aplicacion futura y ya han vencido.
+     */
+    public static function aplicarAjustesPendientes(): void
+    {
+        try {
+            $q = DBPDO::ejecutarConsulta(
+                "SELECT id, tipo_valor, valor, params_json, motivo, id_usuario
+                 FROM log_ajustes_globales
+                 WHERE estado = 'pendiente' AND fecha_aplicacion <= NOW()"
+            );
+            $rows = $q->fetchAll(PDO::FETCH_ASSOC);
+
+            foreach ($rows as $row) {
+                $params   = json_decode($row['params_json'], true) ?: [];
+                $tipo     = $params['tipo'] ?? $row['tipo_valor'];
+                $valor    = (float)($params['valor'] ?? $row['valor']);
+                $categoria   = $params['categoria'] ?? null;
+                $excepciones = $params['excepciones'] ?? [];
+                $redondeoA   = (float)($params['redondeo_a'] ?? 1.0);
+                $motivo      = $row['motivo'];
+                $idUsuario   = $row['id_usuario'];
+
+                $resultado = self::_ejecutarAjusteUnificado(
+                    $tipo, $valor, $categoria, $excepciones, $motivo, $redondeoA, $idUsuario, null
+                );
+
+                DBPDO::ejecutarConsulta(
+                    "UPDATE log_ajustes_globales SET estado = 'aplicado', productos_afectados = :n WHERE id = :id",
+                    [':n' => $resultado['actualizados'], ':id' => $row['id']]
+                );
+            }
+        } catch (Throwable $e) {
+            error_log("[aplicarAjustesPendientes] " . $e->getMessage());
+        }
+    }
+
     public static function contarBajoStock()
     {
         try {
@@ -974,6 +1154,19 @@ class ProductoPDO
             return (int)$registro['total'];
         } catch (PDOException $e) {
             return 0;
+        }
+    }
+
+    public static function idsConAlbaranPendiente(): array
+    {
+        try {
+            $sql = "SELECT DISTINCT lc.producto_id FROM lineas_compra lc
+                    JOIN albaranes_compra ac ON lc.albaran_id = ac.id
+                    WHERE ac.estado = 'recibido'";
+            $stmt = DBPDO::ejecutarConsulta($sql);
+            return array_column($stmt->fetchAll(PDO::FETCH_ASSOC), 'producto_id');
+        } catch (PDOException $e) {
+            return [];
         }
     }
 
