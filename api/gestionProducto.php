@@ -17,6 +17,7 @@ try {
     require_once __DIR__ . '/../model/ProductoPDO.php';
     require_once __DIR__ . '/../model/MovimientoStockPDO.php';
     require_once __DIR__ . '/../core/231018libreriaValidacion.php';
+    require_once __DIR__ . '/../model/LogPDO.php';
 
     // session_start(); // Handled by csrf_check.php
 
@@ -120,8 +121,9 @@ try {
 
             $lista = ProductoPDO::listarProductos(false, $limit, $offset, $term, $cat, $estado, $minPrice, $maxPrice, $tag, $excluirPacks, $sortBy);
             $total = ProductoPDO::contarProductos(false, $term, $cat, $estado, $minPrice, $maxPrice, $tag, $excluirPacks);
+            $idsAlbaranPendiente = ProductoPDO::idsConAlbaranPendiente();
 
-            $formatted = array_map(function($p) {
+            $formatted = array_map(function($p) use ($idsAlbaranPendiente) {
                 $icono = $p->getIcono();
                 if ($icono && strlen($icono) > 10) {
                     $icono = 'data:image/png;base64,' . base64_encode($icono);
@@ -148,7 +150,8 @@ try {
                     'activo' => (int)$p->getActivo(),
                     'atributos' => $p->getAtributos(),
                     'mantener_precision' => (int)$p->getMantenerPrecision(),
-                    'componentes_pack' => $p->isPack() ? ProductoPDO::obtenerComponentesPack($p->getId()) : []
+                    'componentes_pack' => $p->isPack() ? ProductoPDO::obtenerComponentesPack($p->getId()) : [],
+                    'albaran_pendiente' => in_array($p->getId(), $idsAlbaranPendiente)
                 ];
             }, $lista);
             echo json_encode(['ok' => true, 'productos' => $formatted, 'total' => $total]);
@@ -156,6 +159,9 @@ try {
 
         case 'añadir':
             $nuevo = ProductoPDO::agregarProducto($datos);
+            LogPDO::addLog('CREATE_PRODUCTO', "Producto creado: {$nuevo['nombre']}", [
+                'id' => (int)$nuevo['id'], 'nombre' => $nuevo['nombre'], 'referencia' => $nuevo['referencia'],
+            ]);
             echo json_encode([
                 'ok'       => true,
                 'producto' => [
@@ -178,6 +184,9 @@ try {
             $id = (int)($datos['id'] ?? 0);
             if (!$id) throw new InvalidArgumentException('ID de producto inválido');
             ProductoPDO::editarProducto($id, $datos);
+            LogPDO::addLog('UPDATE_PRODUCTO', "Producto #{$id} actualizado", [
+                'id' => $id, 'nombre' => $datos['nombre'] ?? '',
+            ]);
             echo json_encode(['ok' => true]);
             break;
 
@@ -185,6 +194,7 @@ try {
             $id = (int)($datos['id'] ?? 0);
             if (!$id) throw new InvalidArgumentException('ID de producto inválido');
             ProductoPDO::eliminarProducto($id);
+            LogPDO::addLog('DELETE_PRODUCTO', "Producto #{$id} eliminado", ['id' => $id]);
             echo json_encode(['ok' => true]);
             break;
 
@@ -192,6 +202,9 @@ try {
             $id = (int)($datos['id'] ?? 0);
             if (!$id) throw new InvalidArgumentException('ID de producto inválido');
             $activo = ProductoPDO::toggleBaja($id);
+            LogPDO::addLog('TOGGLE_PRODUCTO', "Producto #{$id} " . ($activo ? 'activado' : 'dado de baja'), [
+                'id' => $id, 'activo' => (bool)$activo,
+            ]);
             echo json_encode(['ok' => true, 'activo' => $activo]);
             break;
 
@@ -213,6 +226,9 @@ try {
             }
             
             MovimientoStockPDO::registrarMovimiento($id, 'ajuste', $cantidad, $idUsuario, $motivo);
+            LogPDO::addLog('AJUSTE_STOCK', "Ajuste de stock en producto #{$id}: " . ($cantidad > 0 ? "+{$cantidad}" : $cantidad), [
+                'id' => $id, 'cantidad' => $cantidad, 'motivo' => $motivo,
+            ]);
             echo json_encode(['ok' => true]);
             break;
 

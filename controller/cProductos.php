@@ -31,6 +31,9 @@ if (isset($_REQUEST['volver'])) {
     exit;
 }
 
+// Aplicar ajustes masivos programados que hayan vencido
+ProductoPDO::aplicarAjustesPendientes();
+
 // Paginación
 ['pag' => $pag, 'limit' => $limit, 'offset' => $offset] = obtenerPaginacion(50);
 
@@ -39,6 +42,11 @@ $totalPaginas = ceil($totalProductos / $limit);
 
 // Helper para mapear objetos Producto a arrays para la vista
 function mapProducto(Producto $oProd) {
+    static $idsAlbaranPendiente = null;
+    if ($idsAlbaranPendiente === null) {
+        $idsAlbaranPendiente = ProductoPDO::idsConAlbaranPendiente();
+    }
+
     $icono = $oProd->getIcono();
     if ($icono && strlen($icono) > 200 && strpos($icono, 'data:image') === false) {
         $icono = 'data:image/png;base64,' . base64_encode($icono);
@@ -64,7 +72,8 @@ function mapProducto(Producto $oProd) {
         'precio_proveedor' => $oProd->getPrecioProveedor(),
         'margen'         => (float)$oProd->getMargen(),
         'mantener_precision' => (int)$oProd->getMantenerPrecision(),
-        'componentes_pack' => $oProd->getEsPack() ? ProductoPDO::obtenerComponentesPack($oProd->getId()) : []
+        'componentes_pack' => $oProd->getEsPack() ? ProductoPDO::obtenerComponentesPack($oProd->getId()) : [],
+        'albaran_pendiente' => in_array($oProd->getId(), $idsAlbaranPendiente)
     ];
 }
 
