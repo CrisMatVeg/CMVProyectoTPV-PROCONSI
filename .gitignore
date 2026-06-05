@@ -37,6 +37,13 @@ Desktop.ini
 /db_backups/
 /backup/
 
-# Configuración sensible local (opcional)
-# config/confDBPDO.php
+# Configuración sensible local
+config/confDBPDO.php
+config/config.php
 .env
+
+# Artefactos de debug
+storage/debug_hash.txt
+
+# Archivos generados de VeriFactu
+/storage/verifactu/xml/*.xml

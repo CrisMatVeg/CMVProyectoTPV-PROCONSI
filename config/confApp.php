@@ -1,5 +1,9 @@
 <?php
 require_once './core/231018libreriaValidacion.php';
+require_once './core/helpers.php';
+require_once __DIR__ . '/constantes.php';
+require_once __DIR__ . '/config.php';
+
 require_once './model/Usuario.php';
 require_once './model/UsuarioPDO.php';
 require_once './model/Producto.php';
@@ -18,12 +22,7 @@ $controller = [
     "Usuarios" => "controller/cUsuarios.php",
     "Roles" => "controller/cRoles.php",
     "Clientes" => "controller/cClientes.php",
-    // "Detalle" => "controller/cDetalle.php",
-    // "MiCuenta" => "controller/cMiCuenta.php",
-    // "BorrarCuenta" => "controller/cBorrarCuenta.php",
-    // "CambiarPassword" => "controller/cCambiarPassword.php",
     "Registro" => "controller/cRegistro.php",
-    // "WIP" => "controller/cWIP.php",
     "error" => "controller/cError.php",
     "Productos" => "controller/cProductos.php",
     "Promociones" => "controller/cPromociones.php",
@@ -34,9 +33,6 @@ $controller = [
     "Analitica" => "controller/cAnalitica.php",
     "Proveedores" => "controller/cProveedores.php",
     "Compras" => "controller/cCompras.php",
-    // "REST" => "controller/cREST.php",
-    // "DetallesNasa" => "controller/cDetallesNasa.php",
-    // "DetallesDog" => "controller/cDetallesDog.php",
     "MtoDepartamentos" => "controller/cMtoDepartamentos.php",
     "Configuracion" => "controller/cConfiguracion.php",
     "RecuperarPassword" => "controller/cRecuperarPassword.php",
@@ -52,12 +48,7 @@ $view = [
     "Clientes" => "view/vClientes.php",
     "layout" => "view/layout.php",
     "Login" => "view/vLogin.php",
-    // "Detalle" => "view/vDetalle.php",
-    // "MiCuenta" => "view/vMiCuenta.php",
-    // "BorrarCuenta" => "view/vBorrarCuenta.php",
-    // "CambiarPassword" => "view/vCambiarPassword.php",
     "Registro" => "view/vRegistro.php",
-    // "WIP" => "view/vWIP.php",
     "error" => "view/vError.php",
     "Productos" => "view/vProductos.php",
     "Promociones" => "view/vPromociones.php",
@@ -68,9 +59,6 @@ $view = [
     "Analitica" => "view/vAnalitica.php",
     "Proveedores" => "view/vProveedores.php",
     "Compras" => "view/vCompras.php",
-    // "REST" => "view/vREST.php",
-    // "DetallesNasa" => "view/vDetallesNasa.php",
-    // "DetallesDog" => "view/vDetallesDog.php",
     "MtoDepartamentos" => "view/vMtoDepartamentos.php",
     "Configuracion" => "view/vConfiguracion.php",
     "RecuperarPassword" => "view/vRecuperarPassword.php",

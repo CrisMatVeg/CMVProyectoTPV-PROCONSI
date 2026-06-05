@@ -33,19 +33,19 @@ if (isset($_REQUEST['irProductos'])) {
     exit;
 }
 
-if (isset($_REQUEST['irTiposIVA'])) {
+if (isset($_REQUEST['irTiposIVA']) && $_SESSION['usuarioActualTPV']->tienePermiso('gestionar_iva')) {
     $_SESSION['paginaEnCurso'] = 'TiposIVA';
     header('Location: index.php');
     exit;
 }
 
-if (isset($_REQUEST['irTarifas'])) {
+if (isset($_REQUEST['irTarifas']) && $_SESSION['usuarioActualTPV']->tienePermiso('gestionar_tarifas')) {
     $_SESSION['paginaEnCurso'] = 'Tarifas';
     header('Location: index.php');
     exit;
 }
 
-if (isset($_REQUEST['irPromociones'])) {
+if (isset($_REQUEST['irPromociones']) && $_SESSION['usuarioActualTPV']->tienePermiso('gestionar_promociones')) {
     $_SESSION['paginaEnCurso'] = 'Promociones';
     header('Location: index.php');
     exit;
@@ -72,7 +72,7 @@ $avDashboard = [
     'productos_count' => 0
 ];
 
-if ($_SESSION['usuarioActualTPV']->getRol() === 'admin') {
+if ($_SESSION['usuarioActualTPV']->tienePermiso('ver_analitica')) {
     require_once 'model/VentaPDO.php';
     require_once 'model/ProductoPDO.php';
 

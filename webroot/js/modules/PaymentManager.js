@@ -3,7 +3,7 @@
  * Handles checkout process, payment methods, and client/socio selection.
  */
 
-import { AppState } from './AppConfig.js';
+import { AppConfig, AppState } from './AppConfig.js';
 import { ApiService } from './ApiService.js';
 import { Utils } from './Utils.js';
 import { CartManager } from './CartManager.js';
@@ -13,6 +13,11 @@ import { TicketManager } from './TicketManager.js';
 export const PaymentManager = {
   // Constants
   SOCIO_DISCOUNT: 5,
+
+  // State (Recovered)
+  totalVentaActual: 0,
+  checkoutContext: 'efectivo',
+  _isSaving: false,
 
   init() {
     this.setupEventListeners();
@@ -35,73 +40,52 @@ export const PaymentManager = {
     }
   },
 
-  /**
-   * Inicializa el proceso de pago
-   */
   async processPayment() {
-    // Resetear estado de comprobación de efectivo
-    window.cajaEfectivoActual = null;
-    try {
-      const resp = await ApiService.getCajaEstadoActual();
-      if (resp.ok) {
-        window.cajaEfectivoActual = resp.efectivoActual;
-      }
-    } catch (e) {
-      console.error("Error al obtener estado de caja:", e);
-    }
+    await this._verificarEstadoCaja();
 
-    AppState.tipoClienteActual = "particular";
-    document.getElementById("empresaDatos").classList.add("d-none");
-    document.getElementById("empresaNombre").value = "";
-    document.getElementById("empresaNif").value = "";
-    document.getElementById("efectivoRecibido").value = "";
-
-    const aCuentaPagado = document.getElementById("aCuentaPagado");
-    const aCuentaFecha = document.getElementById("aCuentaFechaLimite");
-    if (aCuentaPagado) aCuentaPagado.value = "0.00";
-    if (aCuentaFecha) {
-      const nextMonth = new Date();
-      nextMonth.setMonth(nextMonth.getMonth() + 1);
-      aCuentaFecha.value = nextMonth.toISOString().split("T")[0];
-    }
-
-    const cambioEl = document.getElementById("efectivoCambio");
-    if (cambioEl) {
-      cambioEl.textContent = "0,00 €";
-      cambioEl.classList.remove("text-red");
-      cambioEl.classList.add("text-accent");
-    }
-
-    const efectivoGestion = document.getElementById("efectivoGestion");
-    if (AppState.selectedPayment === "efectivo") {
-      efectivoGestion.classList.remove("d-none");
-      setTimeout(() => document.getElementById("efectivoRecibido").focus(), 100);
+    if (AppState.socioActual || AppState.clienteSeleccionado) {
+      // Solo sincronizar con servidor si hay cliente identificado
+      await this.syncCartPricesWithServer();
     } else {
-      efectivoGestion.classList.add("d-none");
+      // Sin cliente: resetear cualquier tarifa residual y recalcular desde cero
+      const cartReset = AppState.cart;
+      Object.keys(cartReset).forEach(key => {
+        const item = cartReset[key];
+        if (item._customPrice) return;
+        item._tariffApplied = false;
+        item.appliedTariffs = [];
+        if (item.basePriceSnapshot != null) item.price = item.basePriceSnapshot;
+      });
+      AppState.cart = cartReset;
+      CartManager.recalculateCartPrices();
     }
 
+    const totals = CartManager.calculateTotals();
+    this.totalVentaActual = totals ? totals.total : 0;
+
+    const activeSidebarBtn = document.querySelector(".pay-btn.selected");
+    if (activeSidebarBtn) {
+      this.checkoutContext = activeSidebarBtn.dataset.method;
+      AppState.selectedPayment = this.checkoutContext;
+    }
+
+    if (!AppState.clienteSeleccionado && !AppState.socioActual) {
+      await this.seleccionarTipoCliente("particular");
+    }
+
+    this._procesarVales();
+
+    if (typeof window.abrirModalPago === "function") {
+      window.abrirModalPago();
+    } else {
+      document.getElementById("clienteModal")?.classList.add("visible");
+    }
+
+    this.updateMixSummary();
     this.updateTypeButtons();
 
-    AppState.socioActual = null;
-    document.getElementById("socioBusqueda").classList.add("d-none");
-    document.getElementById("socioRegistro").classList.add("d-none");
-    document.getElementById("socioInfo").innerText = "";
-    AppState.clienteSeleccionado = null;
-
-    const gen = document.getElementById("clienteBusquedaGenerica");
-    if (gen) {
-      gen.classList.add("d-none");
-      const res = document.getElementById("clienteResultados");
-      if (res) res.innerHTML = "";
-      const btnAdd = document.getElementById("btnAddCliente");
-      if (btnAdd) btnAdd.classList.add("d-none");
-    }
-    const reg = document.getElementById("clienteRegistro");
-    if (reg) reg.classList.add("d-none");
-
     document.querySelectorAll(".form-error").forEach((el) => (el.innerText = ""));
-    
-    this.quitarValeAplicado();
+
     const valeContainer = document.getElementById("clienteValesContainer");
     if (valeContainer) valeContainer.classList.add("d-none");
 
@@ -110,6 +94,52 @@ export const PaymentManager = {
     if (puntosContainer) puntosContainer.classList.add("d-none");
 
     document.getElementById("clienteModal").classList.add("visible");
+  },
+
+  async _verificarEstadoCaja() {
+    window.cajaEfectivoActual = null;
+    try {
+      const resp = await ApiService.request("./api/cajaEstadoActual.php");
+      if (resp.ok) {
+        window.cajaEfectivoActual = parseFloat(resp.efectivoActual);
+        console.log('[Caja] Efectivo en turno calculado por API:', window.cajaEfectivoActual, '€');
+        const lbl = document.getElementById('cajaEfectivoLabel');
+        if (lbl) lbl.textContent = Utils.formatCurrency(window.cajaEfectivoActual);
+      }
+    } catch (e) {
+      console.error("Error al obtener estado de caja:", e);
+    }
+  },
+
+  _procesarVales() {
+    if (AppState.valeAplicado) {
+      const existing = window.currentPayments.find(p => p.metodo === "vale");
+      if (!existing) {
+        window.currentPayments.push({
+          metodo: "vale",
+          importe: Math.min(this.totalVentaActual, parseFloat(AppState.valeAplicado.importe_restante)),
+          label: `Vale: ${AppState.valeAplicado.codigo}`
+        });
+      }
+    }
+
+    const totalPagadoVales = window.currentPayments.reduce((acc, p) => acc + (p.metodo === 'vale' ? p.importe : 0), 0);
+    const pendiente = Math.max(0, this.totalVentaActual - totalPagadoVales);
+
+    if (pendiente > 0.01 && AppState.selectedPayment && AppState.selectedPayment !== 'mixto') {
+      const existing = window.currentPayments.find(p => p.metodo === AppState.selectedPayment);
+      if (existing) {
+        existing.importe = pendiente;
+        existing.recibido = pendiente;
+      } else {
+        window.currentPayments.push({
+          metodo: AppState.selectedPayment,
+          importe: pendiente,
+          recibido: pendiente,
+          label: AppState.selectedPayment.charAt(0).toUpperCase() + AppState.selectedPayment.slice(1).replace('_', ' ')
+        });
+      }
+    }
   },
 
   updateTypeButtons() {
@@ -121,13 +151,16 @@ export const PaymentManager = {
     if (btnS) btnS.classList.toggle("selected-type", AppState.tipoClienteActual === "socio");
   },
 
-  seleccionarTipoCliente(tipo) {
+  async seleccionarTipoCliente(tipo) {
     AppState.tipoClienteActual = tipo;
     this.updateTypeButtons();
 
-    document.getElementById("empresaDatos").classList.add("d-none");
-    document.getElementById("socioBusqueda").classList.add("d-none");
-    document.getElementById("socioRegistro").classList.add("d-none");
+    const empD = document.getElementById("empresaDatos");
+    if (empD) empD.classList.add("d-none");
+    const socB = document.getElementById("socioBusqueda");
+    if (socB) socB.classList.add("d-none");
+    const socR = document.getElementById("socioRegistro");
+    if (socR) socR.classList.add("d-none");
 
     const gen = document.getElementById("clienteBusquedaGenerica");
     if (gen) gen.classList.add("d-none");
@@ -142,17 +175,36 @@ export const PaymentManager = {
       AppState.socioActual = null;
       if (gen) gen.classList.remove("d-none");
     } else if (tipo === "socio") {
-      document.getElementById("socioBusqueda").classList.remove("d-none");
-      setTimeout(() => document.getElementById("socioSearch").focus(), 100);
+      const elSocioBusqueda = document.getElementById("socioBusqueda");
+      if (elSocioBusqueda) elSocioBusqueda.classList.remove("d-none");
+      const elSocioSearch = document.getElementById("socioSearch");
+      if (elSocioSearch) setTimeout(() => elSocioSearch.focus(), 100);
     } else {
-      document.getElementById("empresaDatos").classList.remove("d-none");
-      setTimeout(() => document.getElementById("empresaNombre").focus(), 100);
+      const elEmpresaDatos = document.getElementById("empresaDatos");
+      if (elEmpresaDatos) elEmpresaDatos.classList.remove("d-none");
+      const elEmpresaNombre = document.getElementById("empresaNombre");
+      if (elEmpresaNombre) setTimeout(() => elEmpresaNombre.focus(), 100);
       AppState.socioActual = null;
       if (gen) gen.classList.remove("d-none");
     }
 
+    // Resetear flags de tarifa para que recalculateCartPrices pueda recalcular
+    // sin cliente (no resetear items con precio editado manualmente)
+    const cartReset = AppState.cart;
+    Object.keys(cartReset).forEach(key => {
+      const item = cartReset[key];
+      if (item._customPrice) return;
+      item._tariffApplied = false;
+      item.appliedTariffs = [];
+      if (item.basePriceSnapshot != null) item.price = item.basePriceSnapshot;
+    });
+    AppState.cart = cartReset;
+
+    CartManager.recalculateCartPrices();
     const totals = CartManager.calculateTotals();
     UiController.renderCart(totals);
+    this.updateMixSummary();
+    this.checkMostrarPanelNif();
   },
 
   async buscarSocio() {
@@ -171,21 +223,93 @@ export const PaymentManager = {
       });
       if (r.ok) {
         AppState.socioActual = r.cliente;
-        info.innerHTML = `<i class="fa-solid fa-check-circle text-green"></i> ${r.cliente.nombre} (${r.cliente.nif})`;
+        AppState.tipoClienteActual = "socio";
+        this.updateTypeButtons();
+        info.innerHTML = `
+          <div class="d-flex ai-center jc-space-between bg-surface2 p-8 br-8 border-1">
+            <span class="fs-13 fw-600"><i class="fa-solid fa-check-circle text-green mr-8"></i> ${r.cliente.nombre} (${r.cliente.nif})</span>
+            <button type="button" class="btn-tpv-icon sm text-red" onclick="app.deseleccionarCliente()" title="Deseleccionar">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+        `;
         Utils.showToast("Socio identificado");
         this.cargarValesCliente(r.cliente.id);
         this.mostrarPuntosCliente(r.cliente);
+        this.checkMostrarPanelNif();
+        
+        await this.syncCartPricesWithServer();
+
+        CartManager.recalculateCartPrices();
         const totals = CartManager.calculateTotals();
         UiController.renderCart(totals);
+        this.updateMixSummary();
       } else {
-        info.innerHTML = `<span class="text-red">Socio no encontrado.</span>`;
-        btnAdd.classList.remove("d-none");
-        AppState.socioActual = null;
+        throw new Error(r.error || "Socio no encontrado");
       }
     } catch (e) {
       console.error(e);
-      info.innerText = "Error en la búsqueda.";
+      info.innerHTML = `<span class="text-red">Socio no encontrado.</span>`;
+      btnAdd.classList.remove("d-none");
+      AppState.socioActual = null;
+      Utils.showToast(e.message, "error");
     }
+  },
+
+  deseleccionarCliente() {
+    AppState.socioActual = null;
+    AppState.clienteSeleccionado = null;
+    AppState.tipoClienteActual = "particular";
+    
+    // Limpiar UI de resultados
+    const resEl = document.getElementById("clienteResultados");
+    if (resEl) resEl.innerHTML = "";
+    
+    const socioInfo = document.getElementById("socioInfo");
+    if (socioInfo) socioInfo.innerHTML = "";
+    
+    const socioSearch = document.getElementById("socioSearch");
+    if (socioSearch) socioSearch.value = "";
+    
+    const clienteSearch = document.getElementById("clienteSearch");
+    if (clienteSearch) clienteSearch.value = "";
+
+    // Resetear botones de tipo
+    this.updateTypeButtons();
+    
+    // Ocultar paneles de vales y puntos
+    const valeContainer = document.getElementById("clienteValesContainer");
+    if (valeContainer) valeContainer.classList.add("d-none");
+    
+    const puntosContainer = document.getElementById("clientePuntosContainer");
+    if (puntosContainer) puntosContainer.classList.add("d-none");
+    
+    this.quitarValeAplicado();
+    this.quitarPuntosCanjeados();
+
+    // Ocultar y limpiar panel NIF para factura
+    const panelNif = document.getElementById("panelNifFactura");
+    if (panelNif) panelNif.classList.add("d-none");
+    const nifInput = document.getElementById("facturaClienteNif");
+    if (nifInput) nifInput.value = "";
+
+    // Resetear flags de tarifa antes de recalcular (sin cliente = sin tarifa)
+    const cartReset = AppState.cart;
+    Object.keys(cartReset).forEach(key => {
+      const item = cartReset[key];
+      if (item._customPrice) return;
+      item._tariffApplied = false;
+      item.appliedTariffs = [];
+      if (item.basePriceSnapshot != null) item.price = item.basePriceSnapshot;
+    });
+    AppState.cart = cartReset;
+
+    CartManager.recalculateCartPrices();
+    const totals = CartManager.calculateTotals();
+    UiController.renderCart(totals);
+
+    this.updateMixSummary();
+    Utils.showToast("Cliente deseleccionado");
   },
 
   async cargarValesCliente(idCliente) {
@@ -213,241 +337,61 @@ export const PaymentManager = {
             <button type="button" onclick='app.aplicarVale(${JSON.stringify(v)})' class="btn-save fs-10 p-2-8 w-auto">Aplicar</button>
           </div>
         `).join("");
-      } else {
+      } else if (r.ok) {
         listado.innerHTML = '<div class="fs-11 opacity-50 p-4">No hay vales activos para este cliente.</div>';
+      } else {
+        throw new Error(r.error || "Error al cargar vales");
       }
     } catch (e) {
       console.error("Error cargando vales:", e);
       listado.innerHTML = '<div class="fs-11 text-red">Error al cargar vales.</div>';
+      Utils.showToast(e.message, "error");
     }
   },
 
   aplicarVale(vale) {
     AppState.valeAplicado = vale;
+    
+    // [NUEVO] Añadir el vale directamente a la lista de pagos actual para que se refleje en el total pendiente
+    const existing = window.currentPayments.find(p => p.metodo === "vale");
+    if (!existing) {
+        const totals = CartManager.calculateTotals();
+        window.currentPayments.push({
+            metodo: "vale",
+            importe: Math.min(totals.total, parseFloat(vale.importe_restante)),
+            label: `Vale: ${vale.codigo}`
+        });
+    }
+
     const resumen = document.getElementById("valeAplicadoResumen");
     const totalLabel = document.getElementById("valeAplicadoTotal");
-    const pendienteLabel = document.getElementById("valePendienteCobro");
     const listado = document.getElementById("listadoValesCliente");
     
-    const totals = CartManager.calculateTotals();
-    const totalTPV = totals.total;
-
     if (resumen && totalLabel) {
       resumen.classList.remove("d-none");
       totalLabel.textContent = Utils.formatCurrency(parseFloat(vale.importe_restante));
-      if (pendienteLabel) {
-        const rest = Math.max(0, totalTPV - parseFloat(vale.importe_restante));
-        pendienteLabel.textContent = Utils.formatCurrency(rest);
-      }
     }
     if (listado) listado.classList.add("d-none");
     
+    this.updateMixSummary(); // Forzar actualización de sumas en el modal
     Utils.showToast(`<i class="fa-solid fa-ticket"></i> Vale ${vale.codigo} aplicado`);
   },
 
   quitarValeAplicado() {
     AppState.valeAplicado = null;
+    
+    // [NUEVO] Quitar de la lista de pagos
+    window.currentPayments = window.currentPayments.filter(p => p.metodo !== "vale");
+    
     const resumen = document.getElementById("valeAplicadoResumen");
     const listado = document.getElementById("listadoValesCliente");
     
     if (resumen) resumen.classList.add("d-none");
     if (listado) listado.classList.remove("d-none");
+
+    this.updateMixSummary();
   },
 
-  async ejecutarCobroFinal() {
-    const btn = document.getElementById("confirmarClienteBtn");
-    btn.disabled = true;
-    btn.textContent = "Guardando…";
-
-    const totals = CartManager.calculateTotals();
-    const items = Object.values(AppState.cart);
-    if (items.length === 0) {
-        Utils.showToast("⚠ El carrito está vacío", "warning");
-        btn.disabled = false;
-        btn.textContent = "Cobrar";
-        return;
-    }
-
-    const clienteId = AppState.tipoClienteActual === "socio" 
-        ? (AppState.socioActual ? AppState.socioActual.id : null)
-        : (AppState.clienteSeleccionado ? AppState.clienteSeleccionado.id : null);
-
-    // 1. Detect selected method from UI BEFORE validation
-    let modalMethod = null;
-    const selectedBtn = document.querySelector("#selectorMetodoPago .btn-tpv-method.border-accent");
-    if (selectedBtn) {
-        modalMethod = selectedBtn.id.replace("btn", "").toLowerCase();
-        if (modalMethod === "acuenta") modalMethod = "a_cuenta";
-    }
-
-    const facturaActiva = document.getElementById("facturaToggle")?.checked;
-    const currentSelected = (modalMethod || AppState.selectedPayment || "efectivo");
-    const isAcuenta = currentSelected === "a_cuenta";
-    const isMixto = (checkoutContext === "mixto" || currentSelected === "mixto");
-    
-    // 2. Validation Logic
-    if (isAcuenta || facturaActiva) {
-        if (!clienteId && AppState.tipoClienteActual !== "empresa") {
-            Utils.showToast("Debe identificar un cliente para esta operación", "warning");
-            btn.disabled = false;
-            btn.textContent = "Cobrar";
-            return;
-        }
-        
-        const empNif = this.getClienteNif();
-        if (facturaActiva && (!empNif || !window.validarDocumento(empNif))) {
-            Utils.showToast("El NIF/CIF del cliente no es válido para factura", "error");
-            btn.disabled = false;
-            btn.textContent = "Cobrar";
-            return;
-        }
-
-        if (isAcuenta) {
-            const aCFecha = (document.getElementById("aCuentaFechaLimite") || {value: ""}).value;
-            if (!window.validarFechas(new Date().toISOString().split("T")[0], aCFecha)) {
-                Utils.showToast("La fecha límite no puede ser anterior a hoy", "error");
-                btn.disabled = false;
-                btn.textContent = "Cobrar";
-                return;
-            }
-        }
-    }
-
-    const efectivoRecibidoEl = document.getElementById("mixPagoMonto") || document.getElementById("efectivoRecibido");
-    const uiEfectivoRecibido = parseFloat((efectivoRecibidoEl || {value:0}).value) || 0;
-
-    const basePayments = (isMixto ? (window.currentPayments || []) : [])
-        .filter(p => parseFloat(p.importe) > 0 && p.metodo !== "puntos");
-
-    // 2. Build the pagos list for the backend
-    const currentPaidTot = basePayments.reduce((acc, p) => acc + parseFloat(p.importe), 0);
-    const totalRemainingToAllocate = Math.max(0, totals.total - currentPaidTot);
-
-    let pagosList = [...basePayments];
-
-    if (isAcuenta) {
-        // SPECIAL LOGIC FOR CREDIT SALES:
-        // The user input (uiEfectivoRecibido) represents the DEBT they want to credit.
-        const debtPart = Math.min(totalRemainingToAllocate, uiEfectivoRecibido);
-        const initialPaymentPart = Math.max(0, totalRemainingToAllocate - debtPart);
-
-        // 1. The cash part (Initial Payment) - This goes to the cash box!
-        if (initialPaymentPart > 0.005) {
-            pagosList.push({
-                metodo: "efectivo",
-                importe: initialPaymentPart,
-                recibido: initialPaymentPart
-            });
-        }
-        // 2. The credit part (The actual debt)
-        if (debtPart > 0.005) {
-            pagosList.push({
-                metodo: "a_cuenta",
-                importe: debtPart,
-                recibido: debtPart
-            });
-        }
-    } else if (totalRemainingToAllocate > 0.005) {
-        // Standard non-credit payment
-        let metodoRemanente = modalMethod || AppState.selectedPayment || "efectivo";
-        if (metodoRemanente === "mixto") metodoRemanente = "efectivo"; 
-        
-        pagosList.push({
-            metodo: metodoRemanente,
-            importe: totalRemainingToAllocate,
-            recibido: metodoRemanente === "efectivo" ? Math.max(totalRemainingToAllocate, uiEfectivoRecibido) : totalRemainingToAllocate
-        });
-    }
-
-    // Identify primary payment method for legacy backend support
-    let finalMetodoPago = modalMethod || AppState.selectedPayment || "efectivo";
-    if (pagosList.length === 1) {
-        finalMetodoPago = pagosList[0].metodo;
-    } else if (pagosList.length > 1) {
-        finalMetodoPago = "mixto";
-    }
-
-    // 3. Identification & Payload
-    const aCuentaFechaEl = document.getElementById("aCuentaFechaLimite");
-    // In the current UI, 'A cuenta' amount in the input represents the DEBT (Importe Fiado).
-    // The backend expects 'pagadoACuenta' to be the INITIAL PAYMENT (Entrega).
-    // So: PaidNow = Total - Debt
-    let aCuentaPagadoVal = 0;
-    if (isAcuenta) {
-        const debtInputVal = parseFloat(uiEfectivoRecibido) || 0;
-        aCuentaPagadoVal = Math.max(0, totals.total - debtInputVal);
-    }
-
-    const cashPayment = pagosList.find(p => p.metodo === "efectivo");
-    const finalEfectivoRecibido = cashPayment ? (cashPayment.recibido || cashPayment.importe) : 0;
-
-    const payload = {
-        tipoCliente: AppState.tipoClienteActual,
-        nombreCliente: this.getClienteNombre(),
-        nifCliente: this.getClienteNif(),
-        idCliente: clienteId,
-        esFactura: facturaActiva ? 1 : 0,
-        comentarios: (document.getElementById("ticketComentarios") || {value: ""}).value.trim(),
-        metodoPago: finalMetodoPago,
-        pagos: pagosList,
-        subtotal: totals.subtotal,
-        total: totals.total,
-        descuentoAmt: totals.totalDiscount,
-        descuentoLabel: this.getDescuentoLabel(),
-        lineas: items.map(it => ({
-            id: it.id,
-            name: it.name,
-            codigo: it.codigo,
-            price: it.price,
-            qty: it.qty,
-            serials: it.serials || []
-        })),
-        efectivo: {
-            recibido: finalEfectivoRecibido
-        },
-        pagadoACuenta: aCuentaPagadoVal,
-        fechaLimitePago: (aCuentaFechaEl || {value:null}).value,
-        idVale: AppState.valeAplicado ? AppState.valeAplicado.id : null,
-        codigoVale: AppState.valeAplicado ? AppState.valeAplicado.codigo : null,
-        importeVale: AppState.valeAplicado ? Math.min(totals.total, parseFloat(AppState.valeAplicado.importe_restante || 0)) : 0,
-        puntosGanados: Math.floor(totals.total),
-        puntosCanjeados: AppState.puntosCanjeados || 0,
-        puntosDescuentoAmt: AppState.puntosDescuentoAmt || 0,
-        codigoCupon: (AppState.currentPromo && AppState.currentPromo.codigo) ? AppState.currentPromo.codigo : null
-    };
-
-    console.log("Saving Venta Payload:", payload);
-
-    try {
-        const data = await ApiService.request("./api/guardarVenta.php", {
-            method: "POST",
-            body: JSON.stringify(payload)
-        });
-        if (data.ok) {
-            Utils.showToast("Venta guardada con éxito", "success");
-            
-            // Delegate clearCart to master main.js if available
-            if (typeof window.clearCart === "function") {
-                window.clearCart();
-            } else {
-                AppState.clearCart();
-            }
-            
-            window.currentPayments = [];
-            TicketManager.showTicket(data.venta, true);
-            document.getElementById("clienteModal").classList.remove("visible");
-        } else {
-            console.error("Backend Error:", data);
-            Utils.showToast("Error: " + (data.error || "Fallo al guardar"), "error");
-        }
-    } catch (e) {
-        console.error("Connection/Runtime Error:", e);
-        Utils.showToast("Error de conexión o de sistema", "error");
-    } finally {
-        btn.disabled = false;
-        btn.textContent = "Cobrar";
-    }
-  },
 
   getClienteNombre() {
     if (AppState.tipoClienteActual === "empresa") return document.getElementById("empresaNombre").value;
@@ -457,10 +401,31 @@ export const PaymentManager = {
   },
 
   getClienteNif() {
-    if (AppState.tipoClienteActual === "empresa") return document.getElementById("empresaNif").value;
-    if (AppState.socioActual) return AppState.socioActual.nif;
-    if (AppState.clienteSeleccionado) return AppState.clienteSeleccionado.nif;
+    if (AppState.tipoClienteActual === "empresa") return document.getElementById("empresaNif")?.value || null;
+    const panelNif = document.getElementById("facturaClienteNif")?.value.trim() || null;
+    if (AppState.socioActual) return AppState.socioActual.nif || panelNif;
+    if (AppState.clienteSeleccionado) return AppState.clienteSeleccionado.nif || panelNif;
     return null;
+  },
+
+  // Muestra u oculta el panel de NIF extra si el cliente seleccionado no tiene NIF y se requiere factura
+  checkMostrarPanelNif() {
+    const panel = document.getElementById("panelNifFactura");
+    if (!panel) return;
+
+    // Solo relevante si factura está activa y el tipo no es empresa (empresa ya tiene su propio campo NIF)
+    if (!AppState.esFactura || AppState.tipoClienteActual === "empresa") {
+      panel.classList.add("d-none");
+      return;
+    }
+
+    const cliente = AppState.socioActual || AppState.clienteSeleccionado;
+    if (cliente && !cliente.nif) {
+      panel.classList.remove("d-none");
+      setTimeout(() => document.getElementById("facturaClienteNif")?.focus(), 100);
+    } else {
+      panel.classList.add("d-none");
+    }
   },
 
   getDescuentoLabel() {
@@ -485,13 +450,15 @@ export const PaymentManager = {
   async guardarNuevoSocio() {
     const nombre = document.getElementById("newSocioNombre").value.trim();
     const nif = document.getElementById("newSocioNif").value.trim();
+    const idType = document.getElementById("newSocioIdType").value;
+    const pais = document.getElementById("newSocioPais").value.trim() || "ES";
 
     if (!nombre || !nif) {
       Utils.showToast("Nombre y NIF son obligatorios", "error");
       return;
     }
 
-    if (!validarDocumento(nif)) {
+    if (idType === "01" && typeof window.validarDocumento === "function" && !window.validarDocumento(nif)) {
       Utils.showToast("El DNI/NIE de socio no es válido", "warning");
       return;
     }
@@ -499,23 +466,131 @@ export const PaymentManager = {
     try {
       const r = await ApiService.request("api/gestionCliente.php", {
         method: "POST",
-        body: JSON.stringify({ accion: "registrar", nombre, nif, es_socio: 1 })
+        body: JSON.stringify({ accion: "registrar", nombre, nif, es_socio: 1, aeat_id_type: idType, aeat_codigo_pais: pais })
       });
       if (r.ok) {
         Utils.showToast("Socio registrado y seleccionado", "success");
-        AppState.socioActual = { id: r.id, nombre, nif, es_socio: true };
+        AppState.socioActual = { id: r.id, nombre, nif, es_socio: true, aeat_id_type: idType, aeat_codigo_pais: pais };
+        AppState.tipoClienteActual = "socio";
+        this.updateTypeButtons();
         this.cancelarRegistroSocio();
         document.getElementById("socioInfo").innerHTML = `<i class="fa-solid fa-check-circle text-green"></i> ${nombre} (NUEVO)`;
         this.cargarValesCliente(r.id);
         
+        await this.syncCartPricesWithServer();
+        
+        CartManager.recalculateCartPrices();
         const totals = CartManager.calculateTotals();
-        UiController.renderCart(totals);
+        if (totals) UiController.renderCart(totals);
       } else {
-        Utils.showToast("Error: " + r.error, "error");
+        throw new Error(r.error || "Error al registrar socio");
       }
     } catch (e) {
       console.error(e);
-      Utils.showToast("Error de conexión", "error");
+      Utils.showToast(e.message, "error");
+    }
+  },
+
+  mostrarRegistroCliente() {
+    document.getElementById("clienteBusquedaGenerica").classList.add("d-none");
+    document.getElementById("clienteRegistro").classList.remove("d-none");
+    const searchTxt = document.getElementById("clienteSearch").value.trim();
+    if (searchTxt) {
+      if (/^[0-9XYZ]/.test(searchTxt)) {
+        document.getElementById("newClienteNif").value = searchTxt;
+      } else {
+        document.getElementById("newClienteNombre").value = searchTxt;
+      }
+    }
+    const tit = document.getElementById("clienteRegistroTitulo");
+    if (tit) {
+      const label = window.I18N?.newLabel?.replace('(', '').replace(')', '') || "Nuevo";
+      tit.innerText = label + ' ' + (AppState.tipoClienteActual === "empresa" ? (window.I18N?.empresa || "Empresa") : (window.I18N?.particular || "Particular"));
+    }
+  },
+
+  cancelarRegistroCliente() {
+    document.getElementById("clienteRegistro").classList.add("d-none");
+    document.getElementById("clienteBusquedaGenerica").classList.remove("d-none");
+  },
+
+  async guardarNuevoCliente() {
+    const nombreInput = document.getElementById("newClienteNombre");
+    const nifInput = document.getElementById("newClienteNif");
+    const idTypeInput = document.getElementById("newClienteIdType");
+    const paisInput = document.getElementById("newClientePais");
+    const nombre = nombreInput?.value.trim() || "";
+    const nif = nifInput?.value.trim() || "";
+    const idType = idTypeInput?.value || "01";
+    const pais = paisInput?.value.trim() || "ES";
+    const tipo = AppState.tipoClienteActual;
+
+    if (!nombre) {
+      Utils.showToast(window.I18N?.fieldRequired || "Campo requerido", "warning");
+      return;
+    }
+
+    if (idType === "01" && nif && typeof window.validarDocumento === "function" && !window.validarDocumento(nif)) {
+      Utils.showToast("El NIF/CIF del cliente no es válido", "warning");
+      return;
+    }
+
+    try {
+      const r = await ApiService.request("api/gestionCliente.php", {
+        method: "POST",
+        body: JSON.stringify({
+          accion: "registrar",
+          nombre,
+          nif,
+          tipo,
+          es_socio: 0,
+          aeat_id_type: idType,
+          aeat_codigo_pais: pais,
+        })
+      });
+
+      if (r.ok) {
+        Utils.showToast("Cliente registrado y seleccionado", "success");
+        const clientObj = {
+          id: r.id,
+          nombre,
+          nif,
+          tipo,
+          es_socio: false,
+          aeat_id_type: idType,
+          aeat_codigo_pais: pais,
+        };
+        AppState.clienteSeleccionado = clientObj;
+
+        if (tipo === "empresa") {
+          const empNom = document.getElementById("empresaNombre");
+          const empNif = document.getElementById("empresaNif");
+          if (empNom) empNom.value = nombre;
+          if (empNif) empNif.value = nif;
+          const empIdT = document.getElementById("empresaIdType");
+          const empP = document.getElementById("empresaPais");
+          if (empIdT) empIdT.value = idType;
+          if (empP) empP.value = pais;
+        }
+
+        const resEl = document.getElementById("clienteResultados");
+        if (resEl) {
+          resEl.innerHTML = `<i class="fa-solid fa-check-circle text-green"></i> ${nombre} (NUEVO)`;
+        }
+
+        this.cancelarRegistroCliente();
+        
+        await this.syncCartPricesWithServer();
+        
+        CartManager.recalculateCartPrices();
+        const totals = CartManager.calculateTotals();
+        if (totals) UiController.renderCart(totals);
+      } else {
+        throw new Error(r.error || "Error al registrar cliente");
+      }
+    } catch (e) {
+      console.error(e);
+      Utils.showToast(e.message, "error");
     }
   },
 
@@ -538,51 +613,78 @@ export const PaymentManager = {
         method: "POST",
         body: JSON.stringify({ accion: "buscarTexto", term, tipo })
       });
-      if (!r.ok) {
-          if (resEl) resEl.innerText = r.error || "Error al buscar.";
+      if (r.ok) {
+        this.ultimosClientesBuscados = r.lista || [];
+        if (!this.ultimosClientesBuscados.length) {
+          if (resEl) resEl.innerText = "Sin resultados.";
+          document.getElementById("btnAddCliente")?.classList.remove("d-none");
           return;
-      }
-      this.ultimosClientesBuscados = r.lista || [];
-      if (!this.ultimosClientesBuscados.length) {
-        if (resEl) resEl.innerText = "Sin resultados.";
-        document.getElementById("btnAddCliente")?.classList.remove("d-none");
-        return;
-      }
-      document.getElementById("btnAddCliente")?.classList.add("d-none");
-      if (resEl) {
-        resEl.innerHTML = this.ultimosClientesBuscados.map((c, idx) => `
-          <button type="button" class="cat-tab p-4-8 fs-11 mb-4" onclick="app.seleccionarClienteGuardado(${idx})">
-            <i class="fa-solid ${c.tipo === "empresa" ? "fa-building" : "fa-user"}"></i>
-            ${c.nombre} ${c.apellidos || ""} (${c.nif || ""})
-          </button>
-        `).join("");
+        }
+        document.getElementById("btnAddCliente")?.classList.add("d-none");
+        if (resEl) {
+          resEl.innerHTML = this.ultimosClientesBuscados.map((c, idx) => `
+            <button type="button" class="cat-tab p-4-8 fs-11 mb-4" onclick="app.seleccionarClienteGuardado(${idx})">
+              <i class="fa-solid ${c.tipo === "empresa" ? "fa-building" : "fa-user"}"></i>
+              ${c.nombre} ${c.apellidos || ""} (${c.nif || ""})
+            </button>
+          `).join("");
+        }
+      } else {
+        throw new Error(r.error || "Error al buscar cliente");
       }
     } catch (e) {
       console.error(e);
-      if (resEl) resEl.innerText = "Error de conexión.";
+      if (resEl) resEl.innerText = "Error al buscar.";
+      Utils.showToast(e.message, "error");
     }
   },
 
-  seleccionarClienteGuardado(idx) {
+  async seleccionarClienteGuardado(idx) {
     const c = this.ultimosClientesBuscados[idx];
     if (!c) return;
     AppState.clienteSeleccionado = c;
+    AppState.tipoClienteActual = c.tipo || "particular";
+    AppState.socioActual = null;
+    
+    await this.syncCartPricesWithServer();
+
+    this.updateTypeButtons();
 
     if (AppState.tipoClienteActual === "empresa") {
         document.getElementById("empresaNombre").value = `${c.nombre} ${c.apellidos || ""}`.trim();
         document.getElementById("empresaNif").value = c.nif || "";
+        const empIdT = document.getElementById("empresaIdType");
+        const empP = document.getElementById("empresaPais");
+        if (empIdT) empIdT.value = c.aeat_id_type || '01';
+        if (empP) empP.value = c.aeat_codigo_pais || 'ES';
     }
 
     const resEl = document.getElementById("clienteResultados");
     if (resEl) {
-        resEl.innerHTML = `<i class="fa-solid fa-check-circle text-success"></i> ${c.nombre} (${c.nif || ""})`;
+        resEl.innerHTML = `
+          <div class="d-flex ai-center jc-space-between bg-surface2 p-8 br-8 border-1 full-width">
+            <span class="fs-13 fw-600"><i class="fa-solid fa-check-circle text-success mr-8"></i> ${c.nombre} (${c.nif || ""})</span>
+            <button type="button" class="btn-tpv-icon sm text-red" onclick="app.deseleccionarCliente()" title="Deseleccionar">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+        `;
         this.cargarValesCliente(c.id);
     }
 
-    Utils.showToast("Cliente seleccionado");
+    Utils.showToast("Cliente seleccionado: " + c.nombre);
     this.mostrarPuntosCliente(c);
+    this.checkMostrarPanelNif();
+
+    // Si el cliente no tiene DNI, ofrecer introducirlo ahora
+    if (!c.nif && typeof window.abrirModalDniRapido === 'function') {
+      setTimeout(() => window.abrirModalDniRapido(c.id, c.nombre), 300);
+    }
+
+    CartManager.recalculateCartPrices();
     const totals = CartManager.calculateTotals();
     UiController.renderCart(totals);
+    this.updateMixSummary();
   },
 
   mostrarPuntosCliente(cliente) {
@@ -678,7 +780,725 @@ export const PaymentManager = {
   },
 
   cerrarModalCliente() {
-    document.getElementById("clienteModal").classList.remove("visible");
+    const modal = document.getElementById("clienteModal");
+    if (modal) modal.classList.remove("visible");
     document.querySelectorAll(".form-error").forEach((el) => (el.innerText = ""));
+  },
+
+  async syncCartPricesWithServer() {
+    try {
+      const idCliente = AppState.socioActual?.id ?? AppState.clienteSeleccionado?.id ?? null;
+      const cartLines = Object.values(AppState.cart).map(it => ({ id: it.id, qty: it.qty }));
+      
+      const recalcResp = await ApiService.request('./api/recalcularPreciosCarrito.php', {
+        method: 'POST',
+        body: JSON.stringify({
+          lineas: cartLines,
+          id_cliente: idCliente,
+          codigoCupon: AppState.currentPromo?.codigo ?? null
+        })
+      });
+
+      if (recalcResp.ok && recalcResp.lineas) {
+        const cart = AppState.cart;
+        recalcResp.lineas.forEach(serverLine => {
+          if (serverLine.comodin) return;
+          const key = Object.keys(cart).find(k => String(cart[k].id) === String(serverLine.id));
+          if (key) {
+            if (cart[key]._customPrice) return; // Precio editado manualmente: no sobreescribir
+            cart[key].price            = serverLine.precio_final;
+            cart[key].basePriceSnapshot = serverLine.precio_base;
+            cart[key].appliedTariffs   = serverLine.appliedTariffs;
+            cart[key]._tariffApplied   = true;
+          }
+        });
+        AppState.cart = cart;
+        
+        // Actualizar el total local tras sincronizar
+        const totals = CartManager.calculateTotals();
+        this.totalVentaActual = totals ? totals.total : this.totalVentaActual;
+      }
+    } catch (e) {
+      console.error('[Tariff recalc] Error al recalcular precios de tarifa:', e);
+    }
+  },
+
+  // --- RECOVERED SPLIT PAYMENTS LOGIC ---
+
+  updateMixSummary() {
+    const totals = CartManager.calculateTotals();
+    this.totalVentaActual = totals ? totals.total : this.totalVentaActual;
+    const displayTotal = this.totalVentaActual; 
+
+    const totalPagado = window.currentPayments.reduce((acc, p) => acc + p.importe, 0);
+    const pendiente = Math.max(0, displayTotal - totalPagado);
+
+    const inputMonto = document.getElementById("mixPagoMonto");
+    if (inputMonto && this.checkoutContext !== 'mixto') {
+        if (AppState.selectedPayment === 'efectivo') {
+            const totalPagadoOtros = window.currentPayments
+                .filter(p => p.metodo !== AppState.selectedPayment)
+                .reduce((acc, p) => acc + p.importe, 0);
+            const faltaReal = Math.max(0, this.totalVentaActual - totalPagadoOtros);
+            inputMonto.value = faltaReal.toFixed(2);
+        }
+    }
+
+    const el_Total = document.getElementById("mixTotalVenta");
+    const el_Pagado = document.getElementById("mixTotalPagado");
+    const el_Pendiente = document.getElementById("mixTotalPendiente");
+
+    if (el_Total) el_Total.textContent = Utils.formatCurrency(displayTotal);
+    if (el_Pagado) el_Pagado.textContent = Utils.formatCurrency(totalPagado);
+    
+    if (el_Pendiente) {
+      el_Pendiente.textContent = Utils.formatCurrency(pendiente);
+      el_Pendiente.parentElement.classList.toggle("text-red", pendiente > 0.01);
+      el_Pendiente.parentElement.classList.toggle("text-green", pendiente <= 0.01);
+    }
+
+    // [NUEVO] Aviso de tarifa aplicada
+    const el_TariffNotice = document.getElementById("tariffNotice");
+    const el_TariffText = document.getElementById("tariffNoticeText");
+    if (el_TariffNotice) {
+      const itemsWithTariffs = Object.values(AppState.cart).filter(it => it.appliedTariffs && it.appliedTariffs.length > 0);
+      if (itemsWithTariffs.length > 0) {
+        // Obtenemos los nombres únicos de las tarifas aplicadas (excluyendo cupones/promos que se muestran aparte)
+        const tariffNames = [...new Set(itemsWithTariffs.flatMap(it => 
+          it.appliedTariffs
+            .filter(t => t.tipo_descuento !== 'cupon' && t.tipo_descuento !== 'promocion')
+            .map(t => t.nombre || t.nombre_descuento || 'Tarifa')
+        ))].filter(name => !!name);
+        
+        if (tariffNames.length > 0) {
+            el_TariffText.textContent = "Tarifa" + (tariffNames.length > 1 ? "s" : "") + ": " + tariffNames.join(", ");
+            el_TariffNotice.classList.remove("d-none");
+            el_TariffNotice.classList.add("d-flex");
+        } else {
+            el_TariffNotice.classList.add("d-none");
+            el_TariffNotice.classList.remove("d-flex");
+        }
+      } else {
+        el_TariffNotice.classList.add("d-none");
+        el_TariffNotice.classList.remove("d-flex");
+      }
+    }
+
+    // [NUEVO] Aviso de Promo/Cupón aplicado
+    const el_PromoNotice = document.getElementById("promoNoticeSummary");
+    const el_PromoText = document.getElementById("promoNoticeText");
+    if (el_PromoNotice) {
+      if (AppState.currentPromo) {
+        const p = AppState.currentPromo;
+        let descText = p.label || p.codigo || p.nombre || '—';
+        if (p.tipo === "bundle" && p.bundle_buy_qty && p.bundle_pay_qty) {
+          descText += ` (${p.bundle_buy_qty}x${p.bundle_pay_qty})`;
+        } else if (p.tipo === "percent") {
+          descText += ` (-${p.valor}%)`;
+        } else if (p.tipo === "amount") {
+          descText += ` (-${Utils.formatCurrency(p.valor)})`;
+        }
+        el_PromoText.textContent = "Promo: " + descText;
+        el_PromoNotice.classList.remove("d-none");
+        el_PromoNotice.classList.add("d-flex");
+      } else {
+        el_PromoNotice.classList.add("d-none");
+        el_PromoNotice.classList.remove("d-flex");
+      }
+    }
+
+    // [NUEVO] Sincronizar el importe del vale si el total ha cambiado
+    if (AppState.valeAplicado) {
+        const pVale = window.currentPayments.find(p => p.metodo === "vale");
+        if (pVale) {
+            const maxCubrible = parseFloat(AppState.valeAplicado.importe_restante);
+            // El vale debe cubrir lo que pueda del total, pero no más de lo que vale
+            pVale.importe = Math.min(this.totalVentaActual, maxCubrible);
+        }
+    }
+
+    // [NUEVO] Si no es mixto, asegurar que el pago principal cubra lo que falta
+    if (this.checkoutContext !== 'mixto' && AppState.selectedPayment) {
+        const pMain = window.currentPayments.find(p => p.metodo === AppState.selectedPayment);
+        if (pMain) {
+            const totalPagadoOtros = window.currentPayments
+                .filter(p => p !== pMain)
+                .reduce((acc, p) => acc + p.importe, 0);
+            const pendienteReal = Math.max(0, this.totalVentaActual - totalPagadoOtros);
+            
+            const oldImporte = pMain.importe;
+            pMain.importe = pendienteReal;
+            
+            if (pMain.metodo === 'efectivo') {
+                if (Math.abs(pMain.recibido - oldImporte) < 0.01 || pMain.recibido < 0.01) {
+                    pMain.recibido = pMain.importe;
+                }
+            }
+        }
+    }
+
+    this.calcularCambioMix();
+
+    const el_Lista = document.getElementById("mixListaPagos");
+    const el_PendienteRow = el_Pendiente?.parentElement;
+    const el_BtnAdd = document.getElementById("mixBtnAddPago");
+
+    if (this.checkoutContext !== 'mixto') {
+        if (el_Lista) el_Lista.style.setProperty("display", "none", "important");
+        if (el_PendienteRow) el_PendienteRow.style.setProperty("display", "none", "important");
+        if (el_BtnAdd) el_BtnAdd.style.setProperty("display", "none", "important");
+        
+        // [NUEVO] El contenedor de gestión solo se muestra si hay algo que gestionar
+        const el_gestion = document.getElementById("cobroMixtoGestion");
+        const requiereMonto = (AppState.selectedPayment === 'efectivo');
+        
+        if (el_gestion) {
+            el_gestion.classList.toggle("d-none", !requiereMonto);
+            
+            // [RESTAURADO] Ocultar selector y etiqueta "Añadir" dentro del contenedor si no es mixto
+            const el_selector = document.getElementById("selectorMetodoPago");
+            const labelAdd = document.getElementById("labelAddPago");
+            if (el_selector) el_selector.style.setProperty("display", "none", "important");
+            if (labelAdd) labelAdd.classList.add("d-none");
+        }
+
+        const area = document.getElementById("pagoMontoArea");
+        if (area && requiereMonto) {
+            area.classList.remove("d-none");
+            area.style.display = "block";
+        } else if (area) {
+            area.classList.add("d-none");
+            area.style.display = "none";
+        }
+
+        // Mostrar un mensaje informativo si es Tarjeta/Bizum/etc (pago exacto)
+        const feedbackEl = document.getElementById("mixPagoStatusFeedback");
+        if (feedbackEl && !requiereMonto && AppState.selectedPayment) {
+            feedbackEl.className = "mt-8 p-12 br-8 text-center font-bold fs-15 bg-accent-soft text-accent border-1";
+            const label = AppState.selectedPayment.charAt(0).toUpperCase() + AppState.selectedPayment.slice(1);
+            feedbackEl.innerHTML = `<i class="fa-solid fa-credit-card"></i> Pago con ${label}: <strong>${Utils.formatCurrency(this.totalVentaActual)}</strong>`;
+            feedbackEl.classList.remove("d-none");
+        }
+    } else {
+        if (el_Lista) el_Lista.style.display = "";
+        if (el_PendienteRow) el_PendienteRow.style.display = "";
+        if (el_BtnAdd) el_BtnAdd.style.display = "";
+        const el_gestion = document.getElementById("cobroMixtoGestion");
+        const el_selector = document.getElementById("selectorMetodoPago");
+        const labelAdd = document.getElementById("labelAddPago");
+        if (el_gestion) el_gestion.classList.remove("d-none");
+        if (el_selector) el_selector.style.display = "";
+        if (labelAdd) labelAdd.classList.remove("d-none");
+
+        // Mostrar el área de importe siempre que haya un método seleccionado en modo mixto
+        const area = document.getElementById("pagoMontoArea");
+        if (area) {
+            if (AppState.selectedPayment) {
+                area.classList.remove("d-none");
+                area.style.display = "block";
+            } else {
+                area.classList.add("d-none");
+                area.style.display = "none";
+            }
+        }
+    }
+
+    // Sincronizar visibilidad del bloque de cambio en efectivo
+    const el_extraEfectivo = document.getElementById("extraEfectivo");
+    if (el_extraEfectivo) el_extraEfectivo.classList.toggle("d-none", AppState.selectedPayment !== "efectivo");
+
+    // Resaltar el botón correspondiente en el selector del modal
+    document.querySelectorAll(".btn-tpv-method").forEach((b) => {
+        b.classList.remove("border-accent", "bg-accent-soft");
+        b.style.borderColor = "";
+        const m = b.id.replace("btn", "").toLowerCase();
+        if (m === AppState.selectedPayment) {
+            b.classList.add("border-accent", "bg-accent-soft");
+            b.style.borderColor = "var(--accent)";
+        }
+    });
+
+    const btnFinal = document.getElementById("confirmarClienteBtn");
+    if (btnFinal) {
+      // Recalcular con los importes ya sincronizados (el bloque anterior puede haberlos modificado)
+      const totalPagadoFinal = window.currentPayments.reduce((acc, p) => acc + p.importe, 0);
+      btnFinal.disabled = (Math.max(0, displayTotal - totalPagadoFinal) > 0.01);
+    }
+
+    this.renderPaymentsList();
+  },
+
+  renderPaymentsList() {
+    const container = document.getElementById("mixListaPagos");
+    if (!container) return;
+
+    if (window.currentPayments.length === 0) {
+      container.innerHTML = `<div class="p-12 text-center opacity-50 fs-12 italic border-2 br-8 dashed" style="border-style: dashed;">${window.I18N?.noPayments || "No hay pagos añadidos"}</div>`;
+      return;
+    }
+
+    const icons = {
+      efectivo: "fa-money-bill-1",
+      tarjeta: "fa-credit-card",
+      bizum: "fa-mobile-screen",
+      vale: "fa-ticket",
+      puntos: "fa-star"
+    };
+
+    container.innerHTML = window.currentPayments
+      .map((p, index) => {
+          const hasCambio = (p.metodo === 'efectivo' && p.recibido > p.importe + 0.005);
+          const cambio = hasCambio ? (p.recibido - p.importe) : 0;
+          return `
+      <div class="d-flex ai-center jc-space-between p-8-12 bg-surface1 br-8 border-1 mb-4 animate-slide-right">
+          <div class="d-flex ai-center gap-8 flex-wrap">
+              <i class="fa-solid ${icons[p.metodo] || "fa-wallet"} opacity-70"></i>
+              <span class="badge ${p.metodo === "efectivo" ? "bg-accent text-white" : "bg-surface3 border-1 text-primary"} p-2-6 br-4 fs-9 font-bold uppercase">${window.I18N?.[p.metodo] || p.metodo.replace("_", " ")}</span>
+              <span class="font-mono font-bold">${Utils.formatCurrency(p.importe)}</span>
+              ${hasCambio ? `<span class="fs-10 text-muted">(Entregado: ${Utils.formatCurrency(p.recibido)} &middot; <span class="text-green font-bold">Cambio: ${Utils.formatCurrency(cambio)}</span>)</span>` : ''}
+          </div>
+          <button onclick="app.removePagoMixto(${index})" class="text-red border-none bg-none cursor-pointer hover-scale p-4">
+              <i class="fa-solid fa-trash-can"></i>
+          </button>
+      </div>
+    `;
+      })
+      .join("");
+  },
+
+  selectModalPayment(btn) {
+    const metodo = btn.id.replace("btn", "").toLowerCase();
+
+    if (metodo === 'bizum') {
+      const cliente = AppState.socioActual || AppState.clienteSeleccionado;
+      if (!cliente) {
+        Utils.showToast(window.I18N?.bizum_no_client || "Selecciona un cliente antes de usar Bizum", 'warning');
+        return;
+      }
+      if (!cliente.telefono) {
+        this._bizumPendingBtn = btn;
+        this.abrirModalTelefonoBizum(cliente);
+        return;
+      }
+    }
+
+    AppState.selectedPayment = metodo;
+
+    // En modo no-mixto: sincronizar currentPayments con el método seleccionado
+    if (this.checkoutContext !== 'mixto') {
+      const metodosNormales = ['efectivo', 'tarjeta', 'bizum'];
+      const pagoExistente = window.currentPayments.find(p => metodosNormales.includes(p.metodo));
+      const yaExiste = window.currentPayments.find(p => p.metodo === metodo);
+      if (pagoExistente && !yaExiste) {
+        pagoExistente.metodo = metodo;
+        pagoExistente.recibido = pagoExistente.importe;
+      } else if (!pagoExistente) {
+        const totals = CartManager.calculateTotals();
+        const importe = totals ? totals.total : this.totalVentaActual;
+        window.currentPayments.push({ metodo, importe, recibido: importe });
+      }
+    }
+
+    this.updateMixSummary();
+
+    const inputMonto = document.getElementById("mixPagoMonto");
+    if (inputMonto) {
+      inputMonto.focus();
+      inputMonto.select();
+    }
+  },
+
+  abrirModalTelefonoBizum(cliente) {
+    const modal = document.getElementById("bizumPhoneModal");
+    const label = document.getElementById("bizumPhoneClientLabel");
+    const input = document.getElementById("bizumPhoneInput");
+    const errorEl = document.getElementById("bizumPhoneError");
+    if (!modal) return;
+    if (label) label.textContent = cliente.nombre || '';
+    if (input) input.value = '';
+    if (errorEl) errorEl.classList.add("d-none");
+    modal.classList.add("visible");
+    setTimeout(() => input && input.focus(), 100);
+  },
+
+  cancelarTelefonoBizum() {
+    const modal = document.getElementById("bizumPhoneModal");
+    if (modal) modal.classList.remove("visible");
+    this._bizumPendingBtn = null;
+  },
+
+  async confirmarTelefonoBizum() {
+    const input = document.getElementById("bizumPhoneInput");
+    const errorEl = document.getElementById("bizumPhoneError");
+    const tel = (input?.value || '').trim();
+
+    const showError = (msg) => {
+      if (errorEl) { errorEl.textContent = msg; errorEl.classList.remove("d-none"); }
+    };
+
+    if (!tel) { showError("El teléfono es obligatorio"); return; }
+    if (!/^[+\d][\d\s\-().]{6,19}$/.test(tel)) { showError("Formato de teléfono no válido"); return; }
+
+    const cliente = AppState.socioActual || AppState.clienteSeleccionado;
+    if (!cliente?.id) { showError("No hay cliente seleccionado"); return; }
+
+    try {
+      const r = await ApiService.request("api/gestionCliente.php", {
+        method: "POST",
+        body: JSON.stringify({ accion: "actualizarTelefono", id: cliente.id, telefono: tel })
+      });
+      if (!r.ok) throw new Error(r.error || "Error al guardar teléfono");
+
+      cliente.telefono = tel;
+
+      const modal = document.getElementById("bizumPhoneModal");
+      if (modal) modal.classList.remove("visible");
+      this._bizumPendingBtn = null;
+
+      AppState.selectedPayment = 'bizum';
+      this.updateMixSummary();
+      const inputMonto = document.getElementById("mixPagoMonto");
+      if (inputMonto) { inputMonto.focus(); inputMonto.select(); }
+      Utils.showToast("Teléfono guardado. Bizum seleccionado.", "success");
+    } catch (e) {
+      showError(e.message);
+    }
+  },
+
+  addPagoMixto() {
+    const inputMonto = document.getElementById("mixPagoMonto");
+    const importeIngresado = parseFloat(inputMonto.value) || 0;
+
+    const metodosValidos = ['efectivo', 'tarjeta', 'bizum'];
+    if (!AppState.selectedPayment || !metodosValidos.includes(AppState.selectedPayment)) {
+      Utils.showToast("Selecciona un método de pago", 'warning');
+      return;
+    }
+
+    if (importeIngresado <= 0) {
+      Utils.showToast(window.I18N?.enterAmount || "Introduce un importe", "warning");
+      return;
+    }
+
+    const totalPagado = window.currentPayments.reduce((acc, p) => acc + p.importe, 0);
+    const pendiente = Math.max(0, this.totalVentaActual - totalPagado);
+    
+    // Para efectivo: el importe aplicado está limitado al pendiente, pero guardamos el recibido real
+    const esEfectivo = (AppState.selectedPayment === "efectivo");
+    const importeAplicado = Math.min(importeIngresado, pendiente);
+    const recibidoReal = esEfectivo ? importeIngresado : importeAplicado;
+
+    // [NUEVO] Validar que hay cambio suficiente ANTES de añadir el pago
+    if (esEfectivo) {
+        const cambioNecesario = Math.max(0, recibidoReal - importeAplicado);
+        if (cambioNecesario > 0.01) {
+            const disponible = parseFloat(window.cajaEfectivoActual) || 0;
+            if (cambioNecesario > (disponible + 0.01)) {
+                Utils.showToast(`No puedes añadir este pago: El cambio (${Utils.formatCurrency(cambioNecesario)}) es mayor que el efectivo disponible (${Utils.formatCurrency(disponible)})`, "error");
+                return;
+            }
+        }
+    }
+
+    window.currentPayments.push({
+      metodo: AppState.selectedPayment,
+      importe: importeAplicado,
+      recibido: recibidoReal,
+    });
+
+    inputMonto.value = "";
+    this.updateMixSummary();
+  },
+
+  removePagoMixto(index) {
+    window.currentPayments.splice(index, 1);
+    this.updateMixSummary();
+  },
+
+  calcularCambioMix() {
+    const inputMonto = document.getElementById("mixPagoMonto");
+    const montoIngresado = parseFloat(inputMonto?.value) || 0;
+    
+    // En modo mixto, todos los pagos ya añadidos están comprometidos → el pendiente
+    // es total menos TODOS los existentes. En modo simple, excluimos los del mismo método
+    // para que el campo de efectivo muestre cuánto falta cubrir con ese método.
+    const totalPagadoOtros = (this.checkoutContext === 'mixto')
+        ? window.currentPayments.reduce((acc, p) => acc + p.importe, 0)
+        : window.currentPayments
+            .filter(p => p.metodo !== AppState.selectedPayment)
+            .reduce((acc, p) => acc + p.importe, 0);
+    const pendienteReal = Math.max(0, this.totalVentaActual - totalPagadoOtros);
+
+    const cambioEl = document.getElementById("efectivoCambio");
+    const feedbackEl = document.getElementById("mixPagoStatusFeedback");
+    if (!cambioEl) return;
+
+    if (AppState.selectedPayment === "efectivo") {
+        const falta = pendienteReal - montoIngresado;
+        const cambio = Math.max(0, montoIngresado - pendienteReal);
+        const disponible = parseFloat(window.cajaEfectivoActual) || 0;
+        const btnConf = document.getElementById("confirmarClienteBtn");
+        console.log('[Cambio] montoIngresado:', montoIngresado, '| pendiente:', pendienteReal, '| cambio:', cambio, '| disponible en caja:', disponible);
+
+        if (falta > 0.01) {
+            feedbackEl.className = "mt-8 p-10 br-8 text-center font-bold fs-13 bg-red-light text-red";
+            feedbackEl.classList.remove("d-none");
+            feedbackEl.innerHTML = `<i class="fa-solid fa-circle-exclamation"></i> Faltan: ${Utils.formatCurrency(falta)}`;
+            // El botón ya está deshabilitado por pendiente > 0 en updateMixSummary
+        } else if (cambio > 0.01) {
+            const esExcesivo = (cambio > disponible + 0.01);
+            feedbackEl.style.cssText = "";
+            feedbackEl.className = esExcesivo
+                ? "mt-8 p-12 br-8 text-center font-bold fs-13 bg-red-light text-red border border-red"
+                : "mt-8 p-10 br-8 text-center font-bold fs-13 bg-green-light text-green";
+            feedbackEl.classList.remove("d-none");
+            const icono = esExcesivo ? "fa-triangle-exclamation" : "fa-hand-holding-dollar";
+            const txtLabel = esExcesivo ? "CAMBIO EXCESIVO — NO SE PUEDE CONFIRMAR" : "Cambio a devolver";
+            const txtExtra = esExcesivo
+                ? `<div class="fs-11 mt-4" style="opacity:0.92;">Efectivo disponible en caja: ${Utils.formatCurrency(disponible)}</div>`
+                : "";
+            feedbackEl.innerHTML = `<i class="fa-solid ${icono}"></i> ${txtLabel}: <strong>${Utils.formatCurrency(cambio)}</strong>${txtExtra}`;
+
+            // Bloquear/desbloquear el botón según disponibilidad
+            if (btnConf) {
+                btnConf.disabled = esExcesivo;
+                btnConf.style.opacity = esExcesivo ? "0.5" : "";
+                btnConf.style.cursor  = esExcesivo ? "not-allowed" : "";
+                btnConf.title = esExcesivo
+                    ? `Sin efectivo suficiente. Necesitas ${Utils.formatCurrency(cambio)}, hay ${Utils.formatCurrency(disponible)}`
+                    : "";
+            }
+        } else {
+            feedbackEl.innerHTML = "";
+            feedbackEl.classList.add("d-none");
+            if (btnConf) {
+                btnConf.disabled = false;
+                btnConf.style.opacity = "";
+                btnConf.style.cursor  = "";
+                btnConf.title = "";
+            }
+        }
+
+        if (this.checkoutContext !== "mixto") {
+            const pEfectivo = window.currentPayments.find(p => p.metodo === "efectivo");
+            if (pEfectivo) pEfectivo.recibido = isNaN(montoIngresado) ? pendienteReal : montoIngresado;
+        }
+
+        cambioEl.textContent = Utils.formatCurrency(cambio);
+    } else {
+        if (feedbackEl) {
+            feedbackEl.innerHTML = "";
+            feedbackEl.classList.add("d-none");
+        }
+        cambioEl.textContent = "0,00 €";
+    }
+
+    if (montoIngresado > 0) {
+        const el_Pendiente = document.getElementById("mixTotalPendiente");
+        if (el_Pendiente) {
+            const pnd = Math.max(0, pendienteReal - montoIngresado);
+            el_Pendiente.textContent = Utils.formatCurrency(pnd);
+            el_Pendiente.parentElement.classList.toggle("text-red", pnd > 0.01);
+        }
+
+        if (AppState.selectedPayment === "efectivo" && this.checkoutContext !== 'mixto') {
+            const efectivoPago = window.currentPayments.find(p => p.metodo === 'efectivo');
+            if (efectivoPago) {
+                efectivoPago.recibido = isNaN(montoIngresado) ? pendienteReal : montoIngresado;
+            }
+        }
+    }
+  },
+
+  /**
+   * Ejecutar el cobro final y guardar en base de datos.
+   * Logic recovered and standardized for modular architecture.
+   */
+  async ejecutarCobroFinal() {
+    if (this._isSaving) return;
+    this._isSaving = true;
+
+    const btn = document.getElementById("confirmarClienteBtn");
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> PROCESANDO...';
+    }
+
+    // [MEJORADO] Sumar todo el cambio de pagos en efectivo (por si hay varios en mixto)
+    const totalCambioEfectivo = window.currentPayments.reduce((acc, p) => {
+        if (p.metodo === 'efectivo') return acc + Math.max(0, p.recibido - p.importe);
+        return acc;
+    }, 0);
+
+    if (totalCambioEfectivo > 0.009) {
+        // [CRÍTICO] Forzar refresco de efectivo disponible justo antes de validar
+        try {
+            const resp = await ApiService.request("./api/cajaEstadoActual.php");
+            if (resp.ok) window.cajaEfectivoActual = parseFloat(resp.efectivoActual);
+        } catch (e) {
+            console.error("No se pudo refrescar el estado de la caja", e);
+        }
+
+        const disponible = parseFloat(window.cajaEfectivoActual) || 0;
+        if (totalCambioEfectivo > (disponible + 0.01)) {
+            Utils.showToast(`BLOQUEADO: No hay efectivo suficiente en el cajón para devolver el cambio (${Utils.formatCurrency(totalCambioEfectivo)}). Disponible: ${Utils.formatCurrency(disponible)}`, "error");
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = "Confirmar Cobro";
+            }
+            return;
+        }
+    }
+
+    // Validar Bizum: requiere cliente seleccionado con teléfono
+    const tieneBizum = window.currentPayments.some(p => p.metodo === 'bizum')
+                       || AppState.selectedPayment === 'bizum';
+    if (tieneBizum) {
+      const clienteBizum = AppState.socioActual || AppState.clienteSeleccionado;
+      if (!clienteBizum) {
+        Utils.showToast(window.I18N?.bizum_no_client || "Selecciona un cliente antes de usar Bizum", "warning");
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-check"></i> Confirmar Cobro'; }
+        return;
+      }
+      if (!clienteBizum.telefono) {
+        this._bizumPendingBtn = null;
+        this.abrirModalTelefonoBizum(clienteBizum);
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-check"></i> Confirmar Cobro'; }
+        return;
+      }
+    }
+
+    // 1. Validar Factura: cliente identificado con nombre y NIF
+    if (AppState.esFactura) {
+      const tieneSocio = !!AppState.socioActual;
+      const tieneEmpresa = !!(document.getElementById("empresaNombre")?.value && document.getElementById("empresaNif")?.value);
+      const tieneParticularIdentificado = !!AppState.clienteSeleccionado;
+      const tieneIdentificado = tieneSocio || tieneEmpresa || tieneParticularIdentificado;
+
+      if (!tieneIdentificado) {
+        Utils.showToast('<i class="fa-solid fa-circle-exclamation"></i> Debes identificar al cliente (Nombre y NIF) para generar una factura.', "error");
+        if (btn) { btn.disabled = false; btn.textContent = "Confirmar Cobro"; }
+        return;
+      }
+
+      // Validar que hay NIF (ya sea registrado o introducido en el panel)
+      const nifActual = this.getClienteNif();
+      if (!nifActual) {
+        this.checkMostrarPanelNif();
+        Utils.showToast('<i class="fa-solid fa-circle-exclamation"></i> Introduce el NIF del cliente para generar la factura.', "error");
+        document.getElementById("facturaClienteNif")?.focus();
+        if (btn) { btn.disabled = false; btn.textContent = "Confirmar Cobro"; }
+        return;
+      }
+    }
+
+    // Capturar metadatos AEAT: de empresa manual o del panel NIF para factura
+    let manualAeatIdType = null;
+    let manualAeatPais = null;
+    if (AppState.tipoClienteActual === 'empresa') {
+        manualAeatIdType = document.getElementById("empresaIdType")?.value;
+        manualAeatPais = document.getElementById("empresaPais")?.value.trim() || 'ES';
+    } else {
+        const panelNif = document.getElementById("facturaClienteNif")?.value.trim();
+        if (panelNif) {
+            manualAeatIdType = document.getElementById("facturaClienteIdType")?.value || '01';
+            manualAeatPais = document.getElementById("facturaClientePais")?.value.trim() || 'ES';
+        }
+    }
+
+    // 3. Preparar payload
+    const totals = CartManager.calculateTotals();
+
+    // Derivar metodoPago desde el contexto de cobro, no del último botón pulsado en el modal.
+    // En modo mixto AppState.selectedPayment cambia con cada método que se selecciona dentro del modal,
+    // por lo que usamos checkoutContext como fuente autoritativa.
+    const metodosUsados = [...new Set(window.currentPayments.map(p => p.metodo))];
+    const derivedMetodoPago = (this.checkoutContext === 'mixto' || metodosUsados.length > 1)
+        ? 'mixto'
+        : (window.currentPayments[0]?.metodo || AppState.selectedPayment || 'efectivo');
+
+    const panelNifValue = document.getElementById("facturaClienteNif")?.value.trim() || null;
+    const clienteNifRegistrado = AppState.socioActual?.nif || AppState.clienteSeleccionado?.nif || null;
+    // nifEsNuevo: el NIF vino del panel porque el cliente no tenía uno registrado
+    const nifEsNuevo = !!(panelNifValue && !clienteNifRegistrado && (AppState.socioActual || AppState.clienteSeleccionado));
+
+    const payload = {
+      cliente: AppState.clienteSeleccionado,
+      socio: AppState.socioActual,
+      tipoCliente: AppState.tipoClienteActual,
+      nifCliente: this.getClienteNif() || null,
+      nifEsNuevo: nifEsNuevo,
+      aeatIdType: manualAeatIdType,
+      aeatCodigoPais: manualAeatPais,
+      lineas: Object.values(window.cart).map(it => ({
+        id: it.id,
+        name: it.name,
+        codigo: it.codigo,
+        price: it.price,
+        qty: it.qty,
+        iva: it.iva,
+        variant: it.variant,
+        basePriceSnapshot: it.basePriceSnapshot,
+        descuentos: it.appliedTariffs,
+        appliedTariffs: it.appliedTariffs,
+        customPrice: !!it._customPrice
+      })),
+      pagos: window.currentPayments,
+      metodoPago: derivedMetodoPago,
+      efectivoRecibido: window.currentPayments.find(p => p.metodo === 'efectivo')?.recibido || 0,
+      total: totals.total,
+      subtotal: totals.subtotal,
+      descuentoAmt: totals.totalDiscount,
+      descuentoPct: (AppState.currentPromo && AppState.currentPromo.tipo === 'percent') ? AppState.currentPromo.valor : 0,
+      descuentoLabel: AppState.currentPromo ? (AppState.currentPromo.label || AppState.currentPromo.codigo || null) : null,
+      esFactura: AppState.esFactura ? 1 : 0,
+      puntosCanjeados: AppState.puntosCanjeados || 0,
+      puntosDescuentoAmt: AppState.puntosDescuentoAmt || 0,
+      codigoCupon: (AppState.currentPromo && AppState.currentPromo.codigo) ? AppState.currentPromo.codigo : null
+    };
+
+    try {
+      const data = await ApiService.request("./api/guardarVenta.php", {
+        method: "POST",
+        body: JSON.stringify(payload)
+      });
+      
+      if (data.ok) {
+        Utils.showToast("Venta guardada con éxito", "success");
+        
+        // [NUEVO] Actualizar stock localmente para refrescar la UI de inmediato
+        const itemsVendidos = Object.values(AppState.cart);
+        itemsVendidos.forEach(item => {
+            if (item.id === -1) return; // Comodines
+            const p = AppConfig.products.find(x => String(x.id) === String(item.id));
+            if (p) {
+                p.stock = Math.max(0, (p.stock || 0) - item.qty);
+            }
+        });
+        // Refrescar el catálogo para mostrar productos agotados
+        UiController.renderProducts();
+
+        if (typeof window.clearCart === "function") {
+          window.clearCart();
+        } else {
+          CartManager.clearCart();
+        }
+        window.currentPayments = [];
+        AppState.valeAplicado = null; // Limpiar vale tras éxito
+        TicketManager.showTicket(data.venta, true);
+        this.cerrarModalCliente();
+      } else {
+        throw new Error(data.error || "Fallo al guardar la venta en el servidor.");
+      }
+    } catch (err) {
+      console.error("Save error:", err);
+      Utils.showToast(err.message, "error");
+    } finally {
+      this._isSaving = false;
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = "Confirmar Cobro";
+      }
+    }
   }
 };

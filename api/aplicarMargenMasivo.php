@@ -11,10 +11,10 @@ require_once __DIR__ . '/../model/ProductoPDO.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
-// Solo POST
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    echo json_encode(['ok' => false, 'mensaje' => 'Método no permitido.']);
+// Seguridad
+if (!isset($_SESSION['usuarioActualTPV']) || !$_SESSION['usuarioActualTPV']->tienePermiso('gestionar_tarifas')) {
+    http_response_code(403);
+    echo json_encode(['ok' => false, 'mensaje' => 'No autorizado']);
     exit;
 }
 
@@ -81,7 +81,35 @@ if ($preview) {
 // Aplicar
 
 try {
+    $motivo = isset($input['motivo']) ? trim($input['motivo']) : null;
+    if (empty($motivo)) {
+        echo json_encode(['ok' => false, 'mensaje' => 'El motivo del cambio es obligatorio.']);
+        exit;
+    }
+
     $resultado = ProductoPDO::aplicarMargenMasivo($margen, $categoria, $excepciones);
+
+    // Registrar en el log global
+    $catNombre = 'Todas';
+    if ($categoria) {
+        $qCat = DBPDO::ejecutarConsulta("SELECT nombre FROM categorias WHERE codigo = :c OR id = :c", [':c' => $categoria]);
+        $rowCat = $qCat->fetch();
+        if ($rowCat) $catNombre = $rowCat['nombre'];
+    }
+
+    $idUsuario = isset($_SESSION['usuarioActualTPV']) ? $_SESSION['usuarioActualTPV']->getId() : null;
+    if ($idUsuario) {
+        ProductoPDO::registrarLogAjusteGlobal([
+            'id_usuario' => $idUsuario,
+            'tipo_operacion' => 'margen_masivo',
+            'valor' => $margen,
+            'tipo_valor' => 'percent',
+            'categoria_nom' => $catNombre,
+            'motivo' => $motivo,
+            'productos_afectados' => $resultado['actualizados']
+        ]);
+    }
+
     echo json_encode([
         'ok'          => true,
         'actualizados' => $resultado['actualizados'],

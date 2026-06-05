@@ -57,7 +57,10 @@ CREATE TABLE IF NOT EXISTS proveedores (
     aplica_re TINYINT(1) DEFAULT 0,
     notas TEXT,
     activo TINYINT(1) DEFAULT 1,
-    fecha_alta TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    fecha_alta TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    condiciones_pago VARCHAR(255) DEFAULT NULL,
+    plazo_entrega VARCHAR(100) DEFAULT NULL,
+    vencimiento_dias INT DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS usuarios (
@@ -100,9 +103,9 @@ CREATE TABLE IF NOT EXISTS productos (
     referencia VARCHAR(50) NOT NULL UNIQUE,
     nombre VARCHAR(100) NOT NULL,
     descripcion TEXT,
-    precio_coste DECIMAL(10,2) DEFAULT 0.00,
-    precio_proveedor DECIMAL(10,4) DEFAULT 0.00,
-    precio_venta DECIMAL(10,2) DEFAULT 0.00,
+    precio_coste DECIMAL(30,15) DEFAULT 0.000000000000000,
+    precio_proveedor DECIMAL(30,15) DEFAULT 0.000000000000000,
+    precio_venta DECIMAL(30,15) DEFAULT 0.000000000000000,
     stock_actual INT DEFAULT 0,
     stock_minimo INT DEFAULT 0,
     meses_garantia INT DEFAULT 24,
@@ -117,6 +120,7 @@ CREATE TABLE IF NOT EXISTS productos (
     margen DECIMAL(10,2) DEFAULT 0.00,
     es_pack TINYINT(1) DEFAULT 0,
     requiere_serial TINYINT(1) DEFAULT 0,
+    mantener_precision TINYINT(1) NOT NULL DEFAULT 0,
     activo TINYINT(1) DEFAULT 1,
     creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_prod_iva FOREIGN KEY (id_tipo_iva) REFERENCES tipos_iva(id) ON DELETE SET NULL,
@@ -172,8 +176,8 @@ CREATE TABLE IF NOT EXISTS movimientos_stock (
 CREATE TABLE IF NOT EXISTS auditoria_precios_base (
     id INT AUTO_INCREMENT PRIMARY KEY,
     id_producto INT NOT NULL,
-    precio_old DECIMAL(10,2) NOT NULL,
-    precio_new DECIMAL(10,2) NOT NULL,
+    precio_old DECIMAL(30,15) NOT NULL,
+    precio_new DECIMAL(30,15) NOT NULL,
     motivo VARCHAR(255),
     id_usuario INT,
     fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -246,7 +250,7 @@ CREATE TABLE IF NOT EXISTS ventas (
     tipo_cliente ENUM('particular','empresa') NOT NULL DEFAULT 'particular',
     nombre_cliente VARCHAR(100) NULL,
     nif_cliente VARCHAR(20) NULL,
-    metodo_pago ENUM('efectivo', 'tarjeta', 'bizum', 'a_cuenta') NOT NULL,
+    metodo_pago ENUM('efectivo', 'tarjeta', 'bizum', 'a_cuenta', 'mixto') NOT NULL,
     subtotal DECIMAL(10,2) NOT NULL,
     descuento_pct DECIMAL(5,2) DEFAULT 0,
     descuento_amt DECIMAL(10,2) DEFAULT 0,
@@ -264,6 +268,11 @@ CREATE TABLE IF NOT EXISTS ventas (
     id_turno INT DEFAULT NULL,
     tipo_documento ENUM('venta', 'abono') NOT NULL DEFAULT 'venta',
     id_venta_origen INT NULL DEFAULT NULL,
+    hash_actual VARCHAR(64) DEFAULT NULL,
+    hash_anterior VARCHAR(64) DEFAULT NULL,
+    firma_digital LONGTEXT DEFAULT NULL,
+    estado_envio_aeat ENUM('pendiente', 'enviado', 'error_critico', 'subsanacion_pendiente', 'bloqueado', 'anulado_pendiente') NOT NULL DEFAULT 'pendiente',
+    codigo_qr TEXT DEFAULT NULL,
     CONSTRAINT fk_ventas_usr FOREIGN KEY (id_usuario) REFERENCES usuarios(id) ON DELETE SET NULL,
     CONSTRAINT fk_ventas_clie FOREIGN KEY (id_cliente) REFERENCES clientes(id) ON DELETE SET NULL,
     CONSTRAINT fk_ventas_z FOREIGN KEY (num_z) REFERENCES cierres_fiscales(id),
@@ -385,6 +394,7 @@ CREATE TABLE IF NOT EXISTS facturas_compra_prov (
     total DECIMAL(10,2) NOT NULL,
     metodo_pago VARCHAR(50),
     pagado TINYINT(1) DEFAULT 0,
+    fecha_vencimiento DATE NULL,
     CONSTRAINT fk_fcp_prov FOREIGN KEY (proveedor_id) REFERENCES proveedores(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -397,7 +407,7 @@ CREATE TABLE IF NOT EXISTS albaranes_compra (
     iva_total DECIMAL(10,2) NOT NULL,
     re_total DECIMAL(10,2) NOT NULL,
     total DECIMAL(10,2) NOT NULL,
-    estado ENUM('pendiente', 'facturado', 'anulado') DEFAULT 'pendiente',
+    estado ENUM('recibido', 'validado', 'facturado', 'anulado') DEFAULT 'recibido',
     factura_id INT DEFAULT NULL,
     CONSTRAINT fk_alb_prov FOREIGN KEY (proveedor_id) REFERENCES proveedores(id),
     CONSTRAINT fk_alb_fact FOREIGN KEY (factura_id) REFERENCES facturas_compra_prov(id) ON DELETE SET NULL
@@ -466,3 +476,103 @@ CREATE TABLE IF NOT EXISTS pagos_venta (
     CONSTRAINT fk_pago_usr FOREIGN KEY (id_usuario) REFERENCES usuarios(id) ON DELETE SET NULL,
     CONSTRAINT fk_pago_turno FOREIGN KEY (id_turno) REFERENCES caja_turnos(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+-- 10. TABLAS COMPLEMENTARIAS
+
+CREATE TABLE IF NOT EXISTS correlativos (
+    nombre VARCHAR(50) PRIMARY KEY,
+    valor INT NOT NULL DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS cola_envios (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    id_venta INT NOT NULL,
+    xml_path VARCHAR(255) NULL,
+    intentos INT DEFAULT 0,
+    ultimo_error TEXT NULL,
+    estado ENUM('pendiente', 'enviado', 'error_critico', 'bloqueado') DEFAULT 'pendiente',
+    fecha_proximo_intento DATETIME DEFAULT CURRENT_TIMESTAMP,
+    creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    actualizado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_cola_venta FOREIGN KEY (id_venta) REFERENCES ventas(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE INDEX idx_cola_estado_fecha ON cola_envios(estado, fecha_proximo_intento);
+
+CREATE TABLE IF NOT EXISTS log_ajustes_globales (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    fecha DATETIME NOT NULL,
+    id_usuario INT NOT NULL,
+    tipo_operacion VARCHAR(50) NOT NULL,
+    valor DECIMAL(10,2) NOT NULL,
+    tipo_valor VARCHAR(20) NOT NULL,
+    categoria_nom VARCHAR(100) NOT NULL DEFAULT 'Todas',
+    motivo TEXT NOT NULL,
+    productos_afectados INT NOT NULL DEFAULT 0,
+    CONSTRAINT fk_lag_usuario FOREIGN KEY (id_usuario) REFERENCES usuarios(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS analitica_resumen_diario (
+    fecha DATE PRIMARY KEY,
+    total_tickets INT NOT NULL DEFAULT 0,
+    total_ventas DECIMAL(10,2) NOT NULL DEFAULT 0,
+    total_base DECIMAL(10,2) NOT NULL DEFAULT 0,
+    margen_estimado DECIMAL(10,2) NOT NULL DEFAULT 0,
+    total_efectivo DECIMAL(10,2) NOT NULL DEFAULT 0,
+    total_tarjeta DECIMAL(10,2) NOT NULL DEFAULT 0,
+    total_bizum DECIMAL(10,2) NOT NULL DEFAULT 0,
+    total_a_cuenta DECIMAL(10,2) NOT NULL DEFAULT 0,
+    calculado_en DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS analitica_producto_diario (
+    fecha DATE NOT NULL,
+    id_producto INT NOT NULL,
+    nombre VARCHAR(150),
+    categoria VARCHAR(50),
+    referencia VARCHAR(50),
+    unidades INT NOT NULL DEFAULT 0,
+    total DECIMAL(10,2) NOT NULL DEFAULT 0,
+    coste DECIMAL(10,2) NOT NULL DEFAULT 0,
+    PRIMARY KEY (fecha, id_producto)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS analitica_iva_diario (
+    fecha DATE NOT NULL,
+    porcentaje DECIMAL(5,2) NOT NULL,
+    cuota DECIMAL(10,2) NOT NULL DEFAULT 0,
+    total DECIMAL(10,2) NOT NULL DEFAULT 0,
+    PRIMARY KEY (fecha, porcentaje)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 11. TRIGGERS DE INTEGRIDAD VERIFACTU (RD 1007/2023)
+DELIMITER //
+
+CREATE TRIGGER tg_ventas_prevent_update BEFORE UPDATE ON ventas
+FOR EACH ROW
+BEGIN
+    -- Si la factura ya tiene huella (fue emitida fiscalmente), bloqueamos cambios en campos críticos
+    IF OLD.hash_actual IS NOT NULL THEN
+        IF NEW.total <> OLD.total OR 
+           NEW.base_imponible <> OLD.base_imponible OR 
+           NEW.iva_amt <> OLD.iva_amt OR 
+           NEW.subtotal <> OLD.subtotal OR
+           NEW.fecha <> OLD.fecha OR
+           NEW.numero_ticket <> OLD.numero_ticket OR
+           NEW.es_factura <> OLD.es_factura THEN
+           
+            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'VeriFactu: Inalterabilidad violada. No se permite modificar campos que afecten a la huella fiscal.';
+        END IF;
+    END IF;
+END //
+
+CREATE TRIGGER tg_ventas_prevent_delete BEFORE DELETE ON ventas
+FOR EACH ROW
+BEGIN
+    IF OLD.hash_actual IS NOT NULL THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'VeriFactu: Inalterabilidad violada. No se permite eliminar registros del historial fiscal.';
+    END IF;
+END //
+
+DELIMITER ;

@@ -12,8 +12,8 @@ if (!isset($_SESSION['usuarioActualTPV'])) {
     exit;
 }
 
-// Solo administradores (aunque luego podríamos afinar con permisos específicos)
-if ($_SESSION['usuarioActualTPV']->getRol() !== 'admin') {
+// Solo administradores o gestores de personal
+if (!$_SESSION['usuarioActualTPV']->tienePermiso('gestionar_usuarios')) {
     $_SESSION['paginaEnCurso'] = 'Dashboard';
     header('Location: index.php');
     exit;
@@ -25,7 +25,7 @@ if (isset($_REQUEST['irUsuarios'])) {
     header('Location: index.php');
     exit;
 }
-if (isset($_REQUEST['volver']) || isset($_REQUEST['irDashboard'])) {
+if (isset($_REQUEST['volver'])) {
     $_SESSION['paginaEnCurso'] = 'Dashboard';
     header('Location: index.php');
     exit;
@@ -48,12 +48,18 @@ if (isset($_REQUEST['accion'])) {
                 // Podríamos añadir editarRol en RolPDO
                 $sql = "UPDATE roles SET nombre = :nom, descripcion = :des WHERE id = :id";
                 DBPDO::ejecutarConsulta($sql, [':nom' => $nombre, ':des' => $desc, ':id' => $idRol]);
+                RolPDO::asignarPermisos($idRol, $permisosIds);
+                LogPDO::addLog('UPDATE_ROL', "Rol #{$idRol} ({$nombre}) actualizado", [
+                    'id' => $idRol, 'nombre' => $nombre, 'permisos_count' => count($permisosIds),
+                ]);
             } else {
-                $idRol = RolPDO::añadirRol($nombre, $desc);
+                $idRol = RolPDO::agregarRol($nombre, $desc);
+                RolPDO::asignarPermisos($idRol, $permisosIds);
+                LogPDO::addLog('CREATE_ROL', "Rol creado: {$nombre}", [
+                    'id' => (int)$idRol, 'nombre' => $nombre, 'permisos_count' => count($permisosIds),
+                ]);
             }
 
-            error_log("GUARDANDO ROL ID: " . $idRol . " CON PERMISOS: " . print_r($permisosIds, true));
-            RolPDO::asignarPermisos($idRol, $permisosIds);
             $mensajeOk = "Rol guardado correctamente.";
         } else {
             $error = "El nombre del rol es obligatorio.";

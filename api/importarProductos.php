@@ -83,7 +83,7 @@ try {
                 ProductoPDO::editarProducto($existente['id'], $updateData);
                 $actualizados++;
             } else {
-                ProductoPDO::añadirProducto($data);
+                ProductoPDO::agregarProducto($data);
                 $creados++;
             }
         } catch (Exception $e) { $errores++; }

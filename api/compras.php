@@ -15,12 +15,19 @@ try {
     require_once __DIR__ . '/../model/DBPDO.php';
     require_once __DIR__ . '/../model/Usuario.php';
     require_once __DIR__ . '/../model/CompraPDO.php';
+    require_once __DIR__ . '/../model/LogPDO.php';
 
     // session_start(); // Handled by csrf_check.php
 
     if (!isset($_SESSION['usuarioActualTPV'])) {
         http_response_code(401);
         echo json_encode(['ok' => false, 'error' => 'No autorizado']);
+        exit;
+    }
+
+    if (!$_SESSION['usuarioActualTPV']->tienePermiso('gestionar_inventario')) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'No tienes permiso para gestionar compras']);
         exit;
     }
 
@@ -36,12 +43,13 @@ try {
                     echo json_encode(CompraPDO::obtenerDetalleFactura($_GET['id']));
                 }
             } else {
+                $provId = $_GET['proveedor_id'] ?? null;
                 if ($type === 'albaranes_pendientes') {
-                    echo json_encode(CompraPDO::listarAlbaranes(true));
+                    echo json_encode(CompraPDO::listarAlbaranes(true, $provId));
                 } elseif ($type === 'albaranes') {
-                    echo json_encode(CompraPDO::listarAlbaranes(false));
+                    echo json_encode(CompraPDO::listarAlbaranes(false, $provId));
                 } else {
-                    echo json_encode(CompraPDO::listarFacturas());
+                    echo json_encode(CompraPDO::listarFacturas($provId));
                 }
             }
             break;
@@ -61,7 +69,25 @@ try {
                     $data['fecha'] ?? date('Y-m-d'),
                     $data['lineas']
                 );
+                LogPDO::addLog('CREATE_ALBARAN', "Albarán #{$id} registrado (proveedor #{$data['proveedor_id']})", [
+                    'id' => (int)$id, 'numero_albaran' => $data['numero_albaran'] ?? 'S/N',
+                    'proveedor_id' => (int)$data['proveedor_id'], 'lineas' => count($data['lineas']),
+                ]);
                 echo json_encode(['ok' => true, 'success' => (bool)$id, 'id' => $id]);
+            } elseif ($action === 'validar_albaran') {
+                if (!isset($data['id'])) {
+                    echo json_encode(['ok' => false, 'error' => 'ID de albarán faltante']);
+                    break;
+                }
+                $res = CompraPDO::validarAlbaran($data['id']);
+                if ($res === true) {
+                    LogPDO::addLog('VALIDAR_ALBARAN', "Albarán #{$data['id']} validado (stock actualizado)", [
+                        'id' => (int)$data['id'],
+                    ]);
+                    echo json_encode(['ok' => true, 'success' => true]);
+                } else {
+                    echo json_encode(['ok' => false, 'error' => $res['error'] ?? 'Error desconocido']);
+                }
             } elseif ($action === 'registrar_factura') {
                 if (!isset($data['proveedor_id']) || !isset($data['ids_albaranes']) || empty($data['ids_albaranes'])) {
                     echo json_encode(['ok' => false, 'error' => 'Datos de factura incompletos']);
@@ -72,9 +98,30 @@ try {
                     $data['numero_factura'],
                     $data['fecha'],
                     $data['ids_albaranes'],
-                    $data['metodo_pago'] ?? 'banco'
+                    $data['metodo_pago'] ?? 'banco',
+                    $data['pagado'] ?? true
                 );
+                LogPDO::addLog('CREATE_FACTURA_COMPRA', "Factura de compra #{$id} registrada: {$data['numero_factura']}", [
+                    'id' => (int)$id, 'numero_factura' => $data['numero_factura'],
+                    'proveedor_id' => (int)$data['proveedor_id'],
+                    'albaranes' => count($data['ids_albaranes']),
+                    'metodo_pago' => $data['metodo_pago'] ?? 'banco',
+                ]);
                 echo json_encode(['ok' => true, 'success' => (bool)$id, 'id' => $id]);
+            } elseif ($action === 'pagar_factura') {
+                if (!isset($data['id'])) {
+                    echo json_encode(['ok' => false, 'error' => 'ID de factura faltante']);
+                    break;
+                }
+                $res = CompraPDO::pagarFactura($data['id'], $data['metodo_pago'] ?? 'banco');
+                if ($res === true) {
+                    LogPDO::addLog('PAGAR_FACTURA', "Factura #{$data['id']} marcada como pagada", [
+                        'id' => (int)$data['id'], 'metodo_pago' => $data['metodo_pago'] ?? 'banco',
+                    ]);
+                    echo json_encode(['ok' => true, 'success' => true]);
+                } else {
+                    echo json_encode(['ok' => false, 'error' => $res['error'] ?? 'Error desconocido']);
+                }
             }
             break;
 

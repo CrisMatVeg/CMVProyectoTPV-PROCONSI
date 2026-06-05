@@ -62,7 +62,7 @@ class TipoIVAPDO
         return $row ?: null;
     }
 
-    public static function añadir(array $d): void
+    public static function agregar(array $d): void
     {
         $sql = "INSERT INTO tipos_iva
                 (codigo, nombre, porcentaje, recargo_equivalencia, fecha_inicio, fecha_fin, activo)
@@ -107,6 +107,22 @@ class TipoIVAPDO
         ProductoPDO::recalcularPreciosCosteGlobal();
     }
 
+
+    public static function obtenerPorId(int $id): ?array
+    {
+        $q = DBPDO::ejecutarConsulta("SELECT * FROM tipos_iva WHERE id = :id", [':id' => $id]);
+        $row = $q->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
+    }
+
+    public static function contarProductos(int $id): int
+    {
+        $q = DBPDO::ejecutarConsulta(
+            "SELECT COUNT(*) FROM productos WHERE id_tipo_iva = :id",
+            [':id' => $id]
+        );
+        return (int)$q->fetchColumn();
+    }
 
     public static function eliminar(int $id): void
     {

@@ -33,7 +33,7 @@
                 <?php } ?>
             </div>
 
-            <button type="submit" name="acceder" class="btn-save mt-10 p-14">
+            <button type="submit" name="acceder" class="btn-save mt-10 p-14 as-center">
                 <?php echo L('login_btn'); ?>
             </button>
         </form>

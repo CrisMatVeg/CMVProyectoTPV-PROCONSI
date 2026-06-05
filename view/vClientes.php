@@ -25,17 +25,21 @@
 </style>
 <div class="main-full p-24">
     <div class="section-header container-wider">
-        <div class="section-title">
-            <h1><?php echo L('dashboard_btn_clients'); ?></h1>
-            <p><?php echo L('dashboard_btn_clients_sub'); ?></p>
+        <div class="d-flex ai-center gap-16">
+            <a href="index.php?irDashboard=1" class="btn-prominent-back compact" title="<?php echo L('login_back'); ?>">
+                <i class="fa-solid fa-chevron-left"></i>
+                <span><?php echo L('login_back'); ?></span>
+            </a>
+            <div class="vr" style="height: 32px; width: 1px; background: var(--border); opacity: 0.5;"></div>
+            <div class="section-title">
+                <h1><?php echo L('dashboard_btn_clients'); ?></h1>
+                <p><?php echo L('dashboard_btn_clients_sub'); ?></p>
+            </div>
         </div>
         <div class="d-flex gap-12">
-            <button onclick="abrirModalCliente()" class="btn-add">
-                <i class="fa-solid fa-user-plus"></i> <?php echo L('client_btn_new'); ?>
+            <button onclick="abrirModalCliente()" class="btn-add" aria-label="<?php echo L('client_btn_new'); ?>">
+                <i class="fa-solid fa-user-plus" aria-hidden="true"></i> <?php echo L('client_btn_new'); ?>
             </button>
-            <a href="index.php?irDashboard=1" class="btn-back">
-                <?php echo L('login_back'); ?>
-            </a>
         </div>
     </div>
 
@@ -43,8 +47,8 @@
     <div class="filters-panel-new container-wider mb-24 br-20 shadow-sm" style="background: var(--surface2); padding: 20px; border: 1px solid var(--border);">
         <div class="flex-1">
             <div class="search-input-fancy" style="border-radius: 12px; background: var(--surface); padding-left: 15px;">
-                <i class="fa-solid fa-magnifying-glass opacity-50"></i>
-                <input type="text" id="filtroNombre" placeholder="<?php echo L('client_search_placeholder'); ?>" oninput="filtrarClientes()" style="height: 48px; border: none; background: transparent; width: 100%; padding-left: 10px;">
+                <i class="fa-solid fa-magnifying-glass opacity-50" aria-hidden="true"></i>
+                <input type="text" id="filtroNombre" placeholder="<?php echo L('client_search_placeholder'); ?>" aria-label="<?php echo L('client_search_placeholder'); ?>" style="height: 48px; border: none; background: transparent; width: 100%; padding-left: 10px;">
             </div>
         </div>
 
@@ -140,14 +144,14 @@
                         </td>
                         <td class="text-center">
                             <div class="d-flex jc-center gap-8 pr-20">
-                                <button class="btn-icon text-primary" title="<?php echo L('client_tip_history'); ?>" onclick="abrirHistorialCliente(<?php echo $c['id']; ?>)">
-                                    <i class="fa-solid fa-file-invoice-dollar"></i>
+                                <button class="btn-icon text-primary" title="<?php echo L('client_tip_history'); ?>" aria-label="<?php echo L('client_tip_history'); ?>" onclick="abrirHistorialCliente(<?php echo $c['id']; ?>)">
+                                    <i class="fa-solid fa-file-invoice-dollar" aria-hidden="true"></i>
                                 </button>
-                                <button class="btn-icon" title="<?php echo L('user_tip_edit'); ?>" onclick='editarCliente(<?php echo json_encode($c, JSON_HEX_APOS | JSON_HEX_QUOT); ?>)'>
-                                    <i class="fa-solid fa-pen"></i>
+                                <button class="btn-icon" title="<?php echo L('user_tip_edit'); ?>" aria-label="<?php echo L('user_tip_edit'); ?>" onclick='editarCliente(<?php echo json_encode($c, JSON_HEX_APOS | JSON_HEX_QUOT); ?>)'>
+                                    <i class="fa-solid fa-pen" aria-hidden="true"></i>
                                 </button>
-                                <button class="btn-icon text-danger" title="<?php echo L('modal_delete'); ?>" onclick="eliminarCliente(<?php echo $c['id']; ?>)">
-                                    <i class="fa-solid fa-trash"></i>
+                                <button class="btn-icon text-danger" title="<?php echo L('modal_delete'); ?>" aria-label="<?php echo L('modal_delete'); ?>" onclick="eliminarCliente(<?php echo $c['id']; ?>)">
+                                    <i class="fa-solid fa-trash" aria-hidden="true"></i>
                                 </button>
                             </div>
                         </td>
@@ -167,7 +171,7 @@
         </table>
 
         <!-- Paginación -->
-        <div class="pagination-footer mt-20 d-flex ai-center jc-between">
+        <div class="pagination-footer mt-20 d-flex ai-center p-16 bg-surface border-top" style="flex-direction: column-reverse; justify-content: center; gap: 12px;">
             <div class="pagination-info fs-12 text-muted">
                 <?php 
                     $from = $avClientes['paginacion']['totalRegistros'] > 0 ? ($avClientes['paginacion']['actual'] - 1) * $avClientes['paginacion']['limit'] + 1 : 0;
@@ -197,13 +201,13 @@
 </div>
 
 <!-- MODAL ALTA/EDICIÓN CLIENTE -->
-<div class="modal-overlay" id="clienteAdminModal">
-    <div class="modal modal-content gap-16 ai-stretch w-modal-md" style="max-width: 800px; border-radius: 20px; overflow: hidden; border: 1px solid var(--border); box-shadow: var(--shadow-lg);">
+<div class="modal-overlay" id="clienteAdminModal" role="dialog" aria-modal="true" aria-labelledby="client_modal_title">
+    <div class="modal modal-content gap-16 ai-stretch w-modal-md" style="max-width: 800px; border-radius: 20px; border: 1px solid var(--border); box-shadow: var(--shadow-lg);">
         <div class="modal-header mb-0">
-            <h2 class="m-0 fs-18" id="client_modal_new_title"><?php echo L('client_modal_new_title'); ?></h2>
-            <button onclick="cerrarAdminModalCliente()" class="btn-close-modal">&times;</button>
+            <h2 class="m-0 fs-18" id="client_modal_title"><?php echo L('client_modal_new_title'); ?></h2>
+            <button onclick="cerrarAdminModalCliente()" class="btn-close-modal" aria-label="<?php echo L('modal_cancel'); ?>">&times;</button>
         </div>
-        <form id="clienteForm" class="modal-body p-20">
+        <form id="clienteForm" class="modal-body p-20" style="overflow-y: auto; max-height: calc(80vh - 130px);">
             <input type="hidden" id="clienteId">
             <div class="form-group">
                 <label class="form-label"><?php echo L('client_label_type'); ?></label>
@@ -222,7 +226,18 @@
             </div>
             <div class="form-group mb-0 mt-10">
                 <label class="form-label"><?php echo L('client_th_nif'); ?></label>
-                <input type="text" id="clienteNif" class="form-input font-mono">
+                <div class="d-flex gap-8">
+                    <select id="clienteIdType" class="form-input" style="width: 130px;" title="Tipo de identificación">
+                        <option value="01">01 - NIF Español</option>
+                        <option value="02">02 - NIF-IVA (VIES)</option>
+                        <option value="03">03 - Pasaporte</option>
+                        <option value="04">04 - ID Oficial País</option>
+                        <option value="05">05 - Certificado</option>
+                        <option value="06">06 - Otro Documento</option>
+                    </select>
+                    <input type="text" id="clienteNif" class="form-input font-mono flex-1" placeholder="Documento">
+                    <input type="text" id="clientePais" class="form-input font-mono" style="width: 60px;" placeholder="ES" maxlength="2" title="Código de País (ISO)">
+                </div>
             </div>
             <div class="form-group mb-0 mt-10">
                 <label class="form-label"><?php echo L('user_label_email'); ?></label>
@@ -237,8 +252,12 @@
                 <textarea id="clienteNotas" class="form-input" rows="2"></textarea>
             </div>
             <div class="form-group mb-0 mt-10">
+                <label class="form-label" style="display:flex;justify-content:space-between;align-items:center;">
                     <span><?php echo L('client_label_rol'); ?></span>
-                    <button type="button" class="btn-text fs-12 text-blue p-0" style="background:none; border:none; cursor:pointer;" onclick="crearNuevoRol()"><?php echo L('client_btn_new_rol'); ?></button>
+                    <span style="display:inline-flex;gap:8px;">
+                        <button type="button" class="btn-text fs-12 text-blue p-0" style="background:none;border:none;cursor:pointer;" onclick="crearNuevoRol()"><?php echo L('client_btn_new_rol'); ?></button>
+                        <button type="button" class="btn-text fs-12 text-red p-0" style="background:none;border:none;cursor:pointer;" onclick="eliminarRolSeleccionado()"><?php echo L('client_btn_delete_rol'); ?></button>
+                    </span>
                 </label>
                 <select id="clienteRol" class="form-input">
                     <?php if (!empty($avClientes['roles'])): ?>
@@ -261,11 +280,11 @@
 </div>
 
 <!-- MODAL HISTORIAL CLIENTE -->
-<div class="modal-overlay" id="historialClienteModal">
+<div class="modal-overlay" id="historialClienteModal" role="dialog" aria-modal="true" aria-labelledby="historialTitle">
     <div class="modal modal-content gap-16 ai-stretch w-900" style="max-width: 900px; border-radius: 20px; overflow: hidden; border: 1px solid var(--border); box-shadow: var(--shadow-lg);">
         <div class="modal-header mb-0">
             <h2 class="m-0 fs-18" id="historialTitle"><?php echo L('client_modal_history_title'); ?></h2>
-            <button onclick="cerrarAdminHistorialModal()" class="btn-close-modal">&times;</button>
+            <button onclick="cerrarAdminHistorialModal()" class="btn-close-modal" aria-label="<?php echo L('modal_cancel'); ?>">&times;</button>
         </div>
         <div class="modal-body p-0" style="max-height: 70vh; overflow-y: auto;">
             <!-- Tabs -->
@@ -358,9 +377,11 @@
             telefono: document.getElementById('clienteTelefono').value.trim(),
             notas: document.getElementById('clienteNotas').value.trim(),
             rol: document.getElementById('clienteRol').value,
+            aeat_id_type: document.getElementById('clienteIdType').value,
+            aeat_codigo_pais: document.getElementById('clientePais').value.trim() || 'ES',
         };
 
-        if (!validarDocumento(payload.nif)) {
+        if (payload.aeat_id_type === '01' && !validarDocumento(payload.nif)) {
             showCustomAlert("<?php echo L('client_js_invalid_doc'); ?>", "<?php echo L('client_js_invalid_doc_body'); ?>", 'warning');
             return;
         }
@@ -400,7 +421,9 @@
         document.getElementById('clienteTelefono').value = '';
         document.getElementById('clienteNotas').value = '';
         document.getElementById('clienteRol').value = 'general';
-        document.getElementById('client_modal_new_title').innerText = "<?php echo L('client_modal_new_title'); ?>";
+        document.getElementById('clienteIdType').value = '01';
+        document.getElementById('clientePais').value = 'ES';
+        document.getElementById('client_modal_title').innerText = "<?php echo L('client_modal_new_title'); ?>";
         document.getElementById('clienteAdminModal').classList.add('visible');
     }
 
@@ -414,8 +437,9 @@
         document.getElementById('clienteTelefono').value = c.telefono || '';
         document.getElementById('clienteNotas').value = c.notas || '';
         document.getElementById('clienteRol').value = c.rol || 'general';
-        document.getElementById('client_modal_new_title').innerText = "<?php echo L('client_modal_edit_title'); ?>";
-
+        document.getElementById('clienteIdType').value = c.aeat_id_type || '01';
+        document.getElementById('clientePais').value = c.aeat_codigo_pais || 'ES';
+        document.getElementById('client_modal_title').innerText = "<?php echo L('client_modal_edit_title'); ?>";
         document.getElementById('clienteAdminModal').classList.add('visible');
     }
 
@@ -445,7 +469,7 @@
                             showCustomAlert("<?php echo L('prod_js_error'); ?>", data.error || "<?php echo L('prod_js_error'); ?>", 'error');
                             return;
                         }
-                        location.reload();
+                        loadClients(paginationData.actual);
                     } catch (e) {
                         console.error(e);
                         showCustomAlert("<?php echo L('error'); ?>", "<?php echo L('prod_js_error'); ?>", 'error');
@@ -507,14 +531,27 @@
                         timeStyle: 'short'
                     });
 
-                    let badgeClass = 'status-active';
-                    if (v.estado === 'pendiente_pago') badgeClass = 'status-pending';
-                    else if (['devuelta', 'anulada'].includes(v.estado)) badgeClass = 'status-cancelled';
+                    const esAbono = v.tipo_documento === 'abono' || (parseFloat(v.total) < 0);
+                    let statusHtml = '';
+
+                    if (esAbono) {
+                        statusHtml = `<span class="status-pill" style="background:var(--red-light);color:var(--red);border-color:var(--red);padding:2px 8px;font-size:10px;" title="Abono"><i class="fa-solid fa-file-circle-minus"></i> ${I18N.statusAbono}</span>`;
+                    } else if (v.estado === 'anulada') {
+                        statusHtml = `<span class="status-pill" style="background:var(--red-light);color:var(--red);border-color:var(--red);padding:2px 8px;font-size:10px;" title="Anulada"><i class="fa-solid fa-rectangle-xmark"></i> ${I18N.statusAnnulled}</span>`;
+                    } else if (v.estado === 'completada') {
+                        statusHtml = `<span class="status-pill status-active" title="${I18N.statusCompleted}"><i class="fa-solid fa-check"></i></span>`;
+                    } else if (['devuelta', 'parcialmente_devuelta'].includes(v.estado)) {
+                        statusHtml = `<span class="status-pill" style="background:#fff3e0;color:#e65100;border-color:#e65100;padding:2px 8px;font-size:10px;" title="Rectificada"><i class="fa-solid fa-triangle-exclamation"></i> ${I18N.statusRectified}</span>`;
+                    } else if (v.estado === 'pendiente_pago') {
+                        statusHtml = `<span class="status-pill status-pending" style="padding:2px 8px;font-size:10px;" title="Pendiente"><i class="fa-solid fa-clock"></i> ${I18N.pending}</span>`;
+                    } else {
+                        statusHtml = `<span class="status-pill" style="padding: 2px 8px; font-size: 10px; text-transform: uppercase;">${v.estado.replace('_', ' ')}</span>`;
+                    }
 
                     htmlV += `<tr>
                         <td>${fechaStr}</td>
                         <td class="font-mono">#${v.numero_ticket}</td>
-                        <td><span class="status-pill ${badgeClass}" style="padding: 2px 8px; font-size: 10px; text-transform: uppercase;">${v.estado.replace('_', ' ')}</span></td>
+                        <td>${statusHtml}</td>
                         <td class="text-right font-mono">${total.toFixed(2)}€</td>
                         <td class="text-right font-mono">${v.estado === 'pendiente_pago' ? pagado.toFixed(2) + '€' : '-'}</td>
                         <td class="text-right font-mono fw-bold ${pendiente > 0 ? 'text-danger' : 'text-success'}">${pendiente.toFixed(2)}€</td>
@@ -593,6 +630,41 @@
                 },
                 '',
                 'Ej: VIP, VIP+, etc.'
+        );
+    }
+
+    async function eliminarRolSeleccionado() {
+        const sel = document.getElementById('clienteRol');
+        const nombre = sel ? sel.value : '';
+        if (!nombre || nombre === 'general') {
+            showCustomAlert(<?php echo json_encode(L('prod_js_error')); ?>, <?php echo json_encode(L('client_js_delete_rol_protected')); ?>, 'error');
+            return;
+        }
+        const label = sel.options[sel.selectedIndex]?.text || nombre;
+        showCustomConfirm(
+            <?php echo json_encode(L('client_js_delete_rol_title')); ?>,
+            <?php echo json_encode(L('client_js_delete_rol_msg')); ?>.replace('{rol}', label),
+            async () => {
+                try {
+                    const resp = await fetch('api/gestionRolCliente.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ accion: 'eliminar', nombre }),
+                    });
+                    const data = await resp.json();
+                    if (!data.ok) {
+                        showCustomAlert(<?php echo json_encode(L('prod_js_error')); ?>, data.error || <?php echo json_encode(L('prod_js_error')); ?>, 'error');
+                        return;
+                    }
+                    showNotification('<i class="fa-solid fa-circle-check"></i> ' + <?php echo json_encode(L('client_js_rol_deleted')); ?>, 'success');
+                    setTimeout(() => location.reload(), 800);
+                } catch (e) {
+                    console.error(e);
+                    showCustomAlert(<?php echo json_encode(L('prod_js_error')); ?>, <?php echo json_encode(L('prod_js_error')); ?>, 'error');
+                }
+            },
+            <?php echo json_encode(L('modal_btn_accept')); ?>,
+            'danger'
         );
     }
 
@@ -763,8 +835,8 @@
 
     // Inicializar contador al cargar
     document.addEventListener('DOMContentLoaded', () => {
-        // El primer render ya viene del PHP, pero configuramos los eventos
         const inputBusqueda = document.getElementById('filtroNombre');
         inputBusqueda.addEventListener('input', filtrarClientes);
+        loadClients(1);
     });
 </script>

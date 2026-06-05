@@ -14,6 +14,7 @@ try {
     require_once __DIR__ . '/../model/DBPDO.php';
     require_once __DIR__ . '/../model/Usuario.php';
     require_once __DIR__ . '/../model/RolClientePDO.php';
+    require_once __DIR__ . '/../model/LogPDO.php';
 
     // session_start(); // Handled by csrf_check.php
 
@@ -31,9 +32,9 @@ try {
     $accion = $input['accion'] ?? '';
 
     if ($accion === 'crear') {
-        if ($_SESSION['usuarioActualTPV']->getRol() !== 'admin') {
-            http_response_code(401);
-            echo json_encode(['ok' => false, 'error' => 'Solo administradores pueden crear roles']);
+        if (!$_SESSION['usuarioActualTPV']->tienePermiso('gestionar_clientes')) {
+            http_response_code(403);
+            echo json_encode(['ok' => false, 'error' => 'No tienes permiso para crear roles de cliente']);
             exit;
         }
 
@@ -49,8 +50,29 @@ try {
             }
         }
 
-        $id = RolClientePDO::añadirRol($nombre);
+        $id = RolClientePDO::agregarRol($nombre);
+        LogPDO::addLog('CREATE_ROL_CLIENTE', "Rol de cliente creado: {$nombre}", [
+            'id' => (int)$id, 'nombre' => strtolower($nombre),
+        ]);
         echo json_encode(['ok' => true, 'id' => $id, 'nombre' => strtolower($nombre)]);
+        exit;
+    }
+
+    if ($accion === 'eliminar') {
+        if (!$_SESSION['usuarioActualTPV']->tienePermiso('gestionar_clientes')) {
+            http_response_code(403);
+            echo json_encode(['ok' => false, 'error' => 'No tienes permiso para eliminar roles de cliente']);
+            exit;
+        }
+
+        $nombre = strtolower(trim($input['nombre'] ?? ''));
+        if ($nombre === '' || $nombre === 'general') {
+            throw new Exception("El rol '$nombre' no puede eliminarse");
+        }
+
+        RolClientePDO::eliminarRol($nombre);
+        LogPDO::addLog('DELETE_ROL_CLIENTE', "Rol de cliente eliminado: {$nombre}", ['nombre' => $nombre]);
+        echo json_encode(['ok' => true]);
         exit;
     }
 

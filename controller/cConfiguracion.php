@@ -3,14 +3,13 @@
 require_once 'model/ConfiguracionPDO.php';
 require_once 'model/TipoIVAPDO.php';
 
-// Solo administradores pueden acceder
-if (!isset($_SESSION['usuarioActualTPV']) || $_SESSION['usuarioActualTPV']->getRol() !== 'admin') {
+// Solo administradores o gestores de configuración pueden acceder
+if (!isset($_SESSION['usuarioActualTPV']) || !$_SESSION['usuarioActualTPV']->tienePermiso('gestionar_configuracion')) {
     header('Location: index.php?irDashboard=1');
     exit;
 }
 
-// Navegación Global
-if (isset($_REQUEST['volver']) || isset($_REQUEST['irDashboard'])) {
+if (isset($_REQUEST['volver'])) {
     $_SESSION['paginaEnCurso'] = 'Dashboard';
     header('Location: index.php');
     exit;
@@ -34,7 +33,8 @@ if (isset($_POST['guardarConfiguracion'])) {
             'empresa_telefono', 'empresa_email', 'empresa_web', 'empresa_registro',
             'social_instagram', 'social_facebook', 'ticket_pie_pagina', 'ticket_politica',
             'smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_secure',
-            'empresa_aplica_re'
+            'empresa_aplica_re',
+            'verifactu_productor_nombre', 'verifactu_productor_nif', 'verifactu_id_sistema', 'verifactu_version_sistema'
         ];
 
         $configuracionesAGuardar = [];
@@ -47,6 +47,9 @@ if (isset($_POST['guardarConfiguracion'])) {
         if (!empty($configuracionesAGuardar)) {
             $exito = ConfiguracionPDO::guardarConfiguracion($configuracionesAGuardar);
             if ($exito) {
+                LogPDO::addLog('UPDATE_CONFIGURACION', "Configuración del sistema actualizada", [
+                    'campos_modificados' => array_keys($configuracionesAGuardar),
+                ]);
                 $showSuccess = true;
             } else {
                 $aErrores['general'] = "Hubo un error al guardar la configuración.";
@@ -97,7 +100,11 @@ $campos = [
     'smtp_user',
     'smtp_pass',
     'smtp_secure',
-    'empresa_aplica_re'
+    'empresa_aplica_re',
+    'verifactu_productor_nombre',
+    'verifactu_productor_nif',
+    'verifactu_id_sistema',
+    'verifactu_version_sistema'
 ];
 
 $avConfig = [];

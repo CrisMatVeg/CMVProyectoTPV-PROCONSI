@@ -1,19 +1,23 @@
 <div class="main-full p-24">
     <!-- CABECERA DE SECCIÓN -->
     <div class="section-header container">
-        <div class="section-title">
-            <div class="d-flex ai-center gap-12 mb-4">
-                <i class="fa-solid fa-user-shield text-accent fs-32"></i>
-                <h1 class="m-0 fs-28"><?php echo L('roles_title'); ?></h1>
+        <div class="d-flex ai-center gap-16">
+            <a href="index.php?irDashboard=1" class="btn-prominent-back compact" title="<?php echo L('login_back'); ?>">
+                <i class="fa-solid fa-chevron-left"></i>
+                <span><?php echo L('login_back'); ?></span>
+            </a>
+            <div class="vr" style="height: 32px; width: 1px; background: var(--border); opacity: 0.5;"></div>
+            <div class="section-title">
+                <div class="d-flex ai-center gap-12 mb-4">
+                    <i class="fa-solid fa-user-shield text-accent fs-32"></i>
+                    <h1 class="m-0 fs-28"><?php echo L('roles_title'); ?></h1>
+                </div>
+                <p class="text-muted fs-14"><?php echo L('roles_subtitle'); ?></p>
             </div>
-            <p class="text-muted fs-14"><?php echo L('roles_subtitle'); ?></p>
         </div>
         <div class="d-flex gap-12 ai-center">
-            <a href="index.php?irDashboard=1" class="btn-back">
-                <i class="fa-solid fa-house"></i> <?php echo L('roles_btn_dashboard'); ?>
-            </a>
             <a href="index.php?irUsuarios=1" class="btn-back">
-                <i class="fa-solid fa-users"></i> <?php echo L('login_back'); ?>
+                <i class="fa-solid fa-users text-muted pr-4"></i> <?php echo L('menu_usuarios'); ?>
             </a>
         </div>
     </div>
@@ -39,23 +43,26 @@
     <div class="container d-grid grid-2-1 gap-32">
         <!-- LISTADO DE ROLES -->
         <div class="card p-0 br-20 bg-white shadow-sm border-2 overflow-hidden">
-            <div class="p-20 border-bottom bg-surface">
+            <div class="p-20 border-bottom bg-surface d-flex jc-space-between ai-center">
                 <h3 class="m-0 fs-16"><i class="fa-solid fa-list-ul mr-8"></i> <?php echo L('roles_card_list'); ?></h3>
+                <button class="btn-primary-soft fs-12 px-12 py-6 br-8 font-bold" onclick="limpiarForm()">
+                    <i class="fa-solid fa-plus mr-4"></i> <?php echo L('roles_btn_new'); ?>
+                </button>
             </div>
             <table class="data-table mb-0">
                 <thead>
                     <tr>
                         <th class="pl-20"><?php echo L('roles_th_name'); ?></th>
                         <th><?php echo L('roles_th_desc'); ?></th>
-                        <th class="text-right pr-20"><?php echo L('roles_th_actions'); ?></th>
+                        <th class="text-center" style="width: 100px;"><?php echo L('roles_th_actions'); ?></th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php foreach ($avRoles['roles'] as $r): ?>
-                        <tr>
+                        <tr id="role-row-<?php echo $r['id']; ?>">
                             <td class="pl-20 font-bold"><?php echo L('role_' . strtolower($r['nombre'])); ?></td>
                             <td class="text-muted fs-13"><?php echo L('role_' . strtolower($r['nombre']) . '_desc'); ?></td>
-                            <td class="text-right pr-20">
+                            <td class="text-center">
                                 <button class="btn-icon" onclick='cargarRolParaEditar(<?php echo htmlspecialchars(json_encode($r), ENT_QUOTES, "UTF-8"); ?>)' title="<?php echo L('roles_tip_edit'); ?>">
                                     <i class="fa-solid fa-pen-to-square"></i>
                                 </button>
@@ -93,7 +100,6 @@
                                 <input type="checkbox" name="permisos[]" value="<?php echo $p['id']; ?>" class="perm-check" data-clave="<?php echo $p['clave']; ?>">
                                 <div>
                                     <div class="fs-14 font-bold"><?php echo L('perm_' . strtolower($p['clave'])); ?></div>
-                                    <div class="fs-11 text-muted"><?php echo L('roles_perm_key'); ?>: <?php echo $p['clave']; ?></div>
                                 </div>
                             </label>
                         <?php endforeach; ?>
@@ -101,7 +107,9 @@
                 </div>
 
                 <div class="modal-footer p-0 mt-32 border-top pt-20 d-flex gap-12">
-                    <button type="button" class="btn-cancel flex-1" onclick="limpiarForm()"><?php echo L('modal_cancel'); ?></button>
+                    <button type="button" class="btn-cancel flex-1 jc-center" onclick="limpiarForm()">
+                        <i class="fa-solid fa-eraser mr-8"></i> <?php echo L('roles_btn_clear'); ?>
+                    </button>
                     <button type="submit" class="btn-save flex-2 jc-center">
                         <i class="fa-solid fa-floppy-disk mr-8"></i> <?php echo L('roles_btn_save'); ?>
                     </button>
@@ -118,7 +126,12 @@
         const requestId = ++lastRequestId;
         const roleNames = {
             'admin': "<?php echo L('role_admin'); ?>",
-            'cajero': "<?php echo L('role_cajero'); ?>"
+            'administrador': "<?php echo L('role_administrador'); ?>",
+            'encargado': "<?php echo L('role_encargado'); ?>",
+            'cajero': "<?php echo L('role_cajero'); ?>",
+            'supervisor': "<?php echo L('role_supervisor'); ?>",
+            'dependiente': "<?php echo L('role_dependiente'); ?>",
+            'superadmin': "<?php echo L('role_superadmin'); ?>"
         };
         const editLabel = "<?php echo L('roles_js_edit_title'); ?>";
         const localizedName = roleNames[rol.nombre.toLowerCase()] || rol.nombre;
@@ -126,6 +139,11 @@
         document.getElementById('idRol').value = rol.id;
         document.getElementById('roleName').value = rol.nombre;
         document.getElementById('roleDesc').value = rol.descripcion || '';
+
+        // Resaltar fila seleccionada
+        document.querySelectorAll('tr[id^="role-row-"]').forEach(tr => tr.classList.remove('row-active'));
+        const row = document.getElementById('role-row-' + rol.id);
+        if (row) row.classList.add('row-active');
 
         // Resetear checkboxes inmediatamente
         const checks = document.querySelectorAll('.perm-check');
@@ -157,6 +175,9 @@
         document.getElementById('idRol').value = "0";
         document.getElementById('roleForm').reset();
 
+        // Limpiar resaltado de filas
+        document.querySelectorAll('tr[id^="role-row-"]').forEach(tr => tr.classList.remove('row-active'));
+
         const checks = document.querySelectorAll('.perm-check');
         checks.forEach(c => c.checked = false);
     }
@@ -186,5 +207,28 @@
         width: 18px;
         height: 18px;
         accent-color: var(--accent);
+    }
+
+    .row-active {
+        background-color: var(--blue-light) !important;
+        border-left: 4px solid var(--accent) !important;
+    }
+
+    .row-active td {
+        color: var(--accent) !important;
+    }
+
+    .btn-primary-soft {
+        background: var(--blue-light);
+        color: var(--accent);
+        border: 1px solid transparent;
+        border-radius: 8px;
+        transition: all 0.2s;
+        cursor: pointer;
+    }
+
+    .btn-primary-soft:hover {
+        background: var(--accent);
+        color: white;
     }
 </style>

@@ -1,6 +1,6 @@
 </header>
 <div class="main container-full d-flex ai-center jc-center min-h-80vh">
-    <div class="modal modal-content auth-card w-400 p-40 shadow-2xl">
+    <div class="modal modal-content auth-card w-480 p-40 shadow-2xl">
         <div class="topbar-brand-dot mb-24 anim-pulse"></div>
         <div class="modal-title text-center fs-24 font-bold text-accent"><?php echo L('login_forgot_title'); ?></div>
         <div class="modal-sub mb-32 text-center text-muted fs-14">
@@ -28,14 +28,13 @@
                     <?php endif; ?>
                 </div>
 
-                <div class="d-flex flex-column gap-12 mt-8">
+                <div class="grid-2 gap-12 mt-8">
+                    <a href="index.php?menu=Login" class="btn-cancel p-14 fs-14 text-decoration-none transition-all d-flex ai-center jc-center">
+                         <?php echo L('login_forgot_btn_cancel'); ?>
+                    </a>
                     <button type="submit" name="enviarSolicitud" class="btn-save p-14 fs-14 shadow-lg hover-translate-y">
                         <i class="fa-solid fa-paper-plane mr-10"></i> <?php echo L('login_forgot_btn_send'); ?>
                     </button>
-                    
-                    <a href="index.php?menu=Login" class="btn-cancel border-none bg-none text-muted p-12 cursor-pointer text-center text-decoration-none fs-13 hover-text-accent transition-all">
-                         <?php echo L('login_forgot_btn_cancel'); ?>
-                    </a>
                 </div>
             </form>
         <?php endif; ?>

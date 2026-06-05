@@ -12,22 +12,9 @@ if (!isset($_SESSION['usuarioActualTPV'])) {
     exit;
 }
 
-// Solo administradores
-if ($_SESSION['usuarioActualTPV']->getRol() !== 'admin') {
+// Solo administradores o gestores de productos
+if (!$_SESSION['usuarioActualTPV']->tienePermiso('gestionar_productos')) {
     $_SESSION['paginaEnCurso'] = 'Dashboard';
-    header('Location: index.php');
-    exit;
-}
-
-// Navegación Global
-if (isset($_REQUEST['salir'])) {
-    session_destroy();
-    header('Location: index.php');
-    exit;
-}
-
-if (isset($_REQUEST['irTPV'])) {
-    $_SESSION['paginaEnCurso'] = 'inicioPrivado';
     header('Location: index.php');
     exit;
 }
@@ -38,41 +25,39 @@ if (isset($_REQUEST['irCierreCaja'])) {
     exit;
 }
 
-if (isset($_REQUEST['irMiPerfil'])) {
-    $_SESSION['paginaEnCurso'] = 'MiPerfil';
-    header('Location: index.php');
-    exit;
-}
-
-if (isset($_REQUEST['volver']) || isset($_REQUEST['irDashboard'])) {
+if (isset($_REQUEST['volver'])) {
     $_SESSION['paginaEnCurso'] = 'Dashboard';
     header('Location: index.php');
     exit;
 }
 
-// Paginación
-$pag = isset($_GET['p']) ? max(1, (int)$_GET['p']) : 1;
-$limit = 50;
-$offset = ($pag - 1) * $limit;
+// Aplicar ajustes masivos programados que hayan vencido
+ProductoPDO::aplicarAjustesPendientes();
 
-$totalProductos = ProductoPDO::contarProductos(false);
+// Paginación
+['pag' => $pag, 'limit' => $limit, 'offset' => $offset] = obtenerPaginacion(50);
+
+$totalProductos = ProductoPDO::contarProductos(false, '', '', 'all', null, null, '', true);
 $totalPaginas = ceil($totalProductos / $limit);
 
-// Obtener la lista de productos paginada
-$oProductos = ProductoPDO::listarProductos(false, $limit, $offset);
-$listaProductos = [];
-foreach ($oProductos as $oProd) {
+// Helper para mapear objetos Producto a arrays para la vista
+function mapProducto(Producto $oProd) {
+    static $idsAlbaranPendiente = null;
+    if ($idsAlbaranPendiente === null) {
+        $idsAlbaranPendiente = ProductoPDO::idsConAlbaranPendiente();
+    }
+
     $icono = $oProd->getIcono();
-    if ($icono && strlen($icono) > 10) {
+    if ($icono && strlen($icono) > 200 && strpos($icono, 'data:image') === false) {
         $icono = 'data:image/png;base64,' . base64_encode($icono);
     }
 
-    $listaProductos[] = [
+    return [
         'id'             => $oProd->getId(),
         'nombre'         => $oProd->getNombre(),
         'referencia'     => $oProd->getReferencia(),
-        'precio_venta'   => (float)$oProd->getPrecioVenta(),
-        'precio_coste'   => (float)$oProd->getPrecioCoste(),
+        'precio_venta'   => $oProd->getPrecioVenta(),
+        'precio_coste'   => $oProd->getPrecioCoste(),
         'iva'            => (float)$oProd->getIva(),
         'meses_garantia' => (int)$oProd->getMesesGarantia(),
         'stock_minimo'   => (int)$oProd->getStockMinimo(),
@@ -84,12 +69,21 @@ foreach ($oProductos as $oProd) {
         'atributos'      => $oProd->getAtributos(),
         'es_pack'        => $oProd->getEsPack(),
         'id_proveedor'   => $oProd->getIdProveedor(),
-        'precio_proveedor' => (float)$oProd->getPrecioProveedor(),
+        'precio_proveedor' => $oProd->getPrecioProveedor(),
         'margen'         => (float)$oProd->getMargen(),
-        'componentes_pack' => $oProd->getEsPack() ? ProductoPDO::obtenerComponentesPack($oProd->getId()) : []
+        'mantener_precision' => (int)$oProd->getMantenerPrecision(),
+        'componentes_pack' => $oProd->getEsPack() ? ProductoPDO::obtenerComponentesPack($oProd->getId()) : [],
+        'albaran_pendiente' => in_array($oProd->getId(), $idsAlbaranPendiente)
     ];
 }
 
+// Obtener la lista de productos paginada (sin packs)
+$oProductos = ProductoPDO::listarProductos(false, $limit, $offset, '', '', 'all', null, null, '', true);
+$listaProductos = array_map('mapProducto', $oProductos);
+
+// Obtener la lista completa de packs para la pestaña específica
+$oPacks = ProductoPDO::listarPacks();
+$listaPacks = array_map('mapProducto', $oPacks);
 
 // Obtener tipos de IVA y el general vigente para usarlo en la UI
 require_once 'model/TipoIVAPDO.php';
@@ -103,6 +97,7 @@ $listaProveedores = ProveedorPDO::listarTodos(true); // Solo activos
 
 $avProductos = [
     'productos'  => $listaProductos,
+    'packs'      => $listaPacks,
     'usuario'    => $_SESSION['usuarioActualTPV']->getNombre(),
     'ivaGeneral' => $ivaGeneralActual,
     'tipos_iva'  => $tiposIva,

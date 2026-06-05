@@ -33,7 +33,6 @@ try {
         exit;
     }
 
-    $q = DBPDO::ejecutarConsulta($sql, [':desde' => $fechaDesde, ':hasta' => $fechaHasta]);
     $kpis = VentaPDO::obtenerKPIs($fechaDesde, $fechaHasta, $idCajero, $tipoDocumento);
 
     // Top Products

@@ -5,20 +5,62 @@ class ConfiguracionPDO
 {
 
     /**
+     * Métodos de seguridad para cifrar credenciales sensibles en la BD.
+     */
+    private static function encrypt($data) {
+        if (empty($data) || strpos($data, 'ENC:') === 0) return $data;
+        $key = hash('sha256', defined('DBNAME') ? DBNAME : 'tpv_electrobazar_secret', true);
+        $iv = openssl_random_pseudo_bytes(16);
+        $encrypted = openssl_encrypt($data, 'aes-256-cbc', $key, 0, $iv);
+        return 'ENC:' . bin2hex($iv) . ':' . $encrypted;
+    }
+
+    private static function decrypt($data) {
+        if (empty($data) || strpos($data, 'ENC:') !== 0) return $data;
+        $parts = explode(':', $data);
+        if (count($parts) === 3) {
+            $iv = hex2bin($parts[1]);
+            $key = hash('sha256', defined('DBNAME') ? DBNAME : 'tpv_electrobazar_secret', true);
+            $decrypted = openssl_decrypt($parts[2], 'aes-256-cbc', $key, 0, $iv);
+            return $decrypted !== false ? $decrypted : $data;
+        }
+        return $data;
+    }
+
+    /**
      * Obtiene todos los parámetros de configuración como un array asociativo [clave => valor]
+     * Resultado cacheado en sesión 5 minutos para evitar queries en cada carga de página.
      * @return array
      */
-    public static function obtenerConfiguracion()
+    public static function obtenerConfiguracion(): array
     {
+        $cacheKey = '_cache_config';
+        $tsKey    = '_cache_config_ts';
+        if (isset($_SESSION[$cacheKey], $_SESSION[$tsKey]) && (time() - $_SESSION[$tsKey]) < 300) {
+            return $_SESSION[$cacheKey];
+        }
+
         $config = [];
         $sql = "SELECT clave, valor FROM configuracion";
         $result = DBPDO::ejecutarConsulta($sql);
-
         while ($row = $result->fetch(PDO::FETCH_ASSOC)) {
-            $config[$row['clave']] = $row['valor'];
+            $val = $row['valor'];
+            if ($row['clave'] === 'smtp_pass') $val = self::decrypt($val);
+            $config[$row['clave']] = $val;
         }
 
+        $_SESSION[$cacheKey] = $config;
+        $_SESSION[$tsKey]    = time();
         return $config;
+    }
+
+    /**
+     * Invalida la caché de configuración en sesión.
+     * Llamar tras guardar cambios de configuración.
+     */
+    public static function invalidarCache(): void
+    {
+        unset($_SESSION['_cache_config'], $_SESSION['_cache_config_ts']);
     }
 
     /**
@@ -32,7 +74,8 @@ class ConfiguracionPDO
         $result = DBPDO::ejecutarConsulta($sql, [':clave' => $clave]);
         $row = $result->fetch(PDO::FETCH_ASSOC);
 
-        return $row ? $row['valor'] : null;
+        if (!$row) return null;
+        return ($clave === 'smtp_pass') ? self::decrypt($row['valor']) : $row['valor'];
     }
 
     /**
@@ -56,16 +99,35 @@ class ConfiguracionPDO
             foreach ($configuraciones as $clave => $valor) {
                 // Solo guardar si la clave no está vacía
                 if (!empty($clave)) {
-                    $stmt->execute([':valor' => $valor, ':clave' => $clave]);
+                    $oldValue = self::obtenerValor($clave);
+                    $valGuardar = ($clave === 'smtp_pass') ? self::encrypt($valor) : $valor;
+                    $stmt->execute([':valor' => $valGuardar, ':clave' => $clave]);
+
+                    // Si la configuración es fiscal, registrar evento VeriFactu
+                    if (strpos($clave, 'verifactu_') === 0 || strpos($clave, 'empresa_') === 0) {
+                         if ($oldValue !== (string)$valor) {
+                             require_once __DIR__ . '/VeriFactuEventService.php';
+                             VeriFactuEventService::logConfigChange($clave, $oldValue, $valor);
+                         }
+                    }
                 }
             }
  
             $db->commit();
+            self::invalidarCache();
             return true;
         } catch (Exception $e) {
             $db->rollBack();
             error_log("Error al guardar la configuración: " . $e->getMessage());
             return false;
         }
+    }
+
+    /**
+     * Actualiza una única configuración (Shorthand para guardarConfiguracion)
+     */
+    public static function actualizarValor($clave, $valor)
+    {
+        return self::guardarConfiguracion([$clave => $valor]);
     }
 }

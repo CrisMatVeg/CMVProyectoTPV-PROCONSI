@@ -11,11 +11,16 @@ export const CartManager = {
    * Price Engine: Calculate dynamic price based on tariffs and dates
    */
   getEffectivePrice(product, socio = null) {
-    let finalPrice = parseFloat(product.price);
+    const basePrice = parseFloat(product.price || 0);
+    let finalPrice = basePrice;
+    const appliedTariffs = [];
     const now = new Date();
-    const currentTime = now.getHours().toString().padStart(2, "0") + ":" +
-                        now.getMinutes().toString().padStart(2, "0") + ":" +
-                        now.getSeconds().toString().padStart(2, "0");
+    const currentTime =
+      now.getHours().toString().padStart(2, "0") +
+      ":" +
+      now.getMinutes().toString().padStart(2, "0") +
+      ":" +
+      now.getSeconds().toString().padStart(2, "0");
 
     const activeTariffs = AppConfig.tarifas.filter((t) => {
       const currentDate = now.toISOString().split("T")[0];
@@ -23,7 +28,7 @@ export const CartManager = {
 
       if (t.fecha_aplicacion && currentDate < t.fecha_aplicacion) return false;
       if (t.fecha_fin && currentDate > t.fecha_fin) return false;
-      
+
       if (t.dias_semana) {
         const allowedDays = t.dias_semana.split(",").map(Number);
         if (!allowedDays.includes(currentDay)) return false;
@@ -34,18 +39,55 @@ export const CartManager = {
         try {
           const ids = JSON.parse(t.producto_ids) || [];
           if (!ids.includes(parseInt(product.id))) return false;
-        } catch (e) { return false; }
+        } catch (e) {
+          return false;
+        }
       }
 
       if (t.hora_inicio && currentTime < t.hora_inicio) return false;
       if (t.hora_fin && currentTime > t.hora_fin) return false;
 
-      if (t.es_solo_socios && (!socio || parseInt(socio.es_socio) !== 1)) return false;
-      if (t.id_cliente && (!socio || parseInt(socio.id) !== parseInt(t.id_cliente))) return false;
-      
-      if (t.tipo_cliente !== "todos") {
-        if (!socio || (t.tipo_cliente === "mayorista" && parseInt(socio.es_mayorista) !== 1) || (t.tipo_cliente !== "mayorista" && socio.tipo !== t.tipo_cliente)) {
+      // 3. Segmentación Cliente
+      if (t.es_solo_socios && (!socio || parseInt(socio.es_socio) !== 1))
+        return false;
+
+      // 3.1. Cliente Específico (id_cliente o cliente_ids)
+      let isSpecificMatch = false;
+      if (t.id_cliente && socio && parseInt(socio.id) === parseInt(t.id_cliente)) {
+        isSpecificMatch = true;
+      }
+      if (!isSpecificMatch && t.cliente_ids && socio) {
+        try {
+          const ids = JSON.parse(t.cliente_ids);
+          if (Array.isArray(ids) && ids.includes(parseInt(socio.id))) {
+            isSpecificMatch = true;
+          }
+        } catch (e) {}
+      }
+
+      // Si la tarifa especifica clientes y este no lo es, fuera.
+      if ((t.id_cliente || t.cliente_ids) && !isSpecificMatch) return false;
+
+      // 3.2. Roles / Segmentos (Solo si no es match específico)
+      if (!isSpecificMatch) {
+        const rolCliente = socio && socio.rol ? socio.rol.toLowerCase() : "general";
+
+        // Comprobar roles_segmento (nuevo formato)
+        if (t.roles_segmento) {
+          const segmentos = t.roles_segmento
+            .toLowerCase()
+            .split(",")
+            .map((s) => s.trim());
+          if (!segmentos.includes(rolCliente)) return false;
+        }
+        // Comprobar tipo_cliente (legacy)
+        else if (t.tipo_cliente && t.tipo_cliente !== "todos") {
+          const tipoReq = t.tipo_cliente.toLowerCase();
+          if (tipoReq === "mayorista") {
+            if (rolCliente !== "mayorista" && (!socio || parseInt(socio.es_mayorista) !== 1)) return false;
+          } else if (tipoReq !== rolCliente) {
             return false;
+          }
         }
       }
 
@@ -54,25 +96,71 @@ export const CartManager = {
 
     activeTariffs.sort((a, b) => b.prioridad - a.prioridad);
 
-    activeTariffs.forEach((t) => {
+    // Solo aplicar la tarifa de mayor prioridad
+    activeTariffs.slice(0, 1).forEach((t) => {
       const val = parseFloat(t.valor);
+      const keepPrecision = !!parseInt(product.mantener_precision || 0);
       let variation = 0;
       if (t.tipo === "percent") {
-        variation = Math.round(finalPrice * (val / 100) * 100) / 100;
+        variation = keepPrecision
+          ? finalPrice * (val / 100)
+          : Math.round(finalPrice * (val / 100) * 100) / 100;
       } else {
         variation = val;
       }
-      finalPrice += variation;
+
+      if (variation !== 0) {
+        finalPrice += variation;
+        appliedTariffs.push({
+          id_origen: t.id,
+          tipo_descuento: "tarifa",
+          nombre: t.nombre,
+          valor_descontado: variation,
+        });
+      }
     });
 
-    return Math.max(0, finalPrice);
+    return {
+      price: Math.max(0, finalPrice),
+      appliedTariffs,
+      basePrice,
+    };
+  },
+
+  /**
+   * Recalculate all items in cart based on current socio
+   */
+  recalculateCartPrices() {
+    const cart = AppState.cart;
+    let changed = false;
+    Object.keys(cart).forEach((key) => {
+      const item = cart[key];
+      // Skip custom products (comodines)
+      if (String(key).startsWith("comodin_") || item.id === -1) return;
+      // Skip items already validated by the server API or with manually edited price
+      if (item._tariffApplied || item._customPrice) return;
+
+      const product = AppConfig.products.find((p) => String(p.id) === String(item.id));
+      if (!product) return;
+
+      const effective = this.getEffectivePrice(product, AppState.socioActual);
+      if (item.price !== effective.price) {
+        item.price = effective.price;
+        item.appliedTariffs = effective.appliedTariffs;
+        item.basePriceSnapshot = effective.basePrice;
+        changed = true;
+      }
+    });
+    if (changed) {
+      AppState.cart = cart;
+    }
   },
 
   /**
    * Core Cart Actions
    */
   addToCart(id) {
-    const product = AppConfig.products.find(p => String(p.id) === String(id));
+    const product = AppConfig.products.find((p) => String(p.id) === String(id));
     if (!product || product.inactive || product.stock <= 0) return false;
 
     const cart = AppState.cart; // Read ONCE into a local variable
@@ -80,18 +168,52 @@ export const CartManager = {
       if (cart[id].qty >= product.stock) return "stock_limit";
       cart[id].qty++;
     } else {
-      const finalPrice = this.getEffectivePrice(product, AppState.socioActual);
+      const basePrice = parseFloat(product.price || 0);
       cart[id] = {
         ...product,
         qty: 1,
-        price: finalPrice,
+        price: basePrice,
+        appliedTariffs: [],
+        basePriceSnapshot: basePrice,
         iva: parseFloat(product.iva || 21),
         cartKey: String(id),
-        serials: []
+        serials: [],
       };
     }
     AppState.cart = cart; // Write back via setter to persist
     return true;
+  },
+
+  addCustomProduct(name, price, iva) {
+    const cart = AppState.cart;
+    const timestamp = new Date().getTime();
+    const cartKey = `comodin_${timestamp}`;
+
+    cart[cartKey] = {
+      id: -1,
+      name: name,
+      codigo: "COMODIN",
+      price: parseFloat(price),
+      iva: parseFloat(iva || 21),
+      qty: 1,
+      icono: '<i class="fa-solid fa-box-open"></i>',
+      maxStock: 999999,
+      cartKey: cartKey,
+      serials: []
+    };
+
+    AppState.cart = cart;
+    return true;
+  },
+
+  removeFromCart(id) {
+    const cart = AppState.cart;
+    if (cart[id]) {
+      delete cart[id];
+      AppState.cart = cart;
+      return true;
+    }
+    return false;
   },
 
   changeQty(id, delta) {
@@ -107,6 +229,16 @@ export const CartManager = {
       delete cart[id];
     }
     AppState.cart = cart; // Write back
+  },
+
+  setItemPrice(cartKey, newPrice) {
+    const cart = AppState.cart;
+    if (!cart[cartKey]) return;
+    const price = parseFloat(newPrice);
+    if (isNaN(price) || price < 0) return;
+    cart[cartKey].price = Math.round(price * 100) / 100;
+    cart[cartKey]._customPrice = true;
+    AppState.cart = cart;
   },
 
   setQty(id, value) {
@@ -134,8 +266,42 @@ export const CartManager = {
   /**
    * Bundle & Promo Logic
    */
+  applyDiscountCode(code) {
+    if (!code) {
+      AppState.currentPromo = null;
+      return { ok: false, error: "Código vacío" };
+    }
+    const cleanCode = code.trim().toUpperCase();
+    const promo = AppConfig.promos.find(p => p.codigo && p.codigo.toUpperCase() === cleanCode);
+    
+    if (promo) {
+      const totals = this.calculateTotals();
+      const minSub = parseFloat(promo.min_subtotal) || 0;
+
+      if (totals.subtotal < minSub) {
+        return { ok: false, error: `Pedido mínimo: ${Utils.formatCurrency(minSub)}` };
+      }
+
+      AppState.currentPromo = { ...promo, _manual: true };
+
+      // Avisar si hay items con precio manual que quedan excluidos del descuento
+      const customCount = Object.values(AppState.cart).filter(i => i._customPrice).length;
+      if (customCount > 0) {
+        Utils.showToast(
+          `${customCount} producto${customCount > 1 ? 's' : ''} con precio manual ${customCount > 1 ? 'quedan excluidos' : 'queda excluido'} del descuento`,
+          'warning'
+        );
+      }
+
+      return { ok: true, promo };
+    }
+    
+    return { ok: false, error: "Código no válido" };
+  },
+
   autoApplyBundles() {
-    if (AppState.currentPromo && AppState.currentPromo.codigo) return;
+    // Solo bloquear si hay un cupón aplicado MANUALMENTE en esta venta
+    if (AppState.currentPromo && AppState.currentPromo._manual && AppState.currentPromo.codigo) return;
 
     const items = Object.values(AppState.cart);
     if (!items.length) {
@@ -152,13 +318,21 @@ export const CartManager = {
 
     const autoPromo = AppConfig.promos.find(p => {
       if (p.tipo !== "bundle" && p.tipo !== "fixed_bundle") return false;
-      if (p.codigo) return false;
-      
+      // Los bundles auto-aplican aunque tengan código interno (el código es solo un identificador)
+
       const buyQty = parseInt(p.bundle_buy_qty) || 0;
+      if (buyQty === 0) return false;
+
       return Object.entries(qtyByBaseId).some(([id, qty]) => {
         if (qty < buyQty) return false;
-        if (!p.id_producto && !p.categoria_code) return true;
+        if (!p.id_producto && !p.producto_ids && !p.categoria_code) return true;
         if (p.id_producto && p.id_producto == id) return true;
+        if (p.producto_ids) {
+          try {
+            const ids = JSON.parse(p.producto_ids);
+            if (Array.isArray(ids) && ids.map(Number).includes(Number(id))) return true;
+          } catch (e) {}
+        }
         if (p.categoria_code && p.categoria_code.split(',').includes(catByBaseId[id])) return true;
         return false;
       });
@@ -177,19 +351,25 @@ export const CartManager = {
     this.autoApplyBundles();
     const items = Object.values(AppState.cart);
     let subtotal = 0;
+    let subtotalNormal = 0; // Items sin precio manual (participan en descuentos)
     let bundleDiscountTotal = 0;
 
-    // 1. Calculate base subtotal
+    // 1. Calculate base subtotal (pre-promo)
+    // Los items con precio editado manualmente contribuyen al subtotal pero no a los descuentos
     items.forEach((item) => {
-      const p = parseFloat(item.price || 0);
+      let p = parseFloat(item.price || 0);
       const q = parseInt(item.qty || 0);
-      subtotal += p * q;
+      const lineTotal = p * q;
+      subtotal += lineTotal;
+      if (!item._customPrice) subtotalNormal += lineTotal;
     });
 
     // 2. Apply bundle discounts (2x1, fixed Price bundle, etc.)
+    // Items con precio manual quedan excluidos de bundles
     if (AppState.currentPromo && (AppState.currentPromo.tipo === "bundle" || AppState.currentPromo.tipo === "fixed_bundle")) {
       const groups = {};
       items.forEach((item) => {
+        if (item._customPrice) return; // precio manual: excluido de bundles
         const key = item.id;
         const p = parseFloat(item.price || 0);
         const q = parseInt(item.qty || 0);
@@ -199,11 +379,17 @@ export const CartManager = {
 
       Object.values(groups).forEach((group) => {
         let promoApplies = false;
-        if (AppState.currentPromo.id_producto && AppState.currentPromo.id_producto == group.baseId) promoApplies = true;
-        else if (AppState.currentPromo.categoria_code) {
+        if (AppState.currentPromo.id_producto && AppState.currentPromo.id_producto == group.baseId) {
+          promoApplies = true;
+        } else if (AppState.currentPromo.producto_ids) {
+          try {
+            const ids = JSON.parse(AppState.currentPromo.producto_ids);
+            if (Array.isArray(ids) && ids.map(Number).includes(Number(group.baseId))) promoApplies = true;
+          } catch (e) {}
+        } else if (AppState.currentPromo.categoria_code) {
           const allowedCats = AppState.currentPromo.categoria_code.split(',');
           if (allowedCats.includes(group.cat)) promoApplies = true;
-        } else if (!AppState.currentPromo.id_producto && !AppState.currentPromo.categoria_code) {
+        } else if (!AppState.currentPromo.id_producto && !AppState.currentPromo.producto_ids && !AppState.currentPromo.categoria_code) {
           promoApplies = true;
         }
 
@@ -230,21 +416,23 @@ export const CartManager = {
     }
 
     // 3. Apply general discounts (percent or fixed amount)
-    const subtotalAfterBundles = subtotal - bundleDiscountTotal;
+    // Se aplican solo sobre el subtotal de items SIN precio manual
+    const subtotalNormalAfterBundles = subtotalNormal - bundleDiscountTotal;
     let generalDiscount = 0;
 
     if (AppState.currentPromo && (AppState.currentPromo.tipo === "percent" || AppState.currentPromo.tipo === "amount")) {
       const val = parseFloat(AppState.currentPromo.valor || 0);
       if (AppState.currentPromo.tipo === "percent") {
-        generalDiscount = (subtotalAfterBundles * val) / 100;
+        generalDiscount = (subtotalNormalAfterBundles * val) / 100;
       } else {
-        generalDiscount = Math.min(subtotalAfterBundles, val);
+        generalDiscount = Math.min(subtotalNormalAfterBundles, val);
       }
     }
 
     // 4. Partner (Socio) Discount (accumulative 5% over remainder)
-    const socioAmt = (AppState.socioActual && AppState.socioActual.es_socio) 
-      ? (subtotalAfterBundles - generalDiscount) * (AppConfig.socioDiscount / 100) 
+    // Solo sobre items sin precio manual
+    const socioAmt = (AppState.socioActual && AppState.socioActual.es_socio)
+      ? (subtotalNormalAfterBundles - generalDiscount) * (AppConfig.socioDiscount / 100)
       : 0;
 
     // IMPORTANT: Loyalty points are treated as a direct "discount" on the price per final requirements.
@@ -253,9 +441,10 @@ export const CartManager = {
     const subtotalFinal = Math.max(0, subtotal - totalDiscount);
 
     // 5. Derive Base and Tax from PVP (which already contains VAT)
-    // Loyalty points are a payment method, so they shouldn't reduce the taxable base
-    const subtotalTaxable = Math.max(0, subtotal - bundleDiscountTotal - generalDiscount - socioAmt);
-    const discountFactor = subtotal > 0 ? subtotalTaxable / subtotal : 1;
+    // Según requerimientos del usuario: los descuentos/promos NO afectan a la base imponible ni al IVA.
+    // Se calculan sobre el subtotal bruto (post-tarifa, pre-promo).
+    const subtotalTaxable = subtotal; 
+    const discountFactor = 1.0; 
     let totalBase = 0;
     let totalTax = 0;
     const breakdown = {};
@@ -263,10 +452,10 @@ export const CartManager = {
     items.forEach((item) => {
       const p = parseFloat(item.price || 0);
       const q = parseInt(item.qty || 0);
-      const itemPvpOrig = p * q;
-      const itemPvpFinal = itemPvpOrig * discountFactor;
+
+      const itemPvpFinal = p * q;
       
-      const rate = (item.iva !== undefined && item.iva !== null) ? parseFloat(item.iva) : 25;
+      const rate = (item.iva !== undefined && item.iva !== null) ? parseFloat(item.iva) : 21;
       const base = itemPvpFinal / (1 + rate / 100);
       const tax = itemPvpFinal - base;
  
@@ -280,6 +469,10 @@ export const CartManager = {
 
     return {
       subtotal,          
+      bundleDiscount: bundleDiscountTotal,
+      generalDiscount: generalDiscount,
+      socioDiscount: socioAmt,
+      puntosDiscount: (AppState.puntosDescuentoAmt || 0),
       totalDiscount,      
       subtotalFinal,     
       totalBase,         
@@ -290,12 +483,18 @@ export const CartManager = {
   },
 
   postponeSale() {
+    const saved = JSON.parse(localStorage.getItem("postponed-sales") || "[]");
+    if (saved.length > 0) {
+        Utils.showToast("Ya existe una venta aparcada", "warning");
+        return;
+    }
+
     const items = Object.values(AppState.cart);
     if (!items.length) {
         Utils.showToast("El carrito está vacío", "warning");
         return;
     }
-    const saved = JSON.parse(localStorage.getItem("postponed-sales") || "[]");
+
     saved.push({
         id: Date.now(),
         date: new Date().toISOString(),
@@ -311,7 +510,20 @@ export const CartManager = {
 
   resumeSale(id) {
     const saved = JSON.parse(localStorage.getItem("postponed-sales") || "[]");
-    const index = saved.findIndex(s => s.id === id);
+    if (!saved.length) return;
+
+    if (Object.keys(AppState.cart).length > 0) {
+        Utils.showToast("Vacía el carrito primero para recuperar la venta", "warning");
+        return;
+    }
+
+    let index = -1;
+    if (id === undefined) {
+        index = saved.length - 1; // Resume last one
+    } else {
+        index = saved.findIndex(s => s.id === id);
+    }
+    
     if (index === -1) return;
 
     const sale = saved.splice(index, 1)[0];
@@ -327,3 +539,9 @@ export const CartManager = {
     Utils.showToast("Venta recuperada", "success");
   }
 };
+
+// Expose to global scope for legacy main.js
+if (typeof window !== "undefined") {
+    window.CartManager = CartManager;
+}
+

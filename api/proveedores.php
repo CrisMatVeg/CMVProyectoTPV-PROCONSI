@@ -16,12 +16,20 @@ try {
     require_once __DIR__ . '/../model/Usuario.php';
     require_once __DIR__ . '/../model/ProveedorPDO.php';
     require_once __DIR__ . '/../model/Validador.php';
+    require_once __DIR__ . '/../model/LogPDO.php';
 
     // session_start(); // Handled by csrf_check.php
 
     if (!isset($_SESSION['usuarioActualTPV'])) {
         http_response_code(401);
         echo json_encode(['ok' => false, 'error' => 'No autorizado']);
+        exit;
+    }
+
+    $usuario = $_SESSION['usuarioActualTPV'];
+    if (!$usuario->tienePermiso('gestionar_proveedores')) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'No tienes permiso para gestionar proveedores']);
         exit;
     }
 
@@ -40,7 +48,8 @@ try {
                     'email' => $proveedor->getEmail(),
                     'aplica_re' => $proveedor->getAplicaRe(),
                     'notas' => $proveedor->getNotas(),
-                    'activo' => $proveedor->getActivo()
+                    'activo' => $proveedor->getActivo(),
+                    'vencimiento_dias' => $proveedor->getVencimientoDias()
                 ] : null]);
             } else {
                 $proveedores = ProveedorPDO::listarTodos(isset($_GET['soloActivos']) ? ($_GET['soloActivos'] === 'true') : true);
@@ -54,7 +63,8 @@ try {
                         'telefono' => $p->getTelefono(),
                         'email' => $p->getEmail(),
                         'aplica_re' => $p->getAplicaRe(),
-                        'activo' => $p->getActivo()
+                        'activo' => $p->getActivo(),
+                        'vencimiento_dias' => $p->getVencimientoDias()
                     ];
                 }
                 echo json_encode(['ok' => true, 'proveedores' => $res]);
@@ -83,15 +93,23 @@ try {
                     $data['id'], $data['cif_nif'], $data['nombre'],
                     $data['direccion'] ?? '', $data['telefono'] ?? '',
                     $data['email'] ?? '', $data['aplica_re'] ?? false,
-                    $data['notas'] ?? '', $data['activo'] ?? true
+                    $data['notas'] ?? '', $data['activo'] ?? true,
+                    $data['vencimiento_dias'] ?? 0
                 );
+                LogPDO::addLog('UPDATE_PROVEEDOR', "Proveedor #{$data['id']} actualizado: {$data['nombre']}", [
+                    'id' => (int)$data['id'], 'nombre' => $data['nombre'], 'cif_nif' => $data['cif_nif'],
+                ]);
                 echo json_encode(['ok' => true, 'success' => $success]);
             } else {
-                $id = ProveedorPDO::añadirProveedor(
+                $id = ProveedorPDO::agregarProveedor(
                     $data['cif_nif'], $data['nombre'], $data['direccion'] ?? '',
                     $data['telefono'] ?? '', $data['email'] ?? '',
-                    $data['aplica_re'] ?? false, $data['notas'] ?? ''
+                    $data['aplica_re'] ?? false, $data['notas'] ?? '',
+                    $data['vencimiento_dias'] ?? 0
                 );
+                LogPDO::addLog('CREATE_PROVEEDOR', "Proveedor creado: {$data['nombre']} ({$data['cif_nif']})", [
+                    'id' => (int)$id, 'nombre' => $data['nombre'], 'cif_nif' => $data['cif_nif'],
+                ]);
                 echo json_encode(['ok' => true, 'success' => (bool)$id, 'id' => $id]);
             }
             break;
@@ -99,6 +117,9 @@ try {
         case 'DELETE':
             if (isset($_GET['id'])) {
                 $success = ProveedorPDO::borrarProveedor($_GET['id']);
+                LogPDO::addLog('DELETE_PROVEEDOR', "Proveedor #{$_GET['id']} eliminado", [
+                    'id' => (int)$_GET['id'],
+                ]);
                 echo json_encode(['ok' => true, 'success' => $success]);
             }
             break;

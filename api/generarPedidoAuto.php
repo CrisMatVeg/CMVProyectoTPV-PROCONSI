@@ -23,6 +23,18 @@ try {
         throw new Exception('No autorizado');
     }
 
+    // IDs de productos que ya tienen albarán pendiente de recibir (estado='recibido')
+    $sqlPendientes = "SELECT DISTINCT lc.producto_id, ac.numero_albaran
+                      FROM lineas_compra lc
+                      JOIN albaranes_compra ac ON lc.albaran_id = ac.id
+                      JOIN productos p ON lc.producto_id = p.id
+                      WHERE ac.estado = 'recibido' AND p.stock_actual <= p.stock_minimo AND p.activo = 1";
+    $stmtPend = DBPDO::ejecutarConsulta($sqlPendientes);
+    $pendientesRaw = $stmtPend->fetchAll(PDO::FETCH_ASSOC);
+    $idsConPendiente = array_column($pendientesRaw, 'producto_id');
+    $albaranesPendientes = array_values(array_unique(array_column($pendientesRaw, 'numero_albaran')));
+    $omitidosAlbaranPendiente = $albaranesPendientes;
+
     $sqlProd = "SELECT p.id, p.id_proveedor, p.nombre, p.referencia, p.stock_actual, p.stock_minimo, p.activo
                 FROM productos p WHERE p.es_pack = 0 AND p.activo = 1 AND p.id_proveedor IS NOT NULL AND p.stock_actual <= p.stock_minimo";
     $stmtProd = DBPDO::ejecutarConsulta($sqlProd);
@@ -32,11 +44,13 @@ try {
     foreach ($bajoStock as $p) {
         if ($p['activo'] == 0) { $omitidosInactivos++; continue; }
         if (empty($p['id_proveedor'])) { $omitidosSinProveedor++; continue; }
+        // Excluir productos que ya tienen albarán pendiente de recibir
+        if (in_array($p['id'], $idsConPendiente)) { continue; }
         $validos[] = ['id' => $p['id'], 'nombre' => $p['nombre'], 'referencia' => $p['referencia'] ?? '', 'id_proveedor' => $p['id_proveedor'], 'stock_actual' => (int)$p['stock_actual'], 'stock_minimo' => (int)$p['stock_minimo']];
     }
 
     if (empty($validos)) {
-        echo json_encode(['ok' => true, 'mensaje' => 'No se han podido generar pedidos.', 'total_bajo_stock' => count($bajoStock), 'omitidos_inactivos' => $omitidosInactivos, 'omitidos_sin_proveedor' => $omitidosSinProveedor, 'datos_pedido' => []]);
+        echo json_encode(['ok' => true, 'mensaje' => 'No se han podido generar pedidos.', 'total_bajo_stock' => count($bajoStock), 'omitidos_inactivos' => $omitidosInactivos, 'omitidos_sin_proveedor' => $omitidosSinProveedor, 'omitidos_albaran_pendiente' => $omitidosAlbaranPendiente, 'datos_pedido' => []]);
         exit;
     }
 
@@ -62,7 +76,7 @@ try {
         $porProveedor[$provId]['productos'][] = ['id' => $p['id'], 'nombre' => $p['nombre'] . ' (' . ($p['referencia'] ?: 'S/R') . ')', 'referencia' => $p['referencia'] ?? '', 'cantidad' => $cantidadSugerida, 'precio_coste_neto' => $precioNeto, 'iva_pct' => $pctIva, 're_pct' => $rePct];
     }
 
-    echo json_encode(['ok' => true, 'datos_pedido' => array_values($porProveedor), 'total_bajo_stock' => count($bajoStock), 'omitidos_inactivos' => $omitidosInactivos, 'omitidos_sin_proveedor' => $omitidosSinProveedor]);
+    echo json_encode(['ok' => true, 'datos_pedido' => array_values($porProveedor), 'total_bajo_stock' => count($bajoStock), 'omitidos_inactivos' => $omitidosInactivos, 'omitidos_sin_proveedor' => $omitidosSinProveedor, 'omitidos_albaran_pendiente' => $omitidosAlbaranPendiente]);
 } catch (Throwable $e) {
     http_response_code(500);
     echo json_encode(['ok' => false, 'error' => $e->getMessage()]);

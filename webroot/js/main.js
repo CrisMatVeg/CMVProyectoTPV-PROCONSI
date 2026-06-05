@@ -1,17 +1,15 @@
 console.log("main.js: Script loaded and executing (v15)");
+if (typeof I18N === 'undefined') window.I18N = {}; 
 const PRODUCTS = typeof DB_PRODUCTS !== "undefined" ? DB_PRODUCTS : [];
 
 
 // ── Estado global ──────────────────────────────────────────────────────────────
-Object.defineProperty(window, 'cart', {
-    get: function() {
-        let c = JSON.parse(localStorage.getItem("tpv_cart") || "{}");
-        return (c && typeof c === 'object' && !Array.isArray(c)) ? c : {};
-    },
-    set: function(v) {
-        localStorage.setItem("tpv_cart", JSON.stringify(v));
-    }
-});
+var __initCart;
+try {
+    __initCart = JSON.parse(localStorage.getItem("tpv_cart") || "{}");
+} catch(e) { __initCart = {}; }
+var cart = (__initCart && typeof __initCart === 'object' && !Array.isArray(__initCart)) ? __initCart : {};
+window.cart = cart;
 var selectedPayment = "efectivo";
 let discountPct = 0;
 let ticketNum = 1001;
@@ -71,174 +69,89 @@ let ULTIMOS_CLIENTES_BUSCADOS = [];
   };
 })();
 
-// ── Motor de Precios Dinámicos ────────────────────────────────────────────────
-function getEffectivePrice(p, socio = null) {
-  let finalPrice = parseFloat(p.price);
-  const ahora = new Date();
-  const horaActual =
-    ahora.getHours().toString().padStart(2, "0") +
-    ":" +
-    ahora.getMinutes().toString().padStart(2, "0") +
-    ":" +
-    ahora.getSeconds().toString().padStart(2, "0");
-
-  // Filtrar tarifas validas
-  const activas = TARIFAS.filter((t) => {
-    // 0. Programación Temporal Avanzada
-    const fechaActual = ahora.toISOString().split("T")[0];
-    const diaActual = ahora.getDay(); // 0 (Dom) - 6 (Sáb)
-
-    // Check Start Date
-    if (t.fecha_aplicacion && fechaActual < t.fecha_aplicacion) return false;
-    // Check End Date
-    if (t.fecha_fin && fechaActual > t.fecha_fin) return false;
-    // Check Days of Week
-    if (t.dias_semana) {
-      const diasPermitidos = t.dias_semana.split(",").map(Number);
-      if (!diasPermitidos.includes(diaActual)) return false;
-    }
-
-    // 1. Scope de producto
-    if (t.scope === "categoria" && p.cat !== t.categoria) return false;
-    if (t.scope === "productos") {
-      try {
-        const ids = JSON.parse(t.producto_ids) || [];
-        if (!ids.includes(parseInt(p.id))) return false;
-      } catch (e) {
-        return false;
-      }
-    }
-
-    // 2. Horario
-    if (t.hora_inicio && horaActual < t.hora_inicio) return false;
-    if (t.hora_fin && horaActual > t.hora_fin) return false;
-
-    // 3. Segmentación Cliente
-    if (t.es_solo_socios && (!socio || parseInt(socio.es_socio) !== 1))
-      return false;
-    if (
-      t.id_cliente &&
-      (!socio || parseInt(socio.id) !== parseInt(t.id_cliente))
-    )
-      return false;
-    if (t.tipo_cliente !== "todos") {
-      if (!socio || socio.tipo !== t.tipo_cliente) {
-        // Caso especial mayorista (es un flag, no un tipo ENUM en la DB original, pero lo mapeamos)
-        if (
-          t.tipo_cliente === "mayorista" &&
-          (!socio || parseInt(socio.es_mayorista) !== 1)
-        )
-          return false;
-        if (
-          t.tipo_cliente !== "mayorista" &&
-          (!socio || socio.tipo !== t.tipo_cliente)
-        )
-          return false;
-      }
-    }
-
-    return true;
-  });
-
-  // Aplicar por prioridad
-  activas.sort((a, b) => b.prioridad - a.prioridad);
-
-  activas.forEach((t) => {
-    const val = parseFloat(t.valor);
-    let variation = 0;
-    if (t.tipo === "percent") {
-      variation = Math.round(finalPrice * (val / 100) * 100) / 100;
-    } else {
-      variation = val;
-    }
-    finalPrice += variation;
-  });
-
-  return Math.max(0, finalPrice);
-}
-
 // ── Estado de venta pospuesta ──────────────────────────────────────────────────
-let postponedSale = JSON.parse(sessionStorage.getItem("postponedSale")) || null;
+// [MODERN] Postponed sales now handled in AppState/CartManager (localStorage)
 var currentPayments = []; // [NUEVO] Para pagos mixtos
 let totalVentaActual = 0; // [NUEVO] Para sincronizar con el modal de cobro
 let checkoutContext = 'mixto'; // [NUEVO] Contexto original del sidebar
 
 // ── Tema (modo + acento) ──────────────────────────────────────────────────────
+// Mantenemos funciones globales como delegadores a UiController vía App para compatibilidad legacy
 function applyTheme(mode, accent, font) {
-    const body = document.body;
-    if (!body) return;
-    if (mode) body.dataset.themeMode = mode;
-    if (accent) body.dataset.themeAccent = accent;
-    if (font) body.dataset.themeFont = font;
-
-    const modeButtons = {
-        light: "themeModeLight",
-        dark: "themeModeDark",
-        black: "themeModeBlack",
-    };
-    const accentButtons = {
-        blue: "themeAccentBlue",
-        green: "themeAccentGreen",
-        red: "themeAccentRed",
-        purple: "themeAccentPurple",
-        amber: "themeAccentAmber",
-    };
-    const fontButtons = {
-        'dm-mono': "themeFontMono",
-        'inter': "themeFontInter",
-        'outfit': "themeFontOutfit",
-        'roboto': "themeFontRoboto",
-        'system': "themeFontSystem"
-    };
-
-    if (mode) {
-        Object.entries(modeButtons).forEach(([m, id]) => {
-            const btn = document.getElementById(id);
-            if (btn) btn.classList.toggle("active", m === mode);
-        });
-    }
-    if (accent) {
-        Object.entries(accentButtons).forEach(([a, id]) => {
-            const btn = document.getElementById(id);
-            if (btn) btn.classList.toggle("active", a === accent);
-        });
-    }
-    if (font) {
-        Object.entries(fontButtons).forEach(([f, id]) => {
-            const btn = document.getElementById(id);
-            if (btn) btn.classList.toggle("active", f === font);
-        });
-    }
+    if (window.app) window.app.applyTheme(mode, accent, font);
 }
 
 function setThemeMode(mode) {
-    applyTheme(mode, null, null);
-    const input = document.getElementById("theme_mode_input");
-    if (input) input.value = mode;
+    if (window.app) window.app.setThemeMode(mode);
 }
 
 function setThemeAccent(accent) {
-    applyTheme(null, accent, null);
-    const input = document.getElementById("theme_accent_input");
-    if (input) input.value = accent;
+    if (window.app) window.app.setThemeAccent(accent);
 }
 
 function setThemeFont(font) {
-    applyTheme(null, null, font);
-    const input = document.getElementById("theme_font_input");
-    if (input) input.value = font;
+    if (window.app) window.app.setThemeFont(font);
 }
 
-if (
-    typeof USER_THEME_MODE !== "undefined" ||
-    typeof USER_THEME_ACCENT !== "undefined" ||
-    typeof USER_THEME_FONT !== "undefined"
-) {
-    applyTheme(USER_THEME_MODE || "light", USER_THEME_ACCENT || "blue", USER_THEME_FONT || "dm-mono");
+// Nota: La inicialización basada en PHP (USER_THEME_*) ahora se gestiona 
+// centralizadamente en app.js -> TpvApp.init()
+
+// ── Navegación de Categorías (Drag-to-Scroll) ──────────────────────────────────
+function initCategoryDragScroll() {
+    const slider = document.getElementById('catTabs');
+    if (!slider) return;
+
+    let isDown = false;
+    let startX;
+    let scrollLeft;
+    let moved = false;
+
+    slider.addEventListener('mousedown', (e) => {
+        isDown = true;
+        moved = false;
+        slider.classList.add('active');
+        startX = e.pageX - slider.offsetLeft;
+        scrollLeft = slider.scrollLeft;
+        // Cambiar comportamiento de scroll para que el drag sea instantáneo
+        slider.style.scrollBehavior = 'auto';
+    });
+
+    slider.addEventListener('mouseleave', () => {
+        isDown = false;
+        slider.classList.remove('active');
+    });
+
+    slider.addEventListener('mouseup', (e) => {
+        isDown = false;
+        slider.classList.remove('active');
+        slider.style.scrollBehavior = 'smooth';
+    });
+
+    slider.addEventListener('mousemove', (e) => {
+        if (!isDown) return;
+        e.preventDefault();
+        const x = e.pageX - slider.offsetLeft;
+        const walk = (x - startX) * 2; // Velocidad de desplazamiento
+        
+        if (Math.abs(walk) > 5) moved = true;
+        slider.scrollLeft = scrollLeft - walk;
+    });
+
+    // Prevenir clics accidentales si hubo arrastre
+    slider.addEventListener('click', (e) => {
+        if (moved) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+    }, true);
 }
+window.initCategoryDragScroll = initCategoryDragScroll;
 
 // ── DOMContentLoaded ──────────────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", function () {
+  // Inicializar navegación por arrastre
+  initCategoryDragScroll();
+
   const finInfo = document.getElementById("finInfoPanel");
   if (finInfo) {
     finInfo.classList.add("d-none");
@@ -261,169 +174,34 @@ document.addEventListener("DOMContentLoaded", function () {
     console.warn("Resizer init failed", e);
   }
 
-  // Atributos filters
-  document.querySelectorAll(".attr-tab").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const isCurrentlyActive = btn.classList.contains("active");
-
-      // Desmarcar todos primero
-      document.querySelectorAll(".attr-tab").forEach((b) => {
-        b.classList.remove("active");
-      });
-
-      if (isCurrentlyActive) {
-        // Toggle off
-        activeAttr = null;
-      } else {
-        // Toggle on
-        btn.classList.add("active");
-        activeAttr = btn.dataset.attr;
+  // Atributos filters: Gestionados por app.selectTag() en vInicioPrivado.php
+  
+  // Bloquear letra 'e', '+', '-' en inputs numéricos (solicitud usuario)
+  // Excepción: ajusteValorInput admite negativos para reducir precios
+  document.addEventListener("keydown", function(e) {
+      if (e.target.tagName === "INPUT" && e.target.type === "number" && e.target.id !== "ajusteValorInput") {
+          if (["e", "E", "+", "-"].includes(e.key)) {
+              e.preventDefault();
+          }
       }
-
-      renderProducts();
-    });
   });
 });
 
 // ── Formato monetario ──────────────────────────────────────────────────────────
 function fmt(n) {
   const val = typeof n === "number" ? n : parseFloat(n) || 0;
-  return val.toFixed(2).replace(".", ",") + " €";
+  return val.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 // ── Catálogo ───────────────────────────────────────────────────────────────────
+// Delegamos al controlador de UI modular para evitar divergencias en el filtrado/renderizado
 function renderProducts() {
-  const grid = document.getElementById("productsGrid");
-  if (!grid) return;
-
-  let filtered = PRODUCTS.filter((p) => {
-    let matchesCat = false;
-    if (activeCat === "all") {
-      matchesCat = true;
-    } else if (activeCat === "baja") {
-      matchesCat = !!p.inactive;
-    } else {
-      // Comparación robusta (insensible a mayúsculas y espacios)
-      const pCat = String(p.cat || "").trim().toLowerCase();
-      const aCat = String(activeCat || "").trim().toLowerCase();
-      matchesCat = !p.inactive && pCat === aCat;
-    }
-
-    if (!matchesCat) return false;
-
-    const pName = String(p.name || "").toLowerCase();
-    const pCode = String(p.codigo || "").toLowerCase();
-    const sTerm = String(searchTerm || "").toLowerCase();
-    const matchesSearch = pName.includes(sTerm) || pCode.includes(sTerm);
-    if (!matchesSearch) return false;
-
-    const matchesPrice =
-      maxPrice === 999999
-        ? true // No user-set filter, show all
-        : p.price >= minPrice && p.price <= maxPrice;
-    if (!matchesPrice) return false;
-
-    let matchesStock = true;
-    if (stockFilter === "in-stock") matchesStock = p.stock > 0;
-    else if (stockFilter === "low-stock")
-      matchesStock = p.stock > 0 && p.stock <= 5;
-    if (!matchesStock) return false;
-
-    if (activeAttr !== null) {
-      if (!p.atributos) return false;
-      try {
-        const pAttrs =
-          typeof p.atributos === "string"
-            ? JSON.parse(p.atributos)
-            : p.atributos;
-        if (!Array.isArray(pAttrs) || !pAttrs.includes(activeAttr))
-          return false;
-      } catch (e) {
-        return false;
-      }
-    }
-
-    return true;
-  });
-
-  filtered.sort((a, b) => {
-    switch (sortOrder) {
-      case "name-asc":
-        return a.name.localeCompare(b.name);
-      case "name-desc":
-        return b.name.localeCompare(a.name);
-      case "price-asc":
-        return a.price - b.price;
-      case "price-desc":
-        return b.price - a.price;
-      case "stock-asc":
-        return a.stock - b.stock;
-      case "stock-desc":
-        return b.stock - a.stock;
-      default:
-        return 0;
-    }
-  });
-
-  grid.innerHTML = filtered
-    .map(
-      (p) => `
-      <div class="product-card${p.inactive ? " inactive" : ""}${p.stock <= 0 ? " out-of-stock" : ""}" id="card-${p.id}" onclick="handleCardClick(event, ${p.id}, this)">
-          ${p.inactive ? '<div class="baja-pill">Baja</div>' : ""}
-          ${p.stock <= 0 ? '<div class="stock-pill" style="background:var(--red); color:white; position:absolute; top:10px; right:10px; padding:2px 8px; border-radius:10px; font-size:10px; font-weight:700;">AGOTADO</div>' : ""}
-          ${(() => {
-            const attr = p.atributos;
-            if (!attr) return "";
-            try {
-              const parsedAttr =
-                typeof attr === "string" ? JSON.parse(attr) : attr;
-              if (Array.isArray(parsedAttr) && parsedAttr.length > 0) {
-                return (
-                  '<div style="position:absolute; top:35px; left:5px; display:flex; flex-direction:column; gap:4px;">' +
-                  parsedAttr
-                    .map(
-                      (a) =>
-                        `<span style="background:var(--accent-soft); color:var(--accent); font-size:9px; padding:2px 6px; border-radius:4px; font-weight:700; border:1px solid var(--accent); white-space:nowrap;">${a}</span>`,
-                    )
-                    .join("") +
-                  "</div>"
-                );
-              }
-            } catch (e) {}
-            return "";
-          })()}
-          <div class="product-icon" style="background: white; border-radius: 8px;">
-              ${
-                p.icono && p.icono.startsWith("data:image")
-                  ? `<img src="${p.icono}" class="prod-img-tpv" alt="${p.name}">`
-                  : `<span class="product-emoji">${p.icono}</span>`
-              }
-          </div>
-          <div>
-              <div class="product-name">${p.name}</div>
-              <div class="product-sku">${p.codigo}</div>
-              <div class="product-stock" style="font-size:11px; color:${p.stock <= 5 ? "var(--red)" : "var(--text-muted)"}; font-weight:600;">Stock: ${p.stock}</div>
-          </div>
-          <div class="product-price" style="margin-top:auto">
-            ${(() => {
-              const eff = getEffectivePrice(p, socioActual);
-              if (Math.abs(eff - p.price) > 0.01) {
-                  return `<span style="text-decoration:line-through; font-size:0.8em; opacity:0.6; margin-right:4px;">${fmt(p.price)}</span> ${fmt(eff)}`;
-              }
-              return fmt(eff);
-            })()}
-          </div>
-          <div class="product-admin-bar">
-              <button class="admin-action edit" onclick="editProduct(event,${p.id})"><i class="fa-solid fa-pen-to-square"></i> ${I18N.edit}</button>
-              <button class="admin-action delete" onclick="deleteProduct(event,${p.id})"><i class="fa-solid fa-trash"></i> ${I18N.delete}</button>
-              <button class="admin-action baja" onclick="toggleBaja(event,${p.id})"><i class="fa-solid ${p.inactive ? "fa-arrow-up" : "fa-arrow-down"}"></i> ${p.inactive ? I18N.active : I18N.inactive}</button>
-          </div>
-      </div>
-    `,
-    )
-    .join("");
-
-  grid.classList.toggle("is-admin", isAdmin);
+  if (window.app && typeof window.app.refreshUI === 'function') {
+      window.app.refreshUI();
+  } else {
+      // Supress warning during initial load noise
+      // console.warn("app.refreshUI not ready...");
+  }
 }
 
 function handleCardClick(e, id, el) {
@@ -500,8 +278,10 @@ function changeQty(cartKey, delta) {
 function clearCart() {
   // ── Estado del carrito ─────────────────────────────────────────────
   cart = {};
+  window.cart = cart;
   discountPct = 0;
   currentPromo = null;
+  window.currentPromo = null;
   currentPayments = [];
   localStorage.removeItem("tpv_cart");
 
@@ -510,6 +290,16 @@ function clearCart() {
   clienteSeleccionado = null;
   puntosCanjeados = 0;
   puntosDescuentoAmt = 0;
+  tipoClienteActual = "particular";
+
+  // ── UI: selección de tipo de cliente y botones ────────────────────
+  seleccionarTipoCliente("particular");
+
+  // ── UI: datos de empresa ──────────────────────────────────────────
+  const el_empresaNombre = document.getElementById("empresaNombre");
+  const el_empresaNif    = document.getElementById("empresaNif");
+  if (el_empresaNombre) el_empresaNombre.value = "";
+  if (el_empresaNif)    el_empresaNif.value = "";
 
   // ── UI: cupón de descuento ─────────────────────────────────────────
   const el_discountCode = document.getElementById("discountCode");
@@ -528,10 +318,12 @@ function clearCart() {
   if (el_btnAddSocio) el_btnAddSocio.classList.add("d-none");
 
   // ── UI: búsqueda de cliente genérico ──────────────────────────────
-  const el_clienteSearch = document.getElementById("clienteBusquedaInput");
-  const el_clienteResult = document.getElementById("clienteBusquedaResult");
+  const el_clienteSearch = document.getElementById("clienteSearch");
+  const el_clienteResult = document.getElementById("clienteResultados");
+  const el_btnAddCliente = document.getElementById("btnAddCliente");
   if (el_clienteSearch) el_clienteSearch.value = "";
   if (el_clienteResult) el_clienteResult.innerHTML = "";
+  if (el_btnAddCliente) el_btnAddCliente.classList.add("d-none");
 
   // ── UI: vales del cliente ─────────────────────────────────────────
   const el_valesContainer = document.getElementById("clienteValesContainer");
@@ -549,349 +341,31 @@ function clearCart() {
 }
 
 
-function postponeSale() {
-  if (Object.keys(cart).length === 0) {
-    showToast(
-      '<i class="fa-solid fa-circle-exclamation"></i> ' + I18N.cartEmpty,
-    );
-    return;
-  }
-
-  postponedSale = {
-    cart: JSON.parse(JSON.stringify(cart)),
-    discountPct,
-    currentPromo,
-    socioActual,
-    selectedPayment,
-  };
-
-  sessionStorage.setItem("postponedSale", JSON.stringify(postponedSale));
-  clearCart();
-  updatePostponeUI();
-  showToast('<i class="fa-solid fa-pause"></i> ' + I18N.salePostponed);
-}
-
-function resumeSale() {
-  if (!postponedSale) return;
-
-  if (Object.keys(cart).length > 0) {
-    if (
-      !confirm(
-        I18N.confirmResume,
-      )
-    )
-      return;
-  }
-
-  cart = postponedSale.cart;
-  discountPct = postponedSale.discountPct;
-  currentPromo = postponedSale.currentPromo;
-  socioActual = postponedSale.socioActual;
-  selectedPayment = postponedSale.selectedPayment;
-
-  postponedSale = null;
-  sessionStorage.removeItem("postponedSale");
-
-  if (currentPromo) {
-    const el_discountCode = document.getElementById("discountCode");
-    if (el_discountCode) el_discountCode.value = currentPromo.code;
-  }
-
-  updatePostponeUI();
-  renderCart();
-  showToast('<i class="fa-solid fa-play"></i> ' + I18N.saleResumed);
-}
-
-function updatePostponeUI() {
-  const btnResume = document.getElementById("btnResumeSale");
-  if (btnResume) {
-    btnResume.style.display = postponedSale ? "flex" : "none";
-  }
-}
+// [LEGACY] Sales postponement moved to CartManager.js / app.js
 
 // ── Auto-aplicación de promociones de pack (sin código) ───────────────────────
 function autoApplyBundlePromos() {
-  // Si ya hay una promo manual activa (con código), no la pisamos
-  if (currentPromo && currentPromo.codigo) return;
-
-  const items = Object.values(cart);
-  if (!items.length) {
-    if (currentPromo && !currentPromo._manual) currentPromo = null;
-    return;
-  }
-
-  // Agrupar cantidades por id base del producto (suma de todas sus variantes)
-  const qtyByBaseId = {};
-  const catByBaseId = {};
-  items.forEach((item) => {
-    qtyByBaseId[item.id] = (qtyByBaseId[item.id] || 0) + item.qty;
-    catByBaseId[item.id] = item.cat;
-  });
-
-  // Buscar la primera promo de pack sin código que aplique al carrito
-  const autoPromo = PROMOS.find((p) => {
-    if (p.tipo !== "bundle" && p.tipo !== "fixed_bundle") return false;
-    if (p.codigo) return false;
-
-    const buyQty = parseInt(p.bundle_buy_qty) || 0;
-    if (buyQty < 2) return false;
-
-    // Comprobar si algún producto (suma de variantes) activa la promo
-    return Object.entries(qtyByBaseId).some(([baseId, totalQty]) => {
-      if (totalQty < buyQty) return false;
-      if (!p.id_producto && !p.categoria_code) return true;
-      if (p.id_producto && p.id_producto == baseId) return true;
-      if (p.categoria_code && p.categoria_code === catByBaseId[baseId])
-        return true;
-      return false;
-    });
-  });
-
-  if (autoPromo) {
-    if (!currentPromo || currentPromo.id !== autoPromo.id) {
-      currentPromo = { ...autoPromo, _manual: false };
-    }
-  } else {
-    if (currentPromo && !currentPromo._manual) currentPromo = null;
+  if (window.CartManager) {
+    window.CartManager.autoApplyBundles();
   }
 }
 
 function renderCart() {
-  // Guardar estado en localStorage
-  localStorage.setItem("tpv_cart", JSON.stringify(cart));
-
-  // Auto-aplicar promos de pack antes de calcular totales
-  autoApplyBundlePromos();
-
-  const items = Object.values(cart);
-  const container = document.getElementById("orderItems");
-  const orderCountEl = document.getElementById("orderCount");
-
-  if (!container || !orderCountEl) return;
-
-  orderCountEl.textContent = items.reduce((a, b) => a + b.qty, 0);
-
-  if (!items.length) {
-    container.innerHTML = `
-      <div class="empty-cart">
-        <div class="empty-cart-icon"><i class="fa-solid fa-cart-shopping"></i></div>
-        <div>Añade productos<br>al pedido</div>
-      </div>`;
-    updateTotals(0);
-    return;
+  if (window.app && typeof window.app.refreshUI === 'function') {
+      window.app.refreshUI();
   }
-
-  container.innerHTML = items
-    .map(
-      (item) => `
-      <div class="order-item">
-        <span class="order-item-emoji">
-          ${
-            item.icono && item.icono.startsWith("data:image")
-              ? `<img src="${item.icono}" class="order-item-img" alt="${item.name}">`
-              : item.icono
-          }
-        </span>
-        <div class="order-item-info">
-          <div class="order-item-name">${item.name}</div>
-          ${
-            item.variant
-              ? `<div class="order-item-variant"><i class="fa-solid fa-tag"></i> ${item.variant}</div>`
-              : ""
-          }
-          <div class="order-item-price">${fmt(item.price)} × ${item.qty}</div>
-        </div>
-        <div class="qty-ctrl">
-          <button class="qty-btn" onclick="changeQty('${item.cartKey || item.id}', -1)"><i class="fa-solid fa-minus"></i></button>
-          <span class="qty-val">${item.qty}</span>
-          <button class="qty-btn" onclick="changeQty('${item.cartKey || item.id}', +1)"><i class="fa-solid fa-plus"></i></button>
-        </div>
-        <div class="order-item-total">${fmt(item.price * item.qty)}</div>
-      </div>
-    `,
-    )
-    .join("");
-
-  const subtotal = items.reduce((a, b) => a + b.price * b.qty, 0);
-  updateTotals(subtotal);
-  updateMixSummary();
 }
 
-function updateTotals(initialSubtotal) {
-  const items = Object.values(cart);
-  let subtotal = 0;
-  let bundleDiscountTotal = 0;
-
-  // 1. Calcular descuentos por PACK (2x1, 3 por 10€, etc.)
-  // Sumamos el subtotal por ítem primero
-  items.forEach((item) => {
-    subtotal += item.price * item.qty;
-  });
-
-  if (
-    currentPromo &&
-    (currentPromo.tipo === "bundle" || currentPromo.tipo === "fixed_bundle")
-  ) {
-    // Agrupar ítems por id base de producto (para manejar variantes)
-    const groups = {};
-    items.forEach((item) => {
-      const key = item.id;
-      if (!groups[key])
-        groups[key] = { baseId: item.id, cat: item.cat, units: [] };
-      for (let i = 0; i < item.qty; i++) groups[key].units.push(item.price);
-    });
-
-    Object.values(groups).forEach((group) => {
-      let promoApplies = false;
-      if (currentPromo.id_producto && currentPromo.id_producto == group.baseId)
-        promoApplies = true;
-      else if (
-        currentPromo.categoria_code &&
-        currentPromo.categoria_code === group.cat
-      )
-        promoApplies = true;
-      else if (!currentPromo.id_producto && !currentPromo.categoria_code)
-        promoApplies = true;
-
-      if (!promoApplies) return;
-
-      const buyQty = parseInt(currentPromo.bundle_buy_qty) || 0;
-      const payQty = parseInt(currentPromo.bundle_pay_qty) || 0;
-      const totalQty = group.units.length;
-
-      if (currentPromo.tipo === "bundle" && buyQty > 0 && payQty > 0) {
-        const sets = Math.floor(totalQty / buyQty);
-        const freeUnits = sets * (buyQty - payQty);
-        // La/s unidad/es más barata/s en cada set son las gratis
-        const sorted = [...group.units].sort((a, b) => a - b);
-        bundleDiscountTotal += sorted
-          .slice(0, freeUnits)
-          .reduce((s, p) => s + p, 0);
-      } else if (currentPromo.tipo === "fixed_bundle" && buyQty > 0) {
-        const sets = Math.floor(totalQty / buyQty);
-        const avgPrice = group.units.reduce((s, p) => s + p, 0) / totalQty;
-        const normalPrice = sets * buyQty * avgPrice;
-        const bundlePrice = sets * parseFloat(currentPromo.valor);
-        if (normalPrice > bundlePrice)
-          bundleDiscountTotal += normalPrice - bundlePrice;
-      }
-    });
-  }
-
-  // 2. Aplicar descuento global (cupón % o importe fijo sobre lo que queda)
-  const subtotalAfterBundles = subtotal - bundleDiscountTotal;
-  let generalDiscount = 0;
-
-  if (
-    currentPromo &&
-    (currentPromo.tipo === "percent" || currentPromo.tipo === "amount")
-  ) {
-    if (currentPromo.tipo === "percent") {
-      generalDiscount = (subtotalAfterBundles * currentPromo.valor) / 100;
-    } else {
-      generalDiscount = Math.min(subtotalAfterBundles, currentPromo.valor);
+function updatePostponeUI() {
+    if (window.app && typeof window.app.updatePostponeUI === 'function') {
+        window.app.updatePostponeUI();
     }
-  }
+}
 
-  // Descuento de socio (5% sobre el total tras otros descuentos)
-  const socioAmt =
-    socioActual && socioActual.es_socio
-      ? (subtotalAfterBundles - generalDiscount) * (SOCIO_DISCOUNT / 100)
-      : 0;
-
-  const puntosAmt = typeof puntosDescuentoAmt !== "undefined" ? puntosDescuentoAmt : 0;
-  const totalDiscount = bundleDiscountTotal + generalDiscount + socioAmt + puntosAmt;
-  const subtotalFinal = Math.max(0, subtotal - totalDiscount);
-
-  // Factor de prorrateo para el IVA (si el total tiene descuento, el IVA baja proporcionalmente)
-  const discountFactor = subtotal > 0 ? subtotalFinal / subtotal : 1;
-
-  // 3. Desglose de IVA por tipos para la UI
-  const ivaGroups = {};
-  items.forEach((item) => {
-    const rate = parseFloat(item.iva || 21);
-    const itemOrigSubtotal = item.price * item.qty;
-    const itemDiscounted = itemOrigSubtotal * discountFactor;
-    // Si el precio ya incluye IVA (PVP), el IVA contenido es: P * (iva/121)
-    const itemBase = itemDiscounted / (1 + rate / 100);
-    const itemTax = itemDiscounted - itemBase;
-
-    if (!ivaGroups[rate]) {
-      ivaGroups[rate] = { base: 0, tax: 0 };
+function updateTotals() {
+    if (window.app && typeof window.app.updateTotals === 'function') {
+        window.app.updateTotals();
     }
-    ivaGroups[rate].base += itemBase;
-    ivaGroups[rate].tax += itemTax;
-  });
-
-  const totalVat = Object.values(ivaGroups).reduce((acc, g) => acc + g.tax, 0);
-  const total = subtotalFinal; // El total es el subtotal tras descuentos, ya incluye IVA (PVP)
-  const baseImponible = subtotalFinal - totalVat;
-
-  // Actualizar UI
-  const elSubtotal = document.getElementById("subtotal");
-  const elTotalAmt = document.getElementById("totalAmt");
-  const elChargeTotal = document.getElementById("chargeTotal");
-  const elDiscountAmt = document.getElementById("discountAmt");
-  const elIvaBreakdown = document.getElementById("ivaBreakdown");
-
-  if (!elSubtotal) return;
-
-  // Mostramos la Base Imponible en el campo Subtotal
-  elSubtotal.textContent = fmt(baseImponible);
-
-  if (elTotalAmt) elTotalAmt.textContent = fmt(total);
-  if (elChargeTotal) elChargeTotal.textContent = fmt(total);
-  if (elDiscountAmt) elDiscountAmt.textContent = "-" + fmt(totalDiscount);
-
-  const el_discountRow = document.getElementById("discountRow");
-  if (el_discountRow) {
-    el_discountRow.style.display = totalDiscount > 0 ? "flex" : "none";
-  }
-
-  // Renderizar desglose de IVA con el nuevo formato (Base por separado del IVA)
-  if (elIvaBreakdown) {
-    const rowSubtotal = document.getElementById("rowSubtotal");
-    if (rowSubtotal) rowSubtotal.style.display = "none";
-
-    elIvaBreakdown.innerHTML = Object.entries(ivaGroups)
-      .map(
-        ([rate, data]) => `
-        <div class="total-row" style="margin-bottom: 2px;">
-          <span>Base imponible (${rate}%)</span>
-          <span>${fmt(data.base)}</span>
-        </div>
-        <div class="total-row" style="margin-bottom: 8px; border-bottom: 1px solid rgba(0,0,0,0.05); padding-bottom: 4px;">
-          <span>IVA ${rate}%</span>
-          <span>${fmt(data.tax)}</span>
-        </div>
-      `,
-      )
-      .join("");
-  }
-
-  const chargeBtn = document.getElementById("chargeBtn");
-  if (chargeBtn) chargeBtn.disabled = subtotal === 0;
-
-  // Sincronizar total global para el modal de cobro
-  totalVentaActual = total;
-
-  // Factura obligatoria si total >= 3000€
-  const toggleFactura = document.getElementById("facturaToggle");
-  if (toggleFactura) {
-    if (total >= 3000) {
-      toggleFactura.checked = true;
-      toggleFactura.disabled = true;
-    } else {
-      toggleFactura.disabled = false;
-    }
-  }
-
-
-
-
-  if (selectedPayment === "a_cuenta") {
-    validarACuenta();
-  }
 }
 
 // ── Pago ───────────────────────────────────────────────────────────────────────
@@ -1033,9 +507,16 @@ function applyDiscount() {
 }
 
 
+// Global trap handle for the checkout modal
+let _clienteModalTrap = null;
+
 function cerrarModalCliente() {
   document.getElementById("clienteModal").classList.remove("visible");
   document.querySelectorAll(".form-error").forEach((el) => (el.innerText = ""));
+  if (window.FocusTrap && _clienteModalTrap) {
+    window.FocusTrap.deactivate(_clienteModalTrap);
+    _clienteModalTrap = null;
+  }
 }
 
 function seleccionarTipoCliente(tipo) {
@@ -1045,13 +526,16 @@ function seleccionarTipoCliente(tipo) {
   const btnE = document.getElementById("btnEmpresa");
   const btnS = document.getElementById("btnSocio");
 
-  btnP.classList.remove("selected-type");
-  btnE.classList.remove("selected-type");
+  if (btnP) btnP.classList.remove("selected-type");
+  if (btnE) btnE.classList.remove("selected-type");
   if (btnS) btnS.classList.remove("selected-type");
 
-  document.getElementById("empresaDatos").classList.add("d-none");
-  document.getElementById("socioBusqueda").classList.add("d-none");
-  document.getElementById("socioRegistro").classList.add("d-none");
+  const empD = document.getElementById("empresaDatos");
+  if (empD) empD.classList.add("d-none");
+  const socB = document.getElementById("socioBusqueda");
+  if (socB) socB.classList.add("d-none");
+  const socR = document.getElementById("socioRegistro");
+  if (socR) socR.classList.add("d-none");
 
   const gen = document.getElementById("clienteBusquedaGenerica");
   if (gen) gen.classList.add("d-none");
@@ -1062,7 +546,7 @@ function seleccionarTipoCliente(tipo) {
   clienteSeleccionado = null;
 
   if (tipo === "particular") {
-    btnP.classList.add("selected-type");
+    if (btnP) btnP.classList.add("selected-type");
     socioActual = null;
     if (gen) gen.classList.remove("d-none");
     // [NUEVO] Si es una venta rápida de particular (efectivo), enfocamos el monto directamente
@@ -1077,12 +561,18 @@ function seleccionarTipoCliente(tipo) {
     }
   } else if (tipo === "socio") {
     if (btnS) btnS.classList.add("selected-type");
-    document.getElementById("socioBusqueda").classList.remove("d-none");
-    setTimeout(() => document.getElementById("socioSearch").focus(), 100);
+    const elSocioBusqueda = document.getElementById("socioBusqueda");
+    if (elSocioBusqueda) elSocioBusqueda.classList.remove("d-none");
+    
+    const elSocioSearch = document.getElementById("socioSearch");
+    if (elSocioSearch) setTimeout(() => elSocioSearch.focus(), 100);
   } else {
-    btnE.classList.add("selected-type");
-    document.getElementById("empresaDatos").classList.remove("d-none");
-    setTimeout(() => document.getElementById("empresaNombre").focus(), 100);
+    if (btnE) btnE.classList.add("selected-type");
+    const elEmpresaDatos = document.getElementById("empresaDatos");
+    if (elEmpresaDatos) elEmpresaDatos.classList.remove("d-none");
+    
+    const elEmpresaNombre = document.getElementById("empresaNombre");
+    if (elEmpresaNombre) setTimeout(() => elEmpresaNombre.focus(), 100);
     socioActual = null;
     if (gen) gen.classList.remove("d-none");
   }
@@ -1114,7 +604,12 @@ async function buscarSocio() {
     const r = await resp.json();
     if (r.ok) {
       socioActual = r.cliente;
-      info.innerHTML = `<i class="fa-solid fa-check-circle text-green"></i> ${r.cliente.nombre} (${r.cliente.nif})`;
+      // Construcción DOM segura: nombre y NIF son datos de usuario (anti-XSS)
+      info.innerHTML = '';
+      const iconSocio = document.createElement('i');
+      iconSocio.className = 'fa-solid fa-check-circle text-green';
+      info.appendChild(iconSocio);
+      info.appendChild(document.createTextNode(` ${r.cliente.nombre} (${r.cliente.nif})`));
       showToast(I18N.socioFound);
       cargarValesCliente(r.cliente.id);
       mostrarPuntosCliente(r.cliente);
@@ -1301,7 +796,7 @@ async function guardarNuevoSocio() {
   const nif = document.getElementById("newSocioNif").value.trim();
 
   if (!nombre || !nif) {
-    alert(I18N.nameNifRequired);
+    showCustomAlert("Error", I18N.nameNifRequired, "error");
     return;
   }
 
@@ -1331,33 +826,29 @@ async function guardarNuevoSocio() {
       document.getElementById("btnAddSocio").classList.add("d-none");
       renderCart();
     } else {
-      alert("Error al registrar: " + r.error);
+      showCustomAlert("Error", "Error al registrar: " + r.error, "error");
     }
   } catch (e) {
     console.error(e);
-    alert("Error de conexión");
+    showCustomAlert("Error", "Error de conexión", "error");
   }
 }
 
+/* 
+ * Migrated to PaymentManager.js 
+ */
+/*
 function mostrarRegistroCliente() {
   document.getElementById("clienteBusquedaGenerica").classList.add("d-none");
   document.getElementById("clienteRegistro").classList.remove("d-none");
   const searchTxt = document.getElementById("clienteSearch").value.trim();
   if (searchTxt) {
-    // Si parece un NIF (letra al final o principio y números), lo ponemos en NIF
     if (/^[0-9XYZ]/.test(searchTxt)) {
       document.getElementById("newClienteNif").value = searchTxt;
     } else {
       document.getElementById("newClienteNombre").value = searchTxt;
     }
   }
-  const tit = document.getElementById("clienteRegistroTitulo");
-  if (tit)
-    tit.innerText =
-      I18N.newLabel.replace('(', '').replace(')', '') + ' ' +
-      (tipoClienteActual === "empresa"
-        ? I18N.empresa
-        : I18N.particular);
 }
 
 function cancelarRegistroCliente() {
@@ -1366,59 +857,9 @@ function cancelarRegistroCliente() {
 }
 
 async function guardarNuevoCliente() {
-  const nombre = document.getElementById("newClienteNombre").value.trim();
-  const nif = document.getElementById("newClienteNif").value.trim();
-  const tipo = tipoClienteActual; // particular o empresa
-
-  if (!nombre) {
-    alert(I18N.fieldRequired);
-    return;
-  }
-
-  try {
-    const resp = await fetch("api/gestionCliente.php", {
-      method: "POST",
-      body: JSON.stringify({
-        accion: "registrar",
-        nombre,
-        nif,
-        tipo,
-        es_socio: 0,
-      }),
-    });
-    const r = await resp.json();
-    if (r.ok) {
-      showToast("Cliente registrado y seleccionado");
-      const clientObj = {
-        id: r.id,
-        nombre,
-        nif,
-        tipo,
-        es_socio: false,
-      };
-      clienteSeleccionado = clientObj;
-
-      if (tipo === "empresa") {
-        document.getElementById("empresaNombre").value = nombre;
-        document.getElementById("empresaNif").value = nif;
-      }
-
-      cancelarRegistroCliente();
-      const resEl = document.getElementById("clienteResultados");
-      if (resEl)
-        resEl.innerHTML = `<i class="fa-solid fa-check-circle text-green"></i> ${nombre} (NUEVO)`;
-      const btnAdd = document.getElementById("btnAddCliente");
-      if (btnAdd) btnAdd.classList.add("d-none");
-
-      renderCart();
-    } else {
-      alert("Error al registrar: " + r.error);
-    }
-  } catch (e) {
-    console.error(e);
-    alert("Error de conexión");
-  }
+  // ... (Full implementation migrated)
 }
+*/
 
 async function buscarClienteGuardado() {
   const term = document.getElementById("clienteSearch")?.value.trim() || "";
@@ -1506,485 +947,20 @@ function seleccionarClienteGuardado(idx) {
   showToast(I18N.clientIdentified);
   validarACuenta();
   renderCart(); // Por si el cliente tiene tarifas especiales o es socio
-  updateMixSummary(); // Actualizar el resumen si hay
+  app.updateMixSummary(); // Actualizar el resumen si hay
 }
 
-async function processPayment() {
-  // Sincronizar totalVentaActual desde el DOM (fuente de verdad actualizada por renderCart/UiController)
-  const elTotalAmt = document.getElementById("totalAmt");
-  if (elTotalAmt) {
-    totalVentaActual = parseFloat(elTotalAmt.textContent.replace(/[^\d,-]/g, '').replace(',', '.')) || 0;
-  }
-
-  // 1. Sincronizar contexto y método desde el sidebar
-  const activeSidebarBtn = document.querySelector(".pay-btn.selected");
-  if (activeSidebarBtn) {
-    checkoutContext = activeSidebarBtn.dataset.method;
-    selectedPayment = checkoutContext;
-  }
-
-  // 2. Resetear selección de cliente a Particular por defecto (si no hay uno ya activo)
-  if (!clienteSeleccionado && !socioActual) {
-    document.getElementById("btnParticular").click();
-  }
-  
-  // currentPayments = []; // [ELIMINADO] No resetear aquí, se limpia en clearCart o al finalizar éxito
-
-  // 2. Si hay un vale aplicado, lo añadimos como primer pago
-  if (valeAplicado) {
-    currentPayments.push({
-      metodo: "vale",
-      importe: Math.min(totalVentaActual, parseFloat(valeAplicado.importe_restante)),
-      label: `Vale: ${valeAplicado.codigo}`,
-    });
-  }
-
-  // (Points are now handled as a discount in CartManager, so they don't enter currentPayments)
-
-  // 3. Pre-añadir el método seleccionado en el sidebar (Efectivo por defecto)
-  const totalPagadoValesPuntos = currentPayments.reduce((acc, p) => acc + p.importe, 0);
-  const pendiente = Math.max(0, totalVentaActual - totalPagadoValesPuntos);
-
-  // Pre-añadimos siempre que no sea mixto (incluso efectivo ahora para simplificar el modal)
-  if (pendiente > 0.01 && selectedPayment && selectedPayment !== 'mixto') {
-    // Si ya existe un pago de este método, lo actualizamos en lugar de añadir otro
-    const existing = currentPayments.find(p => p.metodo === selectedPayment);
-    if (existing) {
-        existing.importe = pendiente;
-        existing.recibido = selectedPayment === 'efectivo' ? 0 : pendiente;
-    } else {
-        // Si es a_cuenta, solo lo pre-añadimos si hay un cliente seleccionado
-        const tieneCliente = !!(clienteSeleccionado || socioActual);
-        
-        if (selectedPayment !== 'a_cuenta' || tieneCliente) {
-          currentPayments.push({
-            metodo: selectedPayment,
-            importe: pendiente,
-            recibido: selectedPayment === 'efectivo' ? 0 : pendiente,
-            label: selectedPayment.charAt(0).toUpperCase() + selectedPayment.slice(1).replace('_', ' ')
-          });
-        }
-    }
-  }
-
-  abrirModalPago();
-  updateMixSummary();
-  
-  // 4. Lógica de UI Condicional: Ocultar selector si no es mixto
-  const el_selector = document.getElementById("selectorMetodoPago");
-  const el_pagoMontoArea = document.getElementById("pagoMontoArea");
-  const el_btnAnadir = el_pagoMontoArea ? el_pagoMontoArea.querySelector("button") : null;
-  const el_labelMonto = document.getElementById("labelMontoPago");
-  const el_gestionArea = document.getElementById("cobroMixtoGestion");
-
-  // Función helper para mostrar un elemento superando el !important de updateMixSummary
-  function forceShow(el) {
-    if (!el) return;
-    el.style.removeProperty("display");
-    el.classList.remove("d-none");
-    el.style.display = "flex";
-  }
-  function forceHide(el) {
-    if (!el) return;
-    el.style.setProperty("display", "none", "important");
-  }
-
-  if (selectedPayment === 'mixto') {
-      if (el_selector) el_selector.classList.remove("d-none");
-      if (el_gestionArea) el_gestionArea.classList.remove("d-none");
-      if (el_labelMonto) el_labelMonto.textContent = "Importe a añadir (€)";
-      forceShow(el_pagoMontoArea);
-      if (el_btnAnadir) el_btnAnadir.classList.remove("d-none");
-  } else {
-      // Es un método individual: ocultar selector de métodos del modal
-      if (el_selector) el_selector.classList.add("d-none");
-
-      if (selectedPayment === 'efectivo') {
-          if (el_labelMonto) el_labelMonto.textContent = "Efectivo Recibido (€)";
-          if (el_gestionArea) el_gestionArea.classList.remove("d-none");
-          // Mostrar área de input superando !important
-          forceShow(el_pagoMontoArea);
-          // Ocultar botón "Añadir" pero mantener el input visible
-          if (el_btnAnadir) el_btnAnadir.classList.add("d-none");
-          // Seleccionar efectivo en el selector de modal (aunque esté oculto)
-          const btnEfe = document.getElementById("btnEfectivo");
-          if (btnEfe) selectModalPayment(btnEfe);
-          // Focus en el input de monto
-          setTimeout(() => {
-            const inputMonto = document.getElementById("mixPagoMonto");
-            if (inputMonto) { inputMonto.value = ""; inputMonto.focus(); }
-          }, 100);
-      } else if (selectedPayment === 'a_cuenta') {
-          const tieneCliente = !!(clienteSeleccionado || socioActual);
-          if (tieneCliente) {
-              if (el_gestionArea) el_gestionArea.classList.add("d-none");
-          } else {
-              if (el_labelMonto) el_labelMonto.textContent = "Importe Fiado";
-              if (el_gestionArea) el_gestionArea.classList.remove("d-none");
-              forceShow(el_pagoMontoArea);
-              const btnAcu = document.getElementById("btnAcuenta");
-              if (btnAcu) selectModalPayment(btnAcu);
-          }
-      } else {
-          // Tarjeta, Bizum: ya se añadieron automáticamente arriba, ocultar área de input
-          forceHide(el_pagoMontoArea);
-          if (el_gestionArea) el_gestionArea.classList.add("d-none");
-      }
-  }
-}
-
- // ── Pagos Mixtos (Split Payments) ─────────────────────────────────────────────
-function updateMixSummary() {
-  // El total de la venta es el bruto (sincronizado con AppState)
-  totalVentaActual = (typeof AppState !== 'undefined' && AppState.cart) ? CartManager.calculateTotals().total : totalVentaActual;
-  const displayTotal = totalVentaActual; 
-
-  // El total pagado incluye TODO (puntos, vales, efectivo, etc.)
-  const totalPagado = currentPayments.reduce((acc, p) => acc + p.importe, 0);
-
-  const pendiente = Math.max(0, displayTotal - totalPagado);
-
-  // Sincronizar input de monto si estamos en modo pago único (A cuenta, Efectivo...)
-  const inputMonto = document.getElementById("mixPagoMonto");
-  if (inputMonto && checkoutContext !== 'mixto') {
-      if (selectedPayment === 'a_cuenta' || selectedPayment === 'efectivo') {
-          // Ambos por defecto muestran el total operativo (en a_cuenta es lo fiado, en efectivo lo pagado)
-          inputMonto.value = displayTotal.toFixed(2);
-      }
-  }
-
-  const el_Total = document.getElementById("mixTotalVenta");
-  const el_Pagado = document.getElementById("mixTotalPagado");
-  const el_Pendiente = document.getElementById("mixTotalPendiente");
-
-  if (el_Total) el_Total.textContent = fmt(displayTotal);
-  if (el_Pagado) el_Pagado.textContent = fmt(totalPagado);
-  
-  const el_PendienteRow = el_Pendiente?.parentElement;
-  const el_Lista = document.getElementById("mixListaPagos");
-  const el_BtnAdd = document.getElementById("mixBtnAddPago");
-
-  if (el_Pendiente) {
-    el_Pendiente.textContent = fmt(pendiente);
-    el_Pendiente.parentElement.classList.toggle("text-red", pendiente > 0.01);
-    el_Pendiente.parentElement.classList.toggle("text-green", pendiente <= 0.01);
-  }
-
-  // Ejecutar feedback inicial
-  calcularCambioMix();
-
-  // Si no es mixto, ocultamos la lista de pagos, el selector y el botón de AÑADIR (petición usuario)
-  if (checkoutContext !== 'mixto') {
-      if (el_Lista) el_Lista.style.setProperty("display", "none", "important");
-      if (el_PendienteRow) el_PendienteRow.style.setProperty("display", "none", "important");
-      if (el_BtnAdd) el_BtnAdd.style.setProperty("display", "none", "important");
-      
-      const el_selector = document.getElementById("selectorMetodoPago");
-      if (el_selector) el_selector.style.setProperty("display", "none", "important");
-
-      // Ocultar también cualquier fila extra del resumen excepto el Total y el Pendiente
-      const resContainer = document.getElementById("pagosMixResumen");
-      if (resContainer) {
-          Array.from(resContainer.children).forEach((child, idx) => {
-              // Dejamos el primer hijo (Total) y el tercero (Pendiente) visibles
-              if (idx !== 0 && idx !== 2) child.style.setProperty("display", "none", "important");
-              else child.style.display = "";
-          });
-      }
-  } else {
-      if (el_Lista) el_Lista.style.display = "";
-      if (el_PendienteRow) el_PendienteRow.style.display = "";
-      if (el_BtnAdd) el_BtnAdd.style.display = "";
-      const el_selector = document.getElementById("selectorMetodoPago");
-      if (el_selector) el_selector.style.display = "";
-
-      // [NUEVO] Restricción: No permitir 'A Cuenta' en cobros mixtos
-      const bAcu = document.getElementById("btnAcuenta");
-      if (bAcu) bAcu.style.setProperty("display", "none", "important");
-
-      const resContainer = document.getElementById("pagosMixResumen");
-      if (resContainer) {
-          Array.from(resContainer.children).forEach((child) => {
-              child.style.display = "";
-          });
-      }
-  }
-
-  // Si ya no queda nada, habilitar botón de cobrar
-  const btnFinal = document.getElementById("confirmarClienteBtn");
-  if (btnFinal) {
-    // Si es "A cuenta", permitimos cobrar siempre que haya un cliente (la validación final la hace el Manager)
-    // Caso contrario, cobro normal/mixto: habilitamos solo si el pendiente es 0.
-    const esAcuenta = (checkoutContext === 'a_cuenta' || (selectedPayment === 'a_cuenta' && checkoutContext !== 'mixto'));
-    btnFinal.disabled = esAcuenta ? false : (pendiente > 0.01);
-  }
-
-  renderPaymentsList();
-}
-
-function renderPaymentsList() {
-  const container = document.getElementById("mixListaPagos");
-  if (!container) return;
-
-  if (currentPayments.length === 0) {
-    container.innerHTML = `<div class="p-12 text-center opacity-50 fs-12 italic border-2 br-8 dashed" style="border-style: dashed;">${I18N.noPayments}</div>`;
-    return;
-  }
-
-  const icons = {
-    efectivo: "fa-money-bill-1",
-    tarjeta: "fa-credit-card",
-    bizum: "fa-mobile-screen",
-    a_cuenta: "fa-file-invoice-dollar",
-    vale: "fa-ticket",
-    puntos: "fa-star"
-  };
-
-  container.innerHTML = currentPayments
-    .map(
-      (p, index) => {
-        const hasCambio = (p.metodo === 'efectivo' && p.recibido > p.importe + 0.005);
-        const cambio = hasCambio ? (p.recibido - p.importe) : 0;
-        return `
-    <div class="d-flex ai-center jc-space-between p-8-12 bg-surface1 br-8 border-1 mb-4 animate-slide-right">
-        <div class="d-flex ai-center gap-8 flex-wrap">
-            <i class="fa-solid ${icons[p.metodo] || "fa-wallet"} opacity-70"></i>
-            <span class="badge ${p.metodo === "efectivo" ? "bg-accent text-white" : "bg-surface3 border-1 text-primary"} p-2-6 br-4 fs-9 font-bold uppercase">${I18N[p.metodo] || p.metodo.replace("_", " ")}</span>
-            <span class="font-mono font-bold">${fmt(p.importe)}</span>
-            ${hasCambio ? `<span class="fs-10 text-muted">(Entregado: ${fmt(p.recibido)} · <span class="text-green font-bold">Cambio: ${fmt(cambio)}</span>)</span>` : ''}
-        </div>
-        <button onclick="removePagoMixto(${index})" class="text-red border-none bg-none cursor-pointer hover-scale p-4">
-            <i class="fa-solid fa-trash-can"></i>
-        </button>
-    </div>
-  `;
-      }
-    )
-    .join("");
-}
-
-function selectModalPayment(btn) {
-  // Limpiar selección previa de botones del selector
-  document.querySelectorAll(".btn-tpv-method").forEach((b) => {
-    b.classList.remove("border-accent", "bg-accent-soft");
-    b.style.borderColor = "";
-  });
-
-  btn.classList.add("border-accent", "bg-accent-soft");
-  btn.style.borderColor = "var(--accent)";
-
-  const metodo = btn.id.replace("btn", "").toLowerCase();
-  selectedPayment = metodo === "acuenta" ? "a_cuenta" : metodo;
-
-  // Mostrar área de monto forzando sobre el !important de updateMixSummary
-  const area = document.getElementById("pagoMontoArea");
-  if (area) {
-    area.style.removeProperty("display");
-    area.classList.remove("d-none");
-    area.style.display = "block";
-  }
-
-  // Ajustar labels y visibilidad de extras
-  document.getElementById("extraEfectivo").classList.toggle("d-none", metodo !== "efectivo");
-  document.getElementById("extraAcuenta").classList.toggle("d-none", metodo !== "acuenta");
-
-  // Pre-rellenar con lo que falta
-  const totalPagado = currentPayments.reduce((acc, p) => acc + p.importe, 0);
-  const pendiente = Math.max(0, totalVentaActual - totalPagado);
-  const inputMonto = document.getElementById("mixPagoMonto");
-  if (inputMonto) {
-    inputMonto.value = pendiente.toFixed(2);
-    inputMonto.focus();
-    inputMonto.select();
-    calcularCambioMix();
-  }
-
-  // Auto-scroll para que el input sea visible en el modal
-  setTimeout(() => {
-    if (area) area.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  }, 50);
-}
-
-
-function addPagoMixto() {
-  const inputMonto = document.getElementById("mixPagoMonto");
-  const importeIngresado = parseFloat(inputMonto.value) || 0;
-
-  // VALIDACIÓN: El método de pago debe ser uno válido.
-  // No se permite registrar pagos sin haber seleccionado Efectivo, Tarjeta o Bizum.
-  const metodosValidos = ['efectivo', 'tarjeta', 'bizum'];
-  if (!selectedPayment || !metodosValidos.includes(selectedPayment)) {
-    showToast(`<i class='fa-solid fa-hand-pointer'></i> Selecciona un método de pago (Efectivo, Tarjeta o Bizum)`, 'warning');
-    return;
-  }
-
-  if (importeIngresado <= 0) {
-    showToast(`<i class='fa-solid fa-circle-exclamation'></i> ${I18N.enterAmount}`);
-    return;
-  }
-
-  // Verificamos si es a_cuenta y si hay cliente
-  if (selectedPayment === "a_cuenta") {
-    const clienteId = tipoClienteActual === 'socio' ? (socioActual ? socioActual.id : null) : (clienteSeleccionado ? clienteSeleccionado.id : null);
-    if (!clienteId) {
-      document.getElementById("aCuentaAlertaCliente").classList.remove("d-none");
-      showToast(`<i class='fa-solid fa-user-xmark'></i> ${I18N.clientNotFound}`);
-      return;
-    }
-    const fecha = document.getElementById("aCuentaFechaLimite").value;
-    if (!fecha) {
-      showToast(`<i class='fa-solid fa-calendar-xmark'></i> ${I18N.enterDate}`);
-      return;
-    }
-  }
-
-  const totalPagado = currentPayments.reduce((acc, p) => acc + p.importe, 0);
-  const pendiente = Math.max(0, totalVentaActual - totalPagado);
-  
-  // Sincronizar contexto desde el sidebar (Back-up por si falló la global)
-  const activeSideBtn = document.querySelector(".pay-btn.selected");
-  const currentCtx = activeSideBtn ? activeSideBtn.dataset.method : checkoutContext;
-
-  // VALIDACIÓN SEGURIDAD: Si venimos de un modo individual "Efectivo", bloquear pagos parciales (petición usuario)
-  if (currentCtx === 'efectivo' && importeIngresado < pendiente) {
-    showToast(`<i class='fa-solid fa-circle-exclamation'></i> ${I18N.cashTotalRequired}`);
-    return;
-  }
-
-  // Para efectivo en modo mixto: el importe aplicado está limitado al pendiente,
-  // pero guardamos el recibido real para calcular el cambio.
-  const esEfectivo = (selectedPayment === "efectivo");
-  const importeAplicado = esEfectivo ? Math.min(importeIngresado, pendiente) : Math.min(importeIngresado, pendiente);
-  const recibidoReal = esEfectivo ? importeIngresado : importeAplicado;
-
-  // Añadir pago
-  currentPayments.push({
-    metodo: selectedPayment,
-    importe: importeAplicado,
-    recibido: recibidoReal,
-    fecha_limite: selectedPayment === "a_cuenta" ? document.getElementById("aCuentaFechaLimite").value : null,
-  });
-
-  // Limpiar y actualizar
-  inputMonto.value = "";
-  const cambioEl = document.getElementById("efectivoCambio");
-
-  // Si el cliente pagó de más en efectivo, mostrar el cambio en el modal
-  if (esEfectivo && recibidoReal > importeAplicado + 0.005) {
-    const cambio = recibidoReal - importeAplicado;
-    if (cambioEl) cambioEl.textContent = fmt(cambio);
-    showToast(`<i class='fa-solid fa-coins'></i> Cambio: ${fmt(cambio)}`, "success");
-  } else {
-    if (cambioEl) cambioEl.textContent = "0,00 €";
-    showToast(`<i class='fa-solid fa-circle-check'></i> ${I18N.paymentIdentified}`);
-  }
-
-  updateMixSummary();
-
-  // Resetear selección de botones
-  document.querySelectorAll(".btn-tpv-method").forEach((b) => {
-    b.classList.remove("border-accent", "bg-accent-soft");
-    b.style.borderColor = "";
-  });
-  document.getElementById("pagoMontoArea").classList.add("d-none");
-}
-
-function removePagoMixto(index) {
-  const pago = currentPayments[index];
-  if (pago && pago.metodo === "puntos") {
-    // Restaurar los globales de puntos si el usuario lo cancela
-    window.puntosCanjeados = 0;
-    window.puntosDescuentoAmt = 0;
-    
-    const area = document.getElementById("puntosCanjeArea");
-    const res = document.getElementById("puntosAplicadosResumen");
-    if (area) area.classList.remove("d-none");
-    if (res) res.classList.add("d-none");
-    
-    // Si quitarPuntosCanjeados existe globalmente (definido en PaymentManager o similar)
-    if (typeof quitarPuntosCanjeados === "function") {
-        quitarPuntosCanjeados();
-    }
-  }
-
-  currentPayments.splice(index, 1);
-  updateMixSummary();
-}
-
-function calcularCambioMix() {
-  const inputMonto = document.getElementById("mixPagoMonto");
-  const montoIngresado = parseFloat(inputMonto?.value) || 0;
-  
-  // Pendiente real = total - TODOS los pagos ya confirmados.
-  // En mixto puede haber varios pagos de distintos métodos; todos cuentan.
-  const totalPagadoConfirmado = currentPayments.reduce((acc, p) => acc + p.importe, 0);
-  const pendienteReal = Math.max(0, totalVentaActual - totalPagadoConfirmado);
-
-  const cambioEl = document.getElementById("efectivoCambio");
-  const feedbackEl = document.getElementById("mixPagoStatusFeedback");
-  if (!cambioEl) return;
-
-  if (selectedPayment === "efectivo") {
-      const falta  = pendienteReal - montoIngresado;
-      const cambio = Math.max(0, montoIngresado - pendienteReal);
-      if (feedbackEl) {
-          if (falta > 0.005) {
-              feedbackEl.className = "mt-8 p-10 br-8 text-center font-bold fs-13 bg-red-soft text-red";
-              feedbackEl.innerHTML = `<i class="fa-solid fa-hourglass-half"></i> Faltan: ${fmt(falta)}`;
-          } else if (cambio > 0.005) {
-              feedbackEl.className = "mt-8 p-10 br-8 text-center font-bold fs-13 bg-green-soft text-green";
-              feedbackEl.innerHTML = `<i class="fa-solid fa-coins"></i> Cambio a devolver: <strong>${fmt(cambio)}</strong>`;
-          } else if (montoIngresado > 0) {
-              feedbackEl.className = "mt-8 p-10 br-8 text-center font-bold fs-13 bg-green-soft text-green";
-              feedbackEl.innerHTML = `<i class="fa-solid fa-check-double"></i> Pago exacto`;
-          } else {
-              feedbackEl.innerHTML = "";
-          }
-      }
-
-    if (montoIngresado > 0 && checkoutContext === 'efectivo') {
-        const pagoEfeActual = currentPayments.find(p => p.metodo === 'efectivo');
-        if (pagoEfeActual) {
-            pagoEfeActual.recibido = montoIngresado;
-        }
-    }
-    cambioEl.textContent = fmt(Math.max(0, montoIngresado - pendienteReal));
-
-  } else if (selectedPayment === "a_cuenta") {
-      // Inversión lógica: montoIngresado es la DEUDA
-      const entregaHoy = Math.max(0, totalVentaActual - montoIngresado);
-      if (feedbackEl) {
-          feedbackEl.className = "mt-8 p-10 br-8 text-center font-bold fs-13 bg-accent-soft text-accent";
-          if (entregaHoy > 0.005) {
-              feedbackEl.innerHTML = `<i class="fa-solid fa-hand-holding-dollar"></i> Deuda: ${fmt(montoIngresado)} | Pago hoy: ${fmt(entregaHoy)}`;
-          } else {
-              feedbackEl.innerHTML = `<i class="fa-solid fa-file-invoice-dollar"></i> Todo fiado (${fmt(montoIngresado)})`;
-          }
-      }
-      cambioEl.textContent = "0,00 €";
-  } else {
-      if (feedbackEl) feedbackEl.innerHTML = "";
-      cambioEl.textContent = "0,00 €";
-  }
-
-  // [NUEVO] Sincronizar el pendiente de la barra lateral sin disparar el bucle recursivo.
-  // Solo actualizamos mientras el usuario teclea (montoIngresado > 0).
-  // Cuando el input está vacío, updateMixSummary ya puso el valor correcto.
-  if (montoIngresado > 0) {
-      const el_Pendiente = document.getElementById("mixTotalPendiente");
-      if (el_Pendiente) {
-          const pnd = (selectedPayment === 'a_cuenta') ? montoIngresado : Math.max(0, pendienteReal - montoIngresado);
-          el_Pendiente.textContent = fmt(pnd);
-          el_Pendiente.parentElement.classList.toggle("text-red", pnd > 0.01);
-      }
-  }
-}
 /**
  * Función auxiliar para calcular el total final del carrito (reutilizando la lógica de renderCart)
  */
 function calculateFinalTotal() {
   const items = Object.values(cart);
-  let subtotal = items.reduce((s, i) => s + i.price * i.qty, 0);
+  let subtotal = 0;
+  items.forEach((item) => {
+    const p = parseFloat(item.price || 0);
+    const q = parseInt(item.qty || 0);
+    subtotal += p * q;
+  });
 
   // Bundle discounts
   let bundleDiscountTotal = 0;
@@ -2065,8 +1041,23 @@ function calculateFinalTotal() {
 }
 
 function abrirModalPago() {
-  document.getElementById("clienteModal").classList.add("visible");
+  const modal = document.getElementById("clienteModal");
+  modal.classList.add("visible");
   validarACuenta();
+  if (window.FocusTrap) {
+    _clienteModalTrap = window.FocusTrap.activate(modal, cerrarModalCliente);
+  }
+
+  // [NUEVO] Enfocar el monto automáticamente si es efectivo
+  if (selectedPayment === 'efectivo') {
+    setTimeout(() => {
+      const input = document.getElementById("mixPagoMonto");
+      if (input) {
+        input.focus();
+        input.select();
+      }
+    }, 200);
+  }
 }
 
 /**
@@ -2170,7 +1161,7 @@ function mostrarTicket(v, isFromTPV = true) {
   if (btnAnular) {
     const isAbono = (v.tipo_documento || 'venta') === 'abono';
     btnAnular.style.display =
-      !isFromTPV && v.estado === "completada" && !isAbono ? "" : "none";
+      !isFromTPV && (v.estado === "completada" || v.estado === "parcialmente_devuelta") && !isAbono ? "" : "none";
     btnAnular.onclick = () =>
       abrirModalAnulacionTicket(v.numero_ticket, v.fecha, v.id_cliente);
   }
@@ -2318,6 +1309,7 @@ function mostrarTicket(v, isFromTPV = true) {
         gDate.setMonth(gDate.getMonth() + months);
         const isExpired = gDate < new Date();
         const gStr = gDate.toLocaleDateString("es-ES");
+        const cantDisponible = l.cantidad - (l.cantidad_devuelta || 0);
 
         return `
           <div style="display:flex; justify-content:space-between; padding: 10px 0; border-bottom: 1px solid var(--surface2); ${l.devuelta ? "opacity:0.6; background:rgba(192,57,43,0.05);" : ""}">
@@ -2326,6 +1318,16 @@ function mostrarTicket(v, isFromTPV = true) {
                 <div>
                   <span style="font-weight:600; ${l.devuelta ? "text-decoration:line-through;" : ""}">${l.nombre_producto}</span>
                   <span style="color:var(--text-muted); font-size:11px; margin-left:6px;">${l.codigo_producto}</span>
+                  <div style="display:flex; gap:4px; margin-top:2px;">
+                    ${(l.descuentos || []).filter(d => d.tipo_descuento === 'tarifa').map(t => {
+                      const tName = t.nombre || t.nombre_descuento || 'Tarifa';
+                      return `
+                        <span class="fs-9 px-6 py-2 br-4 bg-accent-soft text-accent fw-800 tt-uppercase d-inline-flex ai-center gap-4" style="border: 1px solid rgba(var(--accent-rgb), 0.1);">
+                          <i class="fa-solid fa-tag fs-8 opacity-70"></i> ${tName}
+                        </span>
+                      `;
+                    }).join("")}
+                  </div>
                 </div>
                 <span style="font-family:'DM Mono',monospace; font-weight:600;">${fmt(l.total_linea)}</span>
               </div>
@@ -2340,9 +1342,9 @@ function mostrarTicket(v, isFromTPV = true) {
               ${l.devuelta && l.motivo_devolucion ? `<div style="margin-top:4px; font-size:11px; color:var(--red); font-style:italic;"><i class="fa-solid fa-circle-info"></i> Motivo: ${l.motivo_devolucion}</div>` : ""}
             </div>
             ${
-              !isFromTPV && !l.devuelta && v.estado === "completada"
+              !isFromTPV && !l.devuelta && (v.estado === "completada" || v.estado === "parcialmente_devuelta")
                 ? `<div style="padding-left:12px; display:flex; align-items:center;">
-                  <button onclick="abrirModalDevolucion(${l.id}, ${v.numero_ticket}, '${v.fecha}', ${v.id_cliente || "null"}, ${l.meses_garantia || 24})" title="Devolver este producto" class="btn-icon text-red">
+                  <button onclick="abrirModalDevolucion(${l.id}, ${v.numero_ticket}, '${v.fecha}', ${v.id_cliente || "null"}, ${l.meses_garantia || 24}, '${l.nombre_producto.replace(/'/g, "\\'")}', ${l.cantidad})" title="Devolver este producto" class="btn-icon text-red">
                     <i class="fa-solid fa-arrow-rotate-left"></i>
                   </button>
                 </div>`
@@ -2565,7 +1567,12 @@ function mostrarTicket(v, isFromTPV = true) {
   if (descRow) {
     const discountAmt = parseFloat(v.descuento_amt || 0);
     const discountPctVal = parseFloat(v.descuento_pct || 0);
-    if (discountAmt > 0 || discountPctVal > 0) {
+    const puntosAmt = parseFloat(v.puntos_descuento_amt || 0);
+    const totalV = parseFloat(v.total || 0);
+    const subtV = parseFloat(v.subtotal || 0);
+    const diff = Math.max(0, subtV - totalV);
+
+    if (discountAmt > 0 || discountPctVal > 0 || puntosAmt > 0 || diff > 0.01) {
       descRow.classList.remove("d-none");
       const el_tkDescLabel = document.getElementById("tkDescLabel");
       const el_tkDescAmt = document.getElementById("tkDescAmt");
@@ -2579,13 +1586,8 @@ function mostrarTicket(v, isFromTPV = true) {
         }
       }
       if (el_tkDescAmt) {
-        el_tkDescAmt.textContent =
-          "−" +
-          fmt(
-            discountAmt > 0
-              ? discountAmt
-              : (parseFloat(v.subtotal) * discountPctVal) / 100,
-          );
+        const totalToDisplay = diff > 0.01 ? diff : (discountAmt + puntosAmt + (subtV * discountPctVal / 100));
+        el_tkDescAmt.textContent = "−" + fmt(totalToDisplay);
       }
     } else {
       descRow.classList.add("d-none");
@@ -2747,7 +1749,8 @@ async function enviarTicketEmail() {
 }
 
 function nuevaVenta() {
-  document.getElementById("ticketModal").classList.remove("visible");
+  const elTicketModal = document.getElementById("ticketModal");
+  if (elTicketModal) elTicketModal.classList.remove("visible");
   clearCart();
 }
 
@@ -2755,8 +1758,8 @@ function closeModal() {
   nuevaVenta();
 }
 
-async function devolverLinea(idLinea, numTicket) {
-  abrirModalDevolucion(idLinea, numTicket);
+async function devolverLinea(idLinea, numTicket, fechaVenta, idCliente, mesesGarantia, nombreProd, maxQty) {
+  abrirModalDevolucion(idLinea, numTicket, fechaVenta, idCliente, mesesGarantia, nombreProd, maxQty);
 }
 
 async function devolverTicket(numTicket, fechaVenta, idCliente) {
@@ -2772,6 +1775,8 @@ async function confirmarAnulacionTicket(numTicket) {
   const motivo = nota ? `${motivoBase}: ${nota}` : motivoBase;
 
   try {
+
+    const esAnulacion = document.querySelector('input[name="tipoGestionFiscal"]:checked')?.value === 'anulacion';
     const resp = await fetch("api/gestionDevolucion.php", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -2779,16 +1784,24 @@ async function confirmarAnulacionTicket(numTicket) {
         accion: "devolverTicket",
         numTicket,
         motivo,
-        metodoReembolso,
+        metodoReembolso: esAnulacion ? "anulacion" : metodoReembolso,
+        reponerStock: true,
+        esAnulacion
       }),
     });
     const r = await resp.json();
     if (r.ok) {
       document.getElementById("returnModal").classList.remove("visible");
-      const numAbono = r.numTicketAbono;
-      showToast(
-        `<i class='fa-solid fa-check'></i> Abono <strong>A-${numAbono}</strong> generado correctamente`,
-      );
+      
+      if (r.anulacionCompleta) {
+          showToast("<i class='fa-solid fa-check'></i> Venta anulada correctamente (Anulación Fiscal)");
+      } else {
+          const numAbono = r.numTicketAbono;
+          showToast(
+            `<i class='fa-solid fa-check'></i> Abono <strong>A-${numAbono}</strong> generado correctamente`,
+          );
+      }
+
       const v = await cargarVenta(numTicket);
       mostrarTicket(v, false);
       if (typeof updateVentaStatusUI === "function")
@@ -3085,6 +2098,17 @@ function updateEditMargin() {
   }
 }
 
+function toggleEditPrecisionUI() {
+  const keepPrecision = document.getElementById('editMantenerPrecision').checked;
+  const inputVenta = document.getElementById('editPrice');
+  
+  if (!keepPrecision) {
+      const val = parseFloat(inputVenta.value.replace(',', '.')) || 0;
+      inputVenta.value = val.toFixed(2);
+  }
+}
+
+window.toggleEditPrecisionUI = toggleEditPrecisionUI;
 window.updateEditMargin = updateEditMargin;
 
 function editProduct(e, id) {
@@ -3101,6 +2125,8 @@ function editProduct(e, id) {
   document.getElementById("editCost").value = p.precio_coste || 0;
   document.getElementById("editMesesGarantia").value = p.meses_garantia || 24;
   document.getElementById("editEmoji").value = p.icono;
+  const checkPrec = document.getElementById("editMantenerPrecision");
+  if (checkPrec) checkPrec.checked = !!(parseInt(p.mantener_precision || 0));
   updateEditMargin();
 
   const preview = document.getElementById("editImgPreview");
@@ -3152,7 +2178,11 @@ async function saveEdit() {
     const name = document.getElementById("editName")?.value.trim();
     const codigo = document.getElementById("editSku")?.value.trim();
     const modalPrice = parseFloat(document.getElementById("editPrice")?.value);
-    const priceToSave = modalPrice / (window._currentEditFactor || 1);
+    const mantenerPrecision = document.getElementById("editMantenerPrecision")?.checked ? 1 : 0;
+    const rawPrice = modalPrice / (window._currentEditFactor || 1);
+    const priceToSave = mantenerPrecision
+      ? Math.round(rawPrice * 100000) / 100000
+      : parseFloat(rawPrice.toFixed(2));
     const pOrig = PRODUCTS.find((x) => x.id === id);
     const iva = pOrig.iva || 21;
     const mesesGarantia =
@@ -3177,6 +2207,7 @@ async function saveEdit() {
         categoria: pOrig.cat,
         descripcion: pOrig.descripcion || "",
         variantes: getVariantsFromUI("edit"),
+        mantener_precision: mantenerPrecision,
         motivo_cambio_precio: "Cambio rápido desde TPV"
       }),
     });
@@ -3205,6 +2236,7 @@ async function saveEdit() {
     p.meses_garantia = mesesGarantia;
     p.icono = icono || p.icono;
     p.variantes = getVariantsFromUI("edit");
+    p.mantener_precision = mantenerPrecision;
 
     document.getElementById("editModal").classList.remove("visible");
     renderProducts();
@@ -3255,6 +2287,8 @@ function abrirModalDevolucion(
   fechaVenta,
   idCliente,
   mesesGarantia,
+  nombreProducto,
+  maxQty = 1
 ) {
   const modal = document.getElementById("returnModal");
   if (!modal) return;
@@ -3269,16 +2303,31 @@ function abrirModalDevolucion(
   const txtWarranty = document.getElementById("textWarranty");
   const optCash = document.getElementById("optCash");
   const optBalance = document.getElementById("optBalance");
+  const optCard = document.getElementById("optCard");
   const optExchange = document.getElementById("optExchange");
 
+  const productInfo = document.getElementById("returnProductInfo");
+  const productName = document.getElementById("returnProductName");
+  const productWarranty = document.getElementById("returnProductWarrantyBadge");
+  const productStatus = document.getElementById("returnProductStatusBadge");
+
   // Limpiar clases previas
-  [stCommercial, stWarranty].forEach((el) =>
-    el.classList.remove("status-ok", "status-warn", "status-err"),
-  );
-  [optCash, optBalance, optExchange].forEach((el) => {
-    el.classList.remove("disabled");
-    el.querySelector("input").disabled = false;
+  [stCommercial, stWarranty].forEach((el) => {
+    if (el) el.classList.remove("status-ok", "status-warn", "status-err");
   });
+  [optCash, optBalance, optCard, optExchange].forEach((el) => {
+    if (el) {
+        el.classList.remove("disabled");
+        el.querySelector("input").disabled = false;
+    }
+  });
+
+  // Mostrar info de producto
+  if (productInfo) {
+    productInfo.classList.remove("d-none");
+    if (productName) productName.innerText = nombreProducto || "Producto";
+    if (productWarranty) productWarranty.querySelector("span").innerText = `Garantía: ${mesesGarantia} meses`;
+  }
 
   // 2. Calcular plazos
   const dateVenta = new Date(fechaVenta.replace(" ", "T"));
@@ -3304,27 +2353,71 @@ function abrirModalDevolucion(
     optCash.querySelector("input").disabled = true;
     optBalance.classList.add("disabled");
     optBalance.querySelector("input").disabled = true;
+    if (optCard) {
+        optCard.classList.add("disabled");
+        optCard.querySelector("input").disabled = true;
+    }
   }
 
   // Plazo garantía
   if (diffMonths < mesesGarantia) {
     stWarranty.classList.add("status-ok");
     txtWarranty.innerText = `Hasta ${mesesGarantia} meses (OK)`;
+    if (productStatus) {
+        productStatus.classList.remove("d-none");
+        productStatus.style.background = "var(--green-light)";
+        productStatus.style.color = "var(--green)";
+        productStatus.querySelector("span").innerText = "Garantía VIGENTE";
+    }
   } else {
     stWarranty.classList.add("status-err");
     txtWarranty.innerText = `Garantía agotada`;
+    if (productStatus) {
+        productStatus.classList.remove("d-none");
+        productStatus.style.background = "var(--red-light)";
+        productStatus.style.color = "var(--red)";
+        productStatus.querySelector("span").innerText = "Garantía AGOTADA";
+    }
     optExchange.classList.add("disabled");
     optExchange.querySelector("input").disabled = true;
   }
 
-  // Ya no restringimos "Vale / Cupón" a clientes registrados
-  // La validación anterior ha sido eliminada.
+  // Resetear gestión fiscal a Rectificación por defecto y OCULTAR Anulación para líneas sueltas
+  const rectOption = document.querySelector('input[name="tipoGestionFiscal"][value="rectificacion"]');
+  if (rectOption) rectOption.checked = true;
+  toggleRefundMethodVisibility();
+  const fiscalAnulBlock = document.getElementById("fiscalAnulacion");
+  if (fiscalAnulBlock) { fiscalAnulBlock.classList.add("d-none"); fiscalAnulBlock.classList.remove("d-flex"); }
+  const fiscalRectBlock = document.getElementById("fiscalRectification");
+  if (fiscalRectBlock) {
+      fiscalRectBlock.classList.remove("d-none");
+      fiscalRectBlock.classList.add("d-flex", "grid-col-span-2");
+  }
 
-  // Auto-seleccionar primera opción válida
-  const availableInput = modal.querySelector(
-    'input[name="metodoReembolso"]:not(:disabled)',
-  );
-  if (availableInput) availableInput.checked = true;
+  // Gestión de cantidades
+  const qtyRow = document.getElementById("qtyReturnRow");
+  const qtyInput = document.getElementById("qtyReturnInput");
+  const qtyMaxBody = document.getElementById("qtyReturnMaxLabelBody");
+
+  if (qtyRow && qtyInput && qtyMaxBody) {
+    if (maxQty > 1) {
+      qtyRow.classList.remove("d-none");
+      qtyInput.value = maxQty;
+      qtyInput.max = maxQty;
+      qtyMaxBody.innerText = maxQty;
+    } else {
+      qtyRow.classList.add("d-none");
+      qtyInput.value = 1;
+      qtyInput.max = 1;
+      qtyMaxBody.innerText = 1;
+    }
+    
+    // Prevenir que se pueda escribir más del máximo
+    qtyInput.oninput = function() {
+      if (parseInt(this.value) > maxQty) this.value = maxQty;
+      if (parseInt(this.value) < 1) this.value = 1;
+    };
+  }
 
   subtitle.innerText = `Venta del ${dateVenta.toLocaleDateString()}`;
 
@@ -3338,6 +2431,13 @@ function abrirModalAnulacionTicket(numTicket, fechaVenta, idCliente) {
 
   modal.classList.add("visible");
 
+  // Default a anulación y ocultar reembolso
+  const radioAnulacion = document.querySelector('input[name="tipoGestionFiscal"][value="anulacion"]');
+  if (radioAnulacion) {
+      radioAnulacion.checked = true;
+      toggleRefundMethodVisibility();
+  }
+
   // 1. Resetear UI (usamos la misma lógica que en líneas individuales pero adaptada)
   const subtitle = document.getElementById("returnModalSubtitle");
   const stCommercial = document.getElementById("statusCommercial");
@@ -3346,14 +2446,20 @@ function abrirModalAnulacionTicket(numTicket, fechaVenta, idCliente) {
   const txtWarranty = document.getElementById("textWarranty");
   const optCash = document.getElementById("optCash");
   const optBalance = document.getElementById("optBalance");
+  const optCard = document.getElementById("optCard");
   const optExchange = document.getElementById("optExchange");
+
+  const productInfo = document.getElementById("returnProductInfo");
+  if (productInfo) productInfo.classList.add("d-none");
 
   [stCommercial, stWarranty].forEach((el) =>
     el.classList.remove("status-ok", "status-warn", "status-err"),
   );
-  [optCash, optBalance, optExchange].forEach((el) => {
-    el.classList.remove("disabled");
-    el.querySelector("input").disabled = false;
+  [optCash, optBalance, optCard, optExchange].forEach((el) => {
+    if (el) {
+        el.classList.remove("disabled");
+        el.querySelector("input").disabled = false;
+    }
   });
 
   // La anulación de ticket COMPLETO es siempre por reembolso (comercial)
@@ -3369,9 +2475,11 @@ function abrirModalAnulacionTicket(numTicket, fechaVenta, idCliente) {
   } else {
     stCommercial.classList.add("status-err");
     txtCommercial.innerText = `Excedido (${diffDays} días)`;
-    [optCash, optBalance].forEach((el) => {
-      el.classList.add("disabled");
-      el.querySelector("input").disabled = true;
+    [optCash, optBalance, optCard].forEach((el) => {
+      if (el) {
+        el.classList.add("disabled");
+        el.querySelector("input").disabled = true;
+      }
     });
   }
 
@@ -3389,6 +2497,17 @@ function abrirModalAnulacionTicket(numTicket, fechaVenta, idCliente) {
   );
   if (availableInput) availableInput.checked = true;
 
+  // Resetear gestión fiscal a Rectificación por defecto y MOSTRAR Anulación para tickets completos
+  const rectOptionAnul = document.querySelector('input[name="tipoGestionFiscal"][value="rectificacion"]');
+  if (rectOptionAnul) rectOptionAnul.checked = true;
+  const fiscalAnulBlock = document.getElementById("fiscalAnulacion");
+  if (fiscalAnulBlock) { fiscalAnulBlock.classList.remove("d-none"); fiscalAnulBlock.classList.add("d-flex"); }
+  const fiscalRectBlock = document.getElementById("fiscalRectification");
+  if (fiscalRectBlock) {
+      fiscalRectBlock.classList.remove("d-none", "grid-col-span-2");
+      fiscalRectBlock.classList.add("d-flex");
+  }
+
   subtitle.innerText = `Anulación Ticket #${String(numTicket).padStart(4, "0")}`;
 
   document.getElementById("confirmReturnBtn").onclick = () =>
@@ -3401,7 +2520,7 @@ async function confirmarDevolucion(idLinea, numTicket) {
   const metodoReembolso =
     document.querySelector('input[name="metodoReembolso"]:checked')?.value ||
     "efectivo";
-  const cantidadEl = document.getElementById("returnQty");
+  const cantidadEl = document.getElementById("qtyReturnInput");
   const cantidad = cantidadEl ? parseInt(cantidadEl.value) || null : null;
   const finalMotivo = nota ? `${motivo}: ${nota}` : motivo;
 
@@ -3415,24 +2534,30 @@ async function confirmarDevolucion(idLinea, numTicket) {
         cantidad,
         motivo: finalMotivo,
         metodoReembolso,
+        reponerStock: true,
+        esAnulacion: false
       }),
     });
     const data = await resp.json();
-    if (!data.ok)
-      throw new Error(data.error || "No se pudo realizar la devolución");
+    if (data.ok) {
+      document.getElementById("returnModal").classList.remove("visible");
+      
+      if (data.anulacionCompleta) {
+          showToast("<i class='fa-solid fa-check'></i> Venta anulada correctamente (Anulación Fiscal)");
+      } else {
+          const numAbono = data.numTicketAbono;
+          showToast(
+            `<i class='fa-solid fa-check'></i> Abono <strong>A-${numAbono}</strong> generado correctamente`,
+          );
+      }
 
-    document.getElementById("returnModal").classList.remove("visible");
-    const numAbono = data.numTicketAbono;
-    showToast(
-      `<i class='fa-solid fa-check'></i> Abono <strong>A-${numAbono}</strong> generado correctamente`,
-    );
-    const ventaActualizada = await cargarVenta(numTicket);
-    mostrarTicket(ventaActualizada, false);
-    if (typeof updateVentaStatusUI === "function")
-      updateVentaStatusUI(
-        numTicket,
-        ventaActualizada.status || ventaActualizada.estado,
-      );
+      const v = await cargarVenta(numTicket);
+      mostrarTicket(v, false);
+      if (typeof updateVentaStatusUI === "function")
+        updateVentaStatusUI(numTicket, v.status || v.estado);
+    } else {
+      throw new Error(data.error || "No se pudo realizar la devolución");
+    }
   } catch (err) {
     showToast("<i class='fa-solid fa-circle-xmark'></i> " + err.message);
   }
@@ -3587,13 +2712,7 @@ function applyAdvancedFilters() {
   renderProducts();
 }
 
-// ── Reloj ──────────────────────────────────────────────────────────────────────
-function fmt(n) {
-  return new Intl.NumberFormat("es-ES", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(n) + " €";
-}
+
 
 // Variables globales para fidelización (Portadas de PaymentManager)
 var puntosCanjeados = 0;
@@ -3659,17 +2778,6 @@ if (productsGrid) {
 
   renderProducts();
 
-  // Atributos (Tags) Navigation
-  const attrTabs = document.getElementById("attrTabs");
-  if (attrTabs) {
-    attrTabs.addEventListener("click", (e) => {
-      const tag = e.target.closest(".attr-tab-btn");
-      if (!tag) return;
-      tag.classList.toggle("active");
-      applyAdvancedFilters(); // Llamamos a la lógica de filtros locales
-    });
-  }
-
   productsGrid.addEventListener("scroll", () => {
     if (productsGrid.scrollTop + productsGrid.clientHeight >= productsGrid.scrollHeight - 20) {
       loadMoreProducts();
@@ -3679,53 +2787,20 @@ if (productsGrid) {
   updatePostponeUI();
 }
 
-// ── Producto Comodín ───────────────────────────────────────────────────────────
-function abrirModalComodin() {
-  document.getElementById("comodinDesc").value = "";
-  document.getElementById("comodinPrice").value = "";
-  document.getElementById("comodinIva").value = "21";
-  document.getElementById("comodinError").classList.add("d-none");
-  document.getElementById("modalComodin").classList.add("visible");
-  document.getElementById("comodinDesc").focus();
+// [REMOVED] Comodín logic moved to modular architecture (CartManager.js / app.js)
+
+function toggleRefundMethodVisibility() {
+    const fiscalType = document.querySelector('input[name="tipoGestionFiscal"]:checked')?.value;
+    const refundSection = document.getElementById("refundMethodSection");
+    if (!refundSection) return;
+    if (fiscalType === "anulacion") {
+        refundSection.style.display = "none";
+    } else {
+        refundSection.style.display = "block";
+    }
 }
-
-function cerrarModalComodin() {
-  document.getElementById("modalComodin").classList.remove("visible");
-}
-
-function agregarComodin() {
-  const desc = document.getElementById("comodinDesc").value.trim();
-  const price = parseFloat(document.getElementById("comodinPrice").value);
-  const iva = parseFloat(document.getElementById("comodinIva").value);
-  const errorEl = document.getElementById("comodinError");
-
-  if (!desc) {
-    errorEl.textContent = I18N.customDescError || "Introduce una descripción";
-    errorEl.classList.remove("d-none");
-    return;
-  }
-  if (isNaN(price) || price < 0) {
-    errorEl.textContent = I18N.customPriceError || "Introduce un precio válido";
-    errorEl.classList.remove("d-none");
-    return;
-  }
-
-  const timestamp = new Date().getTime();
-  const cartKey = `comodin_${timestamp}`;
-
-  cart[cartKey] = {
-    id: -1,
-    name: desc,
-    codigo: "COMODIN",
-    price: price,
-    iva: iva,
-    qty: 1,
-    icono: '<i class="fa-solid fa-box-open"></i>',
-    maxStock: 999999,
-    cartKey: cartKey,
-  };
-
-  cerrarModalComodin();
-  renderCart();
-  showToast('<i class="fa-solid fa-check"></i> Producto añadido');
-}
+document.addEventListener("change", (e) => {
+    if (e.target.name === "tipoGestionFiscal") {
+        toggleRefundMethodVisibility();
+    }
+});

@@ -35,6 +35,19 @@
         </div>
       </div>
 
+      <!-- SECCIÓN VERIFACTU (REGLAMENTARIA) -->
+      <div style="margin: 10px 0; padding: 8px; display: flex; align-items: center; gap: 15px; background: #fff;">
+        <div style="flex: 0 0 132px;">
+          <img src="{{QR_CODE_IMAGE}}" alt="QR AEAT" style="width: 132px; height: 132px; display: block;" />
+        </div>
+        <div style="flex: 1;">
+          <div style="font-weight: bold; font-size: 13px; margin-bottom: 5px;">{{VERIFACTU_TEXT}}</div>
+          <div style="font-size: 10px; line-height: 1.4; font-family: sans-serif;">
+            Factura verificable en la sede electrónica de la AEAT.
+          </div>
+        </div>
+      </div>
+
       <hr class="sep-solid" />
 
       <!-- DATOS DEL TICKET -->
@@ -84,16 +97,6 @@
       </div>
       <div class="small" style="margin-top: 3px">{{PAGO_DETALLE}}</div>
 
-      <!-- DATOS FINANCIACIÓN -->
-      <div id="fin-container" style="{{DISPLAY_FINANCIACION}}">
-        <hr class="sep-dashed" />
-        <div class="small bold center" style="margin-bottom: 4px">DATOS FINANCIACIÓN</div>
-        <div class="small">
-          <div class="total-row"><span>Entidad:</span><span>{{FINANCIACION_ENTIDAD}}</span></div>
-          <div class="total-row"><span>Plazo:</span><span>{{FINANCIACION_MESES}} meses</span></div>
-          <div class="total-row"><span>Cuota mensual:</span><span>{{FINANCIACION_CUOTA}}</span></div>
-        </div>
-      </div>
 
       <hr class="sep-dashed" />
 
@@ -104,6 +107,7 @@
       </div>
 
       <hr class="sep-dashed" />
+      {{COMENTARIOS}}
 
       <!-- PIE -->
       <div class="center small" style="margin-bottom: 8px; line-height: 1.8">

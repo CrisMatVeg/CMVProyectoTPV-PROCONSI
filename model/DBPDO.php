@@ -48,16 +48,18 @@ class DBPDO
      * @param array|null $parametros Parámetros para consultas preparadas
      * @return PDOStatement Objeto PDOStatement ya ejecutado
      */
-    public static function ejecutarConsulta($sentenciaSQL, $parametros = null)
+    public static function ejecutarConsulta($sentenciaSQL, $parametros = null, ?PDO $db = null)
     {
         try {
-            $consulta = self::getPDO()->prepare($sentenciaSQL);
+            $conn = $db ?? self::getPDO();
+            $consulta = $conn->prepare($sentenciaSQL);
             $consulta->execute($parametros);
             return $consulta;
         } catch (PDOException $e) {
-            // Si es una petición API, AJAX o un script de mantenimiento (scratch), relanzamos la excepción
-            if (strpos($_SERVER['SCRIPT_NAME'], '/api/') !== false || 
-                strpos($_SERVER['SCRIPT_NAME'], '/scratch/') !== false || 
+            // Si es una petición API, AJAX, CLI o un script de mantenimiento (scratch), relanzamos la excepción
+            if (php_sapi_name() === 'cli' ||
+                strpos($_SERVER['SCRIPT_NAME'] ?? '', '/api/') !== false || 
+                strpos($_SERVER['SCRIPT_NAME'] ?? '', '/scratch/') !== false || 
                 (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && $_SERVER['HTTP_X_REQUESTED_WITH'] === 'XMLHttpRequest')) {
                 throw $e;
             }

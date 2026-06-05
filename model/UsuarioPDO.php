@@ -18,7 +18,7 @@ class UsuarioPDO
      * @param string $password Contraseña en texto plano
      * @return Usuario|null Devuelve el objeto Usuario si es válido, null en caso contrario.
      */
-    public static function validarUsuario($login, $password = null)
+    public static function validarUsuario($login, $password = null, $soloActivos = true)
     {
         if ($password != null) {
             // Usamos SHA2 de MySQL para compatibilidad con el script de creación
@@ -37,8 +37,12 @@ class UsuarioPDO
 
         $objetoResultado = $consulta->fetch(PDO::FETCH_ASSOC);
 
-        if (!$objetoResultado || !$objetoResultado['activo']) {
-            return null; // No loguear si está inactivo
+        if (!$objetoResultado) {
+            return null;
+        }
+
+        if ($soloActivos && !$objetoResultado['activo']) {
+            return null;
         }
 
         // Normalización de rol (Legacy compatibility)
@@ -100,7 +104,7 @@ class UsuarioPDO
     /**
      * Añade un nuevo usuario.
      */
-    public static function añadirUsuario($nombre, $login, $password, $rol, $idRol = null, $email = null)
+    public static function agregarUsuario($nombre, $login, $password, $rol, $idRol = null, $email = null)
     {
         $sql = "INSERT INTO usuarios (nombre, login, password, id_rol, email, idioma) 
                 VALUES (:nombre, :login, SHA2(:pass,256), :idrol, :email, 'es')";
@@ -151,15 +155,14 @@ class UsuarioPDO
     /**
      * Cambia el estado Activo/Inactivo (Baja lógica).
      */
-    public static function toggleEstatus($id)
+    public static function toggleEstatus(int $id): bool
     {
-        $sql = "SELECT activo FROM usuarios WHERE id = :id";
-        $q = DBPDO::ejecutarConsulta($sql, [':id' => $id]);
+        $q = DBPDO::ejecutarConsulta("SELECT activo FROM usuarios WHERE id = :id", [':id' => $id]);
         $row = $q->fetch(PDO::FETCH_ASSOC);
         $nuevoEstado = $row['activo'] ? 0 : 1;
 
-        $sqlToggle = "UPDATE usuarios SET activo = :estado WHERE id = :id";
-        return DBPDO::ejecutarConsulta($sqlToggle, [':id' => $id, ':estado' => $nuevoEstado]);
+        DBPDO::ejecutarConsulta("UPDATE usuarios SET activo = :estado WHERE id = :id", [':id' => $id, ':estado' => $nuevoEstado]);
+        return (bool)$nuevoEstado;
     }
 
     /**
@@ -167,7 +170,7 @@ class UsuarioPDO
      */
     public static function buscarPorEmail($email)
     {
-        $sql = "SELECT * FROM usuarios WHERE email = :email AND activo = 1";
+        $sql = "SELECT * FROM usuarios WHERE email = :email";
         $consulta = DBPDO::ejecutarConsulta($sql, [':email' => $email]);
         $row = $consulta->fetch(PDO::FETCH_ASSOC);
 
@@ -205,8 +208,7 @@ class UsuarioPDO
     {
         $sql = "SELECT id FROM usuarios 
                 WHERE token_recuperacion = :token 
-                AND token_expiracion > NOW() 
-                AND activo = 1";
+                AND token_expiracion > NOW()";
         $consulta = DBPDO::ejecutarConsulta($sql, [':token' => $token]);
         $row = $consulta->fetch(PDO::FETCH_ASSOC);
         return $row ? $row['id'] : null;

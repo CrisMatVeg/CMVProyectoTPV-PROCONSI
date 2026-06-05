@@ -5,11 +5,8 @@ if (!isset($_SESSION['usuarioActualTPV'])) {
     exit;
 }
 
-if ($_SESSION['usuarioActualTPV']->getRol() == "admin") {
-    $esAdmin = true;
-} else {
-    $esAdmin = false;
-}
+$userRol = $_SESSION['usuarioActualTPV']->getRol();
+$esAdmin = ($userRol === "admin" || $userRol === "administrador");
 
 // Navegación Global handled by index.php
 
@@ -34,9 +31,9 @@ foreach ($oProductos as $oProducto) {
         "id" => $oProducto->getId(),
         "name" => $oProducto->getNombre(),
         "codigo" => $oProducto->getReferencia(),
-        "price" => (float)$oProducto->getPrecioVenta(),
+        "price" => $oProducto->getPrecioVenta(),
         "iva" => (float)$oProducto->getIva(),
-        "precio_coste" => (float)$oProducto->getPrecioCoste(),
+        "precio_coste" => $oProducto->getPrecioCoste(),
         "stock_minimo" => (int)$oProducto->getStockMinimo(),
         "meses_garantia" => (int)$oProducto->getMesesGarantia(),
         "icono" => $icono,
@@ -46,10 +43,20 @@ foreach ($oProductos as $oProducto) {
         "inactive" => !$oProducto->getActivo(),
         "activo" => $oProducto->getActivo(),
         "es_pack" => $oProducto->getEsPack(),
-        "atributos" => $oProducto->getAtributos()
+        "atributos" => $oProducto->getAtributos(),
+        "mantener_precision" => $oProducto->getMantenerPrecision()
     ];
 }
-file_put_contents(__DIR__ . '/../tmp_debug_tpv_data.json', json_encode($aProductos, JSON_PRETTY_PRINT));
+
+
+// Estado VeriFactu (cacheado 2 min en sesión para no ejecutar queries en cada recarga)
+require_once 'model/AeatQueueService.php';
+$aeatTs = '_cache_aeat_ts';
+if (!isset($_SESSION['_cache_aeat'], $_SESSION[$aeatTs]) || (time() - $_SESSION[$aeatTs]) > 120) {
+    $_SESSION['_cache_aeat'] = (new AeatQueueService())->obtenerResumenEstado();
+    $_SESSION[$aeatTs] = time();
+}
+$resumenAEAT = $_SESSION['_cache_aeat'];
 
 // Cargar categorías dinámicas
 require_once 'model/CategoriaPDO.php';

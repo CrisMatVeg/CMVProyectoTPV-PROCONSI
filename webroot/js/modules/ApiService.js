@@ -18,6 +18,11 @@ export const ApiService = {
       });
 
       if (!response.ok) {
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
@@ -26,7 +31,7 @@ export const ApiService = {
       if (contentType && contentType.includes("application/json")) {
         const data = await response.json();
         if (data.ok === false) {
-          throw data; // Throw the whole error object for better handling
+          throw new Error(data.error || "Error desconocido en el servidor");
         }
         return data;
       }
@@ -36,6 +41,19 @@ export const ApiService = {
       console.error(`ApiService [${url}]:`, error);
       throw error;
     }
+  },
+  
+  async get(url) {
+    return this.request(url, { method: "GET" });
+  },
+
+  async post(url, data) {
+    // Determine path
+    const path = url.startsWith("http") || url.startsWith("./") ? url : `./api/${url}`;
+    return this.request(path, {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
   },
 
   // Ticket & Sales
@@ -80,6 +98,7 @@ export const ApiService = {
         body: JSON.stringify({ nivel, mensaje, endpoint, data }),
       });
     } catch (e) {
+      console.warn('logUI: error al registrar log en servidor:', e);
     }
   },
 

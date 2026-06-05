@@ -7,11 +7,9 @@
     <meta name="csrf-token" content="<?= $_SESSION['csrf_token'] ?? '' ?>" />
     <title>TPV · ElectroBazar</title>
     <link rel="icon" type="image/x-icon" href="./favicon.ico">
-    <link rel="stylesheet" href="./webroot/css/estilos.css?v=2" />
-    <link rel="stylesheet" href="./webroot/css/components.css?v=2" />
-    <link rel="stylesheet" href="./webroot/css/app.css?v=2" />
-    <!-- Generación de PDF en cliente -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <link rel="stylesheet" href="./webroot/css/estilos.css?v=40" />
+    <link rel="stylesheet" href="./webroot/css/components.css?v=47" />
+    <link rel="stylesheet" href="./webroot/css/app.css?v=46" />
     <link rel="stylesheet" href="./webroot/css/fonts.css" />
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -27,40 +25,42 @@
     $empresaDireccion = $appConfig['empresa_direccion'] ?? '';
     $empresaNif = $appConfig['empresa_nif'] ?? '';
 
-    // Cargar tema del usuario actual (si existe)
+    // Cargar tema del usuario actual (si existe) — cacheado en sesión 10 min
     $themeMode = 'light';
     $themeAccent = 'blue';
     $themeFont = 'dm-mono';
     if (isset($_SESSION['usuarioActualTPV'])) {
-        try {
-            $qTheme = DBPDO::ejecutarConsulta(
-                "SELECT theme_mode, theme_accent, theme_font FROM usuarios WHERE id = :id",
-                [':id' => $_SESSION['usuarioActualTPV']->getId()]
-            );
-            $rowTheme = $qTheme->fetch(PDO::FETCH_ASSOC);
-            if ($rowTheme) {
-                if (!empty($rowTheme['theme_mode'])) {
-                    $themeMode = $rowTheme['theme_mode'];
-                }
-                if (!empty($rowTheme['theme_accent'])) {
-                    $themeAccent = $rowTheme['theme_accent'];
-                }
-                if (!empty($rowTheme['theme_font'])) {
-                    $themeFont = $rowTheme['theme_font'];
-                }
+        $uid = $_SESSION['usuarioActualTPV']->getId();
+        $themeCacheKey = '_cache_theme_' . $uid;
+        $themeTs = $themeCacheKey . '_ts';
+        if (!isset($_SESSION[$themeCacheKey], $_SESSION[$themeTs]) || (time() - $_SESSION[$themeTs]) > 600) {
+            try {
+                $qTheme = DBPDO::ejecutarConsulta(
+                    "SELECT theme_mode, theme_accent, theme_font FROM usuarios WHERE id = :id",
+                    [':id' => $uid]
+                );
+                $rowTheme = $qTheme->fetch(PDO::FETCH_ASSOC);
+                $_SESSION[$themeCacheKey] = $rowTheme ?: [];
+                $_SESSION[$themeTs] = time();
+            } catch (\Throwable $e) {
+                $_SESSION[$themeCacheKey] = [];
+                $_SESSION[$themeTs] = time();
             }
-        } catch (\Throwable $e) {
-            // Ignorar errores de tema y usar valores por defecto
         }
+        $rowTheme = $_SESSION[$themeCacheKey];
+        if (!empty($rowTheme['theme_mode']))   $themeMode   = $rowTheme['theme_mode'];
+        if (!empty($rowTheme['theme_accent'])) $themeAccent = $rowTheme['theme_accent'];
+        if (!empty($rowTheme['theme_font']))   $themeFont   = $rowTheme['theme_font'];
     }
     ?>
     <script>
-        const IS_ADMIN_BACKEND = <?php echo json_encode(isset($avInicioPrivado['esAdmin']) && $avInicioPrivado['esAdmin']); ?>;
-        const DB_PRODUCTS = <?php echo json_encode($avInicioPrivado['productos'] ?? []); ?>;
-        const DB_PROMOS = <?php echo json_encode($avInicioPrivado['promos'] ?? []); ?>;
-        const CAJERO_NOMBRE = <?php echo json_encode($avInicioPrivado['nombre_completo'] ?? (isset($_SESSION['usuarioActualTPV']) ? $_SESSION['usuarioActualTPV']->getNombreCompleto() : '')); ?>;
-        const IS_TPV = <?php echo json_encode(isset($_SESSION['paginaEnCurso']) && $_SESSION['paginaEnCurso'] === 'inicioPrivado'); ?>;
-        const CAJA_ABIERTA = <?php echo json_encode($_SESSION['cajaAbierta'] ?? false); ?>;
+        window.IS_ADMIN_BACKEND = <?php echo json_encode(isset($avInicioPrivado['esAdmin']) && $avInicioPrivado['esAdmin']); ?>;
+        window.DB_PRODUCTS = <?php echo json_encode($avInicioPrivado['productos'] ?? []); ?>;
+        window.DB_PROMOS = <?php echo json_encode($avInicioPrivado['promos'] ?? []); ?>;
+        window.USER_ROLE = <?php echo json_encode($avInicioPrivado['rol'] ?? ''); ?>;
+        window.CAJERO_NOMBRE = <?php echo json_encode($avInicioPrivado['nombre_completo'] ?? (isset($_SESSION['usuarioActualTPV']) ? $_SESSION['usuarioActualTPV']->getNombreCompleto() : '')); ?>;
+        window.IS_TPV = <?php echo json_encode(isset($_SESSION['paginaEnCurso']) && $_SESSION['paginaEnCurso'] === 'inicioPrivado'); ?>;
+        window.CAJA_ABIERTA = <?php echo json_encode((bool)CajaTurnoPDO::obtenerTurnoAbierto()); ?>;
         const ESC_POS_ENABLED = true;
         const USER_THEME_MODE = <?php echo json_encode($themeMode); ?>;
         const USER_THEME_ACCENT = <?php echo json_encode($themeAccent); ?>;
@@ -97,6 +97,9 @@
             voucherApplied: "<?php echo L('tpv_js_voucher_applied', true); ?>",
             fieldRequired: "<?php echo L('tpv_js_field_required', true); ?>",
             nameNifRequired: "<?php echo L('tpv_js_name_nif_required', true); ?>",
+            ticket_type_abono: "<?php echo L('ticket_type_abono', true); ?>",
+            invoice: "<?php echo L('ticket_type_invoice', true); ?>",
+            ticket: "<?php echo L('ticket_type_sale', true); ?>",
             clientRegistered: "<?php echo L('tpv_js_client_registered', true); ?>",
             newLabel: "<?php echo L('tpv_js_new_label', true); ?>",
             selectionRequired: "<?php echo L('tpv_js_selection_required', true); ?>",
@@ -104,6 +107,8 @@
             amountToAdd: "<?php echo L('tpv_js_amount_to_add', true); ?>",
             cashReceived: "<?php echo L('tpv_js_cash_received', true); ?>",
             amountOwed: "<?php echo L('tpv_js_amount_owed', true); ?>",
+            precisionLabel: "<?php echo L('prod_label_precision_price', true); ?>",
+            precisionTip: "<?php echo L('prod_tip_precision_price', true); ?>",
             paymentIdentified: "<?php echo L('tpv_js_payment_identified', true); ?>",
             clientIdentified: "<?php echo L('tpv_js_client_identified', true); ?>",
             apply: "<?php echo L('tpv_apply', true); ?>",
@@ -128,7 +133,13 @@
             pointsInvalidAmount: "<?php echo L('points_invalid_amount', true); ?>",
             pointsRedeemedLabel: "<?php echo L('points_redeemed_label', true); ?>",
             customDescError: "<?php echo L('tpv_custom_desc_error', true); ?>",
-            customPriceError: "<?php echo L('tpv_custom_price_error', true); ?>"
+            customPriceError: "<?php echo L('tpv_custom_price_error', true); ?>",
+            stock: "<?php echo L('tpv_stock', true); ?>",
+            statusCompleted: "<?php echo L('history_status_completed', true); ?>",
+            statusAnnulled: "<?php echo L('history_status_annulled_pill', true); ?>",
+            statusRectified: "<?php echo L('history_status_rectified_pill', true); ?>",
+            statusAbono: "<?php echo L('history_status_abono_pill', true); ?>",
+            pending: "<?php echo L('tpv_pending', true); ?>"
         };
 
         // Global Fetch Wrapper for CSRF Protection
@@ -265,20 +276,22 @@
             <?php
             $pendientesArqueo = CajaTurnoPDO::obtenerTurnosPendientesArqueo();
             if (!empty($pendientesArqueo)): ?>
-                <a href="index.php?irCierreCaja" class="status-indicator" style="background: var(--orange); color: white; padding: 2px 10px; border-radius: 20px; font-size: 10px; font-weight: bold; text-transform: uppercase; text-decoration: none; display: inline-flex; align-items: center; gap: 5px;" title="Hay cierres de días anteriores sin contar">
+                <a href="index.php?irCierreCaja" class="status-pill pill-orange" title="Hay cierres de días anteriores sin contar">
                     <i class="fa-solid fa-triangle-exclamation"></i> <?php echo L('label_arqueo_pending'); ?>
                 </a>
             <?php endif; ?>
 
+
             <?php if (isset($_SESSION['cajaAbierta']) && $_SESSION['cajaAbierta']): ?>
-                <span class="status-indicator" style="background: var(--green); color: white; padding: 2px 8px; border-radius: 20px; font-size: 10px; font-weight: bold; text-transform: uppercase;">
+                <span class="status-pill pill-green">
                     <i class="fa-solid fa-circle-check"></i> <?php echo L('label_abierta'); ?>
                 </span>
             <?php else: ?>
-                <span class="status-indicator" style="background: var(--red); color: white; padding: 2px 8px; border-radius: 20px; font-size: 10px; font-weight: bold; text-transform: uppercase;">
+                <span class="status-pill pill-red">
                     <i class="fa-solid fa-circle-xmark"></i> <?php echo L('label_cerrada'); ?>
                 </span>
             <?php endif; ?>
+
             &nbsp;·&nbsp; <?php echo L('label_register'); ?> #1 &nbsp;·&nbsp; <span id="clock">--:--</span> &nbsp;·&nbsp;
             <span id="datestr">--</span>
         </div>
@@ -330,22 +343,59 @@
                                 <img src="https://flagcdn.com/16x12/de.png" alt="DE">
                                 <span>Deutsch</span>
                             </a>
+                            <a href="index.php?lang=eu" class="lang-link <?php echo $lang === 'eu' ? 'active' : ''; ?>">
+                                <img src="https://upload.wikimedia.org/wikipedia/commons/2/2d/Flag_of_the_Basque_Country.svg" alt="EU" style="width: 18px; height: 13px; object-fit: cover; border-radius: 2px;">
+                                <span>Euskara</span>
+                            </a>
+                            <a href="index.php?lang=ca" class="lang-link <?php echo $lang === 'ca' ? 'active' : ''; ?>">
+                                <img src="https://upload.wikimedia.org/wikipedia/commons/c/ce/Flag_of_Catalonia.svg" alt="CA" style="width: 18px; height: 13px; object-fit: cover; border-radius: 2px;">
+                                <span>Català</span>
+                            </a>
+                            <a href="index.php?lang=gl" class="lang-link <?php echo $lang === 'gl' ? 'active' : ''; ?>">
+                                <img src="https://upload.wikimedia.org/wikipedia/commons/6/64/Flag_of_Galicia.svg" alt="GL" style="width: 18px; height: 13px; object-fit: cover; border-radius: 2px;">
+                                <span>Galego</span>
+                            </a>
+                            <a href="index.php?lang=ru" class="lang-link <?php echo $lang === 'ru' ? 'active' : ''; ?>">
+                                <img src="https://flagcdn.com/16x12/ru.png" alt="RU">
+                                <span>Русский</span>
+                            </a>
+                            <a href="index.php?lang=zh" class="lang-link <?php echo $lang === 'zh' ? 'active' : ''; ?>">
+                                <img src="https://flagcdn.com/16x12/cn.png" alt="ZH">
+                                <span>中文</span>
+                            </a>
+                            <a href="index.php?lang=ja" class="lang-link <?php echo $lang === 'ja' ? 'active' : ''; ?>">
+                                <img src="https://flagcdn.com/16x12/jp.png" alt="JA">
+                                <span>日本語</span>
+                            </a>
                         </div>
                     </div>
 
+                    <?php 
+                    $tienePermisoDashboard = $_SESSION['usuarioActualTPV']->tienePermiso('gestionar_productos') 
+                        || $_SESSION['usuarioActualTPV']->tienePermiso('ver_historial') 
+                        || $_SESSION['usuarioActualTPV']->tienePermiso('gestionar_usuarios')
+                        || $_SESSION['usuarioActualTPV']->tienePermiso('gestionar_clientes')
+                        || $_SESSION['usuarioActualTPV']->tienePermiso('gestionar_proveedores')
+                        || $_SESSION['usuarioActualTPV']->tienePermiso('gestionar_inventario')
+                        || $_SESSION['usuarioActualTPV']->tienePermiso('ver_analitica');
+                    
+                    if ($tienePermisoDashboard): ?>
                     <form method="post" action="index.php">
                         <button type="submit" name="irDashboard" class="topbar-btn" title="Panel de Control">
                             <i class="fa-solid fa-gauge-high"></i>
                             <span><?php echo L('menu_inicio'); ?></span>
                         </button>
                     </form>
+                    <?php endif; ?>
 
+                    <?php if ($_SESSION['usuarioActualTPV']->tienePermiso('acceso_tpv')): ?>
                     <form method="post" action="index.php">
                         <button type="submit" name="irTPV" class="topbar-btn" title="Terminal Punto de Venta">
                             <i class="fa-solid fa-cart-shopping"></i>
                             <span><?php echo L('menu_tpv'); ?></span>
                         </button>
                     </form>
+                    <?php endif; ?>
 
                     <form method="post" action="index.php">
                         <button type="submit" name="irMiPerfil" class="topbar-btn" title="Mi Perfil">
@@ -363,6 +413,13 @@
                         </form>
                     <?php endif; ?>
 
+                    <?php if ($_SESSION['usuarioActualTPV']->tienePermiso('gestionar_configuracion')): ?>
+                    <a href="verifactu_log.php" target="_blank" class="topbar-btn" title="<?php echo L('dashboard_fiscal_audit'); ?>">
+                        <i class="fa-solid fa-microchip"></i>
+                        <span><?php echo L('dashboard_fiscal_audit'); ?></span>
+                    </a>
+                    <?php endif; ?>
+
                     <form method="post" action="index.php">
                         <button type="submit" name="salir" class="topbar-btn btn-exit" title="Cerrar sesión">
                             <i class="fa-solid fa-power-off"></i>
@@ -378,7 +435,7 @@
     ?>
 
     <div class="modal-overlay" id="ticketModal">
-        <div class="modal ticket-wrapper" id="ticketContenido" style="display: flex; flex-direction: column; max-height: 90vh; overflow: hidden; padding: 0;">
+        <div class="modal ticket-wrapper" id="ticketContenido" style="display: flex; flex-direction: column; max-height: 90vh; overflow: hidden; padding: 0; min-height: 0;">
             <div class="ticket-brand-header">
                 <div class="title"><i class="fa-solid fa-bolt-lightning"></i> <?= $empresaNombre ?></div>
                 <div class="info"><?= $empresaDireccion ?> · NIF: <?= $empresaNif ?></div>
@@ -395,7 +452,7 @@
                 </button>
             </div>
 
-            <div class="ticket-body" style="flex: 1; overflow-y: auto; padding: 0;">
+            <div class="ticket-body" style="flex: 1; min-height: 0; overflow-y: auto; padding: 0;">
                 <div id="tkSummaryTab" class="ticket-tab-content active p-20">
                     <div class="ticket-meta">
                         <span id="tkTipoDoc" class="doc-type"><?php echo L('ticket_type_sale'); ?></span>
@@ -418,16 +475,17 @@
                         <span class="label"><?php echo L('tpv_payment_method'); ?></span> <span id="tkMetodo">—</span>
                     </div>
 
+
                     <div id="tkLineas" class="ticket-items mt-16 mb-16"></div>
 
                     <div class="ticket-totals pt-16 border-top">
                         <div class="ticket-total-row label text-muted" id="tkSubtotalRow">
                             <span><?php echo L('tpv_subtotal'); ?></span><span id="tkSubtotal">—</span>
                         </div>
+                        <div id="tkIvaDesglose"></div>
                         <div id="tkDescRow" class="ticket-total-row d-none text-green">
                             <span id="tkDescLabel"><?php echo L('tpv_discount'); ?></span><span id="tkDescAmt">—</span>
                         </div>
-                        <div id="tkIvaDesglose"></div>
                         <div id="tkPuntosRow" class="ticket-total-row d-none text-green"></div>
                         <div id="tkValesRow" class="ticket-total-row d-none text-accent">
                             <span><?php echo L('ticket_label_voucher_paid'); ?></span><span id="tkValesAmt">—</span>
@@ -505,7 +563,8 @@
                     display: flex !important;
                     flex-wrap: nowrap !important;
                     gap: 8px !important;
-                    padding: 16px !important;
+                    padding: 16px 16px 45px 16px !important;
+                    box-sizing: border-box !important;
                     justify-content: center !important;
                     align-items: stretch !important;
                     background: var(--surface);
@@ -540,7 +599,7 @@
                 }
             </style>
             
-            <div class="tk-footer-grid" id="ticketFooter">
+            <div class="tk-footer-grid" id="ticketFooter" style="flex-shrink: 0;">
                 <button onclick="imprimirTicket()" class="btn-secondary btn-tk-action" title="<?php echo L('ticket_btn_print'); ?>">
                     <i class="fa-solid fa-print"></i> 
                     <span><?php echo L('ticket_btn_print'); ?></span>
@@ -551,8 +610,9 @@
                     <span>PDF</span>
                 </button>
                 
-                <button id="btnAnularTicket" class="btn-secondary btn-tk-action" style="background: var(--red-light); color: var(--red); border-color: var(--red); display: none;">
-                    <i class="fa-solid fa-ban"></i>
+                <button id="btnAnularTicket" class="btn-secondary btn-tk-action" style="background: var(--red-light); color: var(--red); border-color: var(--red); display: none;" title="<?php echo L('ticket_btn_void'); ?>">
+                    <i class="fa-solid fa-arrow-rotate-left"></i>
+                    <span><?php echo L('ticket_btn_void'); ?></span>
                 </button>
                 
                 <button id="btnNuevaVenta" onclick="nuevaVenta()" class="btn-save btn-tk-action fw-700">
@@ -610,6 +670,18 @@
                 </div>
             </div>
 
+            <div id="returnProductInfo" class="mb-12 p-12 br-12 bg-surface2 border-1 d-none" style="border-style: dashed;">
+                <div class="fs-14 fw-700 mb-4" id="returnProductName">Nombre del Producto</div>
+                <div class="d-flex ai-center gap-8">
+                    <span class="fs-10 px-8 py-4 br-6 fw-700 d-inline-flex ai-center gap-4" id="returnProductWarrantyBadge" style="background:var(--surface3);">
+                        <i class="fa-solid fa-shield-halved"></i> <span>Garantía: -- meses</span>
+                    </span>
+                    <span class="fs-10 px-8 py-4 br-6 fw-700 d-inline-flex ai-center gap-4 d-none" id="returnProductStatusBadge">
+                        <i class="fa-solid fa-circle-check"></i> <span>En plazo</span>
+                    </span>
+                </div>
+            </div>
+
             <!-- Indicadores de Plazo -->
             <div class="d-grid grid-2 gap-12 w-100">
                 <div id="statusCommercial" class="p-16 br-12 border d-flex flex-column ai-center jc-center gap-8 transition shadow-sm">
@@ -624,7 +696,7 @@
                 </div>
             </div>
 
-            <div class="form-group mb-0">
+            <div class="form-group mb-0" id="refundMethodSection">
                 <label class="form-label fw-600 mb-12 fs-13 text-muted tt-uppercase ls-1"><?php echo L('return_label_method'); ?>:</label>
                 <div class="d-flex flex-column gap-12" id="refundMethods">
                     <label class="method-option border br-12 p-16 d-flex ai-center gap-16 cp transition hover-bg-surface2" id="optCash">
@@ -649,15 +721,26 @@
                             <div class="fs-11 text-muted"><?php echo L('return_voucher_sub'); ?></div>
                         </div>
                     </label>
+                    <label class="method-option border br-12 p-16 d-flex ai-center gap-16 cp transition hover-bg-surface2" id="optCard">
+                        <div class="radio-custom d-flex ai-center jc-center">
+                            <input type="radio" name="metodoReembolso" value="tarjeta">
+                            <div class="radio-dot"></div>
+                        </div>
+                        <i class="fa-solid fa-credit-card fs-20 text-accent"></i>
+                        <div class="flex-1">
+                            <div class="fs-14 fw-700">Tarjeta</div>
+                            <div class="fs-11 text-muted">Devolución al terminal TPV</div>
+                        </div>
+                    </label>
                     <label class="method-option border br-12 p-16 d-flex ai-center gap-16 cp transition hover-bg-surface2" id="optExchange">
                         <div class="radio-custom d-flex ai-center jc-center">
                             <input type="radio" name="metodoReembolso" value="reemplazo">
                             <div class="radio-dot"></div>
                         </div>
-                        <i class="fa-solid fa-box-open fs-20 text-orange"></i>
+                        <i class="fa-solid fa-rotate fs-20 text-orange"></i>
                         <div class="flex-1">
-                            <div class="fs-14 fw-700"><?php echo L('return_warranty_desc'); ?></div>
-                            <div class="fs-11 text-muted"><?php echo L('return_warranty_sub'); ?></div>
+                            <div class="fs-14 fw-700">Sustitución / Cambio</div>
+                            <div class="fs-11 text-muted">Cambio por garantía (1:1)</div>
                         </div>
                     </label>
                 </div>
@@ -706,16 +789,51 @@
             </div>
 
 
-            <div class="form-group mb-0">
+            <!-- BLOQUE: TIPO DE GESTIÓN FISCAL -->
+            <div class="form-group mb-20 border-bottom pb-20">
+                <label class="form-label fw-600 mb-12 fs-13 text-muted tt-uppercase ls-1">Tipo de Gestión Fiscal:</label>
+                <div class="d-grid grid-2 gap-12">
+                    <label class="method-option border br-12 p-16 d-flex ai-center gap-12 cp transition hover-bg-surface2" id="fiscalRectification">
+                        <div class="radio-custom d-flex ai-center jc-center">
+                            <input type="radio" name="tipoGestionFiscal" value="rectificacion" checked>
+                            <div class="radio-dot"></div>
+                        </div>
+                        <i class="fa-solid fa-file-invoice fs-20 text-green"></i>
+                        <div class="flex-1">
+                            <div class="fs-13 fw-700">Rectificación</div>
+                            <div class="fs-11 text-muted">Original y Abono válidos (Verde)</div>
+                        </div>
+                    </label>
+                    <label class="method-option border br-12 p-16 d-none ai-center gap-12 cp transition hover-bg-surface2" id="fiscalAnulacion">
+                        <div class="radio-custom d-flex ai-center jc-center">
+                            <input type="radio" name="tipoGestionFiscal" value="anulacion">
+                            <div class="radio-dot"></div>
+                        </div>
+                        <i class="fa-solid fa-file-circle-xmark fs-20 text-red"></i>
+                        <div class="flex-1">
+                            <div class="fs-13 fw-700">Anulación</div>
+                            <div class="fs-11 text-muted">Invalida original (Amarillo)</div>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group mb-12">
                 <label class="form-label fw-600 mb-8"><?php echo L('client_label_notes'); ?>:</label>
+
+                <!-- Motivo libre -->
                 <select id="returnReason" class="form-input mb-8">
-                    <option value="Defectuoso"><?php echo L('return_reason_defective'); ?></option>
-                    <option value="Garantía"><?php echo L('return_reason_warranty'); ?></option>
-                    <option value="Error Cliente"><?php echo L('return_reason_error'); ?></option>
-                    <option value="Otro"><?php echo L('return_reason_other'); ?></option>
+                    <option value="Devolución de mercancía">Devolución de mercancía</option>
+                    <option value="Error en datos de factura">Error en datos / importe</option>
+                    <option value="Garantía / defecto">Defecto / garantía</option>
+                    <option value="Otro motivo">Otro motivo</option>
                 </select>
+
+
+
                 <textarea id="returnNote" class="form-input fs-12" placeholder="<?php echo L('client_comments_placeholder', true); ?>" rows="2"></textarea>
             </div>
+
 
             <div class="modal-footer full-width gap-12 pt-16 border-top">
                 <button onclick="document.getElementById('returnModal').classList.remove('visible')" class="btn-cancel m-0"><?php echo L('modal_close'); ?></button>
@@ -888,10 +1006,14 @@
             border-color: var(--red);
         }
     </style>
-    <script src="./webroot/js/validaciones.js?v=2"></script>
-    <script src="./webroot/js/utils_global.js?v=16"></script>
-    <script src="./webroot/js/main.js?v=31"></script>
-    <script src="./webroot/js/pagination.js?v=1"></script>
+    <!-- Generación de PDF en cliente -->
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script defer src="./webroot/js/validaciones.js?v=2"></script>
+    <script defer src="./webroot/js/utils_global.js?v=16"></script>
+    <?php if (isset($_SESSION['usuarioActualTPV']) && ($_SESSION['paginaEnCurso'] ?? '') !== 'Login'): ?>
+        <script defer src="./webroot/js/main.js?v=46"></script>
+        <script src="./webroot/js/app.js?v=46" type="module"></script>
+    <?php endif; ?>
     <!-- SISTEMA DE MODALES GLOBALES (ALERTAS Y CONFIRMACIONES) -->
     <div class="modal-overlay" id="globalAlertModal" style="z-index: 15000;">
         <div class="modal modal-content gap-16 ai-center w-400 text-center p-32">
@@ -981,6 +1103,21 @@
 
         function cerrarAlert() {
             document.getElementById('globalAlertModal').classList.remove('visible');
+        }
+
+        function showNotification(html, type = 'info') {
+            let notif = document.getElementById('ie-notif');
+            if (!notif) {
+                notif = document.createElement('div');
+                notif.id = 'ie-notif';
+                document.body.appendChild(notif);
+            }
+            const colors = { info: '#1a2fbf', success: '#0f8060', error: '#c0392b' };
+            notif.style.cssText = `position:fixed;bottom:24px;right:24px;background:${colors[type] || colors.info};color:white;padding:14px 20px;border-radius:12px;font-size:13px;font-weight:600;z-index:99999;box-shadow:0 4px 20px rgba(0,0,0,0.2);transition:opacity 0.3s;max-width:400px;line-height:1.4;`;
+            notif.innerHTML = html;
+            notif.style.opacity = '1';
+            clearTimeout(notif._timeout);
+            notif._timeout = setTimeout(() => { notif.style.opacity = '0'; }, 3500);
         }
 
         /**
@@ -1089,9 +1226,7 @@
             }
         }
     </script>
-    <?php if (isset($_SESSION['paginaEnCurso']) && $_SESSION['paginaEnCurso'] === 'inicioPrivado'): ?>
-        <script type="module" src="./webroot/js/app.js?v=16"></script>
-    <?php endif; ?>
+    <?php /* app.js is already loaded on line 1010 via the authenticated-user check. Loading it again here with a different ?v= creates a second isolated ES module instance, breaking shared state. */ ?>
 </body>
 
 </html>

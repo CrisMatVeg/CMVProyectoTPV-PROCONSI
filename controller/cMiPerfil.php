@@ -21,8 +21,7 @@ $aErrores = [
     'pass2' => null
 ];
 
-// Navegación Global
-if (isset($_REQUEST['volver']) || isset($_REQUEST['irDashboard'])) {
+if (isset($_REQUEST['volver'])) {
     $_SESSION['paginaEnCurso'] = 'Dashboard';
     header('Location: index.php');
     exit;

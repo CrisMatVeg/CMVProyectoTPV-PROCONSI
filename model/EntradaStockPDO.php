@@ -31,36 +31,17 @@ class EntradaStockPDO
         string $notas = '',
         ?PDO $db = null
     ): array {
-        // Auto-migración: asegurar que la tabla entradas_stock existe
-        static $tablaCreada = false;
-        if (!$tablaCreada) {
-            try {
-                // Crear tabla si no existe
-                DBPDO::ejecutarConsulta("CREATE TABLE IF NOT EXISTS entradas_stock (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    id_producto INT NOT NULL,
-                    cantidad INT NOT NULL,
-                    precio_coste DECIMAL(10,4) NOT NULL DEFAULT 0,
-                    cmp_anterior DECIMAL(10,4) NOT NULL DEFAULT 0,
-                    cmp_resultante DECIMAL(10,4) NOT NULL DEFAULT 0,
-                    stock_anterior INT NOT NULL DEFAULT 0,
-                    stock_nuevo INT NOT NULL DEFAULT 0,
-                    id_usuario INT DEFAULT NULL,
-                    notas TEXT DEFAULT NULL,
-                    fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    INDEX idx_producto (id_producto)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        // [REMOVIDO] No ejecutar DDL en runtime para evitar implicit commits.
+        // La tabla entradas_stock debe existir previamente asegurada por scripts SQL.
 
-            } catch (\Throwable $e) {
-                error_log("EntradaStockPDO: Error auto-migrando tabla entradas_stock: " . $e->getMessage());
-            }
-            $tablaCreada = true;
-        }
 
-        // 1. Obtener stock y CMP actuales del producto
-        $sqlProd = "SELECT p.precio_coste, p.stock_actual, p.precio_venta, p.margen
-                    FROM productos p WHERE p.id = :id";
-        
+        // 1. Obtener stock y CMP actuales del producto (con IVA para recalcular PVP correctamente)
+        $sqlProd = "SELECT p.precio_coste, p.stock_actual, p.precio_venta, p.margen,
+                           COALESCE(t.porcentaje, 21.0) AS iva_pct
+                    FROM productos p
+                    LEFT JOIN tipos_iva t ON p.id_tipo_iva = t.id
+                    WHERE p.id = :id";
+
         $stmt = ($db) ? $db->prepare($sqlProd) : null;
         if ($db) {
             $stmt->execute([':id' => $idProducto]);
@@ -78,6 +59,7 @@ class EntradaStockPDO
         $cmpActual      = (float)$prod['precio_coste'];
         $pvpActual      = (float)$prod['precio_venta'];
         $margen         = (float)($prod['margen'] ?? 0);
+        $ivaPct         = (float)($prod['iva_pct'] ?? 21.0);
 
         // IMPORTANTE: Para el cálculo del CMP, si el stock actual es negativo,
         // lo tratamos como 0 para no "corromper" la media ponderada con deudas de stock.
@@ -95,9 +77,10 @@ class EntradaStockPDO
         }
 
         // 2b. AJUSTE AUTOMÁTICO DE PVP SI HAY MARGEN DEFINIDO
+        // PVP = CMP × (1 + margen%) × (1 + IVA%)  — el CMP NO incluye IVA
         $pvpNuevo = $pvpActual;
         if ($margen > 0) {
-            $pvpNuevo = round($cmpNuevo * (1 + ($margen / 100)), 2);
+            $pvpNuevo = round($cmpNuevo * (1 + ($margen / 100)) * (1 + ($ivaPct / 100)), 2);
         }
 
         // 3. Actualizar el producto: precio_coste (CMP), stock y PVP (si cambió)

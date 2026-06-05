@@ -15,10 +15,11 @@ try {
     require_once __DIR__ . '/../model/DBPDO.php';
     require_once __DIR__ . '/../model/TarifaPrecioPDO.php';
     require_once __DIR__ . '/../model/Usuario.php';
+    require_once __DIR__ . '/../model/LogPDO.php';
 
     // session_start(); // Handled by csrf_check.php
-    if (!isset($_SESSION['usuarioActualTPV']) || $_SESSION['usuarioActualTPV']->getRol() !== 'admin') {
-        http_response_code(401);
+    if (!isset($_SESSION['usuarioActualTPV']) || !$_SESSION['usuarioActualTPV']->tienePermiso('gestionar_tarifas')) {
+        http_response_code(403);
         echo json_encode(['ok' => false, 'error' => 'No autorizado']);
         exit;
     }
@@ -43,7 +44,10 @@ try {
                 echo json_encode(['ok' => false, 'error' => 'Las tarifas deben ser condicionales (filtros de cliente, fechas o días). Para cambios generales permanentes usa el Ajuste Masivo de Precios.']);
                 break;
             }
-            TarifaPrecioPDO::añadir($input, $_SESSION['usuarioActualTPV']->getId());
+            TarifaPrecioPDO::agregar($input, $_SESSION['usuarioActualTPV']->getId());
+            LogPDO::addLog('CREATE_TARIFA', "Tarifa creada: {$input['nombre']}", [
+                'nombre' => $input['nombre'], 'tipo' => $input['tipo'] ?? '', 'valor' => $input['valor'] ?? null, 'scope' => $input['scope'] ?? 'todos',
+            ]);
             echo json_encode(['ok' => true]);
             break;
 
@@ -60,6 +64,9 @@ try {
                 break;
             }
             TarifaPrecioPDO::editar($id, $input);
+            LogPDO::addLog('UPDATE_TARIFA', "Tarifa #{$id} actualizada: {$input['nombre']}", [
+                'id' => $id, 'nombre' => $input['nombre'],
+            ]);
             echo json_encode(['ok' => true]);
             break;
 
@@ -69,6 +76,9 @@ try {
             $tarifa = TarifaPrecioPDO::obtenerPorId($id);
             if ($tarifa && $tarifa['aplicada']) throw new Exception('No se puede eliminar una tarifa que ya ha sido aplicada permanentemente');
             TarifaPrecioPDO::eliminar($id);
+            LogPDO::addLog('DELETE_TARIFA', "Tarifa #{$id} eliminada: " . ($tarifa['nombre'] ?? ''), [
+                'id' => $id, 'nombre' => $tarifa['nombre'] ?? '',
+            ]);
             echo json_encode(['ok' => true]);
             break;
 
@@ -76,6 +86,9 @@ try {
             $id = (int)($input['id'] ?? 0);
             if ($id <= 0) throw new Exception('ID de tarifa inválido');
             $activo = TarifaPrecioPDO::toggleActivo($id);
+            LogPDO::addLog('TOGGLE_TARIFA', "Tarifa #{$id} " . ($activo ? 'activada' : 'desactivada'), [
+                'id' => $id, 'activo' => (bool)$activo,
+            ]);
             echo json_encode(['ok' => true, 'activo' => $activo]);
             break;
 
@@ -113,8 +126,11 @@ function validarTarifa(array $d): array
     if (!in_array($d['tipo'] ?? '', ['percent', 'amount'], true)) {
         $err['tipo'] = 'Tipo no válido';
     }
-    if (!isset($d['valor']) || !is_numeric($d['valor'])) {
-        $err['valor'] = 'Valor inválido';
+    $val = isset($d['valor']) ? (float)$d['valor'] : 0;
+    if (!is_numeric($d['valor'] ?? null) || $val <= 0) {
+        $err['valor'] = 'El valor debe ser mayor que 0';
+    } elseif (($d['tipo'] ?? '') === 'percent' && $val > 100) {
+        $err['valor'] = 'El porcentaje no puede ser superior al 100%';
     }
 
     $scope = $d['scope'] ?? 'todos';
@@ -137,6 +153,8 @@ function esTarifaCondicional(array $d): bool
 {
     return (!empty($d['tipo_cliente']) || 
             !empty($d['roles_segmento']) || 
+            !empty($d['cliente_ids']) || 
+            !empty($d['id_cliente']) || 
             !empty($d['dias_semana']) || 
             !empty($d['hora_inicio']) || 
             !empty($d['hora_fin']) || 

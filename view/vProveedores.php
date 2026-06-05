@@ -2,16 +2,21 @@
 
     <!-- CABECERA DE SECCIÓN -->
     <div class="section-header container-wider">
-        <div class="section-title">
-            <h1><?php echo L('dashboard_btn_providers'); ?></h1>
-            <p><?php echo L('dashboard_btn_providers_sub'); ?></p>
+        <div class="d-flex ai-center gap-16">
+            <a href="index.php?irDashboard=1" class="btn-prominent-back compact" title="<?php echo L('login_back'); ?>">
+                <i class="fa-solid fa-chevron-left"></i>
+                <span><?php echo L('login_back'); ?></span>
+            </a>
+            <div class="vr" style="height: 32px; width: 1px; background: var(--border); opacity: 0.5;"></div>
+            <div class="section-title">
+                <h1><?php echo L('dashboard_btn_providers'); ?></h1>
+                <p><?php echo L('dashboard_btn_providers_sub'); ?></p>
+            </div>
         </div>
         <div class="d-flex gap-12 ai-center">
-            <a href="index.php?irDashboard=1" class="btn-back">
-                <?php echo L('login_back'); ?>
-            </a>
             <button onclick="abrirModalProveedor()" class="btn-add">
                 <i class="fa-solid fa-truck-field"></i> <?php echo L('prov_btn_new'); ?>
+            </button>
         </div>
     </div>
 
@@ -78,6 +83,9 @@
                             </td>
                             <td class="text-center">
                                 <div class="d-flex jc-center gap-8 pr-20">
+                                    <button class="btn-icon" onclick='verHistorialProveedor(<?php echo json_encode($p); ?>)' title="<?php echo L('prov_btn_history'); ?>" style="color: var(--accent);">
+                                        <i class="fa-solid fa-clock-rotate-left"></i>
+                                    </button>
                                     <button class="btn-icon" onclick='editarProveedor(<?php echo json_encode($p); ?>)' title="<?php echo L('user_tip_edit'); ?>">
                                         <i class="fa-solid fa-pen"></i>
                                     </button>
@@ -133,6 +141,11 @@
                         <label class="form-label"><?php echo L('prov_label_email'); ?></label>
                         <input type="email" id="provEmail" class="form-input" placeholder="<?php echo L('prov_placeholder_email'); ?>">
                     </div>
+
+                    <div class="form-group">
+                        <label class="form-label"><?php echo L('prov_label_due_days'); ?></label>
+                        <input type="number" id="provVencimientoDias" class="form-input" min="0" placeholder="<?php echo L('prov_placeholder_due_days'); ?>">
+                    </div>
  
                     <div class="form-group">
                         <label class="form-label"><?php echo L('prov_label_address'); ?></label>
@@ -156,7 +169,7 @@
             <div id="tabProductos" class="tab-pane d-none">
                 <div class="d-grid grid-2 gap-24 ai-start">
                     <!-- PANEL IZQUIERDO: SELECCIÓN -->
-                    <div class="panel-selection">
+                    <div class="panel-selection" style="display: flex; flex-direction: column; max-height: 420px;">
                         <h3 class="fs-14 font-bold mb-12 d-flex ai-center gap-8 text-accent">
                             <i class="fa-solid fa-list-check"></i> <?php echo L('prov_label_catalog'); ?>
                         </h3>
@@ -165,12 +178,12 @@
                             <input type="text" class="form-input pl-36" id="searchProductosLibres" placeholder="<?php echo L('prod_search_placeholder'); ?>" onkeyup="buscarProductosAlEscribir(event)">
                         </div>
 
-                        <div id="checklistCont">
+                        <div id="checklistCont" style="flex: 1; overflow-y: auto; min-height: 0;">
                             <!-- Checklist de productos cargados aquí -->
                             <div class="p-40 text-center text-muted fs-13"><?php echo L('loading'); ?></div>
                         </div>
 
-                        <div class="d-flex ai-center jc-between mt-auto">
+                        <div class="d-flex ai-center jc-between pt-12 mt-auto" style="flex-shrink: 0;">
                             <span class="fs-12 text-muted"><?php echo L('selected'); ?>: <strong id="countSelectedSearch" class="text-accent">0</strong></span>
                             <button class="btn-vincular" onclick="vincularSeleccionados()">
                                 <i class="fa-solid fa-plus"></i> <?php echo L('prov_btn_link'); ?>
@@ -179,11 +192,11 @@
                     </div>
 
                     <!-- PANEL DERECHO: VINCULADOS -->
-                    <div class="panel-associated">
+                    <div class="panel-associated" style="display: flex; flex-direction: column; max-height: 420px;">
                         <h3 class="fs-14 font-bold mb-12 d-flex ai-center gap-8">
                             <i class="fa-solid fa-link"></i> <?php echo L('prov_label_linked'); ?>
                         </h3>
-                        <div class="table-container m-0 border br-12 overflow-auto bg-white flex-1">
+                        <div class="table-container m-0 border br-12 overflow-auto bg-white" style="flex: 1; min-height: 0;">
                             <table class="data-table">
                                 <thead class="pos-sticky top-0 z-10 bg-surface1">
                                     <tr>
@@ -204,6 +217,39 @@
     </div>
 </div>
 
+<!-- MODAL HISTORIAL DE PEDIDOS -->
+<div id="modalHistorial" class="modal-overlay-bg">
+    <div class="modal-content w-modal-lg" style="max-width: 1000px; border-radius: 20px; overflow: hidden; display: flex; flex-direction: column; max-height: 90vh; border: 1px solid var(--border); box-shadow: var(--shadow-lg);">
+        <div class="modal-header">
+            <h2 id="modalHistorialTitle"><?php echo L('prov_modal_history_title'); ?></h2>
+            <button class="btn-close-modal" onclick="cerrarModalHistorial()">&times;</button>
+        </div>
+        
+        <div class="flex-1 overflow-auto p-24 bg-surface2">
+            <div class="table-container m-0 border br-12 overflow-hidden bg-white">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th class="pl-20"><?php echo L('purchase_th_albaran'); ?></th>
+                            <th><?php echo L('purchase_th_invoice_date'); ?></th>
+                            <th class="text-right"><?php echo L('purchase_total_albaran'); ?></th>
+                            <th class="text-center"><?php echo L('prod_th_status'); ?></th>
+                            <th class="text-center pr-20"><?php echo L('prod_th_actions'); ?></th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbodyHistorial">
+                        <!-- Historial cargado aquí -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div class="modal-footer p-16 bg-surface1 border-top">
+            <button type="button" class="btn-cancel" onclick="cerrarModalHistorial()"><?php echo L('modal_cancel'); ?></button>
+        </div>
+    </div>
+</div>
+
 <script>
     function filtrarProveedores() {
         const term = document.getElementById('provSearch').value.toLowerCase().trim();
@@ -215,13 +261,21 @@
     }
 
     let selectedForLinking = [];
+    let toVincularNuevo = [];   // objetos {id,nombre,referencia,stock_actual} para nuevo proveedor
+    let productLookup = {};     // id -> objeto producto (para recuperar datos al confirmar)
+    let esNuevoProveedor = false;
 
     function abrirModalProveedor() {
         document.getElementById('formProveedor').reset();
         document.getElementById('provId').value = '';
+        document.getElementById('provVencimientoDias').value = '0';
         document.getElementById('modalProveedorTitle').innerText = "<?php echo L('prov_modal_new_title'); ?>";
         document.getElementById('divProvActivo').style.display = 'none';
-        document.getElementById('tabBtnProductos').style.display = 'none';
+        document.getElementById('tabBtnProductos').style.display = 'flex';
+        esNuevoProveedor = true;
+        selectedForLinking = [];
+        toVincularNuevo = [];
+        productLookup = {};
         cambiarTab('general');
         document.getElementById('modalProveedor').style.display = 'flex';
     }
@@ -229,6 +283,9 @@
     function cerrarModalProveedor() {
         document.getElementById('modalProveedor').style.display = 'none';
         selectedForLinking = [];
+        toVincularNuevo = [];
+        productLookup = {};
+        esNuevoProveedor = false;
         document.getElementById('countSelectedSearch').innerText = '0';
         document.getElementById('searchProductosLibres').value = '';
     }
@@ -240,11 +297,15 @@
         document.getElementById('provTel').value = p.telefono;
         document.getElementById('provEmail').value = p.email;
         document.getElementById('provDireccion').value = p.direccion;
-        // document.getElementById('provRE').checked = p.aplica_re == 1; // Ya no se usa toggle
+        document.getElementById('provVencimientoDias').value = p.vencimiento_dias || 0;
         document.getElementById('provActivo').checked = p.activo == 1;
         document.getElementById('divProvActivo').style.display = 'flex';
         document.getElementById('modalProveedorTitle').innerText = "<?php echo L('prov_modal_edit_title'); ?>: " + p.nombre;
         document.getElementById('tabBtnProductos').style.display = 'flex';
+        esNuevoProveedor = false;
+        selectedForLinking = [];
+        toVincularNuevo = [];
+        productLookup = {};
         cambiarTab('general');
         document.getElementById('modalProveedor').style.display = 'flex';
     }
@@ -253,7 +314,7 @@
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         document.querySelectorAll('.tab-pane').forEach(p => {
             p.classList.add('d-none');
-            p.style.display = 'none'; // Ensure hidden completely
+            p.style.display = 'none';
         });
 
         if (tab === 'general') {
@@ -265,11 +326,15 @@
             document.getElementById('tabBtnProductos').classList.add('active');
             const pane = document.getElementById('tabProductos');
             pane.classList.remove('d-none');
-            pane.style.display = 'block'; // Or 'grid' if d-grid works fine
+            pane.style.display = 'block';
             selectedForLinking = [];
             document.getElementById('countSelectedSearch').innerText = '0';
-            lanzarBusquedaProductos(''); // Cargar todos al inicio
-            cargarProductosProveedor();
+            lanzarBusquedaProductos('');
+            if (esNuevoProveedor) {
+                renderizarProductosPendientes();
+            } else {
+                cargarProductosProveedor();
+            }
         }
     }
 
@@ -310,6 +375,31 @@
         }
     }
 
+    function renderizarProductosPendientes() {
+        const tbody = document.getElementById('tbodyProvProductos');
+        if (toVincularNuevo.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3" class="text-center p-40 text-muted"><?php echo L('prov_js_no_linked'); ?></td></tr>';
+            return;
+        }
+        tbody.innerHTML = '';
+        toVincularNuevo.forEach(p => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>
+                    <div class="font-bold fs-13">${p.nombre}</div>
+                    <div class="fs-11 text-muted font-mono">${p.referencia}</div>
+                </td>
+                <td class="text-right font-mono">${p.stock_actual}</td>
+                <td class="text-center">
+                    <button class="btn-icon text-red" onclick="desvincularProducto(${p.id})" title="<?php echo L('prov_js_unlink'); ?>">
+                        <i class="fa-solid fa-link-slash"></i>
+                    </button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
     let searchTimer;
 
     function buscarProductosAlEscribir(e) {
@@ -323,15 +413,24 @@
         const cont = document.getElementById('checklistCont');
 
         try {
-            const res = await fetch(`api/productos_proveedor.php?accion=buscar_libres&term=${term}&id_proveedor=${idProv}`);
+            const res = await fetch(`api/productos_proveedor.php?accion=buscar_libres&term=${encodeURIComponent(term)}&id_proveedor=${idProv}`);
             const data = await res.json();
             if (data.success) {
-                if (data.productos.length === 0) {
+                // En modo nuevo: excluir los ya comprometidos localmente
+                const vinculadosIds = toVincularNuevo.map(p => p.id);
+                const productos = esNuevoProveedor
+                    ? data.productos.filter(p => !vinculadosIds.includes(p.id))
+                    : data.productos;
+
+                // Guardar datos para recuperarlos al confirmar vinculación
+                productos.forEach(p => { productLookup[p.id] = p; });
+
+                if (productos.length === 0) {
                     cont.innerHTML = '<div class="p-40 text-center text-muted fs-13"><?php echo L('prod_no_results_short'); ?></div>';
                     return;
                 }
                 cont.innerHTML = '';
-                data.productos.forEach(p => {
+                productos.forEach(p => {
                     const isSelected = selectedForLinking.includes(p.id);
                     const div = document.createElement('div');
                     div.className = 'item-check' + (isSelected ? ' selected' : '');
@@ -363,21 +462,28 @@
     }
 
     async function vincularSeleccionados() {
-        const ids = selectedForLinking;
-        if (ids.length === 0) return showCustomAlert("<?php echo L('prod_th_status'); ?>", "<?php echo L('prov_js_select_vinc'); ?>", 'warning');
+        if (selectedForLinking.length === 0) return showCustomAlert("<?php echo L('prod_th_status'); ?>", "<?php echo L('prov_js_select_vinc'); ?>", 'warning');
+
+        if (esNuevoProveedor) {
+            // Mover seleccionados al panel derecho (aún sin ID de proveedor)
+            selectedForLinking.forEach(id => {
+                if (!toVincularNuevo.some(p => p.id === id) && productLookup[id]) {
+                    toVincularNuevo.push(productLookup[id]);
+                }
+            });
+            selectedForLinking = [];
+            document.getElementById('countSelectedSearch').innerText = '0';
+            renderizarProductosPendientes();
+            lanzarBusquedaProductos(document.getElementById('searchProductosLibres').value);
+            return;
+        }
 
         const idProv = document.getElementById('provId').value;
         try {
             const res = await fetch('api/productos_proveedor.php', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    accion: 'vincular',
-                    id_proveedor: idProv,
-                    ids: ids
-                })
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ accion: 'vincular', id_proveedor: idProv, ids: selectedForLinking })
             });
             const data = await res.json();
             if (data.success) {
@@ -392,6 +498,14 @@
     }
 
     async function desvincularProducto(id) {
+        if (esNuevoProveedor) {
+            // Quitar del panel derecho local sin tocar la BD
+            toVincularNuevo = toVincularNuevo.filter(p => p.id !== id);
+            renderizarProductosPendientes();
+            lanzarBusquedaProductos(document.getElementById('searchProductosLibres').value);
+            return;
+        }
+
         showCustomConfirm(
             "<?php echo L('prov_js_unlink'); ?>",
             "<?php echo L('prov_js_unlink_confirm'); ?>",
@@ -399,13 +513,8 @@
                 try {
                     const res = await fetch('api/productos_proveedor.php', {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            accion: 'desvincular',
-                            ids: [id]
-                        })
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ accion: 'desvincular', ids: [id] })
                     });
                     const data = await res.json();
                     if (data.success) {
@@ -430,7 +539,8 @@
             telefono: document.getElementById('provTel').value,
             email: document.getElementById('provEmail').value,
             direccion: document.getElementById('provDireccion').value,
-            aplica_re: 1, // Siempre aplicado
+            vencimiento_dias: parseInt(document.getElementById('provVencimientoDias').value) || 0,
+            aplica_re: 1,
             activo: document.getElementById('provActivo').checked ? 1 : 0
         };
 
@@ -447,16 +557,73 @@
         try {
             const res = await fetch('api/proveedores.php', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
             });
             const result = await res.json();
-            if (result.success) window.location.reload();
-            else showCustomAlert("<?php echo L('prod_js_error'); ?>", result.error || "<?php echo L('prod_js_error'); ?>", 'error');
+            if (result.success) {
+                // Si es nuevo proveedor y hay productos pendientes, vincularlos ahora
+                if (esNuevoProveedor && toVincularNuevo.length > 0 && result.id) {
+                    await fetch('api/productos_proveedor.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            accion: 'vincular',
+                            id_proveedor: result.id,
+                            ids: toVincularNuevo.map(p => p.id)
+                        })
+                    });
+                }
+                window.location.reload();
+            } else {
+                showCustomAlert("<?php echo L('prod_js_error'); ?>", result.error || "<?php echo L('prod_js_error'); ?>", 'error');
+            }
         } catch (err) {
             showCustomAlert("<?php echo L('prod_js_error'); ?>", "<?php echo L('prod_js_error'); ?>", 'error');
         }
+    }
+
+    async function verHistorialProveedor(p) {
+        document.getElementById('modalHistorialTitle').innerText = "<?php echo L('prov_modal_history_title'); ?> " + p.nombre;
+        const tbody = document.getElementById('tbodyHistorial');
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center p-20"><?php echo L('loading'); ?></td></tr>';
+        document.getElementById('modalHistorial').style.display = 'flex';
+
+        try {
+            const res = await fetch(`api/compras.php?type=albaranes&proveedor_id=${p.id}`);
+            const data = await res.json();
+            
+            if (data && data.length > 0) {
+                tbody.innerHTML = '';
+                data.forEach(a => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td class="pl-20 font-bold">${a.numero_albaran}</td>
+                        <td>${a.fecha}</td>
+                        <td class="text-right font-mono">${parseFloat(a.total || 0).toFixed(2)}€</td>
+                        <td class="text-center">
+                            <span class="status-pill status-${a.estado === 'facturado' ? 'active' : 'pending'}">
+                                ${a.estado.charAt(0).toUpperCase() + a.estado.slice(1)}
+                            </span>
+                        </td>
+                        <td class="text-center pr-20">
+                            <button class="btn-icon" onclick="window.location.href='index.php?irCompras=1&id_albaran=${a.id}'" title="<?php echo L('purchase_modal_details_title'); ?>">
+                                <i class="fa-solid fa-eye"></i>
+                            </button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } else {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center p-40 text-muted"><?php echo L('purchase_no_albaranes'); ?></td></tr>';
+            }
+        } catch (err) {
+            console.error(err);
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-red p-20"><?php echo L('prod_js_error'); ?></td></tr>';
+        }
+    }
+
+    function cerrarModalHistorial() {
+        document.getElementById('modalHistorial').style.display = 'none';
     }
 </script>

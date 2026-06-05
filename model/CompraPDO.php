@@ -11,8 +11,7 @@ class CompraPDO
     public static function registrarAlbaran($proveedor_id, $numero_albaran, $fecha, $lineas)
     {
         try {
-            $db = new PDO(DSN, USERNAME, PASSWORD);
-            $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+            $db = DBPDO::getPDO();
 
             $db->beginTransaction();
 
@@ -40,7 +39,7 @@ class CompraPDO
             $total = $base_imponible + $iva_total + $re_total;
 
             $sqlAlbaran = "INSERT INTO albaranes_compra (proveedor_id, numero_albaran, fecha, base_imponible, iva_total, re_total, total, estado) 
-                           VALUES (?, ?, ?, ?, ?, ?, ?, 'pendiente')";
+                           VALUES (?, ?, ?, ?, ?, ?, ?, 'recibido')";
             $stmt = $db->prepare($sqlAlbaran);
             $stmt->execute([$proveedor_id, $numero_albaran, $fecha, $base_imponible, $iva_total, $re_total, $total]);
             $albaran_id = $db->lastInsertId();
@@ -50,24 +49,41 @@ class CompraPDO
                              VALUES (?, ?, ?, ?, ?, ?)";
                 $stmt = $db->prepare($sqlLinea);
                 $stmt->execute([$albaran_id, $l['producto_id'], $l['cantidad'], $l['precio_coste_neto'], $l['iva_pct'], $l['re_pct']]);
+            }
 
-                // Actualizar Stock y CMP e insertar en entradas_stock
-                $ivaUnitario = $l['precio_coste_neto'] * ($l['iva_pct'] / 100);
-                $reUnitario = 0;
-                if ($oProv->getAplicaRe()) {
-                    $reUnitario = $l['precio_coste_neto'] * ($l['re_pct'] / 100);
-                }
+            $db->commit();
+            return $albaran_id;
+        } catch (Exception $e) {
+            if (isset($db)) $db->rollBack();
+            error_log("Error en CompraPDO::registrarAlbaran: " . $e->getMessage());
+            throw $e;
+        }
+    }
 
-                $costeAdquisicionUnitario = $l['precio_coste_neto'] + $ivaUnitario + $reUnitario;
+    public static function validarAlbaran($id)
+    {
+        try {
+            $db = DBPDO::getPDO();
+            $db->beginTransaction();
 
-                $notas = "Albarán: $numero_albaran";
-                // Get the user ID if available in session, else null
-                $idUsuario = null;
-                if (isset($_SESSION['usuarioActualTPV']) && is_object($_SESSION['usuarioActualTPV'])) {
-                    if (method_exists($_SESSION['usuarioActualTPV'], 'getId')) {
-                        $idUsuario = $_SESSION['usuarioActualTPV']->getId();
-                    }
-                }
+            // 1. Obtener datos del albarán y sus líneas
+            $albaran = self::obtenerDetalleAlbaran($id);
+            if (!$albaran) throw new Exception("Albarán no encontrado");
+            if ($albaran['estado'] !== 'recibido') throw new Exception("El albarán ya ha sido validado o procesado");
+
+            $oProv = ProveedorPDO::buscarPorId($albaran['proveedor_id']);
+            if (!$oProv) throw new Exception("Proveedor no encontrado");
+
+            // 2. Actualizar Stock y CMP para cada línea
+            foreach ($albaran['lineas'] as $l) {
+                // El IVA soportado NO forma parte del coste: es un impuesto repercutido al cliente.
+                // Solo el recargo de equivalencia (RE) es un coste real no recuperable.
+                $reUnitario = ($oProv->getAplicaRe()) ? $l['precio_coste_neto'] * ($l['re_pct'] / 100) : 0;
+                $costeAdquisicionUnitario = $l['precio_coste_neto'] + $reUnitario;
+
+                $notas = "Albarán validado: " . $albaran['numero_albaran'];
+                $idUsuario = (isset($_SESSION['usuarioActualTPV']) && is_object($_SESSION['usuarioActualTPV']) && method_exists($_SESSION['usuarioActualTPV'], 'getId')) 
+                             ? $_SESSION['usuarioActualTPV']->getId() : null;
 
                 EntradaStockPDO::registrarEntrada(
                     $l['producto_id'],
@@ -79,30 +95,45 @@ class CompraPDO
                 );
             }
 
+            // 3. Cambiar estado a 'validado'
+            $stmt = $db->prepare("UPDATE albaranes_compra SET estado = 'validado' WHERE id = ?");
+            $stmt->execute([$id]);
+
             $db->commit();
-            return $albaran_id;
+            return true;
         } catch (Exception $e) {
             if (isset($db)) $db->rollBack();
-            error_log("Error en CompraPDO::registrarAlbaran: " . $e->getMessage());
-            throw $e; // Relanzar para que la API capture el mensaje real
+            error_log("Error en CompraPDO::validarAlbaran: " . $e->getMessage());
+            return ["error" => $e->getMessage()];
         }
     }
 
-    public static function listarAlbaranes($soloPendientes = false)
+    public static function listarAlbaranes($soloPendientesFacturar = false, $proveedor_id = null)
     {
         try {
-            $db = new PDO(DSN, USERNAME, PASSWORD);
-            $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+            $db = DBPDO::getPDO();
 
             $sql = "SELECT a.*, p.nombre as proveedor_nombre FROM albaranes_compra a 
                     JOIN proveedores p ON a.proveedor_id = p.id";
-            if ($soloPendientes) {
-                $sql .= " WHERE a.estado = 'pendiente'";
+            $params = [];
+            
+            $where = [];
+            if ($soloPendientesFacturar) {
+                $where[] = "a.estado = 'validado'";
             }
+            if ($proveedor_id) {
+                $where[] = "a.proveedor_id = ?";
+                $params[] = $proveedor_id;
+            }
+            
+            if (!empty($where)) {
+                $sql .= " WHERE " . implode(" AND ", $where);
+            }
+            
             $sql .= " ORDER BY a.fecha DESC, a.id DESC";
 
             $stmt = $db->prepare($sql);
-            $stmt->execute();
+            $stmt->execute($params);
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
             error_log("Error en CompraPDO::listarAlbaranes: " . $e->getMessage());
@@ -113,8 +144,7 @@ class CompraPDO
     public static function obtenerDetalleAlbaran($id)
     {
         try {
-            $db = new PDO(DSN, USERNAME, PASSWORD);
-            $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+            $db = DBPDO::getPDO();
 
             $stmt = $db->prepare("SELECT a.*, p.nombre as proveedor_nombre FROM albaranes_compra a 
                                 JOIN proveedores p ON a.proveedor_id = p.id 
@@ -137,13 +167,23 @@ class CompraPDO
         }
     }
 
-    public static function registrarFactura($proveedor_id, $numero_factura, $fecha, $albaranes_ids, $metodo_pago)
+    public static function registrarFactura($proveedor_id, $numero_factura, $fecha, $albaranes_ids, $metodo_pago, $pagada = true)
     {
         try {
-            $db = new PDO(DSN, USERNAME, PASSWORD);
-            $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+            $db = DBPDO::getPDO();
 
             $db->beginTransaction();
+
+            $oProv = ProveedorPDO::buscarPorId($proveedor_id);
+            if (!$oProv) throw new Exception("Proveedor no encontrado");
+
+            // Calcular fecha de vencimiento
+            $fecha_vencimiento = $fecha;
+            if ($oProv->getVencimientoDias() > 0) {
+                $date = new DateTime($fecha);
+                $date->modify('+' . $oProv->getVencimientoDias() . ' days');
+                $fecha_vencimiento = $date->format('Y-m-d');
+            }
 
             // Calcular total sumando los albaranes
             $total = 0;
@@ -154,10 +194,10 @@ class CompraPDO
             $total = $stmtSum->fetch(PDO::FETCH_ASSOC)['total'] ?: 0;
 
             // 1. Crear Factura
-            $sqlFactura = "INSERT INTO facturas_compra_prov (proveedor_id, numero_factura, fecha_factura, total, metodo_pago, pagado) 
-                           VALUES (?, ?, ?, ?, ?, 1)";
+            $sqlFactura = "INSERT INTO facturas_compra_prov (proveedor_id, numero_factura, fecha_factura, fecha_vencimiento, total, metodo_pago, pagado) 
+                           VALUES (?, ?, ?, ?, ?, ?, ?)";
             $stmtFactura = $db->prepare($sqlFactura);
-            $stmtFactura->execute([$proveedor_id, $numero_factura, $fecha, $total, $metodo_pago]);
+            $stmtFactura->execute([$proveedor_id, $numero_factura, $fecha, $fecha_vencimiento, $total, $metodo_pago, $pagada ? 1 : 0]);
             $factura_id = $db->lastInsertId();
 
             // 2. Vincular Albaranes
@@ -165,19 +205,26 @@ class CompraPDO
             $stmtUpdateAlb = $db->prepare($sqlUpdateAlb);
             $stmtUpdateAlb->execute(array_merge([$factura_id], $albaranes_ids));
 
-            // 3. Si el pago es por caja, registrar gasto
-            if ($metodo_pago === 'caja') {
+            // 3. Si se marca como pagada y el pago es por caja, verificar efectivo y registrar gasto
+            if ($pagada && $metodo_pago === 'caja') {
                 require_once __DIR__ . '/CajaTurnoPDO.php';
                 $turno = CajaTurnoPDO::obtenerTurnoAbierto();
-                if ($turno) {
-                    $concepto = "Pago Factura Compra $numero_factura";
-                    // Usamos un nuevo tipo de movimiento 'gasto_compra'
-                    $db->prepare("INSERT INTO caja_movimientos (id_turno, tipo, importe, concepto) VALUES (?, 'retiro', ?, ?)")
-                        ->execute([$turno['id'], $total, $concepto]);
-
-                    $db->prepare("UPDATE caja_turnos SET total_retirado = total_retirado + ? WHERE id = ?")
-                        ->execute([$total, $turno['id']]);
+                if (!$turno) {
+                    throw new Exception("No hay un turno de caja abierto. Abre la caja antes de pagar en efectivo.");
                 }
+                $efectivoDisponible = CajaTurnoPDO::obtenerEfectivoActual();
+                if ($efectivoDisponible < $total) {
+                    throw new Exception(
+                        "Efectivo insuficiente en caja. Disponible: " . number_format($efectivoDisponible, 2, ',', '.') .
+                        " €, Necesario: " . number_format($total, 2, ',', '.') . " €"
+                    );
+                }
+                $concepto = "Pago Factura Compra $numero_factura";
+                $db->prepare("INSERT INTO caja_movimientos (id_turno, tipo, importe, concepto) VALUES (?, 'retiro', ?, ?)")
+                    ->execute([$turno['id'], $total, $concepto]);
+
+                $db->prepare("UPDATE caja_turnos SET total_retirado = total_retirado + ? WHERE id = ?")
+                    ->execute([$total, $turno['id']]);
             }
 
             $db->commit();
@@ -189,17 +236,69 @@ class CompraPDO
         }
     }
 
-    public static function listarFacturas()
+    public static function pagarFactura($id, $metodo_pago)
     {
         try {
-            $db = new PDO(DSN, USERNAME, PASSWORD);
-            $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+            $db = DBPDO::getPDO();
+            $db->beginTransaction();
+
+            $stmt = $db->prepare("SELECT * FROM facturas_compra_prov WHERE id = ?");
+            $stmt->execute([$id]);
+            $factura = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$factura) throw new Exception("Factura no encontrada");
+            if ($factura['pagado']) throw new Exception("La factura ya está pagada");
+
+            // 1. Marcar como pagada
+            $stmtUpdate = $db->prepare("UPDATE facturas_compra_prov SET pagado = 1, metodo_pago = ? WHERE id = ?");
+            $stmtUpdate->execute([$metodo_pago, $id]);
+
+            // 2. Si es por caja, verificar efectivo disponible y registrar gasto
+            if ($metodo_pago === 'caja') {
+                require_once __DIR__ . '/CajaTurnoPDO.php';
+                $turno = CajaTurnoPDO::obtenerTurnoAbierto();
+                if (!$turno) {
+                    throw new Exception("No hay un turno de caja abierto. Abre la caja antes de pagar en efectivo.");
+                }
+                $efectivoDisponible = CajaTurnoPDO::obtenerEfectivoActual();
+                if ($efectivoDisponible < $factura['total']) {
+                    throw new Exception(
+                        "Efectivo insuficiente en caja. Disponible: " . number_format($efectivoDisponible, 2, ',', '.') .
+                        " €, Necesario: " . number_format((float)$factura['total'], 2, ',', '.') . " €"
+                    );
+                }
+                $concepto = "Pago Factura Compra " . $factura['numero_factura'];
+                $db->prepare("INSERT INTO caja_movimientos (id_turno, tipo, importe, concepto) VALUES (?, 'retiro', ?, ?)")
+                    ->execute([$turno['id'], $factura['total'], $concepto]);
+
+                $db->prepare("UPDATE caja_turnos SET total_retirado = total_retirado + ? WHERE id = ?")
+                    ->execute([$factura['total'], $turno['id']]);
+            }
+
+            $db->commit();
+            return true;
+        } catch (Exception $e) {
+            if (isset($db)) $db->rollBack();
+            error_log("Error en CompraPDO::pagarFactura: " . $e->getMessage());
+            return ["error" => $e->getMessage()];
+        }
+    }
+
+    public static function listarFacturas($proveedor_id = null)
+    {
+        try {
+            $db = DBPDO::getPDO();
 
             $sql = "SELECT f.*, p.nombre as proveedor_nombre FROM facturas_compra_prov f 
-                    JOIN proveedores p ON f.proveedor_id = p.id 
-                    ORDER BY f.fecha_factura DESC, f.id DESC";
+                    JOIN proveedores p ON f.proveedor_id = p.id";
+            $params = [];
+            if ($proveedor_id) {
+                $sql .= " WHERE f.proveedor_id = ?";
+                $params[] = $proveedor_id;
+            }
+            $sql .= " ORDER BY f.fecha_factura DESC, f.id DESC";
             $stmt = $db->prepare($sql);
-            $stmt->execute();
+            $stmt->execute($params);
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
             error_log("Error en CompraPDO::listarFacturas: " . $e->getMessage());
@@ -210,8 +309,7 @@ class CompraPDO
     public static function obtenerDetalleFactura($id)
     {
         try {
-            $db = new PDO(DSN, USERNAME, PASSWORD);
-            $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+            $db = DBPDO::getPDO();
 
             $stmt = $db->prepare("SELECT f.*, p.nombre as proveedor_nombre FROM facturas_compra_prov f 
                                 JOIN proveedores p ON f.proveedor_id = p.id 

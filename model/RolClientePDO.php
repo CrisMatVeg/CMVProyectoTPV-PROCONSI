@@ -19,9 +19,18 @@ class RolClientePDO
     }
 
     /**
+     * Elimina un rol de cliente y reasigna sus clientes a 'general'.
+     */
+    public static function eliminarRol(string $nombre): void
+    {
+        DBPDO::ejecutarConsulta("UPDATE clientes SET rol = 'general' WHERE rol = :n", [':n' => $nombre]);
+        DBPDO::ejecutarConsulta("DELETE FROM roles_cliente WHERE nombre = :n", [':n' => $nombre]);
+    }
+
+    /**
      * Añade un nuevo rol de cliente.
      */
-    public static function añadirRol(string $nombre): int
+    public static function agregarRol(string $nombre): int
     {
         $nombre = strtolower(trim($nombre));
         $sql = "INSERT INTO roles_cliente (nombre) VALUES (:n)";

@@ -14,10 +14,11 @@ try {
     require_once __DIR__ . '/../model/DBPDO.php';
     require_once __DIR__ . '/../model/TipoIVAPDO.php';
     require_once __DIR__ . '/../model/Usuario.php';
+    require_once __DIR__ . '/../model/LogPDO.php';
 
     // session_start(); // Handled by csrf_check.php
-    if (!isset($_SESSION['usuarioActualTPV']) || $_SESSION['usuarioActualTPV']->getRol() !== 'admin') {
-        http_response_code(401);
+    if (!isset($_SESSION['usuarioActualTPV']) || !$_SESSION['usuarioActualTPV']->tienePermiso('gestionar_iva')) {
+        http_response_code(403);
         echo json_encode(['ok' => false, 'error' => 'No autorizado']);
         exit;
     }
@@ -43,7 +44,10 @@ try {
                 echo json_encode(['ok' => false, 'aErrores' => $errores]);
                 break;
             }
-            TipoIVAPDO::añadir($input);
+            TipoIVAPDO::agregar($input);
+            LogPDO::addLog('CREATE_TIPO_IVA', "Tipo IVA creado: {$input['nombre']} ({$input['codigo']} - {$input['porcentaje']}%)", [
+                'codigo' => $input['codigo'], 'nombre' => $input['nombre'], 'porcentaje' => $input['porcentaje'],
+            ]);
             echo json_encode(['ok' => true]);
             break;
 
@@ -64,6 +68,9 @@ try {
                 break;
             }
             TipoIVAPDO::editar($id, $input);
+            LogPDO::addLog('UPDATE_TIPO_IVA', "Tipo IVA #{$id} actualizado: {$input['nombre']} ({$input['codigo']} - {$input['porcentaje']}%)", [
+                'id' => $id, 'codigo' => $input['codigo'], 'nombre' => $input['nombre'], 'porcentaje' => $input['porcentaje'],
+            ]);
 
             $hoy    = date('Y-m-d');
             $codigo = $input['codigo'];
@@ -87,7 +94,24 @@ try {
             if ($id <= 0) {
                 throw new Exception('ID de tipo de IVA inválido');
             }
+            $tipoIva = TipoIVAPDO::obtenerPorId($id);
+            if (!$tipoIva) {
+                echo json_encode(['ok' => false, 'error' => 'Tipo de IVA no encontrado.']);
+                break;
+            }
+            if ($tipoIva['activo']) {
+                echo json_encode(['ok' => false, 'error' => 'No se puede eliminar un tipo de IVA activo. Desactívalo primero.']);
+                break;
+            }
+            $nProductos = TipoIVAPDO::contarProductos($id);
+            if ($nProductos > 0) {
+                echo json_encode(['ok' => false, 'error' => "No se puede eliminar: {$nProductos} producto(s) tienen asignado este tipo de IVA."]);
+                break;
+            }
             TipoIVAPDO::eliminar($id);
+            LogPDO::addLog('DELETE_TIPO_IVA', "Tipo IVA #{$id} eliminado: {$tipoIva['nombre']} ({$tipoIva['codigo']})", [
+                'id' => $id, 'codigo' => $tipoIva['codigo'], 'nombre' => $tipoIva['nombre'],
+            ]);
             echo json_encode(['ok' => true]);
             break;
 

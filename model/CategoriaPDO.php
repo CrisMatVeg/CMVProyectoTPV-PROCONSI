@@ -11,12 +11,25 @@ class CategoriaPDO
 {
     public static function listarTodas(): array
     {
+        $cacheKey = '_cache_categorias';
+        $tsKey    = '_cache_categorias_ts';
+        if (isset($_SESSION[$cacheKey], $_SESSION[$tsKey]) && (time() - $_SESSION[$tsKey]) < 300) {
+            return $_SESSION[$cacheKey];
+        }
         $sql = "SELECT * FROM categorias ORDER BY nombre ASC";
         $q = DBPDO::ejecutarConsulta($sql);
-        return $q->fetchAll(PDO::FETCH_ASSOC);
+        $rows = $q->fetchAll(PDO::FETCH_ASSOC);
+        $_SESSION[$cacheKey] = $rows;
+        $_SESSION[$tsKey]    = time();
+        return $rows;
     }
 
-    public static function añadir(string $codigo, string $nombre): bool
+    private static function invalidarCache(): void
+    {
+        unset($_SESSION['_cache_categorias'], $_SESSION['_cache_categorias_ts']);
+    }
+
+    public static function agregar(string $codigo, string $nombre): bool
     {
         $sql = "INSERT INTO categorias (codigo, nombre) VALUES (:codigo, :nombre)";
         try {
@@ -24,6 +37,7 @@ class CategoriaPDO
                 ':codigo' => strtolower(trim($codigo)),
                 ':nombre' => trim($nombre)
             ]);
+            self::invalidarCache();
             return true;
         } catch (Exception $e) {
             return false;
@@ -35,6 +49,7 @@ class CategoriaPDO
         $sql = "DELETE FROM categorias WHERE id = :id";
         try {
             DBPDO::ejecutarConsulta($sql, [':id' => $id]);
+            self::invalidarCache();
             return true;
         } catch (Exception $e) {
             return false;
@@ -84,6 +99,47 @@ class CategoriaPDO
             ]);
 
             $db->commit();
+            self::invalidarCache();
+            return true;
+        } catch (Exception $e) {
+            if (isset($db)) $db->rollBack();
+            return false;
+        }
+    }
+
+    /**
+     * Actualiza el nombre y código de una categoría.
+     */
+    public static function editar(int $id, string $codigo, string $nombre): bool
+    {
+        try {
+            $db = DBPDO::getPDO();
+            $db->beginTransaction();
+
+            // 1. Obtener código antiguo para actualizar productos si el código cambia
+            $sqlOld = "SELECT codigo FROM categorias WHERE id = :id";
+            $qOld = DBPDO::ejecutarConsulta($sqlOld, [':id' => $id]);
+            $oldCode = $qOld->fetchColumn();
+
+            // 2. Actualizar la categoría
+            $sql = "UPDATE categorias SET codigo = :codigo, nombre = :nombre WHERE id = :id";
+            DBPDO::ejecutarConsulta($sql, [
+                ':id' => $id,
+                ':codigo' => strtolower(trim($codigo)),
+                ':nombre' => trim($nombre)
+            ]);
+
+            // 3. Si el código cambió, actualizar los productos vinculados
+            if ($oldCode && $oldCode !== strtolower(trim($codigo))) {
+                $sqlProd = "UPDATE productos SET categoria = :newCode WHERE categoria = :oldCode";
+                DBPDO::ejecutarConsulta($sqlProd, [
+                    ':newCode' => strtolower(trim($codigo)),
+                    ':oldCode' => $oldCode
+                ]);
+            }
+
+            $db->commit();
+            self::invalidarCache();
             return true;
         } catch (Exception $e) {
             if (isset($db)) $db->rollBack();

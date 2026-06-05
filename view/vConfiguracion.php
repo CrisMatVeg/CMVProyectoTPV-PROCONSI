@@ -1,13 +1,17 @@
 </header>
 <div class="main-full p-24">
     <div class="section-header container-wider ai-center jc-space-between">
-        <div class="section-title">
-            <h1 class="d-flex ai-center gap-12"><i class="fa-solid fa-gears text-accent"></i> <?php echo L('dashboard_btn_config'); ?></h1>
-            <p><?php echo L('dashboard_btn_config_sub'); ?></p>
+        <div class="d-flex ai-center gap-16">
+            <a href="index.php?irDashboard=1" class="btn-prominent-back compact" title="<?php echo L('login_back'); ?>">
+                <i class="fa-solid fa-chevron-left"></i>
+                <span><?php echo L('login_back'); ?></span>
+            </a>
+            <div class="vr" style="height: 32px; width: 1px; background: var(--border); opacity: 0.5;"></div>
+            <div class="section-title">
+                <h1 class="d-flex ai-center gap-12"><i class="fa-solid fa-gears text-accent"></i> <?php echo L('dashboard_btn_config'); ?></h1>
+                <p><?php echo L('dashboard_btn_config_sub'); ?></p>
+            </div>
         </div>
-        <a href="index.php?irDashboard=1" class="btn-back">
-            <?php echo L('login_back'); ?>
-        </a>
     </div>
 
     <div class="container-wider">
@@ -45,6 +49,9 @@
                     </div>
                     <div class="config-nav-item" onclick="switchConfigTab('logs')" id="nav-logs">
                         <i class="fa-solid fa-list-check"></i> <span><?php echo L('config_section_logs'); ?></span>
+                    </div>
+                    <div class="config-nav-item" onclick="switchConfigTab('verifactu')" id="nav-verifactu" style="border-left: 3px solid var(--accent);">
+                        <i class="fa-solid fa-cloud-arrow-up"></i> <span class="font-bold"><?php echo L('config_vf_title'); ?></span>
                     </div>
                 </div>
             </aside>
@@ -301,9 +308,129 @@
                             </div>
                         </div>
                     </div>
+                    <!-- PANEL 5: VeriFactu Monitoring & Configuration -->
+                    <div id="panel-verifactu" class="config-panel">
+                        <div class="bg-surface br-20 border-1 shadow-lg p-32">
+                            <div class="section-header ai-center jc-space-between mb-24 pr-0 pb-16 border-bottom">
+                                <div class="section-title">
+                                    <h3 class="fs-20 font-bold text-accent d-flex ai-center gap-12 m-0">
+                                        <i class="fa-solid fa-cloud-arrow-up"></i> <?php echo L('config_vf_title'); ?>
+                                    </h3>
+                                    <p class="fs-14 text-muted m-0 mt-4"><?php echo L('config_vf_sub'); ?></p>
+                                </div>
+                                <div class="d-flex ai-center gap-12">
+                                    <a href="verifactu_log.php" target="_blank" class="btn-save compact d-flex ai-center gap-8 no-print" style="text-decoration: none; min-width: auto; padding: 8px 16px; height: 38px; border-radius: 8px; background: var(--accent); color: white;" title="<?php echo L('config_vf_audit_title'); ?>">
+                                        <i class="fa-solid fa-layer-group"></i> <span><?php echo L('config_vf_audit'); ?></span>
+                                    </a>
+                                    <button type="button" onclick="cargarStatsVerifactu()" class="btn-save compact no-print" style="border: 1px solid var(--border); min-width: auto; padding: 8px 12px; height: 38px; border-radius: 8px; background: var(--surface2); color: var(--accent);" title="<?php echo L('config_vf_update'); ?>">
+                                        <i class="fa-solid fa-sync"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Stats Cards -->
+                            <div class="grid-3 gap-24 mb-32">
+                                <div class="p-24 br-16 border bg-surface d-flex ai-center gap-16 shadow-sm">
+                                    <div class="w-56 h-56 br-12 bg-green-light text-green d-flex ai-center jc-center">
+                                        <i class="fa-solid fa-check-double fs-24"></i>
+                                    </div>
+                                    <div>
+                                        <div class="fs-12 text-muted tt-uppercase fw-bold ls-1 mb-4"><?php echo L('config_vf_sent'); ?></div>
+                                        <div class="fs-28 font-bold font-mono" id="vf-stats-enviados">0</div>
+                                    </div>
+                                </div>
+                                <div class="p-24 br-16 border bg-surface d-flex ai-center gap-16 shadow-sm">
+                                    <div class="w-56 h-56 br-12 bg-amber-light text-amber d-flex ai-center jc-center">
+                                        <i class="fa-solid fa-clock-rotate-left fs-24"></i>
+                                    </div>
+                                    <div>
+                                        <div class="fs-12 text-muted tt-uppercase fw-bold ls-1 mb-4"><?php echo L('config_vf_pending'); ?></div>
+                                        <div class="fs-28 font-bold font-mono" id="vf-stats-pendientes">0</div>
+                                    </div>
+                                </div>
+                                <div class="p-24 br-16 border bg-surface d-flex ai-center gap-16 shadow-sm">
+                                    <div class="w-56 h-56 br-12 bg-red-light text-red d-flex ai-center jc-center">
+                                        <i class="fa-solid fa-triangle-exclamation fs-24"></i>
+                                    </div>
+                                    <div>
+                                        <div class="fs-12 text-muted tt-uppercase fw-bold ls-1 mb-4"><?php echo L('config_vf_errors'); ?></div>
+                                        <div class="fs-28 font-bold font-mono" id="vf-stats-errores">0</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Config Editor & Legal Block -->
+                            <div class="config-grid-2 mb-32">
+                                <!-- Columna Izq: Datos del Productor (Editables) -->
+                                <div class="p-24 br-16 border-1 bg-surface2 d-flex-column jc-between">
+                                    <div>
+                                        <h4 class="fs-14 font-bold text-accent mb-20 tt-uppercase d-flex ai-center gap-8">
+                                            <i class="fa-solid fa-user-gear"></i> <?php echo L('config_vf_prod_data'); ?>
+                                        </h4>
+                                        <div class="d-flex flex-column gap-20">
+                                            <div class="form-group mb-0">
+                                                <label class="form-label fs-11 font-bold text-muted mb-8 tt-uppercase ls-1"><?php echo L('verifactu_label_productor'); ?></label>
+                                                <input type="text" name="verifactu_productor_nombre" class="form-input p-12 bg-white br-8 border-1" value="<?php echo htmlspecialchars($avConfig['verifactu_productor_nombre'] ?? 'ElectroBazar Software S.L.'); ?>">
+                                            </div>
+                                            <div class="form-group mb-0">
+                                                <label class="form-label fs-11 font-bold text-muted mb-8 tt-uppercase ls-1"><?php echo L('verifactu_label_productor_nif'); ?></label>
+                                                <input type="text" name="verifactu_productor_nif" class="form-input p-12 font-mono bg-white br-8 border-1" value="<?php echo htmlspecialchars($avConfig['verifactu_productor_nif'] ?? '99999910G'); ?>">
+                                            </div>
+                                            <div class="d-flex gap-16">
+                                                <div class="form-group mb-0 flex-1">
+                                                    <label class="form-label fs-11 font-bold text-muted mb-8 tt-uppercase ls-1"><?php echo L('config_vf_sys_id'); ?></label>
+                                                    <input type="text" name="verifactu_id_sistema" class="form-input p-12 bg-white br-8 border-1" value="<?php echo htmlspecialchars($avConfig['verifactu_id_sistema'] ?? '01'); ?>">
+                                                </div>
+                                                <div class="form-group mb-0 flex-1">
+                                                    <label class="form-label fs-11 font-bold text-muted mb-8 tt-uppercase ls-1"><?php echo L('config_vf_version'); ?></label>
+                                                    <input type="text" name="verifactu_version_sistema" class="form-input p-12 bg-white br-8 border-1" value="<?php echo htmlspecialchars($avConfig['verifactu_version_sistema'] ?? '1.0.0'); ?>">
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="mt-32">
+                                        <button type="submit" name="guardarConfiguracion" class="btn-save w-full d-flex ai-center jc-center gap-12 py-14 shadow-sm" style="height: 48px;" onclick="document.getElementById('seccion_activa').value='VERIFACTU'">
+                                            <i class="fa-solid fa-floppy-disk"></i> <?php echo L('config_vf_btn_save'); ?>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Columna Der: Cuadro de Certificación -->
+                                <div class="p-24 br-16 border-1 bg-blue-light d-flex-column jc-between" style="border-color: var(--accent); background: rgba(26, 47, 191, 0.03);">
+                                    <div>
+                                        <h4 class="fs-14 font-bold text-accent mb-20 tt-uppercase d-flex ai-center gap-8">
+                                            <i class="fa-solid fa-file-contract"></i> <?php echo L('verifactu_decl_titulo'); ?>
+                                        </h4>
+                                        <div class="fs-13 lh-1-6 text-muted mb-20">
+                                            <p class="mb-12"><?php echo L('verifactu_decl_legal_intro'); ?></p>
+                                            <p><?php echo L('verifactu_decl_legal_body'); ?></p>
+                                        </div>
+                                        <div class="p-16 br-12 bg-white border-1 fs-12 mb-20 shadow-sm" style="border-left: 4px solid var(--accent);">
+                                            <div class="d-flex ai-center gap-12 mb-8">
+                                                <div class="w-8 h-8 br-full bg-accent"></div>
+                                                <span class="text-muted tt-uppercase fw-bold ls-1" style="font-size: 10px;"><?php echo L('config_vf_certified'); ?></span>
+                                            </div>
+                                            <div class="font-bold text-accent mb-4 fs-14">
+                                                <?php echo htmlspecialchars($avConfig['verifactu_nombre_sistema'] ?? 'ElectroBazar TPV'); ?> v<?php echo htmlspecialchars($avConfig['verifactu_version_sistema'] ?? '1.0.0'); ?>
+                                            </div>
+                                            <div class="text-muted italic">
+                                                <?php echo L('config_vf_requested_by'); ?> <span class="font-bold text-text not-italic"><?php echo htmlspecialchars($avConfig['verifactu_productor_nombre'] ?? 'ElectroBazar Software S.L.'); ?></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="mt-auto">
+                                        <a href="api/descargarDeclaracion.php" class="btn-save text-decoration-none d-flex ai-center jc-center gap-12 py-14 shadow-sm" style="background: var(--accent); border-color: var(--accent); height: 48px;">
+                                            <i class="fa-solid fa-file-pdf fs-18"></i> <?php echo L('verifactu_descargar_decl'); ?>
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
                 </form>
 
-                <!-- PANEL 5: Mantenimiento y Seguridad -->
+                <!-- PANEL 6: Mantenimiento y Seguridad -->
                 <div id="panel-mantenimiento" class="config-panel">
                     <div class="bg-surface br-20 border-1 shadow-lg p-32" style="border-left: 5px solid var(--accent);">
                         <div class="section-header ai-center jc-space-between mb-32 pr-0 pb-16 border-bottom">
@@ -408,6 +535,11 @@
                                                 case 'MOVIMIENTO_DINERO': $badgeClass = 'bg-amber-light text-amber'; $iconAction = 'fa-money-bill-transfer'; break;
                                                 case 'APERTURA_CAJA': $badgeClass = 'bg-accent-soft text-accent'; $iconAction = 'fa-key'; break;
                                                 case 'CIERRE_CAJA': $badgeClass = 'bg-red-light text-red'; $iconAction = 'fa-lock'; break;
+                                                // VeriFactu Specific
+                                                case 'VF_ENVIO_EXITO': $badgeClass = 'bg-green-light text-green'; $iconAction = 'fa-cloud-arrow-up'; break;
+                                                case 'VF_ENVIO_ERROR': $badgeClass = 'bg-red-light text-red'; $iconAction = 'fa-triangle-exclamation'; break;
+                                                case 'VF_ENVIO_REINTENTO': $badgeClass = 'bg-surface2 text-amber'; $iconAction = 'fa-clock-rotate-left'; break;
+                                                case 'VF_SUBSANACION': $badgeClass = 'bg-amber-light text-orange'; $iconAction = 'fa-wrench'; break;
                                             }
                                         ?>
                                             <tr class="hover-bg-surface2 transition-all border-top">
@@ -457,9 +589,43 @@
         });
         document.getElementById('panel-' + panelId).classList.add('active');
         
+        // [NUEVO] Si entramos en verifactu, cargar datos
+        if (panelId === 'verifactu') {
+            cargarStatsVerifactu();
+        }
+
         // Scroll al inicio del panel
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
+
+    /**
+     * Carga las estadísticas y cola de VeriFactu vía AJAX
+     */
+    function cargarStatsVerifactu() {
+        fetch('api/verifactu_stats.php?accion=stats')
+            .then(response => {
+                return response.json().then(data => {
+                    if (!response.ok) throw new Error(data.error || 'Error HTTP ' + response.status);
+                    return data;
+                }).catch(err => {
+                    if (!response.ok) throw new Error('Error HTTP ' + response.status);
+                    throw err;
+                });
+            })
+            .then(data => {
+                if (data.ok) {
+                    document.getElementById('vf-stats-enviados').textContent = data.stats.enviados || 0;
+                    document.getElementById('vf-stats-pendientes').textContent = data.stats.pendientes || 0;
+                    document.getElementById('vf-stats-errores').textContent = data.stats.errores || 0;
+                } else {
+                    throw new Error(data.error || 'Error desconocido');
+                }
+            })
+            .catch(err => {
+                console.error('Error cargando VeriFactu:', err);
+            });
+    }
+
 
     // Restaurar pestaña activa al cargar la página
     document.addEventListener('DOMContentLoaded', () => {
@@ -502,6 +668,10 @@
                     return false;
                 }
             }
+        }
+        
+        if (seccion === 'VERIFACTU') {
+            // Validaciones específicas para verifactu si fuera necesario
         }
         
         return true;

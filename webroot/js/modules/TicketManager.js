@@ -17,12 +17,22 @@ export const TicketManager = {
         window.currentVentaPendiente = parseFloat(v.total) - parseFloat(v.pagado_a_cuenta || 0);
 
         const fmt2 = Utils.fmt2;
-
+        const el_tkTipoDoc = document.getElementById("tkTipoDoc");
+        if (el_tkTipoDoc) {
+            const isFactura = v.tipo_cliente === 'empresa' || v.es_factura == 1;
+            const isAbono = (v.tipo_documento || 'venta') === 'abono';
+            if (isAbono) el_tkTipoDoc.textContent = window.I18N?.ticket_type_abono || "TICKET DE ABONO";
+            else el_tkTipoDoc.textContent = isFactura ? (window.I18N?.invoice || "FACTURA") : (window.I18N?.ticket || "TICKET DE VENTA");
+        }
 
         const el_tkNum = document.getElementById("tkNumero");
         if (el_tkNum) {
             const esFactura = v.tipo_cliente === 'empresa' || v.es_factura == 1;
-            el_tkNum.textContent = formatTicketNumber(v.numero_ticket, v.fecha, esFactura);
+            const tipoDoc   = v.tipo_documento || 'venta';
+            el_tkNum.textContent = formatTicketNumber(v.numero_ticket, v.fecha, esFactura, tipoDoc);
+            // Mostrar badge visual para abonos
+            const badgeAbono = document.getElementById('tkBadgeAbono');
+            if (badgeAbono) badgeAbono.style.display = tipoDoc === 'abono' ? 'inline-flex' : 'none';
         }
 
         const el_tkFecha = document.getElementById("tkFecha");
@@ -51,6 +61,28 @@ export const TicketManager = {
                 const isExpired = gDate < new Date();
                 const gStr = gDate.toLocaleDateString("es-ES");
 
+                const appliedDiscounts = l.descuentos || [];
+                const discountBadges = appliedDiscounts
+                  .filter(d => {
+                    // No mostrar si es un cupón (ya sale en el total general)
+                    if (d.tipo_descuento === 'cupon') return false;
+                    // No mostrar si el nombre coincide exactamente con el descuento general del ticket
+                    if (v.descuento_label && (d.nombre === v.descuento_label || d.nombre_descuento === v.descuento_label)) return false;
+                    return true;
+                  })
+                  .map(d => {
+                    const dName = d.nombre || d.nombre_descuento || 'Desc.';
+                    const isTarifa = d.tipo_descuento === 'tarifa';
+                    const bgColor = isTarifa ? 'bg-accent-soft' : 'bg-green-light';
+                    const textColor = isTarifa ? 'text-accent' : 'text-green';
+                    const icon = isTarifa ? 'fa-tag' : 'fa-percent';
+                    return `
+                      <span class="fs-9 px-6 py-2 br-4 ${bgColor} ${textColor} fw-800 tt-uppercase d-inline-flex ai-center gap-4" style="border: 1px solid rgba(var(--${isTarifa ? 'accent' : 'green'}-rgb), 0.1);">
+                        <i class="fa-solid ${icon} fs-8 opacity-70"></i> ${dName}
+                      </span>
+                    `;
+                  }).join("");
+
                 return `
           <div style="display:flex; justify-content:space-between; padding: 10px 0; border-bottom: 1px solid var(--surface2); ${l.devuelta ? "opacity:0.6; background:rgba(192,57,43,0.05);" : ""}">
             <div style="flex:1">
@@ -58,6 +90,7 @@ export const TicketManager = {
                 <div>
                   <span style="font-weight:600; ${l.devuelta ? "text-decoration:line-through;" : ""}">${l.nombre_producto}</span>
                   <span style="color:var(--text-muted); font-size:11px; margin-left:6px;">${l.codigo_producto}</span>
+                  <div style="display:flex; gap:4px; margin-top:2px;">${discountBadges}</div>
                 </div>
                 <span style="font-family:'DM Mono',monospace; font-weight:600;">${fmt2(l.total_linea)}</span>
               </div>
@@ -82,6 +115,7 @@ export const TicketManager = {
         const vSubtotal = parseFloat(v.subtotal) || 0;
         const vDescAmt = parseFloat(v.descuento_amt) || 0;
         const vPuntosAmt = parseFloat(v.puntos_descuento_amt) || 0;
+        const vDescPct = parseFloat(v.descuento_pct || 0);
         
         const ivaGrupos = {};
         v.lineas.forEach((l) => {
@@ -101,7 +135,12 @@ export const TicketManager = {
         let displayTotal = Object.values(ivaGrupos).reduce((acc, g) => acc + g.base + g.tax, 0);
 
         if (el_tkTotal) el_tkTotal.textContent = fmt2(vTotal);
-        if (el_tkSubtotalRow) el_tkSubtotalRow.style.display = "none";
+        
+        if (el_tkSubtotalRow) {
+            el_tkSubtotalRow.style.display = "flex";
+            const el_tkSubtotalVal = document.getElementById("tkSubtotal");
+            if (el_tkSubtotalVal) el_tkSubtotalVal.textContent = fmt2(vSubtotal);
+        }
 
         if (el_tkIvaDesglose) {
             el_tkIvaDesglose.innerHTML = Object.entries(ivaGrupos)
@@ -116,6 +155,36 @@ export const TicketManager = {
                 `).join("");
         }
 
+        const el_tkDescRow = document.getElementById("tkDescRow");
+        if (el_tkDescRow) {
+            // Descuento excluyendo puntos (los puntos tienen su propia fila)
+            const vDescSinPuntos = Math.max(0, vDescAmt - vPuntosAmt);
+            const diff = Math.max(0, vSubtotal - vTotal - vPuntosAmt);
+            if (vDescSinPuntos > 0.001 || diff > 0.01) {
+                el_tkDescRow.classList.remove("d-none");
+                el_tkDescRow.style.display = "flex";
+                const el_tkDescLabel = document.getElementById("tkDescLabel");
+                const el_tkDescAmt = document.getElementById("tkDescAmt");
+
+                if (el_tkDescLabel) {
+                    if (v.descuento_label) {
+                        el_tkDescLabel.textContent = `Descuento (${v.descuento_label})`;
+                    } else if (vDescPct > 0) {
+                        el_tkDescLabel.textContent = `Descuento (${vDescPct}%)`;
+                    } else {
+                        el_tkDescLabel.textContent = "Descuento";
+                    }
+                }
+                if (el_tkDescAmt) {
+                    const amt = diff > 0.01 ? diff : vDescSinPuntos;
+                    el_tkDescAmt.textContent = "−" + fmt2(amt);
+                }
+            } else {
+                el_tkDescRow.classList.add("d-none");
+                el_tkDescRow.style.display = "none";
+            }
+        }
+
         const el_tkPuntosRow = document.getElementById("tkPuntosRow");
         if (el_tkPuntosRow) {
             if (vPuntosAmt > 0) {
@@ -125,6 +194,8 @@ export const TicketManager = {
                 el_tkPuntosRow.classList.add("d-none");
             }
         }
+
+
 
         // Reset tabs
         if (typeof window.switchTicketTab === 'function') {
@@ -144,6 +215,28 @@ export const TicketManager = {
         const el_tkEmail = document.getElementById("tkEmailInput");
         if (el_tkEmail) {
             el_tkEmail.value = v.cliente_email || "";
+        }
+
+        // --- Comentarios / Observaciones ---
+        const el_tkCommentsSection = document.getElementById("tkCommentsSection");
+        const el_tkCommentsText = document.getElementById("tkCommentsText");
+        if (el_tkCommentsSection && el_tkCommentsText) {
+            if (v.comentarios && v.comentarios.trim() !== "") {
+                el_tkCommentsSection.classList.remove("d-none");
+                // Construcción DOM segura: evita XSS con datos de usuario
+                el_tkCommentsText.innerHTML = '';
+                const strong = document.createElement('strong');
+                strong.textContent = 'Observaciones:';
+                el_tkCommentsText.appendChild(strong);
+                el_tkCommentsText.appendChild(document.createElement('br'));
+                v.comentarios.split('\n').forEach((linea, i, arr) => {
+                    el_tkCommentsText.appendChild(document.createTextNode(linea));
+                    if (i < arr.length - 1) el_tkCommentsText.appendChild(document.createElement('br'));
+                });
+            } else {
+                el_tkCommentsSection.classList.add("d-none");
+                el_tkCommentsText.innerHTML = '';
+            }
         }
 
         // --- Multi-Payment Breakdown ---
@@ -183,14 +276,14 @@ export const TicketManager = {
                     }).join("");
 
                 // Show change if cash was received (using global efectivo_recibido from sales header)
-                const cashPago = pagos.find(p => (p.metodo || p.metodo_pago) === 'efectivo');
+                const totalImporteEfectivo = pagos
+                    .filter(p => (p.metodo || p.metodo_pago) === 'efectivo')
+                    .reduce((sum, p) => sum + parseFloat(p.importe || 0), 0);
                 const efRecibido = parseFloat(v.efectivo_recibido || 0);
                 
-                if (cashPago && efRecibido > 0) {
-                    const importeEfectivo = parseFloat(cashPago.importe || 0);
-                    // Solo mostramos si el importe entregado es mayor que el pagado (hay cambio) o si explícitamente se quiere ver el desglose
-                    if (efRecibido > importeEfectivo) {
-                        const cambio = efRecibido - importeEfectivo;
+                if (totalImporteEfectivo > 0 && efRecibido > 0) {
+                    if (efRecibido > totalImporteEfectivo) {
+                        const cambio = efRecibido - totalImporteEfectivo;
                         el_tkPagosLista.innerHTML += `
                             <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; margin-top: 8px; border-top: 1px dashed var(--border); padding-top: 4px; opacity: 0.8;">
                                 <span style="font-weight: 500;">Efectivo entregado:</span>
@@ -215,7 +308,7 @@ export const TicketManager = {
         if (btnAnular) {
             const isAbono = (v.tipo_documento || 'venta') === 'abono';
             // Mostrar botón anular si es historial, completada y no es un abono
-            btnAnular.style.display = (!isFromTPV && v.estado === "completada" && !isAbono) ? "flex" : "none";
+            btnAnular.style.display = (!isFromTPV && (v.estado === "completada" || v.estado === "parcialmente_devuelta") && !isAbono) ? "flex" : "none";
             btnAnular.onclick = () => {
                 if (typeof window.abrirModalAnulacionTicket === 'function') {
                     window.abrirModalAnulacionTicket(v.numero_ticket, v.fecha, v.id_cliente);
@@ -279,25 +372,23 @@ export const TicketManager = {
         Utils.showToast("Enviando correo...", "info");
 
         try {
-            const resp = await fetch("./api/enviarVentaEmail.php", {
+            const data = await ApiService.request("./api/enviarVentaEmail.php", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     numTicket: this.currentTicketNum,
                     destinatario: email,
                     tipo: tipo,
                 }),
             });
-            const data = await resp.json();
 
             if (data.ok) {
                 Utils.showToast("Enviado con éxito", "success");
             } else {
-                throw new Error(data.error);
+                throw new Error(data.error || "Error al enviar el correo");
             }
         } catch (err) {
             console.error("Error email:", err);
-            Utils.showToast("Error al enviar: " + err.message, "error");
+            Utils.showToast(err.message, "error");
         }
     }
 };

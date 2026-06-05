@@ -8,6 +8,40 @@ require_once __DIR__ . '/fpdf.php';
 class PDFServiceV2
 {
 
+    private static function embedQrCode(FPDF $pdf, array $venta, array $appConfig, float $x, float $y, float $size = 25.0): bool
+    {
+        if (empty($venta['hash_actual'])) return false;
+        $nif = $appConfig['empresa_nif'] ?? '';
+        if (empty($nif)) return false;
+
+        try {
+            require_once __DIR__ . '/../vendor/autoload.php';
+            require_once __DIR__ . '/../model/VeriFactuQrService.php';
+
+            $url = VeriFactuQrService::generarUrlAEAT($venta, $nif);
+
+            $qrCode = new \Endroid\QrCode\QrCode(
+                data: $url,
+                encoding: new \Endroid\QrCode\Encoding\Encoding('UTF-8'),
+                errorCorrectionLevel: \Endroid\QrCode\ErrorCorrectionLevel::Medium,
+                size: 200,
+                margin: 5,
+                roundBlockSizeMode: \Endroid\QrCode\RoundBlockSizeMode::Margin
+            );
+            $pngData = (new \Endroid\QrCode\Writer\PngWriter())->write($qrCode)->getString();
+
+            $tmpFile = tempnam(sys_get_temp_dir(), 'vfqr') . '.png';
+            file_put_contents($tmpFile, $pngData);
+
+            $pdf->Image($tmpFile, $x, $y, $size, $size, 'PNG');
+
+            @unlink($tmpFile);
+            return true;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
     private static function decode($txt)
     {
         if ($txt === null) return '';
@@ -89,6 +123,7 @@ class PDFServiceV2
         $pdf->Cell(20, 5, self::decode("IMPORTE"), 0, 1, 'R');
         $pdf->Ln(1);
 
+        $subtotalReal = 0;
         $pdf->SetFont('Courier', '', 8);
         foreach ($venta['lineas'] as $l) {
             $nombre = self::decode($l['nombre_producto']);
@@ -97,6 +132,24 @@ class PDFServiceV2
             $subTexto = (int)$l['cantidad'] . " x " . number_format($l['precio_unitario'], 2, ',', '.') . " " . chr(128);
             $pdf->Cell(40, 4, self::decode($subTexto), 0, 0);
             $pdf->Cell(20, 4, self::formatEuros($l['total_linea']), 0, 1, 'R');
+            
+            $subtotalReal += (float)$l['total_linea'];
+
+            // Descuentos de línea
+            if (!empty($l['descuentos'])) {
+                $pdf->SetFont('Courier', 'I', 7);
+                foreach ($l['descuentos'] as $d) {
+                    $nombreDesc = $d['nombre_descuento'] ?: $d['nombre'] ?: ucfirst($d['tipo_descuento']);
+                    // Filtrar cupones y globales
+                    if (($d['tipo_descuento'] ?? '') === 'cupon') continue;
+                    if (!empty($venta['descuento_label']) && $nombreDesc === $venta['descuento_label']) continue;
+
+                    $vDescontado = (float)($d['valor_descontado'] ?? 0);
+                    $signo = ($vDescontado >= 0) ? '+' : '-';
+                    $pdf->Cell(0, 3, self::decode("  └─ [" . $nombreDesc . "] " . $signo . number_format(abs($vDescontado), 2, ',', '.') . " " . chr(128)), 0, 1);
+                }
+                $pdf->SetFont('Courier', '', 8);
+            }
 
             if (!empty($l['meses_garantia']) && $l['meses_garantia'] > 0) {
                 $pdf->SetFont('Courier', 'I', 7);
@@ -110,12 +163,17 @@ class PDFServiceV2
         $pdf->Cell(0, 0, '', 'T');
         $pdf->Ln(2);
 
-        $pdf->Cell(40, 4, self::decode("Subtotal:"), 0, 0);
-        $pdf->Cell(20, 4, self::formatEuros($venta['subtotal']), 0, 1, 'R');
+        $totalVenta = (float)$venta['total'];
+        $diff = $subtotalReal - $totalVenta;
 
-        if (!empty($venta['descuento_amt']) && (float)$venta['descuento_amt'] > 0) {
-            $pdf->Cell(40, 4, self::decode("Descuento (" . round($venta['descuento_pct']) . "%):"), 0, 0);
-            $pdf->Cell(20, 4, "- " . self::formatEuros($venta['descuento_amt']), 0, 1, 'R');
+        $pdf->Cell(40, 4, self::decode("Subtotal:"), 0, 0);
+        $pdf->Cell(20, 4, self::formatEuros($subtotalReal), 0, 1, 'R');
+
+        if ($diff > 0.01 || (!empty($venta['descuento_amt']) && (float)$venta['descuento_amt'] > 0)) {
+            $amtToShow = $diff > 0.01 ? $diff : (float)$venta['descuento_amt'];
+            $label = !empty($venta['descuento_label']) ? $venta['descuento_label'] : ((float)$venta['descuento_pct'] > 0 ? $venta['descuento_pct'] . '%' : 'Descuento');
+            $pdf->Cell(40, 4, self::decode("Descuento (" . $label . "):"), 0, 0);
+            $pdf->Cell(20, 4, "- " . self::formatEuros($amtToShow), 0, 1, 'R');
         }
 
         $breakdown = self::getVatBreakdown($venta);
@@ -143,7 +201,7 @@ class PDFServiceV2
         $pdf->Ln(2);
         $pdf->SetFont('Courier', 'B', 12);
         $pdf->Cell(30, 8, self::decode("TOTAL"), 0, 0);
-        $pdf->Cell(30, 8, self::formatEuros($venta['total']), 0, 1, 'R');
+        $pdf->Cell(30, 8, self::formatEuros($totalVenta), 0, 1, 'R');
         $pdf->Ln(2);
 
         $pdf->SetFont('Courier', '', 8);
@@ -201,6 +259,23 @@ class PDFServiceV2
         $pdf->Ln(2);
         $pdf->SetFont('Courier', 'B', 7);
         $pdf->Cell(0, 4, self::decode($appConfig['ticket_pie_pagina'] ?? ''), 0, 1, 'C');
+
+        // QR VeriFactu (solo si la venta tiene hash registrado)
+        if (!empty($venta['hash_actual'])) {
+            $pdf->Ln(3);
+            $pdf->Cell(0, 0, '', 'T');
+            $pdf->Ln(2);
+            $pdf->SetFont('Courier', 'B', 6);
+            $pdf->Cell(0, 3, 'VERIFACTU', 0, 1, 'C');
+            $pdf->Ln(1);
+            $qrY = $pdf->GetY();
+            $qrX = (80 - 25) / 2; // centrado en página de 80mm
+            if (self::embedQrCode($pdf, $venta, $appConfig, $qrX, $qrY, 25)) {
+                $pdf->Ln(27);
+                $pdf->SetFont('Courier', '', 5);
+                $pdf->Cell(0, 3, self::decode('Escanea para verificar en AEAT'), 0, 1, 'C');
+            }
+        }
 
         return $pdf->Output('S');
     }
@@ -275,17 +350,50 @@ class PDFServiceV2
         $pdf->SetTextColor(0);
         $pdf->SetFont('Arial', '', 10);
         $fill = false;
+        $subtotalReal = 0;
         foreach ($venta['lineas'] as $l) {
             $pdf->SetFillColor(245, 245, 245);
-            $pdf->Cell(85, 8, self::decode($l['nombre_producto']), 'B', 0, 'L', $fill);
-            $pdf->Cell(20, 8, (int)$l['cantidad'], 'B', 0, 'C', $fill);
-            $pdf->Cell(30, 8, self::formatEuros($l['precio_unitario']), 'B', 0, 'R', $fill);
-            $pdf->Cell(25, 8, "0,00", 'B', 0, 'R', $fill);
-            $pdf->Cell(30, 8, self::formatEuros($l['total_linea']), 'B', 1, 'R', $fill);
+            
+            $lineDescSum = 0;
+            $lineSpecificDescs = [];
+            if (!empty($l['descuentos'])) {
+                foreach ($l['descuentos'] as $d) {
+                    $nombreDesc = $d['nombre_descuento'] ?: $d['nombre'] ?: ucfirst($d['tipo_descuento']);
+                    if (($d['tipo_descuento'] ?? '') === 'cupon') continue;
+                    if (!empty($venta['descuento_label']) && $nombreDesc === $venta['descuento_label']) continue;
+                    
+                    $val = (float)($d['valor_descontado'] ?? 0);
+                    $lineDescSum += abs($val);
+                    $lineSpecificDescs[] = "[" . $nombreDesc . "] " . (($val >= 0) ? '+' : '-') . number_format(abs($val), 2, ',', '.') . " " . chr(128);
+                }
+            }
+
+            $h = 8;
+            if (!empty($lineSpecificDescs)) $h = 12; // Un poco más de espacio si hay detalles
+
+            $pdf->Cell(85, $h, self::decode($l['nombre_producto']), 'B', 0, 'L', $fill);
+            $pdf->Cell(20, $h, (int)$l['cantidad'], 'B', 0, 'C', $fill);
+            $pdf->Cell(30, $h, self::formatEuros($l['precio_unitario']), 'B', 0, 'R', $fill);
+            $pdf->Cell(25, $h, self::formatEuros($lineDescSum), 'B', 0, 'R', $fill);
+            $pdf->Cell(30, $h, self::formatEuros($l['total_linea']), 'B', 1, 'R', $fill);
+            
+            if (!empty($lineSpecificDescs)) {
+                $pdf->SetFont('Arial', 'I', 7);
+                $pdf->SetY($pdf->GetY() - ($h - 4));
+                $pdf->SetX(15);
+                $pdf->Cell(80, 4, self::decode(implode(" | ", $lineSpecificDescs)), 0, 1, 'L');
+                $pdf->SetFont('Arial', '', 10);
+                $pdf->SetY($pdf->GetY() + ($h - 8));
+            }
+
+            $subtotalReal += (float)$l['total_linea'];
             $fill = !$fill;
         }
 
         $pdf->Ln(5);
+
+        $totalVenta = (float)$venta['total'];
+        $diff = $subtotalReal - $totalVenta;
 
         $breakdown = self::getVatBreakdown($venta);
         if (empty($breakdown)) {
@@ -306,10 +414,12 @@ class PDFServiceV2
             }
         }
 
-        if (!empty($venta['descuento_amt']) && (float)$venta['descuento_amt'] > 0) {
+        if ($diff > 0.01 || (!empty($venta['descuento_amt']) && (float)$venta['descuento_amt'] > 0)) {
+            $amtToShow = $diff > 0.01 ? $diff : (float)$venta['descuento_amt'];
+            $label = !empty($venta['descuento_label']) ? $venta['descuento_label'] : ((float)$venta['descuento_pct'] > 0 ? $venta['descuento_pct'] . '%' : 'Descuento');
             $pdf->SetX(130);
-            $pdf->Cell(40, 6, "Descuento:", 0, 0, 'R');
-            $pdf->Cell(30, 6, "- " . self::formatEuros($venta['descuento_amt']), 0, 1, 'R');
+            $pdf->Cell(40, 6, self::decode("Descuento (" . $label . "):"), 0, 0, 'R');
+            $pdf->Cell(30, 6, "- " . self::formatEuros($amtToShow), 0, 1, 'R');
         }
 
         $valesAmt = 0;
@@ -328,7 +438,7 @@ class PDFServiceV2
         $pdf->SetFont('Arial', 'B', 14);
         $pdf->SetX(130);
         $pdf->Cell(40, 10, "TOTAL A PAGAR:", 'T', 0, 'R');
-        $pdf->Cell(30, 10, self::formatEuros($venta['total']), 'T', 1, 'R');
+        $pdf->Cell(30, 10, self::formatEuros($totalVenta), 'T', 1, 'R');
 
         $pdf->Ln(10);
 
@@ -352,10 +462,83 @@ class PDFServiceV2
         }
         $pdf->MultiCell(85, 5, self::decode($condiciones), 0, 'L');
 
+        // QR VeriFactu (solo si la venta tiene hash registrado)
+        if (!empty($venta['hash_actual'])) {
+            $yQr = min($pdf->GetY() + 8, 242);
+            $pdf->SetXY(10, $yQr);
+            $pdf->SetFont('Arial', 'B', 7);
+            $pdf->SetTextColor(100);
+            $pdf->Cell(35, 4, self::decode('Verificación VeriFactu · AEAT'), 0, 1, 'L');
+            $qrY = $pdf->GetY();
+            if (self::embedQrCode($pdf, $venta, $appConfig, 10, $qrY, 28)) {
+                $pdf->SetXY(42, $qrY + 2);
+                $pdf->SetFont('Arial', '', 6);
+                $pdf->MultiCell(65, 3, self::decode("Escanee el código QR con la cámara de su dispositivo para comprobar la autenticidad de este documento en la sede electrónica de la AEAT (VeriFactu)."), 0, 'L');
+            }
+            $pdf->SetTextColor(0);
+        }
+
         $pdf->SetY(275);
         $pdf->SetFont('Arial', '', 8);
         $pdf->SetTextColor(100);
         $pdf->Cell(0, 5, self::decode(($appConfig['empresa_razon_social'] ?? $appConfig['empresa_nombre']) . " · CIF: " . $appConfig['empresa_nif'] . " · " . $appConfig['empresa_direccion']), 0, 1, 'C');
+
+        return $pdf->Output('S');
+    }
+
+    public static function generarDeclaracionResponsablePDF($appConfig)
+    {
+        $productor = $appConfig['verifactu_productor_nombre'] ?? 'ElectroBazar Software S.L.';
+        $nifProductor = $appConfig['verifactu_productor_nif'] ?? 'B00000000';
+        $software = $appConfig['verifactu_nombre_sistema'] ?? 'ElectroBazar TPV';
+        $version = $appConfig['verifactu_version_sistema'] ?? '1.0.0';
+
+        $pdf = new FPDF('P', 'mm', 'A4');
+        $pdf->AddPage();
+        $pdf->SetMargins(25, 25, 25);
+
+        // Encabezado
+        $pdf->SetFont('Arial', 'B', 16);
+        $pdf->Cell(0, 10, self::decode('DECLARACIÓN RESPONSABLE'), 0, 1, 'C');
+        $pdf->SetFont('Arial', 'B', 10);
+        $pdf->Cell(0, 5, self::decode('SISTEMA INFORMÁTICO DE FACTURACIÓN (RD 1007/2023)'), 0, 1, 'C');
+        $pdf->Ln(20);
+
+        // Cuerpo
+        $pdf->SetFont('Arial', '', 11);
+        $textoIntro = "La entidad " . $productor . ", con NIF " . $nifProductor . ", en su condición de entidad productora del sistema informático de facturación:";
+        $pdf->MultiCell(0, 6, self::decode($textoIntro), 0, 'J');
+        $pdf->Ln(8);
+
+        $pdf->SetFont('Arial', 'B', 11);
+        $pdf->Cell(0, 10, self::decode('IDENTIFICACIÓN DEL SISTEMA:'), 0, 1, 'L');
+        $pdf->SetFont('Arial', '', 11);
+        $pdf->Cell(0, 6, self::decode("• Nombre: " . $software), 0, 1);
+        $pdf->Cell(0, 6, self::decode("• Versión: " . $version), 0, 1);
+        $pdf->Ln(10);
+
+        $pdf->SetFont('Arial', 'B', 11);
+        $pdf->Cell(0, 10, self::decode('DECLARA BAJO SU RESPONSABILIDAD:'), 0, 1, 'L');
+        $pdf->SetFont('Arial', '', 11);
+
+        $textoCuerpo = "Que el sistema informático arriba identificado cumple con los requisitos establecidos en el artículo 29.2.j) de la Ley 58/2003, de 17 de diciembre, General Tributaria y en el Reglamento que establece los requisitos que deben adoptar los sistemas y programas informáticos que soporten los procesos de facturación de empresarios y profesionales, aprobado por el Real Decreto 1007/2023, de 5 de diciembre.\n\n" .
+                       "Este sistema ha sido diseñado para garantizar la integridad, conservación, accesibilidad, legibilidad, trazabilidad e inalterabilidad de los registros de facturación, sin interpolaciones, omisiones o alteraciones de las que no quede la debida anotación en el propio sistema, cumpliendo con los estándares de encadenamiento de registros y firma digital exigidos por la normativa vigente.\n\n" .
+                       "La presente declaración responsable se expide a efectos de lo previsto en el artículo 12 del citado Reglamento.";
+
+        $pdf->MultiCell(0, 6, self::decode($textoCuerpo), 0, 'J');
+
+        $pdf->Ln(25);
+
+        // Fecha y Firma
+        $meses = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+        $fechaStr = "En Madrid, a " . date('d') . " de " . $meses[date('n')-1] . " de " . date('Y');
+        $pdf->Cell(0, 6, self::decode($fechaStr), 0, 1, 'L');
+        
+        $pdf->Ln(40);
+        $pdf->SetFont('Arial', 'B', 10);
+        $pdf->Cell(0, 5, self::decode('Firma del Representante Legal'), 0, 1, 'L');
+        $pdf->SetFont('Arial', '', 9);
+        $pdf->Cell(0, 5, self::decode('Sello de la Entidad Productora: ' . $productor), 0, 1, 'L');
 
         return $pdf->Output('S');
     }

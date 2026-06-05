@@ -47,8 +47,8 @@
         const modal = document.getElementById('promoModal');
         if (!modal) return;
 
-        // Reset checklists
-        document.querySelectorAll('.promo-prod-checkbox').forEach(cb => cb.checked = false);
+        // Reset selección de productos
+        _promoSelectedIds = new Set();
         if(window.updateProdCountPromo) updateProdCountPromo();
 
         if (promo) {
@@ -62,20 +62,18 @@
             setVal('promoBuyQty', promo.bundle_buy_qty || '');
             setVal('promoPayQty', promo.bundle_pay_qty || '');
             
-            // Set products
+            // Cargar IDs de productos seleccionados
             let pids = [];
             if (promo.producto_ids) {
                 try {
                     pids = JSON.parse(promo.producto_ids);
-                } catch(e) { 
+                } catch(e) {
                     pids = promo.producto_ids.toString().split(',').map(Number);
                 }
             } else if (promo.id_producto) {
                 pids = [parseInt(promo.id_producto)];
             }
-            document.querySelectorAll('.promo-prod-checkbox').forEach(cb => {
-                cb.checked = pids.includes(parseInt(cb.value));
-            });
+            _promoSelectedIds = new Set(pids.map(Number));
             if(window.updateProdCountPromo) updateProdCountPromo();
 
             const cats = promo.categoria_code ? promo.categoria_code.split(',') : [];
@@ -116,47 +114,120 @@
         }
 
         togglePromoFields();
-        // Reset a la primera pestaña
+        _cachedPromoCatRows = [];
+        const prodSearch = document.getElementById('promoBusquedaProd');
+        if (prodSearch) prodSearch.value = '';
+        const prodList = document.getElementById('listadoProductosPromo');
+        if (prodList) prodList.innerHTML = '';
+
         const firstTab = document.querySelector('#promoModal .tab-btn[data-tab="general"]');
         if (firstTab) switchTabPromo(firstTab, 'tab-promo-general');
 
         modal.classList.add('visible');
     };
 
-    window.filtrarProductosPromo = function() {
-        const input = document.getElementById('promoBusquedaProd');
-        if (!input) return;
-        const val = input.value.toLowerCase().trim();
-        const rows = document.querySelectorAll('.promo-product-row');
-        
-        rows.forEach(row => {
-            const name = (row.dataset.name || '').toLowerCase();
-            const ref = (row.dataset.ref || '').toLowerCase();
-            const matches = name.includes(val) || ref.includes(val);
-            row.classList.toggle('hidden-filter-row', !matches);
-        });
+    let _promoSelectedIds = new Set();
+    let _cachedPromoCatRows = [];
+
+    window.buildPromoFiltersCache = function() {
+        _cachedPromoCatRows = Array.from(document.querySelectorAll('.promo-category-row'));
     };
 
+    let _searchPromoTimer;
+    window.filtrarProductosPromo = function() {
+        clearTimeout(_searchPromoTimer);
+        _searchPromoTimer = setTimeout(async () => {
+            const input = document.getElementById('promoBusquedaProd');
+            const term = (input?.value || '').trim();
+            const container = document.getElementById('listadoProductosPromo');
+            if (!container) return;
+
+            container.innerHTML = '<div class="p-12 text-center text-muted fs-12"><i class="fa-solid fa-spinner fa-spin"></i></div>';
+
+            try {
+                const resp = await fetch('api/gestionPromocion.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ accion: 'buscarProductos', term }),
+                });
+                const r = await resp.json();
+                if (!r.ok) { container.innerHTML = ''; return; }
+
+                container.innerHTML = '';
+                if (r.productos.length === 0) {
+                    container.innerHTML = '<div class="p-12 text-center text-muted fs-12">Sin resultados</div>';
+                    return;
+                }
+
+                const frag = document.createDocumentFragment();
+                r.productos.forEach(p => {
+                    const label = document.createElement('label');
+                    label.className = 'checkbox-item d-flex ai-center gap-12 p-8-12 cp hover-bg-surface2 br-12 transition promo-product-row';
+
+                    const cb = document.createElement('input');
+                    cb.type = 'checkbox';
+                    cb.className = 'promo-prod-checkbox';
+                    cb.value = p.id;
+                    cb.checked = _promoSelectedIds.has(p.id);
+                    cb.addEventListener('change', () => {
+                        if (cb.checked) _promoSelectedIds.add(p.id);
+                        else _promoSelectedIds.delete(p.id);
+                        updateProdCountPromo();
+                    });
+
+                    const info = document.createElement('div');
+                    info.className = 'flex-1';
+                    const nombre = document.createElement('div');
+                    nombre.className = 'fs-13 fw-600 text-main';
+                    nombre.textContent = p.nombre;
+                    const refDiv = document.createElement('div');
+                    refDiv.className = 'fs-11 text-muted';
+                    refDiv.textContent = p.referencia;
+                    info.appendChild(nombre);
+                    info.appendChild(refDiv);
+
+                    const precioDiv = document.createElement('div');
+                    precioDiv.className = 'fs-12 font-mono fw-700 text-accent';
+                    precioDiv.textContent = parseFloat(p.precio).toFixed(2).replace('.', ',') + ' \u20ac';
+
+                    label.appendChild(cb);
+                    label.appendChild(info);
+                    label.appendChild(precioDiv);
+                    frag.appendChild(label);
+                });
+                container.appendChild(frag);
+            } catch(e) {
+                container.innerHTML = '<div class="p-12 text-center text-muted fs-12">Error al cargar</div>';
+            }
+        }, 250);
+    };
+
+    let _searchCatPromoTimer;
     window.filtrarCategoriasPromo = function() {
-        const input = document.getElementById('promoBusquedaCat');
-        if (!input) return;
-        const val = input.value.toLowerCase().trim();
-        const rows = document.querySelectorAll('.promo-category-row');
-        
-        rows.forEach(row => {
-            const name = (row.dataset.name || '').toLowerCase();
-            const code = (row.dataset.code || '').toLowerCase();
-            const matches = name.includes(val) || code.includes(val);
-            row.classList.toggle('hidden-filter-row', !matches);
-        });
+        clearTimeout(_searchCatPromoTimer);
+        _searchCatPromoTimer = setTimeout(() => {
+            const input = document.getElementById('promoBusquedaCat');
+            if (!input) return;
+            const val = input.value.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, "");
+            
+            if (_cachedPromoCatRows.length === 0) buildPromoFiltersCache();
+
+            const len = _cachedPromoCatRows.length;
+            for (let i = 0; i < len; i++) {
+                const row = _cachedPromoCatRows[i];
+                const name = (row.getAttribute('data-name') || '').normalize('NFD').replace(/[\u0300-\u036f]/g, "");
+                const code = (row.getAttribute('data-code') || '').normalize('NFD').replace(/[\u0300-\u036f]/g, "");
+                row.classList.toggle('hidden-filter-row', !!val && !name.includes(val) && !code.includes(val));
+            }
+        }, 100);
     };
 
     window.updateProdCountPromo = function() {
-        const count = document.querySelectorAll('.promo-prod-checkbox:checked').length;
-        setText('promoCountSelectedProd', count + ' <?php echo L('promos_selected'); ?>');
+        setText('promoCountSelectedProd', _promoSelectedIds.size + ' <?php echo L('promos_selected'); ?>');
     };
 
     window.unselectAllProductsPromo = function() {
+        _promoSelectedIds.clear();
         document.querySelectorAll('.promo-prod-checkbox').forEach(cb => cb.checked = false);
         updateProdCountPromo();
     };
@@ -166,10 +237,21 @@
     };
 
     window.switchTabPromo = function(btn, tabId) {
-        document.querySelectorAll('#promoModal .tab-btn').forEach(b => b.classList.remove('active'));
+        const modal = document.getElementById('promoModal');
+        if (!modal) return;
+
+        modal.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        document.querySelectorAll('#promoModal .tab-pane').forEach(p => p.classList.remove('active'));
-        document.getElementById(tabId).classList.add('active');
+
+        requestAnimationFrame(() => {
+            modal.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+            const target = document.getElementById(tabId);
+            if (target) target.classList.add('active');
+            if (tabId === 'tab-promo-filtros') {
+                filtrarProductosPromo();
+                if (_cachedPromoCatRows.length === 0) buildPromoFiltersCache();
+            }
+        });
     };
 
     window.cerrarModalPromo = function() {
@@ -181,7 +263,6 @@
     window.guardarPromo = async function() {
         limpiarErroresPromo();
         const id = document.getElementById('promoId')?.value;
-        const selectedProducts = Array.from(document.querySelectorAll('.promo-prod-checkbox:checked')).map(cb => cb.value);
         
         const payload = {
             accion: id ? 'editar' : 'añadir',
@@ -193,8 +274,8 @@
             min_subtotal: document.getElementById('promoMin')?.value || 0,
             bundle_buy_qty: document.getElementById('promoBuyQty')?.value || '',
             bundle_pay_qty: document.getElementById('promoPayQty')?.value || '',
-            id_producto: null, // Now using producto_ids
-            producto_ids: selectedProducts.length > 0 ? selectedProducts : null,
+            id_producto: null,
+            producto_ids: _promoSelectedIds.size > 0 ? Array.from(_promoSelectedIds) : null,
             categoria_code: Array.from(document.querySelectorAll('.promo-cat-checkbox:checked')).map(cb => cb.value).join(','),
             fecha_inicio: document.getElementById('promoFechaInicio')?.value || null,
             fecha_fin: document.getElementById('promoFechaFin')?.value || null,
@@ -217,8 +298,31 @@
             if (r.ok) {
                 location.reload();
             } else if (r.aErrores) {
+                // Mapa campo → id del tab que lo contiene
+                const campoTab = {
+                    codigo: 'tab-promo-general',
+                    descripcion: 'tab-promo-general',
+                    tipo: 'tab-promo-config',
+                    valor: 'tab-promo-config',
+                    bundle_buy_qty: 'tab-promo-config',
+                    bundle_pay_qty: 'tab-promo-config',
+                };
+                let primerTab = null;
                 for (const [field, msg] of Object.entries(r.aErrores)) {
                     setText('err-' + field, msg);
+                    if (!primerTab && campoTab[field]) primerTab = campoTab[field];
+                }
+                // Saltar al tab que contiene el primer error para que sea visible
+                if (primerTab) {
+                    const dataTabMap = {
+                        'tab-promo-general': 'general',
+                        'tab-promo-config': 'config',
+                    };
+                    const dataTabVal = dataTabMap[primerTab];
+                    if (dataTabVal) {
+                        const targetBtn = document.querySelector(`#promoModal .tab-btn[data-tab="${dataTabVal}"]`);
+                        if (targetBtn) switchTabPromo(targetBtn, primerTab);
+                    }
                 }
             } else {
                 showCustomAlert('Error', r.error || 'No se pudo guardar la promoción', 'error');
@@ -356,6 +460,12 @@
 
     .tab-pane.active {
         display: block;
+        animation: fadeIn 0.2s ease-out;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(4px); }
+        to { opacity: 1; transform: translateY(0); }
     }
 
     /* Special rule for Filters Tab: internally scrollable lists, not the container */
@@ -363,7 +473,6 @@
         display: none;
         overflow: hidden !important;
         flex-direction: column;
-        height: 100%;
         gap: 16px; /* Uniform gap for the tab components */
     }
     #tab-promo-filtros.active {
@@ -396,6 +505,19 @@
     .promo-product-row:has(input:checked) {
         background: var(--blue-light);
         border-color: var(--accent);
+    }
+
+    .promo-product-row, .promo-category-row, .checkbox-item {
+        user-select: none;
+        -webkit-user-select: none;
+    }
+
+    #listadoProductosPromo {
+        min-height: 0;
+    }
+
+    .hidden-filter-row {
+        display: none !important;
     }
 
     /* Modal Spacing & Components */
@@ -468,27 +590,26 @@
         color: white;
     }
 
-    /* Selection container fixed size */
-    .products-selection-container, .categories-selection-container {
-        height: 450px !important;
-        min-height: 450px !important;
-    }
 </style>
 
 
 <div class="main-full p-24">
     <div class="section-header container-wider">
-        <div class="section-title">
-            <h1><?php echo L('promos_title'); ?></h1>
-            <p><?php echo L('promos_subtitle'); ?></p>
+        <div class="d-flex ai-center gap-16">
+            <a href="index.php?irDashboard=1" class="btn-prominent-back compact" title="<?php echo L('login_back'); ?>">
+                <i class="fa-solid fa-chevron-left"></i>
+                <span><?php echo L('login_back'); ?></span>
+            </a>
+            <div class="vr" style="height: 32px; width: 1px; background: var(--border); opacity: 0.5;"></div>
+            <div class="section-title">
+                <h1><?php echo L('promos_title'); ?></h1>
+                <p><?php echo L('promos_subtitle'); ?></p>
+            </div>
         </div>
         <div class="d-flex gap-12">
             <button onclick="window.abrirModalPromo()" class="btn-add">
                 <i class="fa-solid fa-plus"></i> <?php echo L('promos_btn_add'); ?>
             </button>
-            <a href="index.php?irDashboard=1" class="btn-back">
-                <?php echo L('promos_btn_back'); ?>
-            </a>
         </div>
     </div>
 
@@ -617,7 +738,7 @@
 <div class="modal-overlay" id="promoModal">
     <div class="modal modal-content gap-16 ai-stretch w-modal-lg" style="max-width: 1100px; border-radius: 20px; overflow: hidden; height: auto; max-height: 95vh;">
         <div class="modal-header d-flex flex-column mb-0 p-0">
-            <div class="d-flex ai-center jc-center w-100 p-24-32" style="position: relative; padding-right: 80px;">
+            <div class="d-flex ai-center jc-center w-100 p-24-32" style="position: relative; padding-left: 80px; padding-right: 80px;">
                 <h2 id="promoModalTitle" class="m-0 fs-20 fw-800 text-main text-center tt-uppercase ls-1"><?php echo L('promos_modal_title'); ?></h2>
                 <button type="button" onclick="cerrarModalPromo()" class="btn-close-modal fs-32" style="position: absolute; right: 24px; top: 50%; transform: translateY(-50%); background: transparent; border: none; cursor: pointer;">&times;</button>
             </div>
@@ -695,6 +816,7 @@
                     <div class="form-group mb-0">
                         <label class="form-label fs-11" id="labelValor"><?php echo L('promos_label_value'); ?></label>
                         <input type="number" id="promoValor" class="form-input text-right font-mono" step="0.01" min="0">
+                        <span class="form-error" id="err-valor"></span>
                     </div>
                     <div class="form-group mb-0">
                         <label class="form-label fs-11"><?php echo L('promos_label_min'); ?></label>
@@ -755,20 +877,9 @@
                                     <i class="fa-solid fa-eraser mr-4"></i> <?php echo L('promos_btn_clean'); ?>
                                 </button>
                             </div>
-                            <div class="checkbox-list-container p-8" style="overflow-y: auto; flex: 1;">
+                            <div class="checkbox-list-container p-8" style="max-height: 320px; overflow-y: auto;">
                                 <div class="checkbox-list border-0" id="listadoProductosPromo">
-                                    <?php foreach ($avPromos['productos'] as $prod): ?>
-                                        <label class="checkbox-item d-flex ai-center gap-12 p-8-12 cp hover-bg-surface2 br-12 transition promo-product-row"
-                                            data-name="<?php echo htmlspecialchars(strtolower($prod->getNombre())); ?>"
-                                            data-ref="<?php echo htmlspecialchars(strtolower($prod->getReferencia())); ?>">
-                                            <input type="checkbox" class="promo-prod-checkbox" value="<?php echo $prod->getId(); ?>" onchange="updateProdCountPromo()">
-                                            <div class="flex-1">
-                                                <div class="fs-13 fw-600 text-main"><?php echo htmlspecialchars($prod->getNombre()); ?></div>
-                                                <div class="fs-11 text-muted"><?php echo htmlspecialchars($prod->getReferencia()); ?></div>
-                                            </div>
-                                            <div class="fs-12 font-mono fw-700 text-accent"><?php echo number_format($prod->getPrecioVenta(), 2, ',', '.'); ?> €</div>
-                                        </label>
-                                    <?php endforeach; ?>
+                                    <!-- Cargado vía AJAX al abrir la pestaña -->
                                 </div>
                             </div>
                         </div>
@@ -795,7 +906,7 @@
                                     <i class="fa-solid fa-eraser mr-4"></i> <?php echo L('promos_btn_clean'); ?>
                                 </button>
                             </div>
-                            <div class="checkbox-list-container p-8" style="overflow-y: auto; flex: 1;">
+                            <div class="checkbox-list-container p-8" style="max-height: 320px; overflow-y: auto;">
                                 <div class="checkbox-list border-0">
                                     <?php foreach ($avPromos['categorias'] as $cat): ?>
                                         <label class="checkbox-item d-flex ai-center gap-12 p-8-12 cp hover-bg-surface2 br-12 transition promo-category-row"

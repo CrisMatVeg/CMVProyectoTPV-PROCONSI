@@ -1,16 +1,50 @@
 </header>
 <style>
     .cierre-center-container {
-        max-width: 1300px;
+        width: 100%;
         margin: 0 auto;
     }
+
+
 
     .stat-card {
         height: 100%;
     }
+    
+    .caja-flow-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1px;
+        background: var(--border-color);
+        border: 1px solid var(--border-color);
+        border-radius: 20px;
+        overflow: hidden;
+    }
+    
+    .caja-flow-item {
+        background: var(--surface);
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        transition: all 0.2s ease;
+    }
+    
+    .caja-flow-item:hover {
+        background: var(--surface2);
+    }
+    
+    .caja-flow-item.total-highlight {
+        background: rgba(var(--accent-rgb), 0.05);
+    }
+
 </style>
 <?php if (!isset($avCierreCaja) || !is_array($avCierreCaja)) return; ?>
-<div class="main-full container container-wider p-24 mt-24 cierre-center-container">
+<div class="main-full p-24 cierre-center-container">
+    <div class="container-wider">
+
 
     <?php if ($avCierreCaja['mensajeExito']): ?>
         <div class="bg-green-light text-green p-20 br-20 mb-32 d-flex ai-center gap-16 fs-15 font-bold shadow-sm border" style="border-color: rgba(46, 204, 113, 0.2); background: linear-gradient(145deg, rgba(46, 204, 113, 0.05) 0%, rgba(46, 204, 113, 0.1) 100%);">
@@ -71,44 +105,49 @@
 
     <div class="printable-area">
         <!-- TÍTULO -->
-        <div class="section-header pb-24 border-bottom mb-32 d-flex ai-center jc-between">
-            <div class="d-flex ai-center gap-20">
-                <div class="w-64 h-64 br-16 bg-surface2 d-flex ai-center jc-center shadow-sm border">
-                    <i class="fa-solid fa-cash-register fs-28 text-accent"></i>
+        <div class="section-header pb-24 border-bottom mb-40 d-flex ai-center jc-between flex-wrap gap-20">
+            <div class="d-flex ai-center gap-24">
+                <div class="w-72 h-72 br-18 bg-surface2 d-flex ai-center jc-center shadow-sm border">
+                    <i class="fa-solid fa-cash-register fs-32 text-accent"></i>
                 </div>
                 <div>
                     <?php if (isset($avCierreCaja['modoEdicionPendiente']) && $avCierreCaja['modoEdicionPendiente']): ?>
-                        <h1 class="section-title text-orange m-0 fs-28 fw-800" style="letter-spacing: -1px;"><?php echo L('cash_close_title_arqueo'); ?></h1>
-                        <div class="text-muted fs-14 mt-4 d-flex ai-center gap-8">
-                            <span class="bg-orange-light text-orange px-8 py-2 br-6 fw-700 fs-11 tt-uppercase"><?php echo L('cash_close_label_recovered'); ?></span>
-                            <?php echo L('cash_close_label_shift_of'); ?> <?php echo date('d/m/Y H:i', strtotime($avCierreCaja['turno']['fecha_apertura'])); ?> ·
+                        <h1 class="section-title text-orange m-0 fs-32 fw-800" style="letter-spacing: -1px;"><?php echo L('cash_close_title_arqueo'); ?></h1>
+                        <div class="text-muted fs-15 mt-6 d-flex ai-center gap-12">
+                            <span class="bg-orange-light text-orange px-10 py-4 br-8 fw-700 fs-11 tt-uppercase ls-1 shadow-xs"><?php echo L('cash_close_label_recovered'); ?></span>
+                            <span class="opacity-70"><?php echo L('cash_close_label_shift_of'); ?></span> <span class="font-bold text-text"><?php echo date('d/m/Y H:i', strtotime($avCierreCaja['turno']['fecha_apertura'])); ?></span> ·
                             <span class="font-bold text-text"><?php echo htmlspecialchars($avCierreCaja['turno']['nombre_usuario_apertura'] ?? L('tpv_unknown', true)); ?></span>
                         </div>
                     <?php else: ?>
-                        <h1 class="section-title m-0 fs-28 fw-800" style="letter-spacing: -1px;"><?php echo L('cash_close_title_z'); ?></h1>
-                        <div class="text-muted fs-14 mt-4 d-flex ai-center gap-8">
-                            <i class="fa-solid fa-calendar-day opacity-50"></i>
-                            <?php echo L('cash_close_label_day'); ?> <span class="font-bold text-text"><?php echo $avCierreCaja['fecha']; ?></span> ·
-                            <i class="fa-solid fa-user-tie opacity-50 ml-8"></i>
-                            <?php echo L('cash_close_label_cashier'); ?>: <span class="font-bold text-text"><?php echo $avCierreCaja['nombre_completo']; ?></span>
+                        <h1 class="section-title m-0 fs-32 fw-800" style="letter-spacing: -1px;"><?php echo L('cash_close_title_z'); ?></h1>
+                        <div class="text-muted fs-15 mt-6 d-flex ai-center gap-12">
+                            <div class="d-flex ai-center gap-6 bg-surface2 px-12 py-4 br-8 border shadow-xs">
+                                <i class="fa-solid fa-calendar-day text-accent opacity-70"></i>
+                                <?php echo L('cash_close_label_day'); ?> <span class="font-bold text-text ml-4"><?php echo $avCierreCaja['fecha']; ?></span>
+                            </div>
+                            <div class="d-flex ai-center gap-6 bg-surface2 px-12 py-4 br-8 border shadow-xs">
+                                <i class="fa-solid fa-user-tie text-accent opacity-70"></i>
+                                <?php echo L('cash_close_label_cashier'); ?>: <span class="font-bold text-text ml-4"><?php echo $avCierreCaja['nombre_completo']; ?></span>
+                            </div>
                         </div>
                     <?php endif; ?>
                 </div>
             </div>
-            <div class="d-flex gap-12 no-print">
+            <div class="d-flex gap-16 no-print">
                 <?php if (isset($avCierreCaja['modoEdicionPendiente']) && $avCierreCaja['modoEdicionPendiente']): ?>
-                    <a href="index.php?irCierreCaja" class="btn-cancel bg-surface d-flex ai-center gap-8 shadow-sm transition-all hover-translate-y" style="text-decoration: none; border: 1px solid #ddd; color: #666; height: 44px; padding: 0 20px; border-radius: 10px;">
+                    <a href="index.php?irCierreCaja" class="btn-cancel bg-surface d-flex ai-center gap-10 shadow-sm transition-all hover-translate-y" style="text-decoration: none; border: 1px solid var(--border); color: var(--text-muted); height: 48px; padding: 0 24px; border-radius: 12px; font-weight: 600;">
                         <i class="fa-solid fa-times"></i> <?php echo L('modal_cancel'); ?>
                     </a>
                 <?php endif; ?>
                 <form method="post" action="index.php" class="m-0">
                     <input type="hidden" name="paginaAnterior" value="cierreCaja">
-                    <button type="submit" name="irInicio" class="btn-back">
-                        <?php echo L('cash_close_btn_return_tpv'); ?>
+                    <button type="submit" name="irInicio" class="btn-prominent-back" style="height: 48px; padding: 0 28px; border-radius: 12px;">
+                        <i class="fa-solid fa-arrow-left-long mr-8"></i> <?php echo L('cash_close_btn_return_tpv'); ?>
                     </button>
                 </form>
             </div>
         </div>
+
 
         <!-- BLOQUE 1: RESUMEN DE VENTAS Y PAGOS -->
         <div class="mb-32">
@@ -159,11 +198,12 @@
         </div>
 
         <!-- BLOQUE 2: FLUJO DE EFECTIVO EN CAJA -->
-        <div class="mb-32">
-            <h3 class="mb-20 d-flex ai-center gap-10">
-                <div class="w-32 h-32 br-50 bg-green-light text-green d-flex ai-center jc-center"><i class="fa-solid fa-cash-register"></i></div>
-                <?php echo L('cash_close_section_flow'); ?>
+        <div class="mb-48">
+            <h3 class="mb-24 d-flex ai-center gap-12">
+                <div class="w-40 h-40 br-12 bg-green-light text-green d-flex ai-center jc-center shadow-xs border"><i class="fa-solid fa-cash-register fs-18"></i></div>
+                <span class="fs-20 fw-800" style="letter-spacing: -0.5px;"><?php echo L('cash_close_section_flow'); ?></span>
             </h3>
+
 
             <?php if (!$avCierreCaja['turno']): ?>
                 <div class="p-48 br-20 border-2 bg-surface d-flex flex-column ai-center text-center shadow-sm">
@@ -198,9 +238,9 @@
                     </form>
                 </div>
             <?php else: ?>
-                <div class="d-grid gap-0 mb-32 border br-20 bg-surface shadow-sm overflow-hidden text-center" style="grid-template-columns: repeat(5, 1fr);">
+                <div class="caja-flow-grid mb-32 shadow-sm">
                     <!-- Fórmula Visual -->
-                    <div class="p-32 border-right d-flex flex-column jc-center ai-center bg-surface transition-all">
+                    <div class="caja-flow-item">
                         <div class="summary-label fs-11 tt-uppercase text-muted mb-12 d-flex ai-center gap-8 fw-600">
                             <?php echo L('cash_close_label_initial_fund'); ?>
                             <div class="w-20 h-20 br-50 bg-surface2 d-flex ai-center jc-center fs-10 text-muted shadow-xs"><i class="fa-solid fa-plus"></i></div>
@@ -211,7 +251,7 @@
                         <div class="fs-10 text-muted mt-4 tt-uppercase opacity-60"><?php echo htmlspecialchars($avCierreCaja['turno']['nombre_usuario_apertura'] ?? L('tpv_unknown', true)); ?></div>
                     </div>
 
-                    <div class="p-32 border-right d-flex flex-column jc-center ai-center bg-surface transition-all">
+                    <div class="caja-flow-item">
                         <div class="summary-label fs-11 tt-uppercase text-muted mb-12 d-flex ai-center gap-8 fw-600">
                             <?php echo L('cash_close_label_collected_cash'); ?>
                             <div class="w-20 h-20 br-50 bg-green-light text-green d-flex ai-center jc-center fs-10 shadow-xs"><i class="fa-solid fa-plus"></i></div>
@@ -222,7 +262,7 @@
                         <div class="fs-10 text-green mt-4 tt-uppercase opacity-70 font-bold"><?php echo L('cash_close_label_shift_sales'); ?></div>
                     </div>
 
-                    <div class="p-32 border-right d-flex flex-column jc-center ai-center bg-surface transition-all">
+                    <div class="caja-flow-item">
                         <div class="summary-label fs-11 tt-uppercase text-muted mb-12 d-flex ai-center gap-8 fw-600">
                             <?php echo L('cash_close_label_manual_income'); ?>
                             <div class="w-20 h-20 br-50 bg-blue-light text-accent d-flex ai-center jc-center fs-10 shadow-xs"><i class="fa-solid fa-plus"></i></div>
@@ -233,7 +273,7 @@
                         <div class="fs-10 text-accent mt-4 tt-uppercase opacity-70 font-bold"><?php echo L('cash_close_label_manual_entries'); ?></div>
                     </div>
 
-                    <div class="p-32 border-right d-flex flex-column jc-center ai-center bg-surface transition-all">
+                    <div class="caja-flow-item">
                         <div class="summary-label fs-11 tt-uppercase text-muted mb-12 d-flex ai-center gap-8 fw-600">
                             <?php echo L('cash_close_label_withdrawals'); ?>
                             <div class="w-20 h-20 br-50 bg-red-light text-red d-flex ai-center jc-center fs-10 shadow-xs"><i class="fa-solid fa-minus"></i></div>
@@ -244,7 +284,7 @@
                         <div class="fs-10 text-red mt-4 tt-uppercase opacity-70 font-bold"><?php echo L('cash_close_label_cash_outs'); ?></div>
                     </div>
 
-                    <div class="p-32 d-flex flex-column jc-center ai-center bg-accent-light" style="background: rgba(var(--accent-rgb), 0.08);">
+                    <div class="caja-flow-item total-highlight">
                         <div class="summary-label fs-11 tt-uppercase text-accent mb-12 d-flex ai-center gap-8 font-bold">
                             <?php echo L('cash_close_label_expected_cash'); ?>
                             <div class="w-24 h-24 br-50 bg-accent text-white d-flex ai-center jc-center fs-12 shadow-sm"><i class="fa-solid fa-equals"></i></div>
@@ -255,55 +295,57 @@
                     </div>
                 </div>
 
+
                 <!-- Formularios de Retiradas/Ingresos Integrados -->
                 <?php if (empty($avCierreCaja['pendientesArqueo'])): ?>
-                    <div class="d-grid grid-2 gap-24">
+                    <div class="d-grid grid-2 gap-24 mb-40">
                         <!-- RETIRADA -->
-                        <div class="p-24 br-20 border bg-surface shadow-sm">
+                        <div class="p-24 br-20 border bg-surface shadow-sm transition-all hover-translate-y">
                             <div class="fs-14 font-bold mb-16 d-flex ai-center gap-10">
-                                <div class="w-28 h-28 br-8 bg-surface d-flex ai-center jc-center text-red border shadow-xs"><i class="fa-solid fa-hand-holding-dollar fs-14"></i></div>
+                                <div class="w-32 h-32 br-10 bg-red-light text-red d-flex ai-center jc-center shadow-xs border"><i class="fa-solid fa-hand-holding-dollar fs-14"></i></div>
                                 <?php echo L('cash_close_register_withdrawal'); ?>
                             </div>
-                            <form method="post" class="d-flex flex-column gap-16">
+                            <form method="post" class="d-flex flex-column gap-20">
                                 <div class="d-flex gap-16">
                                     <div class="form-group mb-0" style="flex: 2;">
                                         <label class="form-label fs-11 fw-700 opacity-60 tt-uppercase"><?php echo L('cash_close_label_concept'); ?></label>
-                                        <input type="text" name="conceptoRetiro" class="form-input h-48 px-16" placeholder="<?php echo L('cash_close_placeholder_withdrawal'); ?>" required>
+                                        <input type="text" name="conceptoRetiro" class="form-input h-48 px-16 br-10" placeholder="<?php echo L('cash_close_placeholder_withdrawal'); ?>" required>
                                     </div>
                                     <div class="form-group mb-0" style="flex: 1;">
                                         <label class="form-label fs-11 fw-700 opacity-60 tt-uppercase"><?php echo L('cash_close_label_amount'); ?> (€)</label>
-                                        <input type="number" step="0.01" name="importeRetiro" class="form-input font-mono h-48 px-16 font-bold" placeholder="0.00" required>
+                                        <input type="number" step="0.01" min="0.01" name="importeRetiro" class="form-input font-mono h-48 px-16 br-10 font-bold" placeholder="0.00" required>
                                     </div>
                                 </div>
-                                <button type="submit" name="registrarRetiro" class="btn-save bg-red font-bold shadow-sm hover-scale-sm w-100" style="height: 40px; font-size: 14px; white-space: nowrap; border-radius: 10px;">
-                                    <?php echo L('cash_close_btn_withdraw'); ?>
+                                <button type="submit" name="registrarRetiro" class="btn-save bg-red font-bold shadow-md hover-scale-sm w-100" style="height: 48px; font-size: 14px; border-radius: 12px;">
+                                    <i class="fa-solid fa-arrow-up-from-bracket mr-8"></i> <?php echo L('cash_close_btn_withdraw'); ?>
                                 </button>
                             </form>
                         </div>
 
                         <!-- INGRESO -->
-                        <div class="p-24 br-20 border bg-surface shadow-sm">
+                        <div class="p-24 br-20 border bg-surface shadow-sm transition-all hover-translate-y">
                             <div class="fs-14 font-bold mb-16 d-flex ai-center gap-10">
-                                <div class="w-28 h-28 br-8 bg-surface d-flex ai-center jc-center text-accent border shadow-xs"><i class="fa-solid fa-piggy-bank fs-14"></i></div>
+                                <div class="w-32 h-32 br-10 bg-accent-light text-accent d-flex ai-center jc-center shadow-xs border"><i class="fa-solid fa-piggy-bank fs-14"></i></div>
                                 <?php echo L('cash_close_register_income'); ?>
                             </div>
-                            <form method="post" class="d-flex flex-column gap-16">
+                            <form method="post" class="d-flex flex-column gap-20">
                                 <div class="d-flex gap-16">
                                     <div class="form-group mb-0" style="flex: 2;">
                                         <label class="form-label fs-11 fw-700 opacity-60 tt-uppercase"><?php echo L('cash_close_label_concept'); ?></label>
-                                        <input type="text" name="conceptoIngreso" class="form-input h-48 px-16" placeholder="<?php echo L('cash_close_placeholder_deposit'); ?>" required>
+                                        <input type="text" name="conceptoIngreso" class="form-input h-48 px-16 br-10" placeholder="<?php echo L('cash_close_placeholder_deposit'); ?>" required>
                                     </div>
                                     <div class="form-group mb-0" style="flex: 1;">
                                         <label class="form-label fs-11 fw-700 opacity-60 tt-uppercase"><?php echo L('cash_close_label_amount'); ?> (€)</label>
-                                        <input type="number" step="0.01" name="importeIngreso" class="form-input font-mono h-48 px-16 font-bold" placeholder="0.00" required>
+                                        <input type="number" step="0.01" min="0.01" name="importeIngreso" class="form-input font-mono h-48 px-16 br-10 font-bold" placeholder="0.00" required>
                                     </div>
                                 </div>
-                                <button type="submit" name="registrarIngreso" class="btn-save bg-accent font-bold shadow-sm hover-scale-sm w-100" style="height: 40px; font-size: 14px; white-space: nowrap; border-radius: 10px;">
-                                    <?php echo L('cash_close_btn_deposit'); ?>
+                                <button type="submit" name="registrarIngreso" class="btn-save bg-accent font-bold shadow-md hover-scale-sm w-100" style="height: 48px; font-size: 14px; border-radius: 12px;">
+                                    <i class="fa-solid fa-arrow-down-to-bracket mr-8"></i> <?php echo L('cash_close_btn_deposit'); ?>
                                 </button>
                             </form>
                         </div>
                     </div>
+
                 <?php else: ?>
                     <div class="p-24 br-16 border-2 bg-surface shadow-sm text-center" style="border-style: dashed; opacity: 0.7;">
                         <div class="w-48 h-48 br-50 bg-surface2 text-muted d-flex ai-center jc-center mx-auto mb-12 border">
@@ -317,11 +359,12 @@
         </div>
 
         <!-- BLOQUE 3: ARQUEO DE CAJA Y CIERRE (Z) -->
-        <div class="mb-32">
-            <h3 class="mb-20 d-flex ai-center gap-10">
-                <div class="w-32 h-32 br-50 bg-surface text-muted d-flex ai-center jc-center font-bold fs-16 shadow-sm border-2">Z</div>
-                <?php echo L('cash_close_fiscal_title'); ?>
+        <div class="mb-48">
+            <h3 class="mb-24 d-flex ai-center gap-12">
+                <div class="w-40 h-40 br-12 bg-surface text-muted d-flex ai-center jc-center font-bold fs-20 shadow-sm border-2">Z</div>
+                <span class="fs-20 fw-800" style="letter-spacing: -0.5px;"><?php echo L('cash_close_fiscal_title'); ?></span>
             </h3>
+
 
             <?php if (!empty($avCierreCaja['pendientesArqueo']) && !isset($avCierreCaja['modoEdicionPendiente'])): ?>
                 <div class="p-48 border-2 br-16 bg-surface shadow-sm text-center" style="border-color: var(--accent); background: rgba(var(--accent-rgb), 0.02);">
@@ -338,88 +381,93 @@
                             <input type="hidden" name="idTurnoPendiente" value="<?php echo (int)$avCierreCaja['turno']['id']; ?>">
                         <?php endif; ?>
                         <!-- GRID SUPERIOR 1x2 PARA PASOS 1 Y 2 -->
-                        <div class="grid-2 gap-32 mb-32">
+                        <!-- GRID SUPERIOR 1x3 PARA PASOS 1, 2 Y DESCUADRE -->
+                        <div class="grid-3 gap-24 mb-32">
                             <!-- PASO 1: Conteo real -->
-                            <div class="d-flex flex-column gap-16 ai-center">
-                                <div class="d-flex ai-center jc-center gap-12 mb-8">
-                                    <div class="w-28 h-28 br-50 bg-accent text-white d-flex ai-center jc-center font-bold fs-14" style="width: 28px; height: 28px;">1</div>
-                                    <div class="fs-14 font-bold tt-uppercase text-muted text-center"><?php echo L('cash_close_step_1'); ?></div>
+                            <div class="d-flex flex-column gap-16 ai-center p-24 bg-surface2 br-20 border shadow-sm transition-all" style="min-height: 180px;">
+                                <div class="d-flex ai-center jc-center gap-12">
+                                    <div class="w-28 h-28 br-50 bg-accent text-white d-flex ai-center jc-center font-bold fs-14">1</div>
+                                    <div class="fs-14 font-bold tt-uppercase text-muted"><?php echo L('cash_close_step_1'); ?></div>
                                 </div>
-                                <div class="p-24 bg-surface2 br-12 border d-flex ai-center jc-center gap-24 w-100 shadow-sm" style="min-height: 110px;">
-                                    <i class="fa-solid fa-coins text-accent fs-40 opacity-50"></i>
-                                    <div class="d-flex ai-center gap-8 border br-16 bg-surface px-16 h-56 shadow-sm" style="width: 180px;">
-                                        <input type="number" step="0.01" name="realEfectivo" id="realEfectivo" class="form-input border-0 bg-transparent h-100 p-0 font-mono fs-24 font-bold text-accent text-right w-100 outline-none" placeholder="0.00" oninput="calcularDiferencia()" required>
-                                        <span class="fs-22 font-bold text-muted">€</span>
-                                    </div>
+                                <div class="d-flex ai-center gap-8 border br-16 bg-surface px-16 h-64 shadow-sm w-100">
+                                    <i class="fa-solid fa-coins text-accent fs-32 opacity-40"></i>
+                                    <input type="number" step="0.01" name="realEfectivo" id="realEfectivo" class="form-input border-0 bg-transparent h-100 p-0 font-mono fs-28 font-bold text-accent text-right w-100 outline-none" placeholder="0.00" oninput="calcularDiferencia()" required>
+                                    <span class="fs-22 font-bold text-muted">€</span>
                                 </div>
                             </div>
 
                             <!-- PASO 2: Fondo para mañana -->
-                            <div class="d-flex flex-column gap-16 ai-center">
-                                <div class="d-flex ai-center jc-center gap-12 mb-8">
-                                    <div class="w-28 h-28 br-50 bg-accent text-white d-flex ai-center jc-center font-bold fs-14" style="width: 28px; height: 28px;">2</div>
-                                    <div class="fs-14 font-bold tt-uppercase text-muted text-center"><?php echo L('cash_close_step_2'); ?></div>
+                            <div class="d-flex flex-column gap-16 ai-center p-24 bg-surface2 br-20 border shadow-sm transition-all" style="min-height: 180px;">
+                                <div class="d-flex ai-center jc-center gap-12">
+                                    <div class="w-28 h-28 br-50 bg-accent text-white d-flex ai-center jc-center font-bold fs-14">2</div>
+                                    <div class="fs-14 font-bold tt-uppercase text-muted"><?php echo L('cash_close_step_2'); ?></div>
                                 </div>
-                                <div class="p-24 bg-surface2 br-12 border d-flex ai-center jc-center gap-24 w-100 shadow-sm" style="min-height: 110px;">
-                                    <i class="fa-solid fa-piggy-bank text-muted fs-40 opacity-50"></i>
-                                    <div class="d-flex ai-center gap-8 border br-16 bg-surface px-16 h-56 shadow-sm" style="width: 180px;">
-                                        <input type="number" step="0.01" name="fondoSiguiente" id="fondoSiguiente" class="form-input border-0 bg-transparent h-100 p-0 font-mono fs-24 font-bold text-text text-right w-100 outline-none" placeholder="0.00" required>
-                                        <span class="fs-22 font-bold text-muted">€</span>
-                                    </div>
+                                <div class="d-flex ai-center gap-8 border br-16 bg-surface px-16 h-64 shadow-sm w-100">
+                                    <i class="fa-solid fa-piggy-bank text-muted fs-32 opacity-40"></i>
+                                    <input type="number" step="0.01" name="fondoSiguiente" id="fondoSiguiente" class="form-input border-0 bg-transparent h-100 p-0 font-mono fs-28 font-bold text-text text-right w-100 outline-none" placeholder="0.00" required>
+                                    <span class="fs-22 font-bold text-muted">€</span>
                                 </div>
                             </div>
-                        </div>
 
-                        <!-- CONTENEDOR FLEX INFERIOR CENTRADO PARA DESCUADRE -->
-                        <div class="border-bottom pb-40 mb-32 d-flex jc-center">
-                            <div class="bg-surface2 br-12 p-24 text-center border shadow-md" style="min-width: 380px; border-top: 4px solid var(--accent);">
-                                <div class="fs-11 tt-uppercase text-muted font-bold mb-8"><?php echo L('cash_close_label_diff'); ?></div>
-                                <div id="diffCaja" class="fs-40 font-mono font-bold text-muted mb-8" style="white-space: nowrap; line-height: 1;">0,00 €</div>
-                                <div class="fs-14 text-muted" style="white-space: nowrap;">
+                            <!-- DESCUADRE -->
+                            <div class="d-flex flex-column gap-16 ai-center p-24 bg-surface2 br-20 border shadow-md transition-all" style="min-height: 180px; border-top: 4px solid var(--accent);">
+                                <div class="fs-11 tt-uppercase text-muted font-bold"><?php echo L('cash_close_label_diff'); ?></div>
+                                <div id="diffCaja" class="fs-40 font-mono font-bold text-muted" style="white-space: nowrap; line-height: 1;">0,00 €</div>
+                                <div class="fs-13 text-muted mt-auto" style="white-space: nowrap;">
                                     <?php echo L('cash_close_label_was_expected'); ?> <span class="font-bold text-text"><?php echo number_format($avCierreCaja['esperadoTurno'], 2, ',', '.'); ?> €</span>
                                 </div>
                             </div>
                         </div>
 
+
                         <!-- PASO 3: Cantidad a sacar (Calculado) -->
-                        <div class="d-flex ai-center jc-center bg-surface2 p-32 br-12 border flex-wrap gap-48" style="background: linear-gradient(145deg, var(--surface2) 0%, rgba(var(--accent-rgb), 0.05) 100%);">
-                            <div class="d-flex ai-center jc-center gap-24" style="min-width: 300px;">
-                                <div class="w-64 h-64 br-12 bg-surface shadow-sm d-flex ai-center jc-center border" style="flex-shrink: 0;"><i class="fa-solid fa-arrow-right-from-bracket text-accent fs-32"></i></div>
-                                <div class="text-center">
+                        <div class="bg-surface2 p-32 br-20 border shadow-md mb-24" style="background: linear-gradient(145deg, var(--surface2) 0%, rgba(var(--accent-rgb), 0.05) 100%);">
+                            <div class="d-flex ai-center gap-24">
+                                <div class="w-72 h-72 br-16 bg-surface shadow-sm d-flex ai-center jc-center border" style="flex-shrink: 0;"><i class="fa-solid fa-arrow-right-from-bracket text-accent fs-32"></i></div>
+                                <div>
                                     <div class="fs-14 tt-uppercase text-accent font-bold mb-4"><?php echo L('cash_close_step_3'); ?></div>
-                                    <div id="importeRetiradaCierre" class="fs-40 font-mono font-bold" style="letter-spacing: -1px;">0,00 €</div>
-                                </div>
-                            </div>
-                            <div class="text-center d-flex flex-column ai-center gap-12" style="min-width: 300px;">
-                                <input type="hidden" name="totalTarjeta" value="<?php echo $avCierreCaja['resumen']['totalTarjeta']; ?>">
-                                <input type="hidden" name="totalBizum" value="<?php echo $avCierreCaja['resumen']['totalBizum']; ?>">
-
-                                <div class="d-flex jc-center gap-12">
-                                    <?php if ($avCierreCaja['canCerrarTurno']): ?>
-                                        <button type="submit" name="doCierreTurno" class="btn-cancel h-56 px-24 fs-14 border-2 shadow-sm hover-scale d-flex ai-center gap-10 m-0" style="background: var(--surface2);">
-                                            <i class="fa-solid fa-clock-rotate-left"></i> <?php echo L('cash_close_btn_only_close_shift'); ?>
-                                        </button>
-                                    <?php endif; ?>
-
-                                    <?php if ($avCierreCaja['canCerrarCaja']): ?>
-                                        <button type="submit" name="doCierreZ" class="btn-save h-56 px-32 fs-16 shadow-lg hover-scale d-flex ai-center gap-10 m-0" style="background: var(--green); border-color: var(--green); white-space: nowrap;">
-                                            <i class="fa-solid fa-check-double fs-18"></i> <span class="font-bold"><?php echo L('cash_close_btn_do_z'); ?></span>
-                                        </button>
-                                    <?php endif; ?>
-
-                                    <?php if (!$avCierreCaja['canCerrarTurno'] && !$avCierreCaja['canCerrarCaja']): ?>
-                                        <div class="p-16 bg-red-light text-red border br-8 d-flex ai-center gap-10 fs-13 font-bold">
-                                            <i class="fa-solid fa-lock fs-18"></i>
-                                            <?php echo L('cash_close_no_perms'); ?>
-                                        </div>
-                                    <?php endif; ?>
-                                </div>
-                                <div class="fs-11 text-muted max-w-400">
-                                    <?php echo L('cash_close_help_close_shift'); ?> <br>
-                                    <?php echo L('cash_close_help_do_z'); ?>
+                                    <div id="importeRetiradaCierre" class="fs-48 font-mono font-bold" style="letter-spacing: -1px; line-height: 1;">0,00 €</div>
                                 </div>
                             </div>
                         </div>
+
+                        <!-- ACCIONES DE CIERRE: dos opciones claramente diferenciadas -->
+                        <div class="grid-2 gap-20">
+                            <?php if ($avCierreCaja['canCerrarTurno']): ?>
+                            <div class="p-24 br-20 border-2 bg-surface shadow-sm d-flex flex-column gap-16" style="border-color: var(--border);">
+                                <div class="d-flex ai-center gap-12">
+                                    <div class="w-40 h-40 br-10 bg-surface2 text-muted d-flex ai-center jc-center shadow-xs border" style="flex-shrink:0;">
+                                        <i class="fa-solid fa-clock-rotate-left fs-18"></i>
+                                    </div>
+                                    <div>
+                                        <div class="fs-13 font-bold text-text"><?php echo L('cash_close_btn_only_close_shift'); ?></div>
+                                        <div class="fs-11 text-muted mt-2"><?php echo L('cash_close_help_close_shift'); ?></div>
+                                    </div>
+                                </div>
+                                <button type="submit" name="doCierreTurno" class="btn-cancel h-48 fs-14 border-2 shadow-sm hover-scale-sm d-flex ai-center jc-center gap-10 m-0 w-100" style="background: var(--surface); border-radius: 12px;">
+                                    <i class="fa-solid fa-clock-rotate-left"></i> <?php echo L('cash_close_btn_only_close_shift'); ?>
+                                </button>
+                            </div>
+                            <?php endif; ?>
+
+                            <?php if ($avCierreCaja['canCerrarCaja']): ?>
+                            <div class="p-24 br-20 border-2 bg-surface shadow-md d-flex flex-column gap-16" style="border-color: var(--green); background: linear-gradient(145deg, var(--surface) 0%, rgba(46,204,113,0.04) 100%);">
+                                <div class="d-flex ai-center gap-12">
+                                    <div class="w-40 h-40 br-10 bg-green text-white d-flex ai-center jc-center shadow-sm" style="flex-shrink:0;">
+                                        <i class="fa-solid fa-check-double fs-18"></i>
+                                    </div>
+                                    <div>
+                                        <div class="fs-13 font-bold text-text"><?php echo L('cash_close_btn_do_z'); ?></div>
+                                        <div class="fs-11 text-muted mt-2"><?php echo L('cash_close_help_do_z'); ?></div>
+                                    </div>
+                                </div>
+                                <button type="submit" name="doCierreZ" class="btn-save h-48 fs-15 shadow-lg hover-scale-sm d-flex ai-center jc-center gap-10 m-0 w-100 font-bold" style="background: var(--green); border-color: var(--green); border-radius: 12px;">
+                                    <i class="fa-solid fa-check-double fs-18"></i> <?php echo L('cash_close_btn_do_z'); ?>
+                                </button>
+                            </div>
+                            <?php endif; ?>
+                        </div>
+
                     </form>
                 </div>
             <?php endif; ?>
@@ -464,7 +512,8 @@
                     <?php echo L('cash_close_no_tickets'); ?>
                 </div>
             <?php else: ?>
-                <table class="data-table mt-12">
+            <div class="overflow-x-auto">
+                <table class="analitica-table mt-12">
                     <thead>
                         <tr>
                             <th class="pl-24 py-16"><?php echo L('cash_close_th_ticket'); ?></th>
@@ -477,6 +526,7 @@
                             <th class="text-center py-16"><?php echo L('cash_close_th_actions'); ?></th>
                         </tr>
                     </thead>
+
                     <tbody>
                         <?php foreach ($avCierreCaja['ventas'] as $i => $v): ?>
                             <tr class="transition-all hover-bg-surface2">
@@ -530,11 +580,15 @@
                         <?php endforeach; ?>
                     </tbody>
                 </table>
+            </div>
             <?php endif; ?>
         </div>
 
+
+        </div>
     </div>
 </div>
+
 
 <!-- Listener para actualizaciones de caja en tiempo real -->
 <script>

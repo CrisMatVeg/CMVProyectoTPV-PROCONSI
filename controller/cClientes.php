@@ -12,34 +12,14 @@ if (!isset($_SESSION['usuarioActualTPV'])) {
     exit;
 }
 
-// Solo administradores
-if ($_SESSION['usuarioActualTPV']->getRol() !== 'admin') {
+// Solo administradores o gestores de clientes
+if (!$_SESSION['usuarioActualTPV']->tienePermiso('gestionar_clientes')) {
     $_SESSION['paginaEnCurso'] = 'Dashboard';
     header('Location: index.php');
     exit;
 }
 
-// Navegación global
-if (isset($_REQUEST['salir'])) {
-    session_destroy();
-    header('Location: index.php');
-    exit;
-}
-
-if (isset($_REQUEST['irTPV'])) {
-    $_SESSION['paginaEnCurso'] = 'inicioPrivado';
-    header('Location: index.php');
-    exit;
-}
-
-if (isset($_REQUEST['irMiPerfil'])) {
-    $_SESSION['paginaEnCurso'] = 'MiPerfil';
-    header('Location: index.php');
-    exit;
-}
-
-// Navegación básica (volver al Dashboard)
-if (isset($_REQUEST['volver']) || isset($_REQUEST['irDashboard'])) {
+if (isset($_REQUEST['volver'])) {
     $_SESSION['paginaEnCurso'] = 'Dashboard';
     header('Location: index.php');
     exit;
@@ -49,9 +29,7 @@ require_once 'model/ClientePDO.php';
 require_once 'model/RolClientePDO.php';
 
 // Paginación
-$pag = isset($_GET['p']) ? max(1, (int)$_GET['p']) : 1;
-$limit = 50;
-$offset = ($pag - 1) * $limit;
+['pag' => $pag, 'limit' => $limit, 'offset' => $offset] = obtenerPaginacion(50);
 
 $totalClientes = ClientePDO::contarTodos();
 $totalPaginas = ceil($totalClientes / $limit);

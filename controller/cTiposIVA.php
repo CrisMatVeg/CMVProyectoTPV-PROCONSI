@@ -10,7 +10,7 @@ if (!isset($_SESSION['usuarioActualTPV'])) {
     exit;
 }
 
-if ($_SESSION['usuarioActualTPV']->getRol() !== 'admin') {
+if (!$_SESSION['usuarioActualTPV']->tienePermiso('gestionar_iva')) {
     $_SESSION['paginaEnCurso'] = 'Dashboard';
     header('Location: index.php');
     exit;
@@ -18,27 +18,7 @@ if ($_SESSION['usuarioActualTPV']->getRol() !== 'admin') {
 
 require_once 'model/TipoIVAPDO.php';
 
-// Navegación global
-if (isset($_REQUEST['salir'])) {
-    session_destroy();
-    header('Location: index.php');
-    exit;
-}
-
-if (isset($_REQUEST['irTPV'])) {
-    $_SESSION['paginaEnCurso'] = 'inicioPrivado';
-    header('Location: index.php');
-    exit;
-}
-
-if (isset($_REQUEST['irMiPerfil'])) {
-    $_SESSION['paginaEnCurso'] = 'MiPerfil';
-    header('Location: index.php');
-    exit;
-}
-
-// Navegación hacia Dashboard
-if (isset($_REQUEST['volver']) || isset($_REQUEST['irDashboard'])) {
+if (isset($_REQUEST['volver'])) {
     $_SESSION['paginaEnCurso'] = 'Dashboard';
     header('Location: index.php');
     exit;

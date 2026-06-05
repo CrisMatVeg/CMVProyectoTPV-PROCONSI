@@ -15,10 +15,11 @@ try {
     require_once __DIR__ . '/../model/DBPDO.php';
     require_once __DIR__ . '/../model/PromocionPDO.php';
     require_once __DIR__ . '/../model/Usuario.php';
+    require_once __DIR__ . '/../model/LogPDO.php';
 
     // session_start(); // Handled by csrf_check.php
-    if (!isset($_SESSION['usuarioActualTPV']) || $_SESSION['usuarioActualTPV']->getRol() !== 'admin') {
-        http_response_code(401);
+    if (!isset($_SESSION['usuarioActualTPV']) || !$_SESSION['usuarioActualTPV']->tienePermiso('gestionar_promociones')) {
+        http_response_code(403);
         echo json_encode(['ok' => false, 'error' => 'No autorizado']);
         exit;
     }
@@ -38,7 +39,10 @@ try {
                 echo json_encode(['ok' => false, 'aErrores' => $errores]);
                 break;
             }
-            PromocionPDO::añadir($input);
+            PromocionPDO::agregar($input);
+            LogPDO::addLog('CREATE_PROMOCION', "Promoción creada: {$input['descripcion']}", [
+                'descripcion' => $input['descripcion'], 'tipo' => $input['tipo'] ?? '', 'valor' => $input['valor'] ?? null,
+            ]);
             echo json_encode(['ok' => true]);
             break;
 
@@ -53,6 +57,9 @@ try {
                 break;
             }
             PromocionPDO::editar($id, $input);
+            LogPDO::addLog('UPDATE_PROMOCION', "Promoción #{$id} actualizada: {$input['descripcion']}", [
+                'id' => $id, 'descripcion' => $input['descripcion'],
+            ]);
             echo json_encode(['ok' => true]);
             break;
 
@@ -62,6 +69,7 @@ try {
                 throw new Exception('ID de promoción inválido');
             }
             PromocionPDO::eliminar($id);
+            LogPDO::addLog('DELETE_PROMOCION', "Promoción #{$id} eliminada", ['id' => $id]);
             echo json_encode(['ok' => true]);
             break;
 
@@ -71,6 +79,9 @@ try {
                 throw new Exception('ID de promoción inválido');
             }
             $activo = PromocionPDO::toggleActivo($id);
+            LogPDO::addLog('TOGGLE_PROMOCION', "Promoción #{$id} " . ($activo ? 'activada' : 'desactivada'), [
+                'id' => $id, 'activo' => (bool)$activo,
+            ]);
             echo json_encode(['ok' => true, 'activo' => $activo]);
             break;
 
@@ -81,6 +92,22 @@ try {
             }
             PromocionPDO::actualizarOrden($ids);
             echo json_encode(['ok' => true]);
+            break;
+
+        case 'buscarProductos':
+            require_once __DIR__ . '/../model/ProductoPDO.php';
+            $term = trim($input['term'] ?? '');
+            $productos = ProductoPDO::listarProductos(false, 100, 0, $term);
+            $result = [];
+            foreach ($productos as $p) {
+                $result[] = [
+                    'id'         => (int)$p->getId(),
+                    'nombre'     => $p->getNombre(),
+                    'referencia' => $p->getReferencia(),
+                    'precio'     => (float)$p->getPrecioVenta(),
+                ];
+            }
+            echo json_encode(['ok' => true, 'productos' => $result]);
             break;
 
         default:
@@ -96,7 +123,12 @@ function validarPromocion(array $d): array {
     if (empty($d['descripcion'])) $err['descripcion'] = 'La descripción es obligatoria';
     if (!in_array($tipo, ['percent', 'amount', 'bundle', 'fixed_bundle'], true)) $err['tipo'] = 'Tipo no válido';
     if ($tipo === 'percent' || $tipo === 'amount' || $tipo === 'fixed_bundle') {
-        if (!isset($d['valor']) || !is_numeric($d['valor']) || (float)$d['valor'] <= 0) $err['valor'] = 'Valor inválido';
+        $val = isset($d['valor']) ? (float)$d['valor'] : 0;
+        if (!is_numeric($d['valor'] ?? null) || $val <= 0) {
+            $err['valor'] = 'El valor debe ser mayor que 0';
+        } elseif ($tipo === 'percent' && $val > 100) {
+            $err['valor'] = 'El porcentaje no puede ser superior al 100%';
+        }
     }
     if ($tipo === 'bundle' || $tipo === 'fixed_bundle') {
         if (empty($d['bundle_buy_qty']) || !is_numeric($d['bundle_buy_qty']) || (int)$d['bundle_buy_qty'] <= 1) $err['bundle_buy_qty'] = 'Cantidad de compra inválida (mín. 2)';

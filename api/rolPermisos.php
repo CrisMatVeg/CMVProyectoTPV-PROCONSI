@@ -8,8 +8,8 @@ require_once __DIR__ . '/csrf_check.php';
 // session_start(); // csrf_check already starts session
 header('Content-Type: application/json');
 
-// Seguridad mínima (autenticado)
-if (!isset($_SESSION['usuarioActualTPV'])) {
+// Seguridad mínima (autenticado y con permiso de gestión de usuarios)
+if (!isset($_SESSION['usuarioActualTPV']) || !$_SESSION['usuarioActualTPV']->tienePermiso('gestionar_usuarios')) {
     echo json_encode(['ok' => false, 'error' => 'No autorizado']);
     exit;
 }

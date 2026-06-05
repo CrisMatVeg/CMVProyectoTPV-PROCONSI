@@ -2,17 +2,21 @@
 ?>
 <div class="main-full p-24">
     <div class="section-header container-wider">
-        <div class="section-title">
-            <h1><?php echo L('tax_title'); ?></h1>
-            <p><?php echo L('tax_subtitle'); ?></p>
+        <div class="d-flex ai-center gap-16">
+            <a href="index.php?irDashboard=1" class="btn-prominent-back compact" title="<?php echo L('login_back'); ?>">
+                <i class="fa-solid fa-chevron-left"></i>
+                <span><?php echo L('login_back'); ?></span>
+            </a>
+            <div class="vr" style="height: 32px; width: 1px; background: var(--border); opacity: 0.5;"></div>
+            <div class="section-title">
+                <h1><?php echo L('tax_title'); ?></h1>
+                <p><?php echo L('tax_subtitle'); ?></p>
+            </div>
         </div>
         <div class="d-flex gap-12">
             <button onclick="abrirModalIva()" class="btn-add">
                 <i class="fa-solid fa-plus"></i> <?php echo L('tax_btn_add'); ?>
             </button>
-            <a href="index.php?irDashboard=1" class="btn-back">
-                <?php echo L('rates_btn_back'); ?>
-            </a>
         </div>
     </div>
 
@@ -182,6 +186,10 @@
 
     async function guardarIva() {
         limpiarErroresIva();
+        const btn = document.querySelector('#ivaModal .btn-save');
+        const oldHtml = btn ? btn.innerHTML : '';
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>'; }
+
         const id = document.getElementById('ivaId').value;
         const payload = {
             accion: id ? 'editar' : 'añadir',
@@ -194,11 +202,10 @@
             activo: document.getElementById('ivaActivo').checked ? 1 : 0,
         };
 
-        if (payload.fecha_inicio && payload.fecha_fin) {
-            if (!validarFechas(payload.fecha_inicio, payload.fecha_fin)) {
-                showCustomAlert("<?php echo L('rates_confirm_apply_title'); ?>", "<?php echo L('rates_confirm_apply_msg'); ?>", 'warning');
-                return;
-            }
+        if (payload.fecha_inicio && payload.fecha_fin && payload.fecha_fin < payload.fecha_inicio) {
+            document.getElementById('err-fecha_fin').innerText = 'La fecha de fin no puede ser anterior a la de inicio';
+            if (btn) { btn.disabled = false; btn.innerHTML = oldHtml; }
+            return;
         }
 
         try {
@@ -223,6 +230,8 @@
         } catch (e) {
             console.error(e);
             showCustomAlert('Error', 'Error de conexión con el servidor', 'error');
+        } finally {
+            if (btn) { btn.disabled = false; btn.innerHTML = oldHtml; }
         }
     }
 

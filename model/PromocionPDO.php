@@ -81,7 +81,7 @@ class PromocionPDO
         return $row ?: null;
     }
 
-    public static function añadir(array $datos): void
+    public static function agregar(array $datos): void
     {
         $sql = "INSERT INTO promociones
                 (codigo, descripcion, tipo, valor, min_subtotal, bundle_buy_qty, bundle_pay_qty, id_producto, producto_ids, categoria_code, activo, solo_socios, roles_segmento, dias_semana, hora_inicio, hora_fin, fecha_inicio, fecha_fin, prioridad, excluidos)
@@ -107,7 +107,7 @@ class PromocionPDO
             ':dias'            => !empty($datos['dias_semana']) ? (is_array($datos['dias_semana']) ? implode(',', $datos['dias_semana']) : $datos['dias_semana']) : null,
             ':h_ini'           => !empty($datos['hora_inicio']) ? $datos['hora_inicio'] : null,
             ':h_fin'           => !empty($datos['hora_fin']) ? $datos['hora_fin'] : null,
-            ':fecha_inicio'    => !empty($datos['fecha_inicio']) ? $datos['fecha_inicio'] : null,
+            ':fecha_inicio'    => !empty($datos['fecha_inicio']) ? $datos['fecha_inicio'] : date('Y-m-d'),
             ':fecha_fin'       => !empty($datos['fecha_fin']) ? $datos['fecha_fin'] : null,
             ':prioridad'       => (int)($datos['prioridad'] ?? 0),
             ':excluidos'       => !empty($datos['excluidos']) ? (is_array($datos['excluidos']) ? json_encode(array_map('intval', $datos['excluidos'])) : $datos['excluidos']) : null,
@@ -169,7 +169,7 @@ class PromocionPDO
             ':dias'            => !empty($datos['dias_semana']) ? (is_array($datos['dias_semana']) ? implode(',', $datos['dias_semana']) : $datos['dias_semana']) : null,
             ':h_ini'           => !empty($datos['hora_inicio']) ? $datos['hora_inicio'] : null,
             ':h_fin'           => !empty($datos['hora_fin']) ? $datos['hora_fin'] : null,
-            ':fecha_inicio'    => !empty($datos['fecha_inicio']) ? $datos['fecha_inicio'] : null,
+            ':fecha_inicio'    => !empty($datos['fecha_inicio']) ? $datos['fecha_inicio'] : date('Y-m-d'),
             ':fecha_fin'       => !empty($datos['fecha_fin']) ? $datos['fecha_fin'] : null,
             ':prioridad'       => (int)($datos['prioridad'] ?? 0),
             ':excluidos'       => !empty($datos['excluidos']) ? (is_array($datos['excluidos']) ? json_encode(array_map('intval', $datos['excluidos'])) : $datos['excluidos']) : null,

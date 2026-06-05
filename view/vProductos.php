@@ -3,80 +3,99 @@
 <div class="main-full p-24">
 
     <div class="section-header container-wider">
-        <div class="section-title">
-            <h1><?php echo L('prod_title'); ?></h1>
-            <p><?php echo L('prod_subtitle'); ?></p>
-        </div>
-        <div class="d-flex gap-12 ai-center flex-wrap">
-            <a href="index.php?irDashboard=1" class="btn-back">
-                <?php echo L('login_back'); ?>
+        <div class="d-flex ai-center gap-16">
+            <a href="index.php?irDashboard=1" class="btn-prominent-back compact" title="<?php echo L('login_back'); ?>">
+                <i class="fa-solid fa-chevron-left"></i>
+                <span><?php echo L('login_back'); ?></span>
             </a>
+            
+            <div class="vr" style="height: 32px; width: 1px; background: var(--border); opacity: 0.5;"></div>
 
-            <div class="tabs-nav mr-12">
+            <div class="section-title">
+                <div class="d-flex ai-center gap-10">
+                    <i class="fa-solid fa-boxes-stacked text-accent fs-24"></i>
+                    <div>
+                        <h1 class="m-0 fs-20"><?php echo L('prod_title'); ?></h1>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex gap-12 ai-center flex-wrap">
+            <div class="tabs-nav compact">
                 <button class="tab-btn active" onclick="switchTab('productos')" id="btnTabProductos">
-                    <?php echo L('prod_tab_standard'); ?>
+                    <i class="fa-solid fa-box"></i>
                 </button>
                 <button class="tab-btn" onclick="switchTab('packs')" id="btnTabPacks">
-                    <?php echo L('prod_tab_packs'); ?>
+                    <i class="fa-solid fa-cubes"></i>
                 </button>
             </div>
 
-            <div class="d-flex gap-8 ai-center bg-surface2 p-4 br-12 border">
+            <!-- Grupo de Utilidades -->
+            <div class="action-toolbar">
                 <!-- Botón Exportar -->
                 <div class="ie-dropdown-wrap" id="exportDropdownWrap">
-                    <button class="btn-filter" onclick="toggleExportDropdown()" style="border:none; background:transparent; color: var(--text-main) !important;">
-                        <?php echo L('prod_btn_export'); ?>
+                    <button class="toolbar-btn" onclick="toggleExportDropdown()" title="<?php echo L('prod_btn_export'); ?>">
+                        <i class="fa-solid fa-file-export"></i>
                     </button>
                     <div class="ie-dropdown" id="exportDropdown">
                         <a href="api/exportarProductos.php?format=csv" class="ie-dropdown-item">
-                            <?php echo L('prod_export_csv'); ?>
+                            <i class="fa-solid fa-file-csv mr-8"></i><?php echo L('prod_export_csv'); ?>
                         </a>
                         <a href="api/exportarProductos.php?format=json" class="ie-dropdown-item">
-                            <?php echo L('prod_export_json'); ?>
+                            <i class="fa-solid fa-file-code mr-8"></i><?php echo L('prod_export_json'); ?>
                         </a>
                     </div>
                 </div>
 
-                <div class="vr mx-4" style="height: 20px; width: 1px; background: var(--border); opacity: 0.5;"></div>
+                <div class="toolbar-divider"></div>
 
-                <button class="btn-filter" onclick="document.getElementById('importFileInput').click()" style="border:none; background:transparent; color: var(--text-main) !important;">
-                    <?php echo L('prod_btn_import'); ?>
+                <button class="toolbar-btn" onclick="document.getElementById('importFileInput').click()" title="<?php echo L('prod_btn_import'); ?>">
+                    <i class="fa-solid fa-file-import"></i>
                 </button>
                 <input type="file" id="importFileInput" accept=".csv,.json" class="d-none" onchange="importarProductos(this)">
 
-                <div class="vr mx-4" style="height: 20px; width: 1px; background: var(--border); opacity: 0.5;"></div>
+                <div class="toolbar-divider"></div>
 
-                <button onclick="abrirModalGestionCategorias()" class="btn-filter" style="border:none; background:transparent; color: var(--text-main) !important;">
-                    <?php echo L('prod_btn_categories'); ?>
+                <button onclick="abrirModalGestionCategorias()" class="toolbar-btn" title="<?php echo L('prod_btn_categories'); ?>">
+                    <i class="fa-solid fa-tags"></i>
                 </button>
 
-                <div class="vr mx-4" style="height: 20px; width: 1px; background: var(--border); opacity: 0.5;"></div>
+                <div class="toolbar-divider"></div>
 
-                <button onclick="generarPedidoAutomatico()" class="btn-filter" id="btnPedidoAuto" style="border:none; background:transparent; color: var(--accent-primary) !important; font-weight: 600;">
-                    <?php echo L('prod_btn_auto_order'); ?>
+                <button onclick="generarPedidoAutomatico()" class="toolbar-btn text-accent" id="btnPedidoAuto" title="<?php echo L('prod_btn_auto_order'); ?>">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
                 </button>
 
-                <div class="vr mx-4" style="height: 20px; width: 1px; background: var(--border); opacity: 0.5;"></div>
+                <div class="toolbar-divider"></div>
 
-                <button onclick="abrirModalMargenMasivo()" class="btn-filter" id="btnMargenMasivo" style="border:none; background:transparent; color: #7c3aed !important; font-weight: 600;" title="<?php echo L('prod_tip_mass_margin'); ?>">
-                    <?php echo L('prod_btn_mass_margin'); ?>
+                <button onclick="abrirModalAjusteUnificado()" class="toolbar-btn text-purple" id="btnAjusteMasivo" title="Ajuste masivo de precios">
+                    <i class="fa-solid fa-sliders"></i>
                 </button>
 
-                <div class="vr mx-4" style="height: 20px; width: 1px; background: var(--border); opacity: 0.5;"></div>
+                <div class="toolbar-divider"></div>
 
-                <button onclick="abrirModalAjusteMasivo()" class="btn-filter" id="btnAjusteMasivo" style="border:none; background:transparent; color: #7c3aed !important; font-weight: 600;" title="<?php echo L('prod_tip_mass_adjustment'); ?>">
-                    <?php echo L('prod_btn_mass_adjustment'); ?>
+                <button onclick="abrirModalHistorialGlobal()" class="toolbar-btn text-orange" id="btnHistorialGlobal" title="<?php echo L('prod_btn_history_global'); ?>">
+                    <i class="fa-solid fa-history"></i>
                 </button>
             </div>
 
             <div class="flex-1"></div>
 
-            <button onclick="abrirModalProducto()" class="btn-save h-44 px-20 shadow-sm" id="btnNuevoProducto">
-                <i class="fa-solid fa-plus"></i> <?php echo L('prod_btn_new_product'); ?>
-            </button>
-            <button onclick="abrirModalPack()" class="btn-save h-44 px-20 shadow-sm d-none" id="btnNuevoPack">
-                <i class="fa-solid fa-plus"></i> <?php echo L('prod_btn_new_pack'); ?>
-            </button>
+            <div class="d-flex gap-8">
+                <button onclick="abrirModalProducto()" class="btn-save-compact" id="btnNuevoProducto" title="<?php echo L('prod_btn_new_product'); ?>">
+                    <div class="icon-stack">
+                        <i class="fa-solid fa-box"></i>
+                        <i class="fa-solid fa-plus tiny-plus"></i>
+                    </div>
+                </button>
+                <button onclick="abrirModalPack()" class="btn-save-compact d-none" id="btnNuevoPack" title="<?php echo L('prod_btn_new_pack'); ?>">
+                    <div class="icon-stack">
+                        <i class="fa-solid fa-cubes"></i>
+                        <i class="fa-solid fa-plus tiny-plus"></i>
+                    </div>
+                </button>
+            </div>
         </div>
     </div>
 
@@ -99,7 +118,7 @@
 
         <div class="filter-item">
             <span class="filter-label"><?php echo L('prod_th_category'); ?></span>
-            <select id="filterCat" class="filter-control" onchange="applyFilters()" style="min-width: 180px;">
+            <select id="filterCat" class="filter-control" onchange="filtrarProductos()" style="min-width: 180px;">
                 <option value="all"><?php echo L('prod_filter_cat_all'); ?></option>
                 <?php foreach ($avProductos['categorias'] as $c): ?>
                     <option value="<?php echo htmlspecialchars($c['codigo']); ?>"><?php echo htmlspecialchars($c['nombre']); ?></option>
@@ -109,11 +128,24 @@
 
         <div class="filter-item">
             <span class="filter-label"><?php echo L('prod_th_status'); ?></span>
-            <select id="filterEstado" class="filter-control" onchange="applyFilters()" style="min-width: 150px;">
+            <select id="filterEstado" class="filter-control" onchange="filtrarProductos()" style="min-width: 150px;">
                 <option value="all"><?php echo L('prod_filter_status_all'); ?></option>
                 <option value="1"><?php echo L('prod_status_active'); ?></option>
                 <option value="0"><?php echo L('prod_status_inactive'); ?></option>
                 <option value="bajo_stock"><?php echo L('prod_status_low_stock'); ?></option>
+            </select>
+        </div>
+
+        <div class="filter-item">
+            <span class="filter-label"><?php echo L('tpv_sort_by'); ?></span>
+            <select id="filterSort" class="filter-control" onchange="filtrarProductos()" style="min-width: 180px;">
+                <option value=""><?php echo L('prod_sort_recent'); ?></option>
+                <option value="name_asc"><?php echo L('tpv_sort_name_asc'); ?></option>
+                <option value="name_desc"><?php echo L('tpv_sort_name_desc'); ?></option>
+                <option value="price_asc"><?php echo L('tpv_sort_price_asc'); ?></option>
+                <option value="price_desc"><?php echo L('tpv_sort_price_desc'); ?></option>
+                <option value="stock_asc"><?php echo L('tpv_sort_stock_asc'); ?></option>
+                <option value="stock_desc"><?php echo L('tpv_sort_stock_desc'); ?></option>
             </select>
         </div>
     </div>
@@ -147,7 +179,12 @@
                                 <span class="fs-24"><?php echo $icono; ?></span>
                             <?php endif; ?>
                         </td>
-                        <td class="font-bold"><?php echo htmlspecialchars($p['nombre']); ?></td>
+                        <td class="font-bold">
+                            <?php echo htmlspecialchars($p['nombre']); ?>
+                            <?php if ($p['es_pack']): ?>
+                                <span class="ml-8 px-6 py-2 br-4 fs-10 bg-accent-soft text-accent border border-accent"><?php echo L('prod_pill_pack'); ?></span>
+                            <?php endif; ?>
+                        </td>
                         <td class="text-muted"><?php echo htmlspecialchars($p['referencia']); ?></td>
                         <td>
                             <span class="cat-pill">
@@ -172,12 +209,17 @@
                             $stock = (int)$p['stock'];
                             $stockMin = (int)$p['stock_minimo'];
                             $esCritico = ($stockMin > 0 && $stock <= $stockMin);
+                            $tieneAlbaranPendiente = !empty($p['albaran_pendiente']);
                             ?>
                             <div class="d-flex flex-column ai-end">
                                 <span class="<?php echo $esCritico ? 'text-red bg-red-soft px-4 br-4' : ''; ?>">
                                     <?php echo $stock; ?>
                                 </span>
-                                <?php if ($esCritico): ?>
+                                <?php if ($esCritico && $tieneAlbaranPendiente): ?>
+                                    <span class="fs-9 tt-uppercase font-bold" style="color:var(--warning,#f59e0b)" title="<?php echo L('prod_albaran_pendiente_title'); ?>">
+                                        <i class="fa-solid fa-truck-clock"></i> <?php echo L('prod_albaran_pendiente'); ?>
+                                    </span>
+                                <?php elseif ($esCritico): ?>
                                     <span class="fs-9 tt-uppercase text-red font-bold"><?php echo L('prod_stock_min_label'); ?> <?php echo $stockMin; ?></span>
                                 <?php else: ?>
                                     <span class="fs-9 tt-uppercase text-muted"><?php echo L('prod_stock_min_label'); ?> <?php echo $stockMin; ?></span>
@@ -185,7 +227,13 @@
                             </div>
                         </td>
                         <td class="text-right font-bold font-mono">
-                            <?php echo number_format($p['precio_venta'], 2, ',', '.'); ?> €
+                            <?php 
+                            if (!empty($p['mantener_precision'])) {
+                                echo str_replace('.', ',', (string)$p['precio_venta']);
+                            } else {
+                                echo number_format($p['precio_venta'], 2, ',', '.');
+                            }
+                            ?> €
                         </td>
                         <td class="text-center">
                             <?php if ($p['activo']): ?>
@@ -233,7 +281,7 @@
         </table>
 
         <!-- Paginación -->
-        <div class="pagination-footer mt-24 d-flex ai-center jc-between p-16 bg-surface border-top">
+        <div class="pagination-footer mt-24 d-flex ai-center p-16 bg-surface border-top" style="flex-direction: column-reverse; justify-content: center; gap: 12px;">
             <div class="pagination-info fs-12 text-muted">
                 <?php 
                     $from = $avProductos['paginacion']['totalRegistros'] > 0 ? ($avProductos['paginacion']['actual'] - 1) * $avProductos['paginacion']['limit'] + 1 : 0;
@@ -277,7 +325,7 @@
                 </tr>
             </thead>
             <tbody id="packsTableBody">
-                <?php foreach ($avProductos['productos'] as $p): if (!$p['es_pack']) continue; ?>
+                <?php foreach ($avProductos['packs'] as $p): ?>
                     <tr class="product-row row-tipo-pack"
                         data-nombre="<?php echo strtolower(htmlspecialchars($p['nombre'])); ?>"
                         data-codigo="<?php echo strtolower(htmlspecialchars($p['referencia'])); ?>"
@@ -458,6 +506,67 @@
         padding: 2px 8px;
     }
 
+    /* --- Tags / Atributos --- */
+    .tags-input-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        min-height: 44px;
+        height: auto !important;
+        align-items: center;
+        background: var(--surface2);
+        border: 2px solid transparent;
+        transition: all 0.2s;
+        border-radius: 12px;
+        padding: 8px 12px;
+    }
+
+    .tags-input-container:focus-within {
+        border-color: var(--accent);
+        background: var(--surface);
+        box-shadow: 0 0 0 4px rgba(52, 152, 219, 0.1);
+    }
+
+    #tagsContainer {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        width: 100%;
+    }
+
+    .tag-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        background: var(--accent);
+        color: white;
+        border-radius: 8px;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        animation: tagPop 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    @keyframes tagPop {
+        from { transform: scale(0.5); opacity: 0; }
+        to { transform: scale(1); opacity: 1; }
+    }
+
+    .tag-chip .remove-tag {
+        cursor: pointer;
+        opacity: 0.8;
+        transition: opacity 0.2s;
+        font-size: 16px;
+        line-height: 1;
+        margin-left: 2px;
+    }
+
+    .tag-chip .remove-tag:hover {
+        opacity: 1;
+    }
+
     /* --- Secciones dentro de pestaña --- */
     .tab-section {
         background: var(--bg-body, var(--surface));
@@ -612,6 +721,23 @@
                         <textarea id="prodDesc" placeholder="<?php echo L('prod_placeholder_desc'); ?>" class="form-input" rows="2"></textarea>
                     </div>
 
+                    <!-- ETIQUETAS / CATEGORIZACIÓN -->
+                    <div class="form-group mb-32">
+                        <label class="form-label mb-8 d-flex jc-between ai-center">
+                            <span><?php echo L('prod_modal_label_tags'); ?></span>
+                            <span class="fs-10 opacity-50 font-normal"><?php echo L('prod_modal_tags_help'); ?></span>
+                        </label>
+                        <div class="tags-input-container" id="tagsWrapper">
+                            <div id="tagsContainer" class="d-flex flex-wrap gap-8"></div>
+                            <input type="text" id="prodTagsInput" 
+                                   class="flex-1 min-w-150 border-0 bg-transparent p-4 fs-14" 
+                                   style="outline: none !important;"
+                                   placeholder="<?php echo L('prod_modal_tags_placeholder'); ?>"
+                                   onkeydown="handleTagKeydown(event)">
+                        </div>
+                        <input type="hidden" id="prodAtributos">
+                    </div>
+
                     <div class="d-grid gap-32 mb-16 p-16 bg-surface2 br-12 border-2" style="grid-template-columns: 1fr 1fr;">
                         <div class="form-group mb-0">
                             <label class="form-label fs-11 tt-uppercase mb-4"><?php echo L('prod_modal_label_provider'); ?></label>
@@ -652,38 +778,40 @@
                             <span class="cmp-badge"><i class="fa-solid fa-robot"></i> <?php echo L('prod_modal_badge_auto'); ?></span>
                             <span class="fs-11 text-muted"><?php echo L('prod_modal_badge_auto_desc'); ?></span>
                         </div>
-                        <div class="d-grid gap-16 mt-12" style="grid-template-columns: 1fr 1fr;">
-                            <div class="form-group mb-0">
-                                <div class="d-flex ai-center mb-4" style="height: 16px;">
-                                    <label class="form-label fs-10 tt-uppercase m-0" style="white-space: nowrap;">
-                                        <?php echo L('prod_modal_label_cost_base'); ?> <span class="opacity-50">(<?php echo L('optional'); ?>)</span>
-                                    </label>
-                                </div>
-                                <input type="text" id="prodPrecioProveedor" placeholder="<?php echo L('prod_placeholder_price'); ?>"
-                                    class="form-input text-right font-mono"
-                                    oninput="calcularTotalDesdeBase()"
-                                    title="<?php echo L('prod_modal_tip_cost_base'); ?>">
+
+                        <!-- CMP - campo principal ancho completo -->
+                        <div class="form-group mt-12 mb-0">
+                            <div class="d-flex ai-center jc-between mb-4 w-100" style="height: 16px;">
+                                <label class="form-label fs-10 tt-uppercase m-0" style="white-space: nowrap;"><?php echo L('prod_modal_label_cost_total'); ?> (€)</label>
+                                <button type="button" id="btnHistorialCostes" onclick="abrirModalHistorialCostes()" class="btn-icon p-0 fs-10 text-accent d-inline-flex ai-center ml-auto" title="<?php echo L('prod_modal_tip_cost_history'); ?>" style="display:none; width: auto; height: auto;">
+                                    <i class="fa-solid fa-clock-rotate-left mr-4"></i> <?php echo L('prod_modal_btn_history'); ?>
+                                </button>
                             </div>
-                            <div class="form-group mb-0">
-                                <div class="d-flex ai-center jc-between mb-4 w-100" style="height: 16px;">
-                                    <label class="form-label fs-10 tt-uppercase m-0" style="white-space: nowrap;"><?php echo L('prod_modal_label_cost_total'); ?></label>
-                                    <button type="button" id="btnHistorialCostes" onclick="abrirModalHistorialCostes()" class="btn-icon p-0 fs-10 text-accent d-inline-flex ai-center ml-auto" title="<?php echo L('prod_modal_tip_cost_history'); ?>" style="display:none; width: auto; height: auto;">
-                                        <i class="fa-solid fa-clock-rotate-left mr-4"></i> <?php echo L('prod_modal_btn_history'); ?>
-                                    </button>
-                                </div>
-                                <input type="text" id="prodPrecioCoste" placeholder="<?php echo L('prod_placeholder_price'); ?>"
-                                    class="form-input text-right font-mono"
-                                    oninput="calcularBaseDesdeTotal(); calcularPrecioDesdeMargen();"
-                                    title="<?php echo L('prod_modal_tip_cost_auto'); ?>">
-                                <span class="form-error" id="err-precio_coste"></span>
-                            </div>
+                            <input type="text" id="prodPrecioCoste" placeholder="<?php echo L('prod_placeholder_price'); ?>"
+                                class="form-input text-right font-mono"
+                                oninput="calcularBaseDesdeTotal(); calcularPrecioDesdeMargen();"
+                                title="<?php echo L('prod_modal_tip_cost_auto'); ?>">
+                            <!-- precio_proveedor oculto: calculado automáticamente a partir del CMP -->
+                            <input type="hidden" id="prodPrecioProveedor">
+                            <span class="form-error" id="err-precio_coste"></span>
                         </div>
-                        <div class="form-group mt-16">
-                            <label class="form-label fs-11 tt-uppercase mb-4"><?php echo L('prod_modal_label_margin'); ?></label>
+
+                        <!-- Margen -->
+                        <div class="form-group mt-16 mb-0">
+                            <label class="form-label fs-11 tt-uppercase mb-4"><?php echo L('prod_modal_label_margin'); ?> (%)</label>
                             <input type="number" id="prodMargen" placeholder="<?php echo L('prod_placeholder_margin'); ?>" step="0.01"
                                 class="form-input text-right font-mono"
                                 oninput="calcularPrecioDesdeMargen()"
                                 title="<?php echo L('prod_modal_tip_margin_calc'); ?>">
+                        </div>
+
+                        <!-- Precio neto venta sin IVA (informativo) -->
+                        <div id="precioNetoVentaBox" class="d-none mt-12 px-12 py-8 br-8 d-flex ai-center jc-between"
+                             style="background: var(--surface2); border: 1px solid var(--border);">
+                            <span class="fs-11 text-muted" style="letter-spacing: 0.3px;">
+                                <i class="fa-solid fa-arrow-right-long mr-6 opacity-40"></i><?php echo L('prod_modal_label_net_sale_price'); ?>
+                            </span>
+                            <span class="font-mono fw-700 fs-13" id="precioNetoVentaDisplay">—</span>
                         </div>
                     </div>
 
@@ -692,12 +820,27 @@
                         <div class="tab-section-title">
                             <?php echo L('prod_th_price'); ?>
                         </div>
+                        <!-- Desglose IVA (informativo) -->
+                        <div id="pvpBreakdownInfo" class="d-none px-10 py-6 br-6 d-flex ai-center gap-6 fs-11 text-muted"
+                             style="background: color-mix(in srgb, var(--accent) 6%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent); margin-bottom: 12px;">
+                            <i class="fa-solid fa-receipt opacity-60"></i>
+                            <span id="pvpBreakdownText"></span>
+                        </div>
                         <div class="form-group mb-0">
                             <label class="form-label fs-11 tt-uppercase mb-4"><?php echo L('prod_th_price'); ?> (€) <span class="opacity-50">(<?php echo L('optional'); ?>)</span></label>
                             <input type="text" id="prodPrecioVenta" placeholder="<?php echo L('prod_placeholder_price'); ?>"
                                 class="form-input text-right font-bold font-mono text-accent fs-18"
                                 oninput="calcularMargenDesdePrecio()"
                                 title="<?php echo L('prod_modal_tip_price_calc'); ?>">
+
+                            <!-- Alta Precisión Checkbox -->
+                            <div class="mt-8 d-flex ai-center gap-8 px-4 py-2 br-6 bg-surface2 border-1 transition-all hover-border-accent" style="width: fit-content;">
+                                <input type="checkbox" id="prodMantenerPrecision" class="form-checkbox cursor-pointer" onchange="togglePrecisionUI()">
+                                <label for="prodMantenerPrecision" class="fs-11 fw-700 text-muted cursor-pointer" style="text-transform: uppercase; letter-spacing: 0.5px;">
+                                    <i class="fa-solid fa-bullseye mr-4 opacity-50"></i> <?php echo L('prod_label_precision_price'); ?>
+                                </label>
+                            </div>
+
                             <span class="form-error" id="err-precio_venta"></span>
                         </div>
                     </div>
@@ -1130,7 +1273,9 @@
         term: '',
         cat: '',
         minPrice: '',
-        maxPrice: ''
+        maxPrice: '',
+        estado: 'all',
+        sortBy: ''
     };
 
     function debounce(func, timeout = 300) {
@@ -1158,8 +1303,11 @@
                     accion: 'listar',
                     term: currentFilters.term,
                     cat: currentFilters.cat,
+                    estado: currentFilters.estado,
                     minPrice: currentFilters.minPrice,
                     maxPrice: currentFilters.maxPrice,
+                    sort_by: currentFilters.sortBy,
+                    excluir_packs: true,
                     limit: limit,
                     offset: offset
                 })
@@ -1191,14 +1339,14 @@
 
         let html = '';
         lista.forEach(p => {
-            if (p.es_pack) return; // En esta pestaña no mostramos packs
-
             const stock = parseInt(p.stock || 0);
             const stockMin = parseInt(p.stock_minimo || 0);
             const esCritico = (stockMin > 0 && stock <= stockMin);
             const statusClass = p.activo ? 'status-active' : 'status-inactive';
             const statusIcon = p.activo ? 'fa-circle-check' : 'fa-circle-xmark';
             const statusText = p.activo ? "<?php echo L('prod_pill_active'); ?>" : "<?php echo L('prod_pill_inactive'); ?>";
+
+            const packBadge = p.es_pack ? '<span class="ml-8 px-6 py-2 br-4 fs-10 bg-accent-soft text-accent border border-accent"><?php echo L('prod_pill_pack'); ?></span>' : '';
 
             let iconHtml = '';
             if (p.icono && p.icono.startsWith('data:image')) {
@@ -1219,10 +1367,13 @@
                     <td class="text-right font-bold font-mono">
                         <div class="d-flex flex-column ai-end">
                             <span class="${esCritico ? 'text-red bg-red-soft px-4 br-4' : ''}">${stock}</span>
-                            <span class="fs-9 tt-uppercase ${esCritico ? 'text-red font-bold' : 'text-muted'}"><?php echo L('prod_stock_min_label'); ?> ${stockMin}</span>
+                            ${esCritico && p.albaran_pendiente
+                                ? `<span class="fs-9 tt-uppercase font-bold" style="color:var(--warning,#f59e0b)" title="<?php echo L('prod_albaran_pendiente_title'); ?>"><i class="fa-solid fa-truck-clock"></i> <?php echo L('prod_albaran_pendiente'); ?></span>`
+                                : `<span class="fs-9 tt-uppercase ${esCritico ? 'text-red font-bold' : 'text-muted'}"><?php echo L('prod_stock_min_label'); ?> ${stockMin}</span>`
+                            }
                         </div>
                     </td>
-                    <td class="text-right font-bold font-mono">${parseFloat(p.precio_venta).toLocaleString('es-ES', {minimumFractionDigits: 2})} €</td>
+                    <td class="text-right font-bold font-mono">${p.mantener_precision ? p.precio_venta.toString().replace('.', ',') : parseFloat(p.precio_venta).toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2})} €</td>
                     <td class="text-center">
                         <span class="status-pill ${statusClass}">
                             <i class="fa-solid ${statusIcon}"></i> ${statusText}
@@ -1274,7 +1425,9 @@
         currentFilters.cat  = document.getElementById('filterCat') ? document.getElementById('filterCat').value : '';
         currentFilters.minPrice = document.getElementById('filterPriceMin') ? document.getElementById('filterPriceMin').value : '';
         currentFilters.maxPrice = document.getElementById('filterPriceMax') ? document.getElementById('filterPriceMax').value : '';
-        
+        currentFilters.estado = document.getElementById('filterEstado') ? document.getElementById('filterEstado').value : 'all';
+        currentFilters.sortBy = document.getElementById('filterSort') ? document.getElementById('filterSort').value : '';
+
         loadProducts(1);
     }, 400);
 
@@ -1315,54 +1468,108 @@
         return opt.dataset.re == "1";
     }
 
+    // Recalcula CMP desde precio_proveedor (oculto) cuando cambia IVA o proveedor
     function calcularTotalDesdeBase() {
-        let base = document.getElementById('prodPrecioProveedor').value.replace(',', '.');
-        base = parseFloat(base) || 0;
-        
+        let base = parseFloat((document.getElementById('prodPrecioProveedor').value || '').replace(',', '.')) || 0;
+        if (base <= 0) return;
+
         const infoIVA = getDatoIVA();
         const aplicaRE = getAplicaRE();
         const pctRE = aplicaRE ? infoIVA.re : 0;
 
-        const total = base * (1 + (infoIVA.iva / 100) + (pctRE / 100));
-        document.getElementById('prodPrecioCoste').value = total.toFixed(4);
-        
-        // Al cambiar el coste, recalculamos PVP si hay margen
+        // CMP = precio_proveedor × (1 + RE/100) — sin IVA
+        const cmp = base * (1 + (pctRE / 100));
+        document.getElementById('prodPrecioCoste').value = cmp.toFixed(4);
+
         calcularPrecioDesdeMargen();
     }
 
+    // Actualiza precio_proveedor (oculto) cuando el usuario edita el CMP directamente
     function calcularBaseDesdeTotal() {
-        let total = document.getElementById('prodPrecioCoste').value.replace(',', '.');
-        total = parseFloat(total) || 0;
+        let cmp = parseFloat((document.getElementById('prodPrecioCoste').value || '').replace(',', '.')) || 0;
 
         const infoIVA = getDatoIVA();
         const aplicaRE = getAplicaRE();
         const pctRE = aplicaRE ? infoIVA.re : 0;
 
-        const base = total / (1 + (infoIVA.iva / 100) + (pctRE / 100));
+        // precio_proveedor = CMP / (1 + RE/100)
+        const base = pctRE > 0 ? cmp / (1 + (pctRE / 100)) : cmp;
         document.getElementById('prodPrecioProveedor').value = base.toFixed(4);
     }
 
+    function actualizarDesglosePVP(precioNeto, ivaPct, pvp) {
+        const box  = document.getElementById('pvpBreakdownInfo');
+        const text = document.getElementById('pvpBreakdownText');
+        if (!box || !text) return;
+        if (precioNeto > 0 && ivaPct >= 0) {
+            box.classList.remove('d-none');
+            const locale = '<?php echo L('locale'); ?>';
+            const fmtNeto = precioNeto.toLocaleString(locale, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            const fmtPvp  = pvp.toLocaleString(locale, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            text.innerHTML = `${fmtNeto}&nbsp;€ + ${ivaPct}% IVA = <strong>${fmtPvp}&nbsp;€</strong>`;
+        } else {
+            box.classList.add('d-none');
+        }
+    }
+
+    function actualizarNetoVentaBox(precioNeto) {
+        const box     = document.getElementById('precioNetoVentaBox');
+        const display = document.getElementById('precioNetoVentaDisplay');
+        if (!box || !display) return;
+        if (precioNeto > 0) {
+            box.classList.remove('d-none');
+            const locale = '<?php echo L('locale'); ?>';
+            display.textContent = precioNeto.toLocaleString(locale, {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' €';
+        } else {
+            box.classList.add('d-none');
+        }
+    }
+
     function calcularPrecioDesdeMargen() {
-        const coste = parseFloat(document.getElementById('prodPrecioCoste').value) || 0;
+        const coste  = parseFloat(document.getElementById('prodPrecioCoste').value) || 0;
         const margen = parseFloat(document.getElementById('prodMargen').value) || 0;
+        const { iva } = getDatoIVA();
         const inputVenta = document.getElementById('prodPrecioVenta');
 
         if (coste >= 0) {
-            const precioVenta = coste * (1 + (margen / 100));
-            inputVenta.value = precioVenta.toFixed(2);
+            // PVP = coste × (1 + margen%) × (1 + IVA%)
+            const precioNeto  = coste * (1 + (margen / 100));
+            const precioVenta = precioNeto * (1 + (iva / 100));
+            const keepPrecision = document.getElementById('prodMantenerPrecision')?.checked;
+            inputVenta.value = keepPrecision ? precioVenta.toString() : precioVenta.toFixed(2);
+
+            actualizarNetoVentaBox(coste > 0 ? precioNeto : 0);
+            actualizarDesglosePVP(coste > 0 ? precioNeto : 0, iva, precioVenta);
         }
     }
 
     function calcularMargenDesdePrecio() {
-        const coste = parseFloat(document.getElementById('prodPrecioCoste').value) || 0;
-        const venta = parseFloat(document.getElementById('prodPrecioVenta').value.replace(',', '.')) || 0;
+        const coste  = parseFloat(document.getElementById('prodPrecioCoste').value) || 0;
+        const venta  = parseFloat(document.getElementById('prodPrecioVenta').value.replace(',', '.')) || 0;
+        const { iva } = getDatoIVA();
         const inputMargen = document.getElementById('prodMargen');
 
         if (coste > 0) {
-            const margen = ((venta / coste) - 1) * 100;
+            // Margen = (PVP_sin_IVA / coste - 1) × 100
+            const ventaSinIva = venta / (1 + (iva / 100));
+            const margen = ((ventaSinIva / coste) - 1) * 100;
             inputMargen.value = margen.toFixed(2);
+
+            actualizarNetoVentaBox(ventaSinIva);
+            actualizarDesglosePVP(ventaSinIva, iva, venta);
         } else {
             inputMargen.value = '0.00';
+        }
+    }
+
+    function togglePrecisionUI() {
+        const keepPrecision = document.getElementById('prodMantenerPrecision').checked;
+        const inputVenta = document.getElementById('prodPrecioVenta');
+        
+        if (!keepPrecision) {
+            // Si desactivamos, redondeamos el valor actual a 2 decimales
+            const val = parseFloat(inputVenta.value.replace(',', '.')) || 0;
+            inputVenta.value = val.toFixed(2);
         }
     }
 
@@ -1370,6 +1577,21 @@
     // --- FUNCIONES GLOBALES DE MODALES ---
 
     function abrirModalProducto(producto = null) {
+        // Atributos / Etiquetas
+        const tagsContainer = document.getElementById('tagsContainer');
+        tagsContainer.innerHTML = '';
+        if (producto && producto.atributos) {
+            try {
+                const attrs = typeof producto.atributos === 'string' ? JSON.parse(producto.atributos) : producto.atributos;
+                if (Array.isArray(attrs)) {
+                    attrs.forEach(tag => addTagUI(tag));
+                }
+            } catch (e) {
+                console.error("Error parsing atributos:", e);
+            }
+        }
+        syncAtributosHidden();
+
         const modal = document.getElementById('modalProducto');
         const title = document.getElementById('modalTitle');
         const productForm = document.getElementById('formProducto');
@@ -1392,7 +1614,7 @@
             title.innerText = <?php echo json_encode(L('prod_modal_title_edit', true)); ?>;
             document.getElementById('prodId').value = producto.id;
             document.getElementById('prodIcono').value = producto.icono || '';
-            document.getElementById('prodCodigo').value = producto.codigo || '';
+            document.getElementById('prodCodigo').value = producto.referencia || '';
             document.getElementById('prodNombre').value = producto.nombre || '';
             document.getElementById('prodDesc').value = producto.descripcion || '';
             document.getElementById('prodCat').value = producto.categoria || '';
@@ -1402,14 +1624,32 @@
             const selIva = document.getElementById('prodIvaTipo');
             if (selIva) selIva.value = producto.codigo_iva || 'GENERAL';
 
-            inputCoste.value = parseFloat(producto.precio_coste || 0).toFixed(2);
-            document.getElementById('prodPrecioVenta').value = producto.price || producto.precio || '0.00';
+            inputCoste.value = producto.precio_coste || '0';
+            document.getElementById('prodPrecioVenta').value = producto.precio_venta || '0.00';
             inputStock.value = producto.stock !== undefined ? producto.stock : (producto.stock_actual || '0');
             document.getElementById('prodStockMin').value = producto.stock_minimo || '0';
             document.getElementById('prodMargen').value = producto.margen || '0.00';
-            document.getElementById('prodPrecioProveedor').value = parseFloat(producto.precio_proveedor || 0).toFixed(4);
+            document.getElementById('prodPrecioProveedor').value = producto.precio_proveedor || '0';
+            
+            const checkPrecision = document.getElementById('prodMantenerPrecision');
+            if (checkPrecision) {
+                const precisionActiva = !!(parseInt(producto.mantener_precision || 0));
+                checkPrecision.checked = precisionActiva;
+                
+                // Si la precisión está desactivada, forzamos el formato de 2 decimales en el input de venta
+                if (!precisionActiva) {
+                    const pVenta = parseFloat(producto.precio_venta) || 0;
+                    document.getElementById('prodPrecioVenta').value = pVenta.toFixed(2);
+                } else {
+                    document.getElementById('prodPrecioVenta').value = producto.precio_venta || '0';
+                }
+            }
 
-            if (parseFloat(producto.margen || 0) <= 0) calcularMargenDesdePrecio();
+            if (parseFloat(producto.margen || 0) <= 0) {
+                calcularMargenDesdePrecio();
+            } else {
+                calcularPrecioDesdeMargen(); // refresca cajas informativas de neto y PVP
+            }
 
             // Bloquear edición manual de stock y coste para productos existentes (solo permitimos si el usuario quiere forzar)
             inputStock.readOnly = true;
@@ -1471,342 +1711,168 @@
     let excepcionesMasivas = [];
     let timerBusquedaExcepciones = null;
 
-    function abrirModalMargenMasivo() {
-        const modal = document.getElementById('modalMargenMasivo');
-        modal.classList.remove('d-none');
-        modal.style.display = 'flex';
-        document.getElementById('massMargenInput').value = '';
-        document.getElementById('margenPreviewBox').style.display = 'none';
-        document.getElementById('btnAplicarMargen').disabled = true;
-        
-        excepcionesMasivas = [];
-        actualizarUIExcepciones();
-        document.getElementById('buscadorExcepciones').value = '';
-        lanzarBusquedaExcepciones('');
-    }
+    /* --- LÓGICA AJUSTE MASIVO UNIFICADO --- */
+    let excepcionesUnificadas = [];
+    let timerBusquedaExcepcionesU = null;
+    let timerPreviewUnificado = null;
 
-    function buscarExcepcionesAlEscribir() {
-        if (timerBusquedaExcepciones) clearTimeout(timerBusquedaExcepciones);
-        timerBusquedaExcepciones = setTimeout(() => {
-            const query = document.getElementById('buscadorExcepciones').value.trim();
-            lanzarBusquedaExcepciones(query);
-        }, 300);
-    }
-
-    async function lanzarBusquedaExcepciones(query) {
-        if (query === '') {
-            document.getElementById('listaExcepciones').innerHTML = '<div class="text-center p-20 text-muted fs-12">' + <?php echo json_encode(L('prod_modal_mass_margin_ex_empty', true)); ?> + '</div>';
-            return;
-        }
-
-        const url = 'api/gestionProducto.php?accion=listar'; 
-        try {
-            const resp = await fetch(url);
-            const r = await resp.json();
-            if (r.ok) {
-                let html = '';
-                const prods = r.productos.filter(p => !p.es_pack && (p.nombre.toLowerCase().includes(query.toLowerCase()) || (p.referencia && p.referencia.toLowerCase().includes(query.toLowerCase()))));
-                const topProds = prods.slice(0, 30);
-                
-                if (topProds.length === 0) {
-                    html = '<div class="text-center p-20 text-muted fs-12">' + <?php echo json_encode(L('prod_js_no_results', true)); ?> + '</div>';
-                } else {
-                    topProds.forEach(p => {
-                        const isSelected = excepcionesMasivas.some(ex => ex.id == p.id);
-                        html += `
-                            <div class="d-flex ai-center jc-between p-12 br-8 bg-surface border">
-                                <div class="d-flex ai-center gap-12">
-                                    <div class="fs-18 text-muted"><i class="${p.icono ? p.icono : 'fa-solid fa-box'}"></i></div>
-                                    <div>
-                                        <div class="font-bold fs-13 text-ellipsis" style="max-width:280px;">${p.nombre}</div>
-                                        <div class="fs-10 text-muted">REF: ${p.referencia || 'S/N'}</div>
-                                    </div>
-                                </div>
-                                <button type="button" class="btn ${isSelected ? 'btn-red' : 'btn-outline'} px-12 py-6 fs-11" onclick="toggleExcepcionMasiva(${p.id}, '${p.nombre.replace(/'/g, "\\'")}', '${(p.referencia||'').replace(/'/g, "\\'")}')">
-                                    <i class="fa-solid ${isSelected ? 'fa-minus' : 'fa-plus'}"></i> ${isSelected ? <?php echo json_encode(L('prod_js_remove', true)); ?> : <?php echo json_encode(L('prod_js_add', true)); ?>}
-                                </button>
-                            </div>
-                        `;
-                    });
-                }
-                document.getElementById('listaExcepciones').innerHTML = html;
-            }
-        } catch(e) {}
-    }
-
-    function toggleExcepcionMasiva(id, nombre, ref) {
-        const idx = excepcionesMasivas.findIndex(ex => ex.id == id);
-        if (idx > -1) {
-            excepcionesMasivas.splice(idx, 1);
-        } else {
-            excepcionesMasivas.push({id, nombre, referencia: ref});
-        }
-        actualizarUIExcepciones();
-        const query = document.getElementById('buscadorExcepciones').value.trim();
-        lanzarBusquedaExcepciones(query); 
-        previewMargenMasivo();
-    }
-
-    function actualizarUIExcepciones() {
-        document.getElementById('contadorExcepciones').innerText = `${excepcionesMasivas.length} ` + <?php echo json_encode(L('selected', true)); ?>;
-    }
-
-    function cerrarModalMargenMasivo() {
-        document.getElementById('modalMargenMasivo').style.display = 'none';
-    }
-
-    let timerPreviewMargen = null;
-
-    function previewMargenMasivo() {
-        const margen = parseFloat(document.getElementById('massMargenInput').value);
-        const btn = document.getElementById('btnAplicarMargen');
-
-        if (isNaN(margen) || margen < 0) {
-            btn.disabled = true;
-            document.getElementById('margenPreviewBox').style.display = 'none';
-            return;
-        }
-
-        btn.disabled = false;
-
-        // Debounce para no saturar la API
-        if (timerPreviewMargen) clearTimeout(timerPreviewMargen);
-        timerPreviewMargen = setTimeout(async () => {
-            const categoria = document.getElementById('massCategoriaSelect').value;
-            try {
-                const resp = await fetch('api/aplicarMargenMasivo.php', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        margen,
-                        categoria,
-                        excepciones: excepcionesMasivas.map(e => e.id),
-                        preview: true
-                    })
-                });
-                const r = await resp.json();
-                if (r.ok) {
-                    document.getElementById('previewCountOk').innerText = r.actualizados;
-                    document.getElementById('previewCountOmit').innerText = r.omitidos;
-                    document.getElementById('margenPreviewBox').style.display = 'block';
-                }
-            } catch (e) {}
-        }, 500);
-    }
-
-    function confirmarAplicarMargen() {
-        const margen = document.getElementById('massMargenInput').value;
-        const catLabel = document.getElementById('massCategoriaSelect').options[document.getElementById('massCategoriaSelect').selectedIndex].text;
-
-        showCustomConfirm(
-            <?php echo json_encode(L('prod_js_apply_margin_confirm_title', true)); ?>,
-            <?php echo json_encode(L('prod_js_apply_margin_confirm_body', true)); ?>.replace('{margen}', margen).replace('{categoria}', catLabel),
-            async () => {
-                    const btn = document.getElementById('btnAplicarMargen');
-                    const oldHtml = btn.innerHTML;
-                    btn.disabled = true;
-                    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + <?php echo json_encode(L('prod_js_applying', true)); ?>;
-
-                    const categoria = document.getElementById('massCategoriaSelect').value;
-                    try {
-                        const resp = await fetch('api/aplicarMargenMasivo.php', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({
-                                margen,
-                                categoria,
-                                excepciones: excepcionesMasivas.map(e => e.id)
-                            })
-                        });
-                        const r = await resp.json();
-                        if (r.ok) {
-                            showCustomAlert(<?php echo json_encode(L('prod_js_success', true)); ?>, r.mensaje || <?php echo json_encode(L('prod_toast_stock_adj_success', true)); ?>, 'success');
-                            location.reload();
-                        } else {
-                            showCustomAlert(<?php echo json_encode(L('prod_js_error', true)); ?>, r.mensaje || r.error || <?php echo json_encode(L('prod_js_error', true)); ?>, 'error');
-                        }
-                    } catch (e) {
-                        showCustomAlert(<?php echo json_encode(L('prod_js_error', true)); ?>, <?php echo json_encode(L('prod_js_error', true)); ?> + ": " + e.message, 'error');
-                    } finally {
-                        btn.disabled = false;
-                        btn.innerHTML = oldHtml;
-                    }
-                },
-                <?php echo json_encode(L('prod_modal_mass_margin_btn_apply', true)); ?>,
-                'danger'
-        );
-    }
-
-    /* --- LÓGICA AJUSTE DE PRECIO MASIVO --- */
-    let excepcionesAjuste = [];
-    let timerBusquedaExcepcionesAjuste = null;
-
-    function abrirModalAjusteMasivo() {
-        const modal = document.getElementById('modalAjusteMasivo');
+    function abrirModalAjusteUnificado(tipoInicial) {
+        const modal = document.getElementById('modalAjusteUnificado');
         modal.classList.add('visible');
-        document.getElementById('ajusteValorInput').value = '';
-        document.getElementById('ajustePreviewBox').style.display = 'none';
-        document.getElementById('btnAplicarAjuste').disabled = true;
-        
-        excepcionesAjuste = [];
-        actualizarUIExcepcionesAjuste();
-        document.getElementById('buscadorExcepcionesAjuste').value = '';
-        lanzarBusquedaExcepcionesAjuste('');
+        document.getElementById('ajusteUValorInput').value = '';
+        document.getElementById('ajusteURedondeoA').value = '1';
+        document.getElementById('ajusteUFechaAplicacion').value = '';
+        document.getElementById('ajusteUMotivoInput').value = '';
+        document.getElementById('ajusteUPreviewBox').style.display = 'none';
+        document.getElementById('btnAplicarAjusteU').disabled = true;
+        if (tipoInicial) document.getElementById('ajusteUTipoSelect').value = tipoInicial;
+        toggleCamposAjusteU();
+        excepcionesUnificadas = [];
+        actualizarUIExcepcionesU();
+        document.getElementById('buscadorExcepcionesU').value = '';
+        document.getElementById('listaExcepcionesU').innerHTML = '';
     }
 
-    function buscarExcepcionesAjuste() {
-        if (timerBusquedaExcepcionesAjuste) clearTimeout(timerBusquedaExcepcionesAjuste);
-        timerBusquedaExcepcionesAjuste = setTimeout(() => {
-            const query = document.getElementById('buscadorExcepcionesAjuste').value.trim();
-            lanzarBusquedaExcepcionesAjuste(query);
+    // Compatibilidad con botones antiguos
+    function abrirModalMargenMasivo() { abrirModalAjusteUnificado('margin'); }
+    function abrirModalAjusteMasivo()  { abrirModalAjusteUnificado('percent'); }
+
+    function cerrarModalAjusteUnificado() {
+        document.getElementById('modalAjusteUnificado').classList.remove('visible');
+    }
+
+    function toggleCamposAjusteU() {
+        const tipo = document.getElementById('ajusteUTipoSelect').value;
+        const wrapRedondeo = document.getElementById('wrapRedondeoA');
+        const lblValor = document.getElementById('ajusteULabelValor');
+        if (wrapRedondeo) wrapRedondeo.style.display = tipo === 'round' ? 'flex' : 'none';
+        const labels = { percent: 'Porcentaje (%)', amount: 'Importe fijo (€)', margin: 'Margen de beneficio (%)', round: 'Redondear a múltiplos de' };
+        if (lblValor) lblValor.textContent = labels[tipo] || 'Valor';
+        previewAjusteUnificado();
+    }
+
+    function actualizarUIExcepcionesU() {
+        const el = document.getElementById('contadorExcepcionesU');
+        if (el) el.innerText = excepcionesUnificadas.length + ' excluidos';
+    }
+
+    function buscarExcepcionesU() {
+        if (timerBusquedaExcepcionesU) clearTimeout(timerBusquedaExcepcionesU);
+        timerBusquedaExcepcionesU = setTimeout(() => {
+            const query = document.getElementById('buscadorExcepcionesU').value.trim();
+            lanzarBusquedaExcepcionesU(query);
         }, 300);
     }
 
-    async function lanzarBusquedaExcepcionesAjuste(query) {
-        if (!query) {
-            document.getElementById('listaExcepcionesAjuste').innerHTML = '';
-            return;
-        }
-
-        const url = 'api/gestionProducto.php?accion=listar'; 
+    async function lanzarBusquedaExcepcionesU(query) {
+        const lista = document.getElementById('listaExcepcionesU');
+        if (!query) { lista.innerHTML = ''; return; }
         try {
-            const resp = await fetch(url);
+            const resp = await fetch('api/gestionProducto.php?accion=listar');
             const r = await resp.json();
-            if (r.ok) {
-                let html = '';
-                const prods = r.productos.filter(p => !p.es_pack && (p.nombre.toLowerCase().includes(query.toLowerCase()) || (p.referencia && p.referencia.toLowerCase().includes(query.toLowerCase()))));
-                const topProds = prods.slice(0, 30);
-                
-                if (topProds.length === 0) {
-                    html = `<div class="text-center p-20 text-muted fs-12">${<?php echo json_encode(L('prod_js_mass_adj_no_results')) ?>}</div>`;
-                } else {
-                    topProds.forEach(p => {
-                        const isSelected = excepcionesAjuste.some(ex => ex.id == p.id);
-                        html += `
-                            <div class="d-flex ai-center jc-between p-12 br-8 bg-surface border" style="width: 100%; box-sizing: border-box;">
-                                <div class="d-flex ai-center gap-12">
-                                    <div class="fs-18 text-muted"><i class="${p.icono ? p.icono : 'fa-solid fa-box'}"></i></div>
-                                    <div>
-                                        <div class="font-bold fs-13 text-ellipsis" style="max-width:260px;">${p.nombre}</div>
-                                        <div class="fs-10 text-muted">REF: ${p.referencia || 'S/N'}</div>
-                                    </div>
-                                </div>
-                                <button type="button" class="btn ${isSelected ? 'btn-red' : 'btn-outline'} px-12 py-6 fs-11" onclick="toggleExcepcionAjuste(${p.id}, '${p.nombre.replace(/'/g, "\\'")}', '${(p.referencia||'').replace(/'/g, "\\'")}')">
-                                    <i class="fa-solid ${isSelected ? 'fa-minus' : 'fa-plus'}"></i> ${isSelected ? 'Quitar' : 'Añadir'}
-                                </button>
-                            </div>
-                        `;
-                    });
-                }
-                document.getElementById('listaExcepcionesAjuste').innerHTML = html;
-            }
+            if (!r.ok) return;
+            const prods = r.productos.filter(p => !p.es_pack && (
+                p.nombre.toLowerCase().includes(query.toLowerCase()) ||
+                (p.referencia && p.referencia.toLowerCase().includes(query.toLowerCase()))
+            )).slice(0, 30);
+            if (!prods.length) { lista.innerHTML = '<div class="text-center p-16 text-muted fs-12">Sin resultados</div>'; return; }
+            lista.innerHTML = prods.map(p => {
+                const sel = excepcionesUnificadas.some(ex => ex.id == p.id);
+                return `<div class="d-flex ai-center jc-between p-10 br-8 bg-surface border" style="width:100%;box-sizing:border-box;">
+                    <div>
+                        <div class="font-bold fs-13" style="max-width:260px;">${p.nombre}</div>
+                        <div class="fs-10 text-muted">REF: ${p.referencia || 'S/N'}</div>
+                    </div>
+                    <button type="button" class="btn ${sel ? 'btn-red' : 'btn-outline'} px-10 py-6 fs-11"
+                        onclick="toggleExcepcionU(${p.id}, '${p.nombre.replace(/'/g, "\\'")}', '${(p.referencia||'').replace(/'/g, "\\'")}')">
+                        <i class="fa-solid ${sel ? 'fa-minus' : 'fa-plus'}"></i> ${sel ? 'Quitar' : 'Añadir'}
+                    </button>
+                </div>`;
+            }).join('');
         } catch(e) {}
     }
 
-    function toggleExcepcionAjuste(id, nombre, ref) {
-        const idx = excepcionesAjuste.findIndex(ex => ex.id == id);
-        if (idx > -1) {
-            excepcionesAjuste.splice(idx, 1);
-        } else {
-            excepcionesAjuste.push({id, nombre, referencia: ref});
-        }
-        actualizarUIExcepcionesAjuste();
-        const query = document.getElementById('buscadorExcepcionesAjuste').value.trim();
-        lanzarBusquedaExcepcionesAjuste(query); 
-        previewAjusteMasivo();
+    function toggleExcepcionU(id, nombre, ref) {
+        const idx = excepcionesUnificadas.findIndex(ex => ex.id == id);
+        if (idx > -1) excepcionesUnificadas.splice(idx, 1);
+        else excepcionesUnificadas.push({id, nombre, referencia: ref});
+        actualizarUIExcepcionesU();
+        lanzarBusquedaExcepcionesU(document.getElementById('buscadorExcepcionesU').value.trim());
+        previewAjusteUnificado();
     }
 
-    function actualizarUIExcepcionesAjuste() {
-        document.getElementById('contadorExcepcionesAjuste').innerText = excepcionesAjuste.length;
-    }
-
-    function cerrarModalAjusteMasivo() {
-        document.getElementById('modalAjusteMasivo').classList.remove('visible');
-    }
-
-    let timerPreviewAjuste = null;
-    function previewAjusteMasivo() {
-        const valor = parseFloat(document.getElementById('ajusteValorInput').value);
-        const btn = document.getElementById('btnAplicarAjuste');
-
+    function previewAjusteUnificado() {
+        const valor = parseFloat(document.getElementById('ajusteUValorInput').value);
+        const btn = document.getElementById('btnAplicarAjusteU');
         if (isNaN(valor) || valor === 0) {
             btn.disabled = true;
-            document.getElementById('ajustePreviewBox').style.display = 'none';
+            document.getElementById('ajusteUPreviewBox').style.display = 'none';
             return;
         }
-
         btn.disabled = false;
-
-        if (timerPreviewAjuste) clearTimeout(timerPreviewAjuste);
-        timerPreviewAjuste = setTimeout(async () => {
-            const categoria = document.getElementById('ajusteCategoriaSelect').value;
-            const tipo = document.getElementById('ajusteTipoSelect').value;
+        if (timerPreviewUnificado) clearTimeout(timerPreviewUnificado);
+        timerPreviewUnificado = setTimeout(async () => {
+            const tipo = document.getElementById('ajusteUTipoSelect').value;
+            const categoria = document.getElementById('ajusteUCategoriaSelect').value;
+            const redondeoA = parseFloat(document.getElementById('ajusteURedondeoA').value) || 1;
             try {
-                const resp = await fetch('api/ajustePrecioMasivo.php', {
+                const resp = await fetch('api/ajusteUnificado.php', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        valor, tipo, categoria,
-                        excepciones: excepcionesAjuste.map(e => e.id),
-                        preview: true
-                    })
+                    body: JSON.stringify({ tipo, valor, redondeo_a: redondeoA, categoria, excepciones: excepcionesUnificadas.map(e => e.id), preview: true })
                 });
                 const r = await resp.json();
                 if (r.ok) {
-                    document.getElementById('previewCountAjuste').innerText = r.total;
-                    document.getElementById('ajustePreviewBox').style.display = 'block';
+                    document.getElementById('ajusteUPreviewCount').innerText = r.total;
+                    document.getElementById('ajusteUPreviewBox').style.display = 'block';
                 }
-            } catch (e) {}
+            } catch(e) {}
         }, 500);
     }
 
-    function confirmarAplicarAjuste() {
-        const valor = document.getElementById('ajusteValorInput').value;
-        const tipo = document.getElementById('ajusteTipoSelect').value;
-        const catLabel = document.getElementById('ajusteCategoriaSelect').options[document.getElementById('ajusteCategoriaSelect').selectedIndex].text;
+    function confirmarAjusteUnificado() {
+        const valor = document.getElementById('ajusteUValorInput').value;
+        const tipo = document.getElementById('ajusteUTipoSelect').value;
+        const motivo = document.getElementById('ajusteUMotivoInput').value.trim();
+        if (!motivo) {
+            showCustomAlert('Error', 'El motivo del ajuste es obligatorio', 'error');
+            document.getElementById('ajusteUMotivoInput').focus();
+            return;
+        }
+        const count = document.getElementById('ajusteUPreviewCount').innerText;
+        const fechaEl = document.getElementById('ajusteUFechaAplicacion').value;
+        const esProgramado = !!fechaEl;
+        const confirmMsg = esProgramado
+            ? `El ajuste se programará para el <strong>${fechaEl}</strong> y se aplicará a <strong>${count}</strong> productos cuando cargues la página de productos en ese momento.`
+            : `Se aplicará a <strong>${count}</strong> productos de forma inmediata. Esta acción no se puede deshacer.`;
 
-        const bodyTexto = `<?php echo L('prod_js_mass_adj_confirm_body') ?>`.replace('{count}', document.getElementById('previewCountAjuste').innerText);
-        
-        showCustomConfirm(
-            '<?php echo L('prod_js_mass_adj_confirm_title') ?>',
-            bodyTexto,
-            async () => {
-                const btn = document.getElementById('btnAplicarAjuste');
-                const oldHtml = btn.innerHTML;
-                btn.disabled = true;
-                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ...';
-
-                const categoria = document.getElementById('ajusteCategoriaSelect').value;
-                try {
-                    const resp = await fetch('api/ajustePrecioMasivo.php', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            valor, tipo, categoria,
-                            excepciones: excepcionesAjuste.map(e => e.id)
-                        })
-                    });
-                    const r = await resp.json();
-                    if (r.ok) {
-                        showCustomAlert('<?php echo L('label_exito') ?>', `<?php echo L('prod_js_mass_adj_success_body') ?>`.replace('{count}', r.total), 'success');
-                        setTimeout(() => location.reload(), 1500);
-                    } else {
-                        showCustomAlert('<?php echo L('error') ?>', r.mensaje || r.error || '...', 'error');
-                    }
-                } catch (e) {
-                    showCustomAlert('<?php echo L('error') ?>', "Error: " + e.message, 'error');
-                } finally {
-                    btn.disabled = false;
-                    btn.innerHTML = oldHtml;
+        showCustomConfirm('Confirmar ajuste masivo', confirmMsg, async () => {
+            const btn = document.getElementById('btnAplicarAjusteU');
+            const oldHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ...';
+            const categoria = document.getElementById('ajusteUCategoriaSelect').value;
+            const redondeoA = parseFloat(document.getElementById('ajusteURedondeoA').value) || 1;
+            try {
+                const resp = await fetch('api/ajusteUnificado.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ tipo, valor: parseFloat(valor), redondeo_a: redondeoA, categoria, motivo, excepciones: excepcionesUnificadas.map(e => e.id), fecha_aplicacion: fechaEl || null })
+                });
+                const r = await resp.json();
+                if (r.ok) {
+                    showCustomAlert('Éxito', r.mensaje || 'Ajuste aplicado', 'success');
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    showCustomAlert('Error', r.error || 'No se pudo aplicar el ajuste', 'error');
                 }
-            },
-            '<?php echo L('prod_js_mass_adj_confirm_btn') ?>',
-            'danger'
-        );
+            } catch(e) {
+                showCustomAlert('Error', 'Error de conexión: ' + e.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = oldHtml;
+            }
+        }, 'Confirmar', 'danger');
     }
 
     async function abrirModalHistorialCostes() {
@@ -1830,7 +1896,7 @@
 
             if (data.ok) {
                 if (data.historial.length === 0) {
-                    body.innerHTML = `<tr><td colspan="5" class="text-center p-48 text-muted">${<?php echo json_encode(L('prod_modal_tab_tarifas_none', true)); ?>}</td></tr>`;
+                    body.innerHTML = `<tr><td colspan="5" class="text-center p-48 text-muted">${<?php echo json_encode(L('prod_modal_cost_history_none', true)); ?>}</td></tr>`;
                 } else {
                     body.innerHTML = data.historial.map(h => {
                         const fecha = new Date(h.fecha);
@@ -1871,8 +1937,14 @@
         document.getElementById('prodPrecioVenta').value = '0.00';
         document.getElementById('prodStock').value = '0';
         document.getElementById('prodStockMin').value = '0';
-        document.getElementById('prodGarantia').value = '24';
         document.getElementById('prodMargen').value = '0.00';
+        document.getElementById('prodPrecioProveedor').value = '0.0000';
+        document.getElementById('precioNetoVentaBox')?.classList.add('d-none');
+        document.getElementById('pvpBreakdownInfo')?.classList.add('d-none');
+            
+        const checkPrecision = document.getElementById('prodMantenerPrecision');
+        if (checkPrecision) checkPrecision.checked = false;
+        document.getElementById('prodGarantia').value = '24';
     }
 
     function switchModalTab(tabId, btn) {
@@ -1965,33 +2037,35 @@
     }
 
     async function excluirDeRegla(idProducto, idRegla, tipo) {
-        if (!confirm(<?php echo json_encode(L('prod_js_confirm_exclude_title', true)); ?>.replace('{tipo}', (tipo === 'tarifa' ? <?php echo json_encode(L('prod_modal_pill_tariff', true)); ?>.toLowerCase() : <?php echo json_encode(L('prod_modal_pill_promo', true)); ?>.toLowerCase())))) return;
-
-        try {
-            const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-            const resp = await fetch('api/gestionExclusiones.php', {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'x-csrf-token': token 
-                },
-                body: JSON.stringify({
-                    accion: 'excluir',
-                    id_producto: idProducto,
-                    id_regla: idRegla,
-                    tipo: tipo
-                })
-            });
-            const data = await resp.json();
-            if (data.ok) {
-                if (typeof showToast === 'function') showToast(<?php echo json_encode(L('prod_js_excluded_success', true)); ?>);
-                cargarTarifasProducto(idProducto);
-            } else {
-                showCustomAlert(<?php echo json_encode(L('prod_js_error', true)); ?>, data.error, 'error');
+        const msg = <?php echo json_encode(L('prod_js_confirm_exclude_title', true)); ?>.replace('{tipo}', (tipo === 'tarifa' ? <?php echo json_encode(L('prod_modal_pill_tariff', true)); ?>.toLowerCase() : <?php echo json_encode(L('prod_modal_pill_promo', true)); ?>.toLowerCase()));
+        
+        showCustomConfirm(<?php echo json_encode(L('modal_confirm_title', true)); ?>, msg, async () => {
+            try {
+                const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+                const resp = await fetch('api/gestionExclusiones.php', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'x-csrf-token': token 
+                    },
+                    body: JSON.stringify({
+                        accion: 'excluir',
+                        id_producto: idProducto,
+                        id_regla: idRegla,
+                        tipo: tipo
+                    })
+                });
+                const data = await resp.json();
+                if (data.ok) {
+                    if (typeof showToast === 'function') showToast(<?php echo json_encode(L('prod_js_excluded_success', true)); ?>);
+                    cargarTarifasProducto(idProducto);
+                } else {
+                    showCustomAlert(<?php echo json_encode(L('prod_js_error', true)); ?>, data.error, 'error');
+                }
+            } catch (e) {
+                showCustomAlert(<?php echo json_encode(L('prod_js_error', true)); ?>, <?php echo json_encode(L('prod_js_connection', true)); ?> + ": " + e.message, 'error');
             }
-        } catch (e) {
-            showCustomAlert(<?php echo json_encode(L('prod_js_error', true)); ?>, <?php echo json_encode(L('prod_js_connection', true)); ?> + ": " + e.message, 'error');
-        }
+        }, <?php echo json_encode(L('modal_btn_confirm', true)); ?>, 'danger');
     }
 
     function cerrarModalProducto() {
@@ -2021,24 +2095,16 @@
             title.textContent = 'Editar Pack: ' + pack.nombre;
             document.getElementById('packId').value = pack.id;
             document.getElementById('packNombre').value = pack.nombre;
-            document.getElementById('packCodigo').value = pack.codigo || '';
-            document.getElementById('packPrecioVenta').value = pack.precio;
+            document.getElementById('packCodigo').value = pack.referencia || '';
+            document.getElementById('packPrecioVenta').value = parseFloat(pack.precio_venta || 0).toFixed(2);
             document.getElementById('packCat').value = pack.categoria;
             document.getElementById('packIcono').value = pack.icono || '';
 
             // Cargar componentes guardados
             componentesPackActivos = pack.componentes_pack ? [...pack.componentes_pack] : [];
 
-            // Buscar IVA actual del producto
-            let codigoIva = 'GENERAL';
-            for (const [key, t] of Object.entries(TIPOS_IVA)) {
-                if (parseFloat(t.porcentaje) === parseFloat(pack.iva_aplicado)) {
-                    codigoIva = key;
-                    break;
-                }
-            }
             if (document.getElementById('packIvaTipo')) {
-                document.getElementById('packIvaTipo').value = codigoIva;
+                document.getElementById('packIvaTipo').value = pack.codigo_iva || 'GENERAL';
             }
 
             // Preview imagen
@@ -2137,15 +2203,44 @@
 
 
 
-    /* Lógica de atributos deshabilitada
-    function añadirAtributoUI(value = null) {
-        ...
+    // --- Lógica de Etiquetas / Atributos ---
+    function handleTagKeydown(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const val = e.target.value.trim();
+            if (val) {
+                addTagUI(val);
+                e.target.value = '';
+                syncAtributosHidden();
+            }
+        }
     }
 
-    function syncAtributos() {
-        ...
+    function addTagUI(tag) {
+        const container = document.getElementById('tagsContainer');
+        // Evitar duplicados
+        const existing = Array.from(container.querySelectorAll('.tag-text')).map(s => s.innerText);
+        if (existing.includes(tag)) return;
+
+        const chip = document.createElement('div');
+        chip.className = 'tag-chip';
+        chip.innerHTML = `
+            <span class="tag-text">${tag}</span>
+            <span class="remove-tag" onclick="removeTagUI(this)">&times;</span>
+        `;
+        container.appendChild(chip);
     }
-    */
+
+    function removeTagUI(el) {
+        el.parentElement.remove();
+        syncAtributosHidden();
+    }
+
+    function syncAtributosHidden() {
+        const container = document.getElementById('tagsContainer');
+        const tags = Array.from(container.querySelectorAll('.tag-text')).map(s => s.innerText);
+        document.getElementById('prodAtributos').value = tags.length > 0 ? JSON.stringify(tags) : '';
+    }
 
 
 
@@ -2191,14 +2286,13 @@
             precio_venta: document.getElementById('prodPrecioVenta').value,
             stock_minimo: document.getElementById('prodStockMin').value,
             requiere_serial: 0,
-            atributos: (document.getElementById('prodAtributos') || {
-                value: null
-            }).value || null,
+            atributos: document.getElementById('prodAtributos').value || null,
             codigo_iva: codigoIva,
             id_proveedor: document.getElementById('prodProveedor').value || null,
             aplica_re: 0,
             es_pack: 0,
-            componentes_pack: null
+            componentes_pack: null,
+            mantener_precision: document.getElementById('prodMantenerPrecision').checked ? 1 : 0
         };
 
         // Enviamos siempre el precio de coste y stock actual para permitir ajustes manuales tanto al añadir como al editar
@@ -2323,8 +2417,8 @@
                         });
                         const r = await resp.json();
                         if (r.ok) {
-                            const targetRow = document.querySelector(`.product-row[data-id="${id}"]`) ||
-                                Array.from(document.querySelectorAll('.product-row')).find(row => row.innerHTML.includes(`eliminarProducto(${id},`));
+                            const targetRow = document.querySelector(`#tbodyProductos tr[data-id="${id}"]`) ||
+                                document.querySelector(`#tbodyPacks tr[data-id="${id}"]`);
 
                             if (targetRow) {
                                 targetRow.style.transition = 'opacity 0.3s, transform 0.3s';
@@ -2347,41 +2441,7 @@
     }
 
     // Lógica de filtrado y ordenación
-    function applyFilters() {
-        const term = document.getElementById('prodSearch').value.toLowerCase().trim();
-        const cat = document.getElementById('filterCat').value;
-        const estado = document.getElementById('filterEstado').value;
-        const priceMin = parseFloat(document.getElementById('filterPriceMin').value) || 0;
-        const priceMax = parseFloat(document.getElementById('filterPriceMax').value) || 999999;
 
-        const rows = document.querySelectorAll('.product-row');
-        let hasResults = false;
-
-        rows.forEach(row => {
-            const nombre = row.dataset.nombre;
-            const codigo = row.dataset.codigo;
-            const categoria = row.dataset.categoria;
-            const activo = row.dataset.activo;
-            const precio = parseFloat(row.dataset.precio);
-
-            const matchesTerm = !term || nombre.includes(term) || codigo.includes(term);
-            const matchesCat = cat === 'all' || categoria === cat;
-            const matchesEstado = estado === 'all' || activo === estado;
-            const matchesPrice = precio >= priceMin && precio <= priceMax;
-
-            if (matchesTerm && matchesCat && matchesEstado && matchesPrice) {
-                row.style.display = '';
-                hasResults = true;
-            } else {
-                row.style.display = 'none';
-            }
-        });
-
-        document.getElementById('noResults').classList.toggle('d-none', hasResults);
-    }
-
-    document.getElementById('filterPriceMin').addEventListener('input', applyFilters);
-    document.getElementById('filterPriceMax').addEventListener('input', applyFilters);
 
     function applySort() {
         const order = document.getElementById('sortOrder').value;
@@ -2480,7 +2540,7 @@
                 document.getElementById('nuevoNS').value = '';
                 cargarNS(idProd);
             } else {
-                alert(<?php echo json_encode(L('prod_js_error', true)); ?> + ": " + (r.error || <?php echo json_encode(L('error_unknown', true)); ?>));
+                showCustomAlert(<?php echo json_encode(L('error', true)); ?>, <?php echo json_encode(L('prod_js_error', true)); ?> + ": " + (r.error || <?php echo json_encode(L('error_unknown', true)); ?>), "error");
             }
         } catch (err) {
             console.error(err);
@@ -2534,29 +2594,37 @@
         const filtersPrecios = document.getElementById('filtersPrecios');
 
         if (tabId === 'productos') {
-            btnProd.classList.add('active');
-            btnPacks.classList.remove('active');
+            if (btnProd) btnProd.classList.add('active');
+            if (btnPacks) btnPacks.classList.remove('active');
 
-            contentProd.classList.add('active');
-            contentProd.classList.remove('d-none');
-            contentPacks.classList.add('d-none');
-            contentPacks.classList.remove('active');
+            if (contentProd) {
+                contentProd.classList.add('active');
+                contentProd.classList.remove('d-none');
+            }
+            if (contentPacks) {
+                contentPacks.classList.add('d-none');
+                contentPacks.classList.remove('active');
+            }
 
-            btnNuevoProd.classList.remove('d-none');
-            btnNuevoPack.classList.add('d-none');
-            filtersPrecios.classList.remove('d-none');
+            if (btnNuevoProd) btnNuevoProd.classList.remove('d-none');
+            if (btnNuevoPack) btnNuevoPack.classList.add('d-none');
+            if (filtersPrecios) filtersPrecios.classList.remove('d-none');
         } else {
-            btnPacks.classList.add('active');
-            btnProd.classList.remove('active');
+            if (btnPacks) btnPacks.classList.add('active');
+            if (btnProd) btnProd.classList.remove('active');
 
-            contentPacks.classList.add('active');
-            contentPacks.classList.remove('d-none');
-            contentProd.classList.add('d-none');
-            contentProd.classList.remove('active');
+            if (contentPacks) {
+                contentPacks.classList.add('active');
+                contentPacks.classList.remove('d-none');
+            }
+            if (contentProd) {
+                contentProd.classList.add('d-none');
+                contentProd.classList.remove('active');
+            }
 
-            btnNuevoPack.classList.remove('d-none');
-            btnNuevoProd.classList.add('d-none');
-            filtersPrecios.classList.add('d-none');
+            if (btnNuevoPack) btnNuevoPack.classList.remove('d-none');
+            if (btnNuevoProd) btnNuevoProd.classList.add('d-none');
+            if (filtersPrecios) filtersPrecios.classList.add('d-none');
         }
     }
 
@@ -2577,51 +2645,64 @@
     }
 
 
+    let _packSearchTimer = null;
+
     function buscarProductoParaPack(query) {
         const resCont = document.getElementById('packSearchResults');
-        query = query.trim().toLowerCase();
+        query = query.trim();
         if (query.length < 2) {
             resCont.style.display = 'none';
             return;
         }
 
-        const idEnEdicion = parseInt(document.getElementById('packId').value) || 0;
-        const yaAñadidos = componentesPackActivos.map(c => parseInt(c.id_producto || c.id));
+        clearTimeout(_packSearchTimer);
+        _packSearchTimer = setTimeout(async () => {
+            const idEnEdicion = parseInt(document.getElementById('packId').value) || 0;
+            const yaAñadidos = componentesPackActivos.map(c => parseInt(c.id_producto || c.id));
 
-        const filtrados = TODOS_LOS_PRODUCTOS.filter(p => {
-            if (p.id === idEnEdicion) return false; // Not itself
-            if (p.es_pack) return false; // Pack of packs not supported yet
-            if (yaAñadidos.includes(p.id)) return false; // Already added
+            try {
+                const resp = await fetch('api/gestionProducto.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ accion: 'listar', term: query, excluir_packs: true, limit: 10, offset: 0 })
+                });
+                const r = await resp.json();
+                if (!r.ok) return;
 
-            return p.nombre.toLowerCase().includes(query) || (p.codigo && p.codigo.toLowerCase().includes(query));
-        }).slice(0, 8); // top 8
+                const filtrados = r.productos
+                    .filter(p => parseInt(p.id) !== idEnEdicion && !yaAñadidos.includes(parseInt(p.id)))
+                    .slice(0, 8);
 
-        resCont.innerHTML = '';
-        if (filtrados.length === 0) {
-            resCont.innerHTML = '<div class="p-16 text-muted fs-12 text-center"><i class="fa-solid fa-circle-info mr-8"></i> ' + <?php echo json_encode(L('prod_js_no_results', true)); ?> + '</div>';
-        } else {
-            filtrados.forEach(p => {
-                const div = document.createElement('div');
-                div.className = 'search-result-item';
-                div.innerHTML = `
-                    <div class="d-flex ai-center gap-12 full-width">
-                        <div class="result-icon"><i class="fa-solid fa-box fs-14"></i></div>
-                        <div class="flex-1 overflow-hidden">
-                            <div class="result-title text-ellipsis">${p.nombre}</div>
-                            <div class="result-meta font-mono">${p.codigo || 'S/R'}</div>
-                        </div>
-                        <div class="result-price">${(parseFloat(p.precio)).toFixed(2)}€</div>
-                    </div>
-                `;
-                div.onclick = () => {
-                    añadirComponente(p);
-                    document.getElementById('packSearchInput').value = '';
-                    resCont.style.display = 'none';
-                };
-                resCont.appendChild(div);
-            });
-        }
-        resCont.style.display = 'block';
+                resCont.innerHTML = '';
+                if (filtrados.length === 0) {
+                    resCont.innerHTML = '<div class="p-16 text-muted fs-12 text-center"><i class="fa-solid fa-circle-info mr-8"></i> ' + <?php echo json_encode(L('prod_js_no_results', true)); ?> + '</div>';
+                } else {
+                    filtrados.forEach(p => {
+                        const div = document.createElement('div');
+                        div.className = 'search-result-item';
+                        div.innerHTML = `
+                            <div class="d-flex ai-center gap-12 full-width">
+                                <div class="result-icon"><i class="fa-solid fa-box fs-14"></i></div>
+                                <div class="flex-1 overflow-hidden">
+                                    <div class="result-title text-ellipsis">${p.nombre}</div>
+                                    <div class="result-meta font-mono">${p.referencia || 'S/R'}</div>
+                                </div>
+                                <div class="result-price">${(parseFloat(p.precio_venta || 0)).toFixed(2)}€</div>
+                            </div>
+                        `;
+                        div.onclick = () => {
+                            añadirComponente(p);
+                            document.getElementById('packSearchInput').value = '';
+                            resCont.style.display = 'none';
+                        };
+                        resCont.appendChild(div);
+                    });
+                }
+                resCont.style.display = 'block';
+            } catch (e) {
+                // silencioso — el dropdown simplemente no se muestra
+            }
+        }, 300);
     }
 
     // Hide search results when click outside
@@ -2637,7 +2718,7 @@
             id_producto: prod.id,
             id: prod.id, // For compatibility
             nombre: prod.nombre,
-            referencia: prod.codigo,
+            referencia: prod.referencia || prod.codigo || '',
             cantidad: 1
         });
         renderComponentesPack();
@@ -2692,16 +2773,13 @@
         });
     }
 
-    document.getElementById('prodSearch').addEventListener('input', applyFilters);
-    document.getElementById('filterCat').addEventListener('change', applyFilters);
-    document.getElementById('filterEstado').addEventListener('change', applyFilters);
 
     // Guardar Pack Form Submit Listener
     document.getElementById('formPack').addEventListener('submit', async (e) => {
         e.preventDefault();
 
         if (componentesPackActivos.length === 0) {
-            alert(<?php echo json_encode(L('prod_js_pack_min_components', true)); ?>);
+            showCustomAlert(<?php echo json_encode(L('modal_alert_title', true)); ?>, <?php echo json_encode(L('prod_js_pack_min_components', true)); ?>, "warning");
             return;
         }
 
@@ -2710,6 +2788,7 @@
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + <?php echo json_encode(L('prod_js_saving', true)); ?>;
 
         const id = document.getElementById('packId').value || null;
+        const pvpSanitizado = document.getElementById('packPrecioVenta').value.replace(',', '.');
         const codIva = document.getElementById('packIvaTipo').value;
         const listaIvas = Array.isArray(TIPOS_IVA) ? TIPOS_IVA : Object.values(TIPOS_IVA);
         const tipoIva = listaIvas.find(t => t.codigo === codIva);
@@ -2723,7 +2802,7 @@
             icono: document.getElementById('packIcono').value || '',
             categoria: document.getElementById('packCat').value,
             precio_coste: 0,
-            precio_venta: document.getElementById('packPrecioVenta').value,
+            precio_venta: pvpSanitizado,
             iva: ivaPerc,
             codigo_iva: codIva,
             stock_actual: 0,
@@ -2756,10 +2835,10 @@
                         .join('\n');
                     if (errorList) msg += '\n\nDetalles:\n' + errorList;
                 }
-                alert(<?php echo json_encode(L('prod_js_error_save', true)); ?> + ":\n" + msg);
+                showCustomAlert(<?php echo json_encode(L('prod_js_error_save', true)); ?>, msg, "error");
             }
         } catch (err) {
-            alert(<?php echo json_encode(L('prod_js_connection', true)); ?>);
+            showCustomAlert(<?php echo json_encode(L('prod_js_error', true)); ?>, <?php echo json_encode(L('prod_js_connection', true)); ?>, "error");
         } finally {
             btn.disabled = false;
             btn.innerHTML = <?php echo json_encode(L('prod_modal_btn_save_pack', true)); ?>;
@@ -2831,31 +2910,51 @@
     });
 
     // Mini-toast local para esta página (puede no tener el global de main.js)
-    function showNotification(html, type = 'info') {
-        let notif = document.getElementById('ie-notif');
-        if (!notif) {
-            notif = document.createElement('div');
-            notif.id = 'ie-notif';
-            document.body.appendChild(notif);
-        }
-        const colors = {
-            info: '#1a2fbf',
-            success: '#0f8060',
-            error: '#c0392b'
-        };
-        notif.style.cssText = `position:fixed;bottom:24px;right:24px;background:${colors[type]};color:white;padding:14px 20px;border-radius:12px;font-size:13px;font-weight:600;z-index:99999;box-shadow:0 4px 20px rgba(0,0,0,0.2);transition:opacity 0.3s;max-width:400px;line-height:1.4;`;
-        notif.innerHTML = html;
-        notif.style.opacity = '1';
-        clearTimeout(notif._timeout);
-        notif._timeout = setTimeout(() => {
-            notif.style.opacity = '0';
-        }, 3500);
-    }
 
     // --- GESTIÓN DE CATEGORÍAS ---
+    
+    function activarEdicionCategoria(id) {
+        const row = document.getElementById('cat-row-' + id);
+        row.querySelectorAll('.cat-view-mode').forEach(el => el.classList.add('d-none'));
+        row.querySelectorAll('.cat-edit-mode').forEach(el => el.classList.remove('d-none'));
+    }
 
+    function cancelarEdicionCategoria(id) {
+        const row = document.getElementById('cat-row-' + id);
+        row.querySelectorAll('.cat-view-mode').forEach(el => el.classList.remove('d-none'));
+        row.querySelectorAll('.cat-edit-mode').forEach(el => el.classList.add('d-none'));
+    }
 
+    async function guardarEdicionCategoria(id) {
+        const row = document.getElementById('cat-row-' + id);
+        const nombre = row.querySelector('.cat-edit-name').value.trim();
+        const codigo = row.querySelector('.cat-edit-code').value.trim();
 
+        if (!nombre || !codigo) {
+            showCustomAlert("Error", "El nombre y el código no pueden estar vacíos.", 'warning');
+            return;
+        }
+
+        try {
+            const resp = await fetch('api/gestionCategoria.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ accion: 'editar', id, nombre, codigo })
+            });
+            const r = await resp.json();
+            if (r.ok) {
+                row.querySelector('.cat-name-label').textContent = nombre;
+                row.querySelector('.cat-code-label').textContent = codigo;
+                cancelarEdicionCategoria(id);
+                showCustomAlert("Éxito", "Categoría actualizada correctamente.", 'success');
+            } else {
+                showCustomAlert("Error", r.error || "No se pudo actualizar.", 'error');
+            }
+        } catch (e) {
+            console.error(e);
+            showCustomAlert("Error", "Error de conexión.", 'error');
+        }
+    }
 
     async function añadirCategoria() {
         const nombre = document.getElementById('newCatNombre').value.trim();
@@ -3072,6 +3171,8 @@
             const data = await resp.json();
 
             if (data.ok) {
+                const pendientes = data.omitidos_albaran_pendiente || [];
+
                 if (data.datos_pedido && data.datos_pedido.length > 0) {
                     // Guardar datos en sessionStorage para recuperarlos en vCompras
                     sessionStorage.setItem('tpv_pedido_auto_data', JSON.stringify(data.datos_pedido));
@@ -3083,14 +3184,26 @@
                         msg += `<br><small style='color:#fbbf24'><i class='fa-solid fa-triangle-exclamation'></i> ${<?php echo json_encode(L('prod_toast_warn_zero_cost', true)); ?>}</small>`;
                     }
 
+                    if (pendientes.length > 0) {
+                        const nums = pendientes.join(', ');
+                        msg += `<br><small style='color:var(--warning,#f59e0b)'><i class='fa-solid fa-truck-clock'></i> ${<?php echo json_encode(L('prod_toast_omitidos_albaran_pendiente', true)); ?>}: ${nums}</small>`;
+                    }
+
                     showNotification(msg, 'success');
 
                     setTimeout(() => {
                         location.href = 'index.php?irCompras=1&pedido_auto=1';
                     }, 2000);
                 } else {
-                    let msg = "<i class='fa-solid fa-circle-info'></i> " + <?php echo json_encode(L('prod_toast_no_low_stock', true)); ?>;
-                    showNotification(msg, 'info');
+                    // Sin productos nuevos que pedir
+                    if (pendientes.length > 0) {
+                        const nums = pendientes.join(', ');
+                        let msg = `<i class='fa-solid fa-truck-clock'></i> ${<?php echo json_encode(L('prod_toast_todos_albaran_pendiente', true)); ?>}<br><small style='color:var(--warning,#f59e0b)'>${nums}</small>`;
+                        showNotification(msg, 'warning');
+                    } else {
+                        let msg = "<i class='fa-solid fa-circle-info'></i> " + <?php echo json_encode(L('prod_toast_no_low_stock', true)); ?>;
+                        showNotification(msg, 'info');
+                    }
                 }
             } else {
                 showNotification("<i class='fa-solid fa-circle-xmark'></i> " + <?php echo json_encode(L('prod_js_error', true)); ?> + ": " + data.error, 'error');
@@ -3100,12 +3213,6 @@
         }
     }
 
-    // Redefinimos applyFilters para que use la carga AJAX
-    window.applyFilters = function() {
-        if (typeof filtrarProductos === 'function') {
-            filtrarProductos();
-        }
-    };
 
     function ajustarStockManual(tipo) {
         const id = document.getElementById('prodId').value;
@@ -3209,141 +3316,97 @@
 </script>
 
 <!-- MODAL MARGEN MASIVO -->
-<div id="modalMargenMasivo" class="modal-overlay-bg" style="display:none;">
-    <div class="modal-content" style="max-width: 550px; border-radius: 20px;">
-        <div class="modal-header">
-            <h2><?php echo L('prod_modal_mass_margin_title'); ?></h2>
-            <button onclick="cerrarModalMargenMasivo()" class="btn-close-modal">&times;</button>
+<!-- MODAL AJUSTE MASIVO UNIFICADO -->
+<div id="modalAjusteUnificado" class="modal-overlay" style="transition: all 0.2s ease;">
+    <div class="modal-content" style="max-width: 580px; border-radius: 20px; max-height: 92vh; display:flex; flex-direction:column;">
+        <div class="modal-header flex-shrink-0">
+            <h2><i class="fa-solid fa-sliders mr-10 text-accent"></i> Ajuste masivo de precios</h2>
+            <button class="btn-close-modal" onclick="cerrarModalAjusteUnificado()">&times;</button>
         </div>
-        <div class="modal-body p-24">
-            <div class="p-16 bg-surface2 br-12 border mb-20 d-flex ai-center gap-12">
-                <div class="fs-24 text-accent"><i class="fa-solid fa-lightbulb"></i></div>
-                <p class="fs-12 m-0 text-muted">
-                    <?php echo L('prod_modal_mass_margin_info'); ?>
-                </p>
-            </div>
 
+        <div class="modal-body p-24" style="flex:1; min-height:0; overflow-y:auto;">
+            <!-- Categoría -->
             <div class="form-group mb-20">
-                <label class="form-label font-bold mb-8"><?php echo L('prod_modal_mass_margin_step1'); ?></label>
-                <select id="massCategoriaSelect" class="form-input h-44" onchange="previewMargenMasivo()">
-                    <option value="all"><?php echo L('prod_modal_mass_margin_cat_all'); ?></option>
-                    <?php foreach ($avProductos['categorias'] as $c): ?>
-                        <option value="<?php echo htmlspecialchars($c['codigo']); ?>">
-                            <?php echo htmlspecialchars($c['nombre']); ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-
-            <div class="form-group mb-20">
-                <label class="form-label font-bold mb-8"><?php echo L('prod_modal_mass_margin_step2'); ?></label>
-                <div class="d-flex ai-center gap-12">
-                    <input type="number" id="massMargenInput" class="form-input h-44 font-mono text-center fs-18" placeholder="0.00" step="0.01" oninput="previewMargenMasivo()">
-                    <div class="fs-20 font-bold opacity-30">%</div>
-                </div>
-            </div>
-
-            <div class="form-group mb-20">
-                <label class="form-label font-bold mb-8 d-flex jc-between ai-center">
-                    <span><?php echo L('prod_modal_mass_margin_step3'); ?></span>
-                    <span class="badge bg-surface2 text-muted fw-normal px-8 py-2 br-4" id="contadorExcepciones">0 <?php echo L('selected'); ?></span>
-                </label>
-                <div class="p-16 border br-12 bg-surface2">
-                    <div class="search-box mb-12">
-                        <i class="fa-solid fa-search"></i>
-                        <input type="text" id="buscadorExcepciones" class="form-input" placeholder="<?php echo L('prod_modal_mass_margin_ex_placeholder'); ?>" oninput="buscarExcepcionesAlEscribir()">
-                    </div>
-                    <div id="listaExcepciones" style="display: flex; flex-direction: column !important; gap: 8px; max-height: 180px; overflow-y: auto;">
-                        <div class="text-center p-20 text-muted fs-12"><i class="fa-solid fa-info-circle mb-8 fs-16 d-block"></i> <?php echo L('prod_modal_mass_margin_ex_empty'); ?></div>
-                    </div>
-                </div>
-            </div>
-
-            <div id="margenPreviewBox" class="p-16 br-12 border-2" style="display:none; background: rgba(var(--accent-rgb), 0.05); border-style: dashed; border-color: var(--accent);">
-                <div class="fs-11 tt-uppercase font-bold text-accent mb-8" style="letter-spacing: 0.05em;"><?php echo L('prod_modal_mass_margin_preview_title'); ?></div>
-                <div class="d-flex jc-between ai-center mb-4">
-                    <span class="fs-13"><?php echo L('prod_modal_mass_margin_updating'); ?></span>
-                    <span id="previewCountOk" class="font-bold text-green fs-14">0</span>
-                </div>
-                <div class="d-flex jc-between ai-center">
-                    <span class="fs-13 text-muted"><?php echo L('prod_modal_mass_margin_omitted'); ?></span>
-                    <span id="previewCountOmit" class="font-bold text-red fs-14">0</span>
-                </div>
-            </div>
-        </div>
-        <div class="modal-footer px-24 pb-24 border-none">
-            <button type="button" onclick="cerrarModalMargenMasivo()" class="btn-cancel"><?php echo L('modal_cancel'); ?></button>
-            <button type="button" id="btnAplicarMargen" onclick="confirmarAplicarMargen()" class="btn-save px-24" style="background: var(--accent); color: white;" disabled>
-                <i class="fa-solid fa-check"></i> <?php echo L('prod_modal_mass_margin_btn_apply'); ?>
-            </button>
-        </div>
-    </div>
-</div>
-
-<!-- MODAL AJUSTE DE PRECIOS MASIVO -->
-<div id="modalAjusteMasivo" class="modal-overlay" style="transition: all 0.2s ease;">
-    <div class="modal-content" style="max-width: 550px; border-radius: 20px;">
-        <div class="modal-header">
-            <h2><?php echo L('prod_modal_mass_adj_title'); ?></h2>
-            <button class="btn-close-modal" onclick="cerrarModalAjusteMasivo()">&times;</button>
-        </div>
-        
-        <div class="modal-body p-24">
-            <div class="p-16 bg-surface2 br-12 border mb-20 d-flex ai-center gap-12">
-                <div class="fs-24 text-accent"><i class="fa-solid fa-circle-exclamation"></i></div>
-                <p class="fs-12 m-0 text-muted">
-                    <?php echo L('prod_modal_mass_adj_important'); ?>
-                </p>
-            </div>
-
-            <div class="form-group mb-20">
-                <label class="form-label font-bold mb-8"><?php echo L('prod_modal_mass_adj_step1'); ?></label>
-                <select id="ajusteCategoriaSelect" class="form-input h-44" onchange="previewAjusteMasivo()">
-                    <option value="all"><?php echo L('tpv_all'); ?></option>
-                    <?php foreach ($aCategorias as $cat) { ?>
-                        <option value="<?php echo $cat->getId(); ?>"><?php echo $cat->getNombre(); ?></option>
+                <label class="form-label font-bold mb-8">Categoría</label>
+                <select id="ajusteUCategoriaSelect" class="form-input h-44" onchange="previewAjusteUnificado()">
+                    <option value="all">Todas las categorías</option>
+                    <?php foreach ($avProductos['categorias'] as $cat) { ?>
+                        <option value="<?php echo htmlspecialchars($cat['codigo']); ?>"><?php echo htmlspecialchars($cat['nombre']); ?></option>
                     <?php } ?>
                 </select>
             </div>
 
-            <div class="d-grid grid-2 gap-16 mb-20">
-                <div class="form-group">
-                    <label class="form-label font-bold mb-8"><?php echo L('prod_modal_mass_adj_step2'); ?></label>
-                    <select id="ajusteTipoSelect" class="form-input h-44" onchange="previewAjusteMasivo()">
-                        <option value="percent"><?php echo L('prod_modal_mass_adj_type_percent'); ?></option>
-                        <option value="amount"><?php echo L('prod_modal_mass_adj_type_amount'); ?></option>
+            <!-- Tipo + Valor -->
+            <div class="d-grid grid-2 gap-16 mb-16">
+                <div class="form-group mb-0">
+                    <label class="form-label font-bold mb-8">Tipo de ajuste</label>
+                    <select id="ajusteUTipoSelect" class="form-input h-44" onchange="toggleCamposAjusteU()">
+                        <option value="percent">Porcentaje (%)</option>
+                        <option value="amount">Importe fijo (€)</option>
+                        <option value="margin">Margen de beneficio (%)</option>
+                        <option value="round">Redondeo de precio</option>
                     </select>
                 </div>
-                <div class="form-group">
-                    <label class="form-label font-bold mb-8"><?php echo L('prod_modal_mass_adj_step3'); ?></label>
-                    <input type="number" id="ajusteValorInput" class="form-input h-44 font-mono text-center fs-18" placeholder="0.00" step="0.01" oninput="previewAjusteMasivo()">
+                <div class="form-group mb-0">
+                    <label class="form-label font-bold mb-8" id="ajusteULabelValor">Porcentaje (%)</label>
+                    <input type="number" id="ajusteUValorInput" class="form-input h-44 font-mono text-center fs-18"
+                        placeholder="0.00" step="0.01" oninput="previewAjusteUnificado()">
                 </div>
             </div>
 
+            <!-- Redondeo: precisión (solo visible si tipo=round) -->
+            <div id="wrapRedondeoA" class="form-group mb-16 d-flex ai-center gap-12" style="display:none!important;">
+                <label class="form-label font-bold mb-0" style="white-space:nowrap;">Redondear a múltiplos de</label>
+                <input type="number" id="ajusteURedondeoA" class="form-input h-44 font-mono text-center" style="width:100px;"
+                    value="1" step="0.01" min="0.01" oninput="previewAjusteUnificado()"
+                    title="Ej: 1 = entero más cercano, 0.5 = mitades, 5 = múltiplos de 5">
+                <span class="fs-13 text-muted">Ej: 94,76 → 95 (con múltiplo 1)</span>
+            </div>
+
+            <!-- Plazo de aplicación -->
+            <div class="form-group mb-20">
+                <label class="form-label font-bold mb-8">
+                    <i class="fa-regular fa-clock mr-6 text-accent"></i> Aplicar a partir de (opcional)
+                </label>
+                <input type="datetime-local" id="ajusteUFechaAplicacion" class="form-input h-44"
+                    title="Si se deja vacío, el ajuste se aplica ahora. Si se indica una fecha futura, se programará.">
+                <p class="fs-11 text-muted mt-6 m-0">Vacío = inmediato. Con fecha futura = se programa y se aplica cuando vuelvas a la página de productos en ese momento.</p>
+            </div>
+
+            <!-- Excepciones -->
             <div class="form-group mb-20">
                 <label class="form-label font-bold mb-8 d-flex jc-between ai-center">
-                    <span><?php echo L('prod_modal_mass_adj_step4'); ?></span>
-                    <span class="badge bg-surface2 text-muted fw-normal px-8 py-2 br-4" id="contadorExcepcionesAjuste">0</span>
+                    <span>Excepciones (productos a excluir)</span>
+                    <span class="badge bg-surface2 text-muted fw-normal px-8 py-2 br-4" id="contadorExcepcionesU">0 excluidos</span>
                 </label>
                 <div class="p-16 border br-12 bg-surface2">
                     <div class="search-box mb-12">
                         <i class="fa-solid fa-search"></i>
-                        <input type="text" id="buscadorExcepcionesAjuste" placeholder="<?php echo L('prod_modal_mass_adj_search_placeholder'); ?>" oninput="buscarExcepcionesAjuste()" class="form-input">
+                        <input type="text" id="buscadorExcepcionesU" class="form-input" placeholder="Buscar producto para excluir..." oninput="buscarExcepcionesU()">
                     </div>
-                    <div id="listaExcepcionesAjuste" style="display: flex; flex-direction: column !important; gap: 8px; max-height: 200px; overflow-y: auto;">
-                    </div>
+                    <div id="listaExcepcionesU" style="display:flex;flex-direction:column;gap:8px;max-height:180px;overflow-y:auto;"></div>
                 </div>
             </div>
 
-            <div id="ajustePreviewBox" class="p-16 br-12 border bg-surface mb-20 text-center" style="display:none; border-style: dashed; border-color: var(--accent);">
-                <span class="fs-13 text-muted"><?php echo L('prod_modal_mass_adj_preview'); ?></span>
-                <div class="fs-24 font-bold text-accent" id="previewCountAjuste">0</div>
+            <!-- Motivo -->
+            <div class="form-group mb-20">
+                <label class="form-label font-bold mb-8">Motivo del ajuste <span class="text-red">*</span></label>
+                <textarea id="ajusteUMotivoInput" class="form-input p-12 fs-13" rows="2"
+                    placeholder="Ej: Revisión semestral de precios..." style="border-radius: 12px;"></textarea>
+            </div>
+
+            <!-- Preview -->
+            <div id="ajusteUPreviewBox" class="p-16 br-12 border bg-surface text-center" style="display:none; border-style:dashed; border-color:var(--accent);">
+                <span class="fs-13 text-muted">Productos afectados:</span>
+                <div class="fs-28 font-bold text-accent" id="ajusteUPreviewCount">0</div>
             </div>
         </div>
-        <div class="modal-footer px-24 pb-24 border-none">
-            <button type="button" onclick="cerrarModalAjusteMasivo()" class="btn-cancel"><?php echo L('modal_cancel'); ?></button>
-            <button type="button" id="btnAplicarAjuste" onclick="confirmarAplicarAjuste()" class="btn-save px-24" style="background: var(--accent); color: white;" disabled>
-                <i class="fa-solid fa-check mr-8"></i> <?php echo L('prod_modal_mass_adj_btn_apply'); ?>
+
+        <div class="modal-footer px-24 pb-24 border-none flex-shrink-0">
+            <button type="button" onclick="cerrarModalAjusteUnificado()" class="btn-cancel">Cancelar</button>
+            <button type="button" id="btnAplicarAjusteU" onclick="confirmarAjusteUnificado()"
+                class="btn-save px-24" style="background:var(--accent);color:white;" disabled>
+                <i class="fa-solid fa-check mr-8"></i> Aplicar ajuste
             </button>
         </div>
     </div>
@@ -3407,15 +3470,23 @@
                     </thead>
                     <tbody class="divide-y" style="background: var(--surface);">
                         <?php foreach ($avProductos['categorias'] as $c): ?>
-                            <tr class="hover-bg-surface2 transition-all">
+                            <tr class="hover-bg-surface2 transition-all" id="cat-row-<?php echo $c['id']; ?>">
                                 <td class="p-20">
                                     <div class="d-flex ai-center gap-20">
                                         <div class="p-12 br-12 bg-surface2 text-muted border" style="width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;">
                                             <i class="fa-solid fa-folder-open fs-18"></i>
                                         </div>
-                                        <div>
-                                            <div class="font-bold fs-15" style="color: var(--text);"><?php echo htmlspecialchars($c['nombre']); ?></div>
-                                            <div class="fs-11 text-muted font-mono opacity-60"><?php echo htmlspecialchars($c['codigo']); ?></div>
+                                        <div class="flex-1">
+                                            <!-- View Mode -->
+                                            <div class="cat-view-mode">
+                                                <div class="font-bold fs-15 text-text cat-name-label"><?php echo htmlspecialchars($c['nombre']); ?></div>
+                                                <div class="fs-11 text-muted font-mono opacity-60 cat-code-label"><?php echo htmlspecialchars($c['codigo']); ?></div>
+                                            </div>
+                                            <!-- Edit Mode (Hidden) -->
+                                            <div class="cat-edit-mode d-none d-flex flex-column gap-8">
+                                                <input type="text" class="form-input h-32 fs-13 py-4 px-8 cat-edit-name" value="<?php echo htmlspecialchars($c['nombre']); ?>" style="border-radius: 6px;">
+                                                <input type="text" class="form-input h-24 fs-11 py-2 px-8 font-mono cat-edit-code" value="<?php echo htmlspecialchars($c['codigo']); ?>" style="border-radius: 6px;">
+                                            </div>
                                         </div>
                                     </div>
                                 </td>
@@ -3435,9 +3506,22 @@
                                     </div>
                                 </td>
                                 <td class="p-20 text-center">
-                                    <button onclick="eliminarCategoria(<?php echo $c['id']; ?>, '<?php echo addslashes(htmlspecialchars($c['nombre'])); ?>')" class="btn-icon text-red bg-red-soft p-12 br-12 transition-all hover-scale" title="<?php echo L('prod_modal_cat_tip_delete'); ?>" style="width: 42px; height: 42px;">
-                                        <i class="fa-solid fa-trash-can fs-16"></i>
-                                    </button>
+                                    <div class="cat-view-mode d-flex jc-center gap-8">
+                                        <button onclick="activarEdicionCategoria(<?php echo $c['id']; ?>)" class="btn-icon text-accent bg-accent-soft p-12 br-12 transition-all hover-scale" title="Editar nombre/código" style="width: 42px; height: 42px;">
+                                            <i class="fa-solid fa-pen-to-square fs-16"></i>
+                                        </button>
+                                        <button onclick="eliminarCategoria(<?php echo $c['id']; ?>, '<?php echo addslashes(htmlspecialchars($c['nombre'])); ?>')" class="btn-icon text-red bg-red-soft p-12 br-12 transition-all hover-scale" title="<?php echo L('prod_modal_cat_tip_delete'); ?>" style="width: 42px; height: 42px;">
+                                            <i class="fa-solid fa-trash-can fs-16"></i>
+                                        </button>
+                                    </div>
+                                    <div class="cat-edit-mode d-none d-flex jc-center gap-8">
+                                        <button onclick="guardarEdicionCategoria(<?php echo $c['id']; ?>)" class="btn-icon text-green bg-green-soft p-12 br-12 transition-all hover-scale" title="Guardar cambios" style="width: 42px; height: 42px;">
+                                            <i class="fa-solid fa-check fs-16"></i>
+                                        </button>
+                                        <button onclick="cancelarEdicionCategoria(<?php echo $c['id']; ?>)" class="btn-icon text-muted bg-surface2 p-12 br-12 transition-all hover-scale" title="Cancelar" style="width: 42px; height: 42px;">
+                                            <i class="fa-solid fa-xmark fs-16"></i>
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -3543,3 +3627,102 @@
     #modalAjusteIcon.text-green { color: var(--green); }
     #modalAjusteIcon.text-red { color: var(--red); }
 </style>
+<!-- MODAL HISTORIAL GLOBAL DE PRECIOS -->
+<div id="modalHistorialGlobalPrecios" class="modal-overlay-bg" style="display:none;">
+    <div class="modal-content" style="max-width: 900px; border-radius: 20px;">
+        <div class="modal-header">
+            <div>
+                <h2 class="m-0"><?php echo L('prod_modal_global_history_title'); ?></h2>
+                <p class="m-0 fs-12 text-muted"><?php echo L('prod_modal_global_history_subtitle'); ?></p>
+            </div>
+            <button onclick="cerrarModalHistorialGlobal()" class="btn-close-modal">&times;</button>
+        </div>
+        <div class="modal-body p-24">
+            <div class="table-container" style="max-height: 500px; overflow-y: auto;">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th class="pl-20"><?php echo L('prod_modal_th_date'); ?></th>
+                            <th><?php echo L('prod_modal_global_history_th_op'); ?></th>
+                            <th class="text-center"><?php echo L('prod_modal_global_history_th_value'); ?></th>
+                            <th><?php echo L('prod_modal_global_history_th_scope'); ?></th>
+                            <th class="text-right"><?php echo L('prod_modal_global_history_th_affected'); ?></th>
+                            <th class="pr-20"><?php echo L('prod_modal_stock_adj_label_reason'); ?></th>
+                        </tr>
+                    </thead>
+                    <tbody id="globalHistoryTableBody">
+                        <!-- JS Loaded -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- HISTORIAL GLOBAL DE PRECIOS ---
+    async function abrirModalHistorialGlobal() {
+        const modal = document.getElementById('modalHistorialGlobalPrecios');
+        const body = document.getElementById('globalHistoryTableBody');
+        
+        body.innerHTML = '<tr><td colspan="6" class="text-center p-24 opacity-50"><i class="fa-solid fa-spinner fa-spin"></i> <?php echo L('loading', true); ?></td></tr>';
+        
+        modal.style.display = 'flex';
+        
+        try {
+            const resp = await fetch('api/obtenerHistorialGlobalPrecios.php');
+            const data = await resp.json();
+            
+            if (data.ok) {
+                if (data.logs.length === 0) {
+                    body.innerHTML = `<tr><td colspan="6" class="text-center p-48 text-muted opacity-60"><i class="fa-solid fa-ghost fs-24 mb-8 d-block"></i> ${<?php echo json_encode(L('prod_modal_global_history_empty', true)); ?>}</td></tr>`;
+                } else {
+                    body.innerHTML = data.logs.map(log => {
+                        const date = new Date(log.fecha);
+                        const op = log.tipo_operacion;
+                        let badgeClass = 'bg-blue-soft text-blue';
+                        let badgeText = '<?php echo L('prod_tip_mass_adjustment'); ?>';
+
+                        if (op === 'margen_masivo') {
+                            badgeClass = 'bg-purple-soft text-purple';
+                            badgeText = '<?php echo L('prod_btn_mass_margin'); ?>';
+                        } else if (op === 'ajuste_manual_margen') {
+                            badgeClass = 'bg-orange-soft text-orange';
+                            badgeText = '<?php echo L('prod_pill_manual_adj', true) ?: "AJUSTE MANUAL"; ?>';
+                        }
+                        
+                        const scopeLabel = log.categoria_nom === 'all' || !log.categoria_nom ? '<?php echo L('prod_modal_mass_margin_cat_all'); ?>' : log.categoria_nom;
+                        
+                        return `
+                            <tr class="hover-bg-surface2 transition">
+                                <td class="pl-20 font-mono fs-12">
+                                    ${date.toLocaleDateString()}<br>
+                                    <span class="opacity-50">${date.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}</span>
+                                </td>
+                                <td>
+                                    <span class="badge ${badgeClass} tt-uppercase font-bold fs-10" style="padding: 2px 8px; border-radius: 4px;">
+                                        ${badgeText}
+                                    </span>
+                                </td>
+                                <td class="text-center font-bold font-mono">
+                                    ${parseFloat(log.valor) > 0 ? '+' : ''}${parseFloat(log.valor).toFixed(2)}${log.tipo_valor === 'percent' ? '%' : '€'}
+                                </td>
+                                <td class="fs-12">${scopeLabel}</td>
+                                <td class="text-right font-bold">${log.productos_afectados}</td>
+                                <td class="pr-20 fs-12 italic opacity-80" style="max-width: 250px;">${log.motivo || '---'}</td>
+                            </tr>
+                        `;
+                    }).join('');
+                }
+            } else {
+                body.innerHTML = `<tr><td colspan="6" class="text-center p-24 text-red">Error: ${data.error}</td></tr>`;
+            }
+        } catch (e) {
+            body.innerHTML = `<tr><td colspan="6" class="text-center p-24 text-red">Error de conexión</td></tr>`;
+        }
+    }
+
+    function cerrarModalHistorialGlobal() {
+        document.getElementById('modalHistorialGlobalPrecios').style.display = 'none';
+    }
+</script>

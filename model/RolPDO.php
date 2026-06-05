@@ -53,7 +53,7 @@ class RolPDO
     /**
      * Crea un nuevo rol.
      */
-    public static function añadirRol(string $nombre, string $descripcion): int
+    public static function agregarRol(string $nombre, string $descripcion): int
     {
         $sql = "INSERT INTO roles (nombre, descripcion) VALUES (:nom, :des)";
         DBPDO::ejecutarConsulta($sql, [':nom' => $nombre, ':des' => $descripcion]);

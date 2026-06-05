@@ -389,115 +389,9 @@ body {
   border-radius: 4px;
 }
 
-.product-card {
-  background: var(--surface);
-  border-radius: var(--radius);
-  border: 1.5px solid var(--border);
-  padding: 12px;
-  cursor: pointer;
-  transition: all 0.15s;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  position: relative;
-}
-.product-card:hover {
-  border-color: var(--accent);
-  box-shadow: var(--shadow);
-  transform: translateY(-1px);
-}
-.product-card:active {
-  transform: translateY(0);
-}
-.product-card.adding {
-  animation: pulse 0.3s ease;
-}
-@keyframes pulse {
-  0% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(0.97);
-  }
-  100% {
-    transform: scale(1);
-  }
-}
-.product-emoji {
-  font-size: 28px;
-  display: block;
-}
-.product-name {
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 1.3;
-  color: var(--text);
-}
-.product-sku {
-  font-family: var(--font-main);
-  font-size: 11px;
-  color: var(--text-muted);
-}
-.product-price {
-  font-family: var(--font-main);
-  font-size: 15px;
-  font-weight: 500;
-  color: var(--text);
-  margin-top: auto;
-}
+/* [DEPRECATED] Product card styles moved to components.css design system */
 
-/* ADMIN ACTIONS */
-.product-admin-bar {
-  display: none;
-  gap: 4px;
-  border-top: 1px solid var(--border);
-  padding-top: 10px;
-  margin-top: 2px;
-}
-.is-admin .product-admin-bar {
-  display: flex;
-}
-.admin-action {
-  flex: 1;
-  padding: 5px 4px;
-  border-radius: 6px;
-  border: 1.5px solid var(--border);
-  background: var(--surface2);
-  cursor: pointer;
-  font-size: 11px;
-  font-weight: 600;
-  font-family: var(--font-main);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 3px;
-  transition: all 0.15s;
-  color: var(--text-muted);
-  line-height: 1;
-}
-.admin-action i,
-.admin-action svg {
-  width: 13px;
-  height: 13px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-.admin-action.edit:hover {
-  border-color: var(--blue);
-  color: var(--blue);
-  background: var(--blue-light);
-}
-.admin-action.delete:hover {
-  border-color: var(--red);
-  color: var(--red);
-  background: var(--red-light);
-}
-.admin-action.baja:hover {
-  border-color: var(--gold);
-  color: var(--gold);
-  background: #fef9e7;
-}
+/* Legacy Admin Actions moved to components.css */
 
 /* disabled / baja product */
 .product-card.inactive .product-emoji {
@@ -730,6 +624,46 @@ body {
   font-size: 11px;
   color: var(--text-muted);
   font-family: var(--font-main);
+  display: flex;
+  align-items: baseline;
+  gap: 1px;
+}
+.price-input {
+  width: 42px;
+  border: none;
+  border-bottom: 1px dashed transparent;
+  background: transparent;
+  text-align: right;
+  font-family: var(--font-main);
+  font-size: 11px;
+  font-weight: 500;
+  color: inherit;
+  padding: 0 1px;
+  line-height: 1.3;
+  cursor: text;
+  transition: border-color 0.15s, color 0.12s;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.price-input::-webkit-outer-spin-button,
+.price-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+}
+.order-item:hover .price-input:not(:focus):not(.price-modified) {
+  border-bottom-color: var(--text-muted);
+}
+.price-input:focus {
+  outline: none;
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  background: transparent;
+}
+.price-input.price-modified {
+  color: var(--accent);
+  font-weight: 700;
+  border-bottom-color: var(--accent);
 }
 
 .qty-ctrl {
@@ -934,7 +868,7 @@ body {
   inset: 0;
   background: rgba(26, 25, 23, 0.5);
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
   padding: 24px 16px;
   overflow-y: auto;
@@ -1900,7 +1834,7 @@ input:focus + .slider {
 
 /* 1. Root: reduce sidebar width so it fits on screen */
 :root {
-  --sidebar-width: 360px;
+  --sidebar-width: 420px;
 }
 
 /* 2. Main grid: use the CSS variable so both columns stay in sync */
@@ -1962,7 +1896,7 @@ input:focus + .slider {
 /* 7. On very wide screens allow a slightly wider sidebar */
 @media (min-width: 1400px) {
   :root {
-    --sidebar-width: 400px;
+    --sidebar-width: 460px;
   }
 }
 
@@ -2190,10 +2124,14 @@ input:focus + .slider {
 }
 
 .config-nav-item.active {
-  background: var(--blue-light);
-  color: var(--accent);
-  border-color: var(--accent-soft);
-  box-shadow: 0 4px 12px rgba(26, 47, 191, 0.08);
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+  box-shadow: 0 8px 20px rgba(var(--accent-rgb, 26, 47, 191), 0.25);
+}
+
+.config-nav-item.active i {
+  color: white;
 }
 
 .config-panel {

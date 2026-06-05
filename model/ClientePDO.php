@@ -11,12 +11,17 @@ class ClientePDO
 {
     public static function listarTodos(int $limit = 50, int $offset = 0): array
     {
-        $sql = "SELECT id, tipo, rol, nombre, apellidos, nif, email, telefono, puntos, ultima_compra, fecha_alta, fecha_baja 
-                FROM clientes 
-                ORDER BY id ASC 
+        // Safety cap: if 0 is passed, we fetch a large but memory-safe batch (2000).
+        // If a specific limit is provided, we respect it.
+        $realLimit = ($limit <= 0) ? 2000 : (int)$limit;
+        
+        $sql = "SELECT id, tipo, rol, nombre, apellidos, nif, email, telefono, puntos, ultima_compra, fecha_alta, fecha_baja
+                FROM clientes
+                WHERE fecha_baja IS NULL
+                ORDER BY id ASC
                 LIMIT :limit OFFSET :offset";
         
-        $sql = str_replace([':limit', ':offset'], [(int)$limit, (int)$offset], $sql);
+        $sql = str_replace([':limit', ':offset'], [$realLimit, (int)$offset], $sql);
         $q = DBPDO::ejecutarConsulta($sql);
         return $q->fetchAll(PDO::FETCH_ASSOC);
     }
@@ -53,15 +58,17 @@ class ClientePDO
     public static function crear(array $d): int
     {
         $sql = "INSERT INTO clientes
-                (tipo, rol, nombre, apellidos, nif, email, telefono, direccion, cp, poblacion, provincia, notas)
-                VALUES (:tipo, :rol, :nombre, :apellidos, :nif, :email, :tel, :dir, :cp, :pob, :prov, :notas)";
+                (tipo, rol, nombre, apellidos, nif, aeat_id_type, aeat_codigo_pais, email, telefono, direccion, cp, poblacion, provincia, notas)
+                VALUES (:tipo, :rol, :nombre, :apellidos, :nif, :aeatIdType, :aeatCodigoPais, :email, :tel, :dir, :cp, :pob, :prov, :notas)";
         DBPDO::ejecutarConsulta($sql, [
             ':tipo'      => in_array($d['tipo'] ?? 'particular', ['particular', 'empresa'], true) ? $d['tipo'] : 'particular',
             ':rol'       => $d['rol'] ?? 'general',
             ':nombre'    => mb_substr(trim($d['nombre'] ?? ''), 0, 100),
             ':apellidos' => mb_substr(trim($d['apellidos'] ?? ''), 0, 150),
-            ':nif'       => $d['nif'] ?? null,
-            ':email'     => $d['email'] ?? null,
+            ':nif'           => $d['nif'] ?? null,
+            ':aeatIdType'    => $d['aeat_id_type'] ?? '01',
+            ':aeatCodigoPais' => $d['aeat_codigo_pais'] ?? 'ES',
+            ':email'         => $d['email'] ?? null,
             ':tel'       => $d['telefono'] ?? null,
             ':dir'       => $d['direccion'] ?? null,
             ':cp'        => $d['cp'] ?? null,
@@ -83,6 +90,8 @@ class ClientePDO
                     nombre = :nombre,
                     apellidos = :apellidos,
                     nif = :nif,
+                    aeat_id_type = :aeatIdType,
+                    aeat_codigo_pais = :aeatCodigoPais,
                     email = :email,
                     telefono = :tel,
                     direccion = :dir,
@@ -97,14 +106,16 @@ class ClientePDO
             ':rol'       => $d['rol'] ?? 'general',
             ':nombre'    => mb_substr(trim($d['nombre'] ?? ''), 0, 100),
             ':apellidos' => mb_substr(trim($d['apellidos'] ?? ''), 0, 150),
-            ':nif'       => $d['nif'] ?? null,
-            ':email'     => $d['email'] ?? null,
-            ':tel'       => $d['telefono'] ?? null,
-            ':dir'       => $d['direccion'] ?? null,
-            ':cp'        => $d['cp'] ?? null,
-            ':pob'       => $d['poblacion'] ?? null,
-            ':prov'      => $d['provincia'] ?? null,
-            ':notas'     => $d['notas'] ?? null,
+            ':nif'           => $d['nif'] ?? null,
+            ':aeatIdType'    => $d['aeat_id_type'] ?? '01',
+            ':aeatCodigoPais' => $d['aeat_codigo_pais'] ?? 'ES',
+            ':email'         => $d['email'] ?? null,
+            ':tel'           => $d['telefono'] ?? null,
+            ':dir'           => $d['direccion'] ?? null,
+            ':cp'            => $d['cp'] ?? null,
+            ':pob'           => $d['poblacion'] ?? null,
+            ':prov'          => $d['provincia'] ?? null,
+            ':notas'         => $d['notas'] ?? null,
         ]);
     }
 
@@ -118,25 +129,27 @@ class ClientePDO
 
     public static function listarPorRol(string $rol, int $limit = 50, int $offset = 0): array
     {
+        $realLimit = ($limit <= 0) ? 100000 : (int)$limit;
+
         $sql = "SELECT id, tipo, rol, nombre, apellidos, nif, email, telefono, puntos, ultima_compra 
                 FROM clientes 
                 WHERE rol = :rol AND fecha_baja IS NULL 
                 ORDER BY id ASC 
                 LIMIT :limit OFFSET :offset";
         
-        $sql = str_replace([':limit', ':offset'], [(int)$limit, (int)$offset], $sql);
+        $sql = str_replace([':limit', ':offset'], [$realLimit, (int)$offset], $sql);
         $q = DBPDO::ejecutarConsulta($sql, [':rol' => $rol]);
         return $q->fetchAll(PDO::FETCH_ASSOC);
     }
-
-    public static function listarSocios(): array
+    
+    public static function listarSocios(int $limit = 50, int $offset = 0): array
     {
-        return self::listarPorRol('socio');
+        return self::listarPorRol('socio', $limit, $offset);
     }
 
-    public static function listarMayoristas(): array
+    public static function listarMayoristas(int $limit = 50, int $offset = 0): array
     {
-        return self::listarPorRol('mayorista');
+        return self::listarPorRol('mayorista', $limit, $offset);
     }
     public static function sumarPuntos(int $id, int $puntos): void
     {

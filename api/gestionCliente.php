@@ -15,6 +15,7 @@ try {
     require_once __DIR__ . '/../model/ClientePDO.php';
     require_once __DIR__ . '/../model/Usuario.php';
     require_once __DIR__ . '/../model/Validador.php';
+    require_once __DIR__ . '/../model/LogPDO.php';
 
     // session_start(); // Handled by csrf_check.php
     if (!isset($_SESSION['usuarioActualTPV'])) {
@@ -39,8 +40,11 @@ try {
                     'id'       => (int)$cli['id'],
                     'nombre'   => $cli['nombre'],
                     'nif'      => $cli['nif'],
+                    'aeat_id_type'     => $cli['aeat_id_type'] ?? '01',
+                    'aeat_codigo_pais' => $cli['aeat_codigo_pais'] ?? 'ES',
                     'rol'      => $cli['rol'] ?? 'general',
                     'puntos'   => $cli['puntos'] ?? 0,
+                    'telefono' => $cli['telefono'] ?? null,
                 ],
             ]);
         } else {
@@ -54,12 +58,14 @@ try {
         $nif    = trim($input['nif'] ?? '');
         $tipo   = $input['tipo'] ?? 'particular';
         $rol    = $input['rol'] ?? 'general';
+        $aeat_id_type = $input['aeat_id_type'] ?? '01';
+        $aeat_codigo_pais = $input['aeat_codigo_pais'] ?? 'ES';
 
         if ($nombre === '' || $nif === '') {
             throw new Exception('Nombre y NIF son obligatorios para registrar un cliente');
         }
 
-        if (!Validador::validarDocumento($nif)) {
+        if ($aeat_id_type === '01' && !Validador::validarDocumento($nif)) {
             throw new Exception('El NIF/CIF proporcionado no tiene un formato válido.');
         }
 
@@ -68,8 +74,13 @@ try {
             $cli['nombre']   = $nombre;
             $cli['tipo']     = $tipo;
             $cli['rol']      = $rol;
+            $cli['aeat_id_type'] = $aeat_id_type;
+            $cli['aeat_codigo_pais'] = $aeat_codigo_pais;
             ClientePDO::actualizar((int)$cli['id'], $cli);
             $nuevoId = (int)$cli['id'];
+            LogPDO::addLog('UPDATE_CLIENTE', "Cliente actualizado: {$nombre} ({$nif})", [
+                'id' => $nuevoId, 'nombre' => $nombre, 'nif' => $nif,
+            ]);
         } else {
             $nuevoId = ClientePDO::crear([
                 'tipo'      => $tipo,
@@ -77,8 +88,13 @@ try {
                 'nombre'    => $nombre,
                 'apellidos' => '',
                 'nif'       => $nif,
+                'aeat_id_type'   => $aeat_id_type,
+                'aeat_codigo_pais' => $aeat_codigo_pais,
                 'email'     => null,
                 'telefono'  => null,
+            ]);
+            LogPDO::addLog('CREATE_CLIENTE', "Cliente creado: {$nombre} ({$nif})", [
+                'id' => (int)$nuevoId, 'nombre' => $nombre, 'nif' => $nif,
             ]);
         }
 
@@ -119,9 +135,10 @@ try {
         $qCount = DBPDO::ejecutarConsulta($countSql, $params);
         $total = (int)$qCount->fetchColumn();
 
-        // Obtener datos paginados
-        $dataSql = "SELECT id, tipo, rol, nombre, apellidos, nif, email, telefono, puntos, fecha_alta " . $baseSql . " ORDER BY id ASC LIMIT :limit OFFSET :offset";
-        $dataSql = str_replace([':limit', ':offset'], [(int)$limit, (int)$offset], $dataSql);
+        // Obtener datos paginados (LIMIT/OFFSET casteados a int, PDO no admite parámetros aquí)
+        $limitInt  = (int)$limit;
+        $offsetInt = (int)$offset;
+        $dataSql = "SELECT id, tipo, rol, nombre, apellidos, nif, aeat_id_type, aeat_codigo_pais, email, telefono, puntos, fecha_alta " . $baseSql . " ORDER BY id ASC LIMIT {$limitInt} OFFSET {$offsetInt}";
 
         $q = DBPDO::ejecutarConsulta($dataSql, $params);
         $lista = $q->fetchAll(PDO::FETCH_ASSOC);
@@ -130,9 +147,9 @@ try {
         exit;
     }
 
-    if ($_SESSION['usuarioActualTPV']->getRol() !== 'admin') {
-        http_response_code(401);
-        echo json_encode(['ok' => false, 'error' => 'No autorizado']);
+    if (!$_SESSION['usuarioActualTPV']->tienePermiso('gestionar_clientes')) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'No tienes permiso para gestionar clientes']);
         exit;
     }
 
@@ -168,6 +185,41 @@ try {
         $id = isset($input['id']) ? (int)$input['id'] : null;
         if (!$id) throw new Exception('ID obligatorio para eliminar');
         ClientePDO::marcarBaja($id);
+        LogPDO::addLog('DELETE_CLIENTE', "Cliente #{$id} dado de baja", ['id' => $id]);
+        echo json_encode(['ok' => true]);
+        exit;
+    }
+
+    if ($accion === 'actualizarNif') {
+        $id  = isset($input['id']) ? (int)$input['id'] : null;
+        $nif = strtoupper(trim($input['nif'] ?? ''));
+        $aeat_id_type = $input['aeat_id_type'] ?? '01';
+        $aeat_codigo_pais = $input['aeat_codigo_pais'] ?? 'ES';
+        if (!$id) throw new Exception('ID obligatorio');
+        if ($nif === '') throw new Exception('El DNI/NIF es obligatorio');
+        if ($aeat_id_type === '01' && !Validador::validarDocumento($nif)) {
+            throw new Exception('El NIF/DNI proporcionado no tiene un formato válido.');
+        }
+        $db = DBPDO::getPDO();
+        $stmt = $db->prepare("UPDATE clientes SET nif = :nif, aeat_id_type = :tipo, aeat_codigo_pais = :pais WHERE id = :id");
+        $stmt->execute([':nif' => $nif, ':tipo' => $aeat_id_type, ':pais' => $aeat_codigo_pais, ':id' => $id]);
+        LogPDO::addLog('UPDATE_CLIENTE', "NIF de cliente #{$id} actualizado a {$nif}", [
+            'id' => $id, 'nif' => $nif,
+        ]);
+        echo json_encode(['ok' => true, 'nif' => $nif]);
+        exit;
+    }
+
+    if ($accion === 'actualizarTelefono') {
+        $id  = isset($input['id']) ? (int)$input['id'] : null;
+        $tel = trim($input['telefono'] ?? '');
+        if (!$id) throw new Exception('ID obligatorio');
+        if ($tel === '') throw new Exception('El teléfono es obligatorio');
+        if (!Validador::validarTelefono($tel)) throw new Exception('El teléfono no tiene un formato válido.');
+        $db = DBPDO::getPDO();
+        $stmt = $db->prepare("UPDATE clientes SET telefono = :tel WHERE id = :id");
+        $stmt->execute([':tel' => $tel, ':id' => $id]);
+        LogPDO::addLog('UPDATE_CLIENTE', "Teléfono de cliente #{$id} actualizado", ['id' => $id]);
         echo json_encode(['ok' => true]);
         exit;
     }
@@ -180,8 +232,11 @@ try {
         throw new Exception('El nombre es obligatorio');
     }
 
+    $aeat_id_type = $input['aeat_id_type'] ?? '01';
+    $aeat_codigo_pais = $input['aeat_codigo_pais'] ?? 'ES';
+
     $nifInput = trim($input['nif'] ?? '');
-    if ($nifInput !== '' && !Validador::validarDocumento($nifInput)) {
+    if ($aeat_id_type === '01' && $nifInput !== '' && !Validador::validarDocumento($nifInput)) {
         throw new Exception('El NIF/CIF proporcionado no tiene un formato válido.');
     }
 
@@ -196,6 +251,8 @@ try {
         'nombre'    => $nombre,
         'apellidos' => $input['apellidos'] ?? '',
         'nif'       => $nifInput ?: null,
+        'aeat_id_type'     => $input['aeat_id_type'] ?? '01',
+        'aeat_codigo_pais' => $input['aeat_codigo_pais'] ?? 'ES',
         'email'     => $input['email'] ?? null,
         'telefono'  => $telefonoInput ?: null,
         'direccion' => $input['direccion'] ?? null,
@@ -207,9 +264,15 @@ try {
 
     if ($id) {
         ClientePDO::actualizar($id, $data);
+        LogPDO::addLog('UPDATE_CLIENTE', "Cliente #{$id} actualizado: {$nombre}", [
+            'id' => $id, 'nombre' => $nombre,
+        ]);
         echo json_encode(['ok' => true, 'id' => $id]);
     } else {
         $nuevoId = ClientePDO::crear($data);
+        LogPDO::addLog('CREATE_CLIENTE', "Cliente creado: {$nombre}", [
+            'id' => (int)$nuevoId, 'nombre' => $nombre, 'nif' => $nifInput ?: null,
+        ]);
         echo json_encode(['ok' => true, 'id' => $nuevoId]);
     }
 } catch (Throwable $e) {

@@ -17,6 +17,7 @@ try {
     require_once __DIR__ . '/../model/ProductoPDO.php';
     require_once __DIR__ . '/../model/MovimientoStockPDO.php';
     require_once __DIR__ . '/../core/231018libreriaValidacion.php';
+    require_once __DIR__ . '/../model/LogPDO.php';
 
     // session_start(); // Handled by csrf_check.php
 
@@ -31,11 +32,17 @@ try {
         exit;
     }
 
-    // Solo administradores
-    if ($_SESSION['usuarioActualTPV']->getRol() !== 'admin') {
-        http_response_code(403);
-        echo json_encode(['ok' => false, 'error' => 'Acceso restringido a administradores']);
-        exit;
+    // Comprobar permisos según la acción
+    $usuario = $_SESSION['usuarioActualTPV'];
+    
+    // Todas las acciones requieren estar autenticado (ya verificado arriba)
+    // Pero solo 'listar' es público para cualquier rol con acceso al TPV
+    if ($accion !== 'listar') {
+        if (!$usuario->tienePermiso('gestionar_productos')) {
+            http_response_code(403);
+            echo json_encode(['ok' => false, 'error' => 'No tienes permiso para realizar operaciones administrativas de productos']);
+            exit;
+        }
     }
 
 
@@ -66,8 +73,9 @@ try {
 
         // Lógica de producto inactivo por defecto si falta precio o stock (solo al añadir)
         if ($accion === 'añadir') {
+            $isPack = !empty($datos['es_pack']);
             $hasPrice = !empty($datos['precio_venta']) && (float)$datos['precio_venta'] > 0;
-            $hasStock = !empty($datos['stock_actual']) && (int)$datos['stock_actual'] > 0;
+            $hasStock = (!empty($datos['stock_actual']) && (int)$datos['stock_actual'] > 0) || $isPack;
             
             if (!$hasPrice || !$hasStock) {
                 $datos['activo'] = 0;
@@ -104,11 +112,18 @@ try {
             $offset = isset($datos['offset']) ? (int)$datos['offset'] : 0;
             $term = isset($datos['term']) ? trim($datos['term']) : '';
             $cat = isset($datos['cat']) ? trim($datos['cat']) : '';
+            $tag = isset($datos['tag']) ? trim($datos['tag']) : '';
+            $estado = isset($datos['estado']) ? trim($datos['estado']) : 'all';
+            $minPrice = isset($datos['minPrice']) ? $datos['minPrice'] : null;
+            $maxPrice = isset($datos['maxPrice']) ? $datos['maxPrice'] : null;
+            $excluirPacks = !empty($datos['excluir_packs']);
+            $sortBy = isset($datos['sort_by']) ? trim($datos['sort_by']) : '';
 
-            $lista = ProductoPDO::listarProductos(false, $limit, $offset, $term, $cat);
-            $total = ProductoPDO::contarProductos(false, $term, $cat);
+            $lista = ProductoPDO::listarProductos(false, $limit, $offset, $term, $cat, $estado, $minPrice, $maxPrice, $tag, $excluirPacks, $sortBy);
+            $total = ProductoPDO::contarProductos(false, $term, $cat, $estado, $minPrice, $maxPrice, $tag, $excluirPacks);
+            $idsAlbaranPendiente = ProductoPDO::idsConAlbaranPendiente();
 
-            $formatted = array_map(function($p) {
+            $formatted = array_map(function($p) use ($idsAlbaranPendiente) {
                 $icono = $p->getIcono();
                 if ($icono && strlen($icono) > 10) {
                     $icono = 'data:image/png;base64,' . base64_encode($icono);
@@ -118,34 +133,48 @@ try {
                     'id' => $p->getId(),
                     'nombre' => $p->getNombre(),
                     'referencia' => $p->getReferencia(),
+                    'descripcion' => $p->getDescripcion(),
                     'icono' => $icono,
                     'es_pack' => (int)$p->isPack(),
-                    'precio_venta' => (float)$p->getPrecioVenta(),
+                    'precio_venta' => $p->getPrecioVenta(),
+                    'precio_coste' => $p->getPrecioCoste(),
+                    'precio_proveedor' => $p->getPrecioProveedor(),
+                    'margen' => (float)$p->getMargen(),
+                    'id_proveedor' => $p->getIdProveedor(),
                     'categoria' => $p->getCategoria(),
+                    'codigo_iva' => $p->getCodigoIva(),
+                    'iva' => (float)$p->getIva(),
                     'stock' => (int)$p->getStockActual(),
                     'stock_minimo' => (int)$p->getStockMinimo(),
+                    'meses_garantia' => (int)$p->getMesesGarantia(),
                     'activo' => (int)$p->getActivo(),
                     'atributos' => $p->getAtributos(),
-                    'componentes_pack' => $p->isPack() ? ProductoPDO::obtenerComponentesPack($p->getId()) : []
+                    'mantener_precision' => (int)$p->getMantenerPrecision(),
+                    'componentes_pack' => $p->isPack() ? ProductoPDO::obtenerComponentesPack($p->getId()) : [],
+                    'albaran_pendiente' => in_array($p->getId(), $idsAlbaranPendiente)
                 ];
             }, $lista);
             echo json_encode(['ok' => true, 'productos' => $formatted, 'total' => $total]);
             break;
 
         case 'añadir':
-            $nuevo = ProductoPDO::añadirProducto($datos);
+            $nuevo = ProductoPDO::agregarProducto($datos);
+            LogPDO::addLog('CREATE_PRODUCTO', "Producto creado: {$nuevo['nombre']}", [
+                'id' => (int)$nuevo['id'], 'nombre' => $nuevo['nombre'], 'referencia' => $nuevo['referencia'],
+            ]);
             echo json_encode([
                 'ok'       => true,
                 'producto' => [
                     'id'       => (int)$nuevo['id'],
-                    'name'     => $nuevo['nombre'],
-                    'codigo'   => $nuevo['referencia'],
-                    'price'    => (float)$nuevo['precio_venta'],
+                    'nombre'   => $nuevo['nombre'],
+                    'referencia' => $nuevo['referencia'],
+                    'precio_venta' => $nuevo['precio_venta'],
                     'icono'    => $nuevo['icono'],
-                    'cat'      => $nuevo['categoria'],
+                    'categoria' => $nuevo['categoria'],
                     'stock'    => !empty($nuevo['es_pack']) ? ProductoPDO::calcularStockPack((int)$nuevo['id']) : (int)$nuevo['stock_actual'],
                     'inactive' => false,
                     'es_pack'  => (int)($nuevo['es_pack'] ?? 0),
+                    'mantener_precision' => (int)($nuevo['mantener_precision'] ?? 0),
                     'componentes_pack' => !empty($nuevo['es_pack']) ? ProductoPDO::obtenerComponentesPack((int)$nuevo['id']) : []
                 ]
             ]);
@@ -155,6 +184,9 @@ try {
             $id = (int)($datos['id'] ?? 0);
             if (!$id) throw new InvalidArgumentException('ID de producto inválido');
             ProductoPDO::editarProducto($id, $datos);
+            LogPDO::addLog('UPDATE_PRODUCTO', "Producto #{$id} actualizado", [
+                'id' => $id, 'nombre' => $datos['nombre'] ?? '',
+            ]);
             echo json_encode(['ok' => true]);
             break;
 
@@ -162,6 +194,7 @@ try {
             $id = (int)($datos['id'] ?? 0);
             if (!$id) throw new InvalidArgumentException('ID de producto inválido');
             ProductoPDO::eliminarProducto($id);
+            LogPDO::addLog('DELETE_PRODUCTO', "Producto #{$id} eliminado", ['id' => $id]);
             echo json_encode(['ok' => true]);
             break;
 
@@ -169,6 +202,9 @@ try {
             $id = (int)($datos['id'] ?? 0);
             if (!$id) throw new InvalidArgumentException('ID de producto inválido');
             $activo = ProductoPDO::toggleBaja($id);
+            LogPDO::addLog('TOGGLE_PRODUCTO', "Producto #{$id} " . ($activo ? 'activado' : 'dado de baja'), [
+                'id' => $id, 'activo' => (bool)$activo,
+            ]);
             echo json_encode(['ok' => true, 'activo' => $activo]);
             break;
 
@@ -190,6 +226,9 @@ try {
             }
             
             MovimientoStockPDO::registrarMovimiento($id, 'ajuste', $cantidad, $idUsuario, $motivo);
+            LogPDO::addLog('AJUSTE_STOCK', "Ajuste de stock en producto #{$id}: " . ($cantidad > 0 ? "+{$cantidad}" : $cantidad), [
+                'id' => $id, 'cantidad' => $cantidad, 'motivo' => $motivo,
+            ]);
             echo json_encode(['ok' => true]);
             break;
 

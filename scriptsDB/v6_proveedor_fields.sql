@@ -1,0 +1,2 @@
+ALTER TABLE proveedores ADD COLUMN condiciones_pago VARCHAR(255) DEFAULT NULL;
+ALTER TABLE proveedores ADD COLUMN plazo_entrega VARCHAR(100) DEFAULT NULL;

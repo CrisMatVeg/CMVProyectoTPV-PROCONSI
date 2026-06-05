@@ -26,17 +26,15 @@ export const AppConfig = {
 export const AppState = {
   // Persistence
   get cart() {
-    try {
-      const saved = localStorage.getItem("tpv_cart");
-      if (!saved) return {};
-      const parsed = JSON.parse(saved);
-      return (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? parsed : {};
-    } catch (e) { return {}; }
+    return typeof window !== 'undefined' && window.cart ? window.cart : {};
   },
   set cart(val) {
+    if (typeof window !== 'undefined') window.cart = val;
     localStorage.setItem("tpv_cart", JSON.stringify(val));
-    // Note: 'cart' in main.js is a 'let' variable (not window.cart),
-    // so we only sync via localStorage. main.js reads from localStorage on next renderCart().
+    if (typeof window !== 'undefined' && typeof window.renderCart === 'function') {
+        // No auto-render explicitly needed here unless AppState sets it from out-of-bounds,
+        // but it's safe since main.js drives the layout.
+    }
   },
 
   // Bridge with legacy globals
@@ -74,14 +72,49 @@ export const AppState = {
   get discountPct() { return window.discountPct || 0; },
   set discountPct(val) { window.discountPct = val; },
 
+  get currentPromo() { return window.currentPromo || null; },
+  set currentPromo(val) { window.currentPromo = val; },
+
+  get esFactura() { return window.esFactura || false; },
+  set esFactura(val) { window.esFactura = val; },
+
   ticketNum: 1001,
-  activeCat: "all",
-  activeAttr: null,
-  searchTerm: "",
-  minPrice: 0,
-  maxPrice: 999999,
-  stockFilter: "all",
-  sortOrder: "name-asc",
+  // Reactivity & Legacy Bridge
+  get searchTerm() { return window.searchTerm || ""; },
+  set searchTerm(val) { window.searchTerm = val; },
+
+  get activeCat() { return window.activeCat || "all"; },
+  set activeCat(val) { window.activeCat = val; },
+
+  get activeTag() { return window.activeTag || null; },
+  set activeTag(val) { window.activeTag = val; },
+
+  get activeAttr() { return window.activeAttr || null; },
+  set activeAttr(val) { window.activeAttr = val; },
+
+  get minPrice() { return window.minPrice || 0; },
+  set minPrice(val) { window.minPrice = val; },
+
+  get maxPrice() { return window.maxPrice || 999999; },
+  set maxPrice(val) { window.maxPrice = val; },
+
+  get stockFilter() { return window.stockFilter || "all"; },
+  set stockFilter(val) { window.stockFilter = val; },
+
+  get sortOrder() { return window.sortOrder || "name-asc"; },
+  set sortOrder(val) { window.sortOrder = val; },
+
+  get offset() { return window.tpvOffset || 0; },
+  set offset(val) { window.tpvOffset = val; },
+
+  get limit() { return window.tpvLimit || 100; },
+  set limit(val) { window.tpvLimit = val; },
+
+  get canLoadMore() { return window.tpvCanLoadMore !== false; },
+  set canLoadMore(val) { window.tpvCanLoadMore = val; },
+
+  get isLoading() { return window.tpvIsLoading || false; },
+  set isLoading(val) { window.tpvIsLoading = val; },
 
   saveCart() {
     localStorage.setItem("tpv_cart", JSON.stringify(this.cart));
@@ -99,6 +132,12 @@ export const AppState = {
     // Clear points state
     this.puntosDescuentoAmt = 0;
     this.puntosCanjeados = 0;
+    this.tipoClienteActual = "particular";
+    this.socioActual = null;
+    this.clienteSeleccionado = null;
+    this.activeTag = null;
+    this.searchTerm = "";
+    
     if (window.currentPayments) {
         window.currentPayments = window.currentPayments.filter(p => p.metodo !== "puntos");
     }
